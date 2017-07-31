@@ -92,11 +92,7 @@ connector.module.ts
 
 In situations where the value or display of a field is dependent on values of preceding fields, the contribution should provide typescripts. It consists of _*.module.ts_ ([Angular Module](https://angular.io/guide/ngmodule)) and _*.ts_ ([Angular Service](https://angular.io/guide/architecture#services))
 
-<ac:structured-macro ac:name="info" ac:schema-version="1" ac:macro-id="c32d1096-1992-444a-9f8d-8ae518bfdf32"><ac:parameter ac:name="title">NOTE</ac:parameter><ac:rich-text-body>
-
-We do not support third-party libraries in typescript code. Recommended using HTTP module wherever possible.
-
-</ac:rich-text-body></ac:structured-macro></div>
+> We do not support third-party libraries in typescript code. Recommended using HTTP module wherever possible.
 
 </td>
 
@@ -126,11 +122,7 @@ Every activity contribution must write the runtime code in **Go** (_activity.g
 
  You can leverage Go testing framework for writing unit test cases(_activity_test.go_) for your contribution runtime.
 
-<ac:structured-macro ac:name="info" ac:schema-version="1" ac:macro-id="fca99ece-cbf2-492c-8e30-6adb7f86dbcd"><ac:parameter ac:name="title">NOTE</ac:parameter><ac:rich-text-body>
-
-No runtime support for connectors. Connectors just provide set of configuration values to the activity.
-
-</ac:rich-text-body></ac:structured-macro></div>
+> No runtime support for connectors. Connectors just provide set of configuration values to the activity.
 
 </td>
 
@@ -1503,11 +1495,6 @@ import {
     IActionResult
 } from "wi-studio/app/contrib/wi-contrib";
 
-
-
-
-
-
 @WiContrib({})
 @Injectable()
 export class ConcatActivityContributionHandler extends WiServiceHandlerContribution {
@@ -1622,8 +1609,178 @@ Like activities, contributing a connector is very easy.
 
 To contribute a connector, create model and typescript files that adhere to following template:
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="c16da4bf-c29a-489c-9b6b-628ac7316d0e"><ac:parameter ac:name="title">connection.json</ac:parameter><ac:plain-text-body>/wi-contributions/<category specified="" in="" display="" configuration="">/connector/<lower case="" connector="" name="">", "ref": "<category specified="" in="" dispay="" configuration="">/connector/<lower case="" connector="" name="">", // One or more configuration fields "settings": [ { // Name of the field "name": "field1", // Type of the field "type": "string", // Is required field. "required": true, // Optional field display configuration. // If present, determines default layout of this field. “display”: { .... } // Default value based on the type "value": "this is default value" } ..... ], // Action buttons to be displayed on the Connector UI "actions": [ { // Display label "name": "Create", // Action Id to be passed to the contribution code "actionId": "create", // Optional button display configuration. // If present, determines default layout of this button. “display”: { .... } } ..... ] }]]></lower></category></lower></category></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="de26a2d1-5395-4d14-a541-aadaf9f0c04e"><ac:parameter ac:name="title">connector.module.ts</ac:parameter><ac:plain-text-body></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="308a8ca6-04c0-4238-b9e6-cc1e2e98f311"><ac:parameter ac:name="title">connector.ts</ac:parameter> <ac:plain-text-body>- Observable for asynchronous reply(HTTP) */ value = (fieldName: string, context: IConnectorContribution): Observable <any>| any => { return null; } /** * Validate the field value and/or update visual appearance of the field or button * Input: * name - Name of the field or action * context - Connector model(connector.json) with latest values * Output: * Observable <ivalidationresult>- In cases where validation depends on external services (e.g. HTTP), return Observable * IValidationResult - Result of validation */ validate = (name: string, context: IConnectorContribution): Observable <ivalidationresult>| IValidationResult => { return null; } /** * Handle actions defined in the connector.json. * Connector configuration can be updated in this method. * Input: * actionId - Action ID associated with the action * context - Connector model(connector.json) with latest values * Output: Either action result or Observable in case of asynchronous operations * IActionResult - For synchronous invocations * Observable <iactionresult>- For asynchronous invocations(e.g. HTTP) */ action = (actionId: string, context: IConnectorContribution): Observable <iactionresult>| IActionResult => { return null; } }]]></iactionresult></iactionresult></ivalidationresult></ivalidationresult></any></ac:plain-text-body></ac:structured-macro>
+**connector.json**
+```json
+{
+    // Unique connector name without spaces or special characters
+    "name": "demo",
+    //Unique connector ID without spaces
+    "title": "Demo Connector",
+    // Name of the author
+    "author": "TIBCO Software Inc.",
+    // Indicates that it is a connector model
+    "type": "flogo:connector",
+    // Version of the connector
+    "version": "1.0.0",
+ 
+    // Connector display configuration
+    "display": {
+       // Connector description
+       "description": "This is TIBCO JDBC connector",
+       // Category under which this connector will be displayed
+       "category": "TIBCO",
+       // Make this connector visible/invisible
+       "visible": true,
+       // Path to the small icon file.
+       // Size Limit:1KB
+       // Format: PNG, SVG
+       "smallIcon": "jdbc-small-icon.png",
+       // Path to the small icon file.
+       // Size Limit: 2KB
+       // Format: PNG, SVG
+       "largeIcon": "jdbc-large-icon.png"
+    },
+ 
+    // ref value must be unique and should not conflict with any other connectors.
+    // It must be category name followed by lower case connector name.
+    // Add your Github repository path in case you are hosting your contributions on github.com
+    // e.g. "github.com/<GITHUB USERNAME>/wi-contributions/<CATEGORY SPECIFIED IN DISPLAY CONFIGURATION>/connector/<LOWER CASE CONNECTOR NAME>",
+    "ref": "<CATEGORY SPECIFIED IN DISPAY CONFIGURATION>/connector/<LOWER CASE CONNECTOR NAME>",
+     
+    // One or more configuration fields
+    "settings": [
+           {
+            // Name of the field
+            "name": "field1",
+  
+            // Type of the field
+            "type": "string",
+  
+            // Is required field.
+            "required": true,
+             
+            // Optional field display configuration.
+            // If present, determines default layout of this field.
+            “display”: {
+              ....
+            }
+             
+            // Default value based on the type
+            "value": "this is default value"
+          }
+          .....
+    ],
+    
+    // Action buttons to be displayed on the Connector UI
+    "actions": [
+          {
+            // Display label
+            "name": "Create",
+            // Action Id to be passed to the contribution code
+            "actionId": "create",
+            // Optional button display configuration.
+            // If present, determines default layout of this button.
+            “display”: {
+              ....
+            }
+          }
 
+          .....
+    ]
+}
+```
+**connector.module.ts**
+```typescript
+import { HttpModule } from "@angular/http";
+import { NgModule } from "@angular/core";
+import { CommonModule } from "@angular/common";
+import {SampleConnectorContributionHandler} from "./connector";
+import {WiServiceContribution} from "wi-studio/app/contrib/wi-contrib";
+
+
+@NgModule({
+  imports: [
+    CommonModule,
+    HttpModule
+  ],
+  providers: [
+    {
+       provide: WiServiceContribution,
+       useClass: SampleConnectorContributionHandler
+     }
+  ]
+})
+
+export default class SampleConnectorModule {
+
+}
+```
+**connector.ts**
+```typescript
+import {Observable} from "rxjs/Observable";
+import {Injectable, Injector, Inject} from "@angular/core";
+import {Http, Response, Headers} from "@angular/http";
+import {
+    WiContrib,
+    WiServiceHandlerContribution,
+    IValidationResult,
+    ValidationResult,
+    IFieldDefinition
+    IActivityContribution,
+    IConnectorContribution
+    ActionResult,
+    IActionResult
+} from "wi-studio/app/contrib/wi-contrib";
+
+@WiContrib({})
+
+@Injectable()
+export class SampleConnectorContributionHandler extends WiServiceHandlerContribution {
+    constructor( @Inject(Injector) injector, @Inject(Http) http) {
+        super(injector, http);
+    }
+
+   /** 
+    * Return a value for the given field.
+    * Input:
+    *        fieldName - Name of the field
+    *        context   - Connector model(connector.json) with latest values
+    * Output: Either a field value or Observable in case of asynchronous operations
+    *   any             - Primitive value or Array of primitive values 
+    *   Observable<any> - Observable for asynchronous reply(HTTP)
+    */ 
+    value = (fieldName: string, context: IConnectorContribution): Observable<any> | any => {
+        return null;
+    }
+ 
+   /** 
+    * Validate the field value and/or update visual appearance of the field or button
+    * Input:
+    *        name     - Name of the field or action
+    *        context  - Connector model(connector.json) with latest values
+    * Output:
+    *       Observable<IValidationResult> - In cases where validation depends on external services (e.g. HTTP), return Observable
+    *       IValidationResult             - Result of validation
+    */
+    validate = (name: string, context: IConnectorContribution): Observable<IValidationResult> | IValidationResult => {
+       return null;
+    }
+
+   /** 
+    * Handle actions defined in the connector.json. 
+    * Connector configuration can be updated in this method.
+    * Input:
+    *        actionId  - Action ID associated with the action
+    *        context   - Connector model(connector.json) with latest values
+    * Output: Either action result or Observable in case of asynchronous operations
+    *        IActionResult             - For synchronous invocations  
+    *        Observable<IActionResult> - For asynchronous invocations(e.g. HTTP)
+    */ 
+    action = (actionId: string, context: IConnectorContribution): Observable<IActionResult> | IActionResult => {
+        return null;
+    }
+}
+```
 Are you ready to develop some real world connectors?
 
 In the next example, we are going to develop a connector for [Amazon Simple Queue Service](https://aws.amazon.com/sqs/) aka SQS. We will also develop two activities that will use SQS connector to send and receive messages from the SQS. 
@@ -1640,31 +1797,540 @@ Lets start with the layout. We will create contribution related files as shown b
 
 Now, lets begin with the connector model.
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="5e25cdc2-5223-4254-acb2-1313476fe6e5"><ac:parameter ac:name="title">connection.json</ac:parameter><ac:plain-text-body></ac:plain-text-body></ac:structured-macro>
-
+**connector.json**
+```typescript
+{
+    "name": "tibco-sqs",
+    "title": "TIBCO SQS Connector",
+    "author": "TIBCO Software Inc.",
+    "type": "flogo:connector",
+    "version": "1.0.0",
+ 
+    "display": {
+       "description": "This is Amazon SQS connector",
+       "category": "AWS",
+       "visible": true,
+       "smallIcon": "sqs-small-icon.png",
+       "largeIcon": "sqs-large-icon.png"
+    },
+ 
+    "ref": "AWS/connector/sqs",
+     
+    "settings": [
+           {
+            "name": "accessKeyId",
+            "type": "string",
+            "required": true,
+            “display”: {
+              "name": "Access Key ID",
+              "description": "AWS Access key ID for the user",
+              // Onlookers should not see your access key id value
+              "type": "password" 
+            }
+          },
+          {
+            "name": "secreteAccessKey",
+            "type": "string",
+            "required": true,
+            “display”: {
+              "name": "Secrete Access Key",
+              "description": "AWS Secrete Access Key for the user",
+              // Onlookers should not see your secrete key value
+              "type": "password" 
+            }
+          },
+          {
+            "name": "region",
+            "type": "string",
+            "required": true,
+            “display”: {
+              "name": "Region",
+              "description": "Name of the region where SQS service is running"
+            }
+          }
+    ],
+    
+    "actions": [
+          {
+            // Lets validate the configuration by querying queues in the given region
+            "name": "Connect",
+            "actionId": "connect",
+            “display”: {
+              // Connect button will be disabled until all configuration values are provided 
+              "readonly": true
+            }
+          }
+    ]
+}
+```
 Now, lets write type script code for SQS connector.
+**connector.module.ts**
+```typescript
+import { HttpModule } from "@angular/http";
+import { NgModule } from "@angular/core";
+import { CommonModule } from "@angular/common";
+import {TibcoSQSConnectorContribution} from "./connector";
+import {WiServiceContribution} from "wi-studio/app/contrib/wi-contrib";
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="5a3594fe-7f0b-4565-a0d3-a2716ed23a99"><ac:parameter ac:name="title">connector.module.ts</ac:parameter><ac:plain-text-body></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="c35b4ecf-544f-473f-9266-e78e154d1ab5"><ac:parameter ac:name="title">connector.ts</ac:parameter> <ac:plain-text-body>| any => { return null; } validate = (name: string, context: IConnectorContribution): Observable <ivalidationresult>| IValidationResult => { if( name === "Connect") { let accessKeyId: IFieldDefinition = context.getField("accessKeyId"); let secreteKey: IFieldDefinition = context.getField("secreteAccessKey"); let region: IFieldDefinition = context.getField("region"); if( accessKeyId.value && secreteKey.value && region.value) { // Enable Connect button return ValidationResult.newValidationResult().setReadonly(false) } } return null; } action = (actionId: string, context: IConnectorContribution): Observable <iactionresult>| IActionResult => { if( actionId == "connect") { let accessKeyId: IFieldDefinition = context.getField("accessKeyId"); let secreteKey: IFieldDefinition = context.getField("secreteAccessKey"); let region: IFieldDefinition = context.getField("region"); AWS.config.update({ region: region.value, credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value) }); let sqs = new AWS.SQS(); let params = {}; sqs.listQueues(params, function(err, data) { if (err) { return ActionResult.newResult().setError("Failed to connect to SQS service due to error: ".concat(err)); } else { return ActionResult.newResult().setError("Successfully connected to SQS service"); } }); } return null; } }]]></iactionresult></ivalidationresult></ac:plain-text-body></ac:structured-macro>
+@NgModule({
+  imports: [
+  	CommonModule,
+  	HttpModule,
+  ],
+  providers: [
+    {
+       provide: WiServiceContribution,
+       useClass: TibcoSQSConnectorContribution
+     }
+  ]
+})
 
+export default class TibcoSQSConnectorModule {
+
+}
+```
+**connector.ts**
+```typescript
+import {AWS} from 'aws-sdk';
+
+import {Observable} from "rxjs/Observable";
+import {Injectable, Injector, Inject} from "@angular/core";
+import {Http, Response, Headers} from "@angular/http";
+import {
+    WiContrib,
+    WiServiceHandlerContribution,
+    IValidationResult,
+    ValidationResult,
+    IFieldDefinition
+    IActivityContribution,
+    IConnectorContribution
+    ActionResult,
+    IActionResult
+} from "wi-studio/app/contrib/wi-contrib";
+
+
+@WiContrib({})
+
+@Injectable()
+export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution {
+    constructor( @Inject(Injector) injector) {
+        super(injector);
+    }
+
+   
+    value = (fieldName: string, context: IConnectorContribution): Observable<any> | any => {
+        return null;
+    }
+ 
+    validate = (name: string, context: IConnectorContribution): Observable<IValidationResult> | IValidationResult => {
+      if( name === "Connect") {
+         let accessKeyId: IFieldDefinition = context.getField("accessKeyId");
+         let secreteKey: IFieldDefinition = context.getField("secreteAccessKey");
+         let region: IFieldDefinition = context.getField("region");
+         if( accessKeyId.value && secreteKey.value && region.value) {
+            // Enable Connect button
+            return ValidationResult.newValidationResult().setReadonly(false)
+         }
+      }
+       return null;
+    }
+
+    action = (actionId: string, context: IConnectorContribution): Observable<IActionResult> | IActionResult => {
+       if( actionId == "connect") {
+         let accessKeyId: IFieldDefinition = context.getField("accessKeyId");
+         let secreteKey: IFieldDefinition = context.getField("secreteAccessKey");
+         let region: IFieldDefinition = context.getField("region");
+         AWS.config.update({
+               region: region.value,
+               credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value)
+         });
+         let sqs = new AWS.SQS();
+         let params = {};
+		 sqs.listQueues(params, function(err, data) {
+  		    if (err) {
+    		   return ActionResult.newResult().setError("Failed to connect to SQS service due to error: ".concat(err));
+  		    } else {
+    		  return ActionResult.newResult().setError("Successfully connected to SQS service");
+  		    }
+		 });
+       }
+       return null;
+    }
+}
+```
 Now, lets create the activity that will send a message on the queue.
 
 Lets begin with the model. We will refer [http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html) to model our activity.
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="5594159e-3835-40c4-af08-be667892648f"><ac:parameter ac:name="title">activity.json</ac:parameter><ac:plain-text-body>": { // DataType: "", // StringValue: "" // }, // "<attrubute2name>": { // DataType: "", // StringValue: "" // }, // ... //} "name": "MessageAttribute", "type": "complex_type", "required": false, "display": { "name": "Message Attributes", "description": "Set message attributes", "type": "texteditor", "syntax": "json", "mappable": true }, //Sample attributes that users can update "value": { "metadata": "", "value": "{ \"Attr1\": {DataType: \"String\",StringValue: \"value1\"},\"Attr2\": {DataType: \"String\",StringValue: \"value2\"}}" }, { "name": "DelaySeconds", "type": "number", "required": false }, { "name": "MessageBody", "type": "string", "required": true } ], "outputs": [ { "name": "MessageId", "type": "string" } ] }]]></attrubute2name></ac:plain-text-body></ac:structured-macro>
+**activity.json**
+```json
+{
+    "name": "sqssendmessage",
+    "version": "1.0.0",
+    "author": "TIBCO Software Inc.",
+    "type": "flogo:activity",
+    "title": "Send SQS Message",
+     
+    "display": {
+       "category": "AWS",
+       "visible": true,
+       "smallIcon": "sqssendmessage-small-icon.png",
+       "largeIcon": "sqssendmessage-large-icon.png",
+       "description": "This activity sends a message to the queue",
+    },
+ 
+    "ref": "AWS/activity/sqssendmessage",
+    "inputs": [
+           {
+            //Select SQS connection from the list
+            "name": "sqsConnection",
+            "type": "object",
+            "required": true,
+            "display":{
+              "name": "SQS Connection",
+              "description": "Select SQS Connection",
+              "type": "connection"
+            },
+            "allowed":[]
+           },
+           {
+            //Select Queue URL from the list
+            "name": "queueUrl",
+            "type": "string",
+            "required": true,
+            "display":{
+              "name": "Queue URL",
+              "description": "Select Queue URL"
+            },
+            "allowed":[]
+           },
+           {
+            //Set message attributes
+            //JSON should be in the below format
+            //{
+  			//	"<Attrubute1Name>": {
+    		//		DataType: "",
+    		//		StringValue: ""
+   			//	},
+  			// "<Attrubute2Name>": {
+    		//		DataType: "",
+    		//		StringValue: ""
+   			//	},
+  			//	...
+ 			//}
+            "name": "MessageAttribute",
+            "type": "complex_type",
+            "required": false,
+            "display": {
+               "name": "Message Attributes",
+               "description": "Set message attributes",
+               "type": "texteditor",
+               "syntax": "json",
+               "mappable": true
+            },
+            //Sample attributes that users can update
+            "value": {
+              "metadata": "",
+              "value": "{ \"Attr1\": {DataType: \"String\",StringValue: \"value1\"},\"Attr2\": {DataType: \"String\",StringValue: \"value2\"}}"
+           },
+           {
+            "name": "DelaySeconds",
+            "type": "number",
+            "required": false
+           },
+           {
+            "name": "MessageBody",
+            "type": "string",
+            "required": true
+           }
+    ],
+  
+    "outputs": [
+           {
+            "name": "MessageId",
+            "type": "string"
+          }
+    ]
+}
+```
 
 Now, lets create type script code to fetch SQS connection and Queue URLs.
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="840a511c-e59e-4073-abe7-08848e337735"><ac:parameter ac:name="title">activity.module.ts</ac:parameter><ac:plain-text-body></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="3903dc13-2619-4857-8daa-93f648eaf5ef"><ac:parameter ac:name="title">activity.ts</ac:parameter> <ac:plain-text-body>| any => { if(fieldName === "sqsConnection") { //Connector ID must match with the name defined in connector.json return ConnectorUtils.getConnectionNames("tibco-sqs"); } else if(fieldName === "queueUrl") { let connectionField: IFieldDefinition = context.getField("sqsConnection"); // Read connection name if(connectionField.value) { //Read connection configuration let connectionConfig: IConnectionContribution = ConnectorUtils.getConnectionConfiguration(connectionField.value); if(connectionConfig) { let accessKeyId: IFieldDefinition = connectionConfig.getField("accessKeyId"); let secreteKey: IFieldDefinition = connectionConfig.getField("secreteAccessKey"); let region: IFieldDefinition = connectionConfig.getField("region"); AWS.config.update({ region: region.value, credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value) }); let sqs = new AWS.SQS(); let params = {}; sqs.listQueues(params, function(err, data) { if (err) { return string[]; } else { return data.QueueUrls; } }); } } } return null; } validate = (fieldName: string, context: IActivityContribution): Observable <ivalidationresult>| IValidationResult => { if(fieldName === "sqsConnection") { let connection: IFieldDefinition = context.getField("sqsConnection") if (connection.value === null) { return ValidationResult.newValidationResult().setError("SQS Connection must be configured"); } } else if(fieldName === "queueUrl") { let queueUrl: IFieldDefinition = context.getField("queueUrl") if (queueUrl.value === null) { return ValidationResult.newValidationResult().setError("Queue URL must be configured"); } } return null; } }]]></ivalidationresult></ac:plain-text-body></ac:structured-macro>
+**activity.module.ts**
+```typescript
+import { HttpModule } from "@angular/http";
+import { NgModule } from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { SQSSendMessageActivityContributionHandler} from "./activity";
+import { WiServiceContribution} from "wi-studio/app/contrib/wi-contrib";
 
+
+@NgModule({
+  imports: [
+  	CommonModule,
+  	HttpModule,
+  ],
+  providers: [
+    {
+       provide: WiServiceContribution,
+       useClass: SQSSendMessageActivityContributionHandler
+     }
+  ]
+})
+
+export default class ConcatActivityModule {
+
+}
+```
+**activity.ts**
+```typescript
+import {Observable} from "rxjs/Observable";
+import {Injectable, Injector, Inject} from "@angular/core";
+import {Http, Response, Headers} from "@angular/http";
+import {
+    WiContrib,
+    WiServiceHandlerContribution,
+    IValidationResult,
+    ValidationResult,
+    IFieldDefinition
+    IActivityContribution,
+    IConnectorContribution
+    ActionResult,
+    IActionResult,
+    ConnectorUtils,
+    CORSUtils
+} from "wi-studio/app/contrib/wi-contrib";
+import {AWS} from 'aws-sdk';
+
+@WiContrib({})
+@Injectable()
+export class SQSSendMessageActivityContributionHandler extends WiServiceHandlerContribution {
+    constructor( @Inject(Injector) injector) {
+        super(injector);
+    }
+
+    value = (fieldName: string, context: IActivityContribution): Observable<any> | any => {
+        if(fieldName === "sqsConnection") {
+           //Connector ID must match with the name defined in connector.json
+           return ConnectorUtils.getConnectionNames("tibco-sqs");
+        } else if(fieldName === "queueUrl") {
+           let connectionField: IFieldDefinition = context.getField("sqsConnection");
+           // Read connection name 
+           if(connectionField.value) {
+            //Read connection configuration
+            let connectionConfig: IConnectionContribution = ConnectorUtils.getConnectionConfiguration(connectionField.value);
+            if(connectionConfig) {
+               	let accessKeyId: IFieldDefinition = connectionConfig.getField("accessKeyId");
+         		let secreteKey: IFieldDefinition = connectionConfig.getField("secreteAccessKey");
+         		let region: IFieldDefinition = connectionConfig.getField("region");
+         		AWS.config.update({
+               		region: region.value,
+               		credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value)
+         		});
+         		let sqs = new AWS.SQS();
+         		let params = {};
+		 		sqs.listQueues(params, function(err, data) {
+  		 	   		if (err) {
+    		   			return string[];
+  		    		} else {
+    		  			return data.QueueUrls;
+  		    		}
+		 		});
+            }
+           }
+        } 
+        return null;
+    }
+ 
+    validate = (fieldName: string, context: IActivityContribution): Observable<IValidationResult> | IValidationResult => {
+       if(fieldName === "sqsConnection") {
+         let connection: IFieldDefinition = context.getField("sqsConnection") 
+         if (connection.value === null) {
+              return ValidationResult.newValidationResult().setError("SQS Connection must be configured");
+         }
+       } else if(fieldName === "queueUrl") {
+         let queueUrl: IFieldDefinition = context.getField("queueUrl") 
+         if (queueUrl.value === null) {
+              return ValidationResult.newValidationResult().setError("Queue URL must be configured");
+         }
+       }
+      return null; 
+    }
+}
+```
 Now, lets write runtime for the activity.
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="8a5ab5f4-4a88-417e-a868-a91867478555"><ac:parameter ac:name="title">activity.go</ac:parameter><ac:plain-text-body></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="e8d5fc27-8082-4e4b-8c30-4fc9ec85e71b"><ac:parameter ac:name="title">activity_test.go</ac:parameter><ac:plain-text-body>" dummyConnectionData["secreteAccessKey"] = "<your secrete="" access="" key="">" dummyConnectionData["region"] = "<region name="" where="" sqs="" is="" running="">" tc.SetInput(ivConnection, dummyConnectionData) tc.SetInput(ivQueueUrl, <your sqs="" queue="" url="">) tc.SetInput(ivMessageBody, "Message from TIBCO") done, err := act.Eval(tc) assert.Nil(t, err) }]]></your></region></your></ac:plain-text-body></ac:structured-macro>
+**activity.go**
+```go
+package sqssendmessage
 
+import (
+	"github.com/TIBCOSoftware/flogo-lib/core/activity"
+	"github.com/TIBCOSoftware/flogo-lib/logger"
+    "github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/aws/credentials"
+    "github.com/aws/aws-sdk-go/aws/session"
+    "github.com/aws/aws-sdk-go/service/sqs"
+    "github.com/TIBCOSoftware/flogo-lib/core/data"
+)
+
+const (
+	ivConnection         = "sqsConnection"
+	ivQueueUrl           = "queueUrl"
+    ivMessageAttributes  = "MessageAttributes"
+    ivDelaySeconds       = "DelaySeconds"
+    ivMessageBody        = "MessageBody"
+    ovMessageId          = "MessageId"
+)
+
+var activityLog = logger.GetLogger("aws-activity-sqssendmessage")
+
+type SQSSendMessageActivity struct {
+	metadata *activity.Metadata
+}
+
+func NewActivity(metadata *activity.Metadata) activity.Activity {
+	return &SQSSendMessageActivity{metadata: metadata}
+}
+
+func (a *SQSSendMessageActivity) Metadata() *activity.Metadata {
+	return a.metadata
+}
+func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err error) {
+    activityLog.Info("Executing SQS Send Message activity")
+    //Read Inputs
+    if context.GetInput(ivConnection) == nil {
+      return false, activity.NewError("SQS connection is not configured", "SQS-SENDMESSAGE-4001", nil)
+    }
+    
+    if context.GetInput(ivQueueUrl) == nil {
+      return false, activity.NewError("SQS Queue URL is not configured", "SQS-SENDMESSAGE-4002", nil)
+    }
+    
+    if context.GetInput(ivMessageBody) == nil {
+      return false, activity.NewError("Message body is not configured", "SQS-SENDMESSAGE-4003", nil)
+    }
+
+
+    //Read connection details
+    connectionInfo := context.GetInput(ivConnection).(map[string]interface{})
+    session, err := session.NewSession(aws.NewConfig().WithRegion(connectionInfo["region"].(string)).WithCredentials(credentials.NewStaticCredentials(connectionInfo["accessKeyId"].(string), connectionInfo["secreteAccessKey"].(string), "")))
+    if err != nil {
+      return false, activity.NewError(fmt.Sprintf("Failed to connect to AWS due to error:%s. Check credentials configured in the connection:%s.",err.Error(),connectionInfo["name"].(string)), "SQS-SENDMESSAGE-4004", nil)
+    }
+    //Create SQS service instance
+    sqsSvc := sqs.New(session)
+    sendMessageInput := &sqs.SendMessageInput{}
+    sendMessageInput.QueueUrl = aws.String(context.GetInput(ivQueueUrl).(string))
+    sendMessageInput.MessageBody = aws.String(context.GetInput(ivMessageBody).(string))
+    
+    messageAttributes := context.GetInput(ivMessageAttributes).(*data.ComplexObject)
+    if context.GetInput(ivMessageAttributes) != nil {
+      //Add message attributes
+      messageAttributes := context.GetInput(ivMessageAttributes).(*data.ComplexObject)
+      attrs := make(map[string]*sqs.MessageAttributeValue, len(messageAttributes.Value))
+      for k, v := range messageAttributes.Value { 
+        attrs[k] = &sqs.MessageAttributeValue{
+          DataType: aws.String(v["DataType"].(string)),
+          StringValue:  aws.String(v["StringValue"].(string)),
+        }
+      }
+      sendMessageInput.MessageAttributes = attrs
+    }
+
+    delaySeconds := context.GetInput(ivDelaySeconds)
+    if delaySeconds != nil {
+      sendMessageInput.DelaySeconds = aws.Int64(delaySeconds.(int64))
+    }
+
+    //Send message to SQS
+    response, err1 := sqsSvc.SendMessage(sendMessageInput)
+    if err1 != nil {
+       return false, activity.NewError(fmt.Sprintf("Failed to send message to SQS due to error:%s",err1.Error()), "SQS-SENDMESSAGE-4005", nil)
+    }
+
+    //Set Message ID in the output
+    context.SetOutput(ovMessageId,*response.MessageId)    
+	return true, nil
+}
+```
+**activity_test.go**
+```go
+
+    response, err1 := sqsSvc.SendMessage(sendMessageInput)
+    if err1 != nil {
+       return false, activity.NewError(fmt.Sprintf("Failed to send message to SQS due to error:%s",err1.Error()), "SQS-SENDMESSAGE-4005", nil)
+    }
+
+    //Set Message ID in the output
+    context.SetOutput(ovMessageId,*response.MessageId)    
+	return true, nil
+}
+
+
+package sqssendmessage
+
+import (
+	"testing"
+	"github.com/TIBCOSoftware/flogo-contrib/action/flow/test"
+	"github.com/TIBCOSoftware/flogo-lib/core/activity"
+    "github.com/stretchr/testify/assert"
+	"io/ioutil"
+    "github.com/TIBCOSoftware/flogo-lib/core/data" 
+)
+
+var activityMetadata *activity.Metadata
+var connectionData = ``
+func getActivityMetadata() *activity.Metadata {
+	if activityMetadata == nil {
+		jsonMetadataBytes, err := ioutil.ReadFile("activity.json")
+		if err != nil {
+			panic("No Json Metadata found for activity.json path")
+		}
+		activityMetadata = activity.NewMetadata(string(jsonMetadataBytes))
+	}
+	return activityMetadata
+}
+
+func TestActivityRegistration(t *testing.T) {
+	act := NewActivity(getActivityMetadata())
+	if act == nil {
+		t.Error("Activity Not Registered")
+		t.Fail()
+		return
+	}
+}
+
+func TestEval(t *testing.T) {
+	act := NewActivity(getActivityMetadata())
+	tc := test.NewTestActivityContext(act.Metadata())
+
+
+    dummyConnectionData := make(map[string]string, 4)
+    //Use your AWS information
+    dummyConnectionData["name"] = "My SQS Connection"
+    dummyConnectionData["accesskeyId"] = "<YOUR ACCESS KEY ID>"
+    dummyConnectionData["secreteAccessKey"] = "<YOUR SECRETE ACCESS KEY>"
+    dummyConnectionData["region"] = "<REGION NAME WHERE SQS IS RUNNING>"
+
+
+	tc.SetInput(ivConnection, dummyConnectionData)
+    tc.SetInput(ivQueueUrl, <YOUR SQS QUEUE URL>)
+    tc.SetInput(ivMessageBody, "Message from TIBCO")
+
+
+	done, err := act.Eval(tc)
+    assert.Nil(t, err)
+}
+```
 Now, lets create the activity that will receive a message from the queue.
 
 Lets begin with the model. We will refer [http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html) to model our activity.
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="72fb730a-a8c1-45d5-a4a8-da0b8a53970a"><ac:parameter ac:name="title">activity.json</ac:parameter><ac:plain-text-body></ac:plain-text-body></ac:structured-macro>
+**activity.json**
+```json
+
+```
 
 Now, lets create type script code to fetch SQS connection and Queue URLs.
 
