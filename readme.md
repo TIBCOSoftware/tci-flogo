@@ -155,7 +155,7 @@ where,
 It is very easy to develop an activity for Web Integrator. Just create the model and runtime files that adhere to following templates:
 
 **activity.json**
-```
+```json
 {
     //Unique activity name without spaces or special characters
     "name": "demo",
@@ -247,7 +247,7 @@ It is very easy to develop an activity for Web Integrator. Just create the mode
 }
 ```
 **activity.go**
-```
+```go
 package demo
  
 import (
