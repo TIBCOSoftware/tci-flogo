@@ -90,7 +90,7 @@ connector.module.ts
 
 <div class="content-wrapper">
 
-In situations where the value or display of a field is dependent on values of preceding fields, the contribution should provide typescripts. It consists of _*.module.ts_ ([Angular Module](https://angular.io/guide/ngmodule)) and _*.ts_ ([Angular Service](https://angular.io/guide/architecture#services))
+In situations where the value or display of a field is dependent on values of preceding fields, the contribution should provide typescripts. It consists of _\*.module.ts_ ([Angular Module](https://angular.io/guide/ngmodule)) and _\*.ts_ ([Angular Service](https://angular.io/guide/architecture#services))
 
 > We do not support third-party libraries in typescript code. Recommended using HTTP module wherever possible.
 
@@ -118,24 +118,17 @@ activity_test.go
 
 <div class="content-wrapper">
 
-Every activity contribution must write the runtime code in **Go** (_activity.go)._
+Every activity contribution must write the runtime code in **Go** (_activity.go_).
 
  You can leverage Go testing framework for writing unit test cases(_activity_test.go_) for your contribution runtime.
 
 > No runtime support for connectors. Connectors just provide set of configuration values to the activity.
-
 </td>
-
 </tr>
-
 </tbody>
-
 </table>
 
-## Contribution layout
-
-* * *
-
+## Contribution Layout 
 Your contributions must follow below folder layout.
 
 ![](images/layout.png)
@@ -154,8 +147,6 @@ Follow below steps to setup your developement enviornment.
 - Runtime: Checkout [flogo-lib](https://github.com/TIBCOSoftware/flogo-lib) and [flogo-contrib](https://github.com/TIBCOSoftware/flogo-contrib) from [Project Flogo](http://www.flogo.io/) and add them into your $GOPATH.
 
 ## Activity Contribution
-
-* * *
 
 It is very easy to develop an activity for Web Integrator. Just create the model and runtime files that adhere to following templates:
 
@@ -546,7 +537,7 @@ func TestEval(t *testing.T) {
 }
 ```
 
-You can test your runtime code against <span>Open Source</span> [Flogo](http://www.flogo.io/) code.
+You can test your runtime code against [Project Flogo](http://www.flogo.io/) code.
 
 *   Ensure $GOPATH variable is set
 *   Ensure your <Category> folder is added to the <span>$GOPATH</span>
@@ -562,15 +553,12 @@ And your _**Concat**_ activity is ready for the use in Web Integrator. Wasn't th
 
 ## Upload your contribution to TIBCO Cloud Integration
 
-* * *
 
 Once contribution is ready, you can upload it using your TCI account.
 
 **WIP**
 
 ## Advanced Configuration
-
-* * *
 
 What we have seen so far is a very simple contribution. How about an activity that displays a dropdown list or displays input/output structure based on a JSON schema?
 
@@ -1606,8 +1594,6 @@ func (a *ConcatActivity) Eval(context activity.Context) (done bool, err error) {
 
 ```
 ## Connector Contribution
-
-* * *
 
 Do you need to integrate with a SAAS service?  Then, you would need a connector to manage connectivity with the SAAS provider.
 
