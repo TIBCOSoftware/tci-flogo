@@ -304,7 +304,7 @@ The activity UI is divided into following 5 main sections. Based on definition i
 
 <td>Configuration</td>
 
-<td>Any input field with __display__ configuration.</td>
+<td>Any input field with <b>display</b> configuration.</td>
 
 <td colspan="1">
 
@@ -325,7 +325,7 @@ The activity UI is divided into following 5 main sections. Based on definition i
 
 <td>Input</td>
 
-<td><span>Any input field with no</span> **display** <span>configuration. It is mapper section where output values from previous activities can be mapped to the field value.</span></td>
+<td>Any input field with no <b>display</b> configuration. It is mapper section where output values from previous activities can be mapped to the field value.</td>
 
 <td colspan="1">
 
@@ -343,9 +343,9 @@ The activity UI is divided into following 5 main sections. Based on definition i
 
 <td>Input Settings</td>
 
-<td><span>Any input field that has a **display** configuration and contributes a schema to the Input section for the value mapping. The **mappable** flag must be set to true.</span></td>
+<td>Any input field that has a <b>display</b> configuration and contributes a schema to the Input section for the value mapping. The <b>mappable</b> flag must be set to true.</td>
 
-<td colspan="1">
+<td colspan="2">
 
 {  
  "name": "field1",  
@@ -368,7 +368,7 @@ The activity UI is divided into following 5 main sections. Based on definition i
 
 <td>Output</td>
 
-<td><span>Any output field with no</span> **display** <span>configuration. This field value can be used in <span>the Input section</span> of downstream activities in the flow.</span></td>
+<td>Any output field with no <b>display</b> configuration. This field value can be used in the Input section of downstream activities in the flow.</td>
 
 <td colspan="1">
 
@@ -387,9 +387,9 @@ The activity UI is divided into following 5 main sections. Based on definition i
 
 <td colspan="1">Output Settings</td>
 
-<td colspan="1"><span>Any output field that has a</span> **display** <span>configuration and contributes a schema to the Output section. <span>This field value can be used in the Input section of downstream activities in the flow.</span></span></td>
+<td>Any output field that has a <b>display</b> configuration and contributes a schema to the Output section. This field value can be used in the Input section of downstream activities in the flow.</td>
 
-<td colspan="1">
+<td colspan="2">
 
 {  
 "name": "output",  
