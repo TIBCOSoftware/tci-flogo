@@ -645,9 +645,7 @@ Lets understand runtime datatypes that you can set to your fields in the model j
 
 <div class="content-wrapper">
 
-data.ComplexObject
-
-Refer [https://github.com/TIBCOSoftware/flogo-lib/blob/master/core/data/data.go](https://github.com/TIBCOSoftware/flogo-lib/blob/master/core/data/data.go)
+[data.ComplexObject](https://godoc.org/github.com/TIBCOSoftware/flogo-lib/core/data#ComplexObject)
 
 </div>
 
