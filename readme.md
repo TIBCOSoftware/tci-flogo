@@ -302,51 +302,60 @@ The activity UI is divided into following 5 main sections. Based on definition i
 
 <tr>
 
-<td>**Configuration**</td>
+<td>Configuration</td>
 
-<td>Any input field with **display** configuration.</td>
+<td>Any input field with __display__ configuration.</td>
 
-<td><span>{</span>  
-<span>"name": "field1",</span>  
-<span>"type": "string",</span>  
-<span>"required": true,</span>  
-**“display”: {**  
-**....**  
+<td colspan="1">
+
+{  
+ "name": "field1",  
+ "type": "string",  
+ "required": true,  
+**"display": {** 
+
+ **....** 
+ 
 **}**  
-<span>}</span></td>
-
+}
+</td>
 </tr>
 
 <tr>
 
-<td>**Input**</td>
+<td>Input</td>
 
 <td><span>Any input field with no</span> **display** <span>configuration. It is mapper section where output values from previous activities can be mapped to the field value.</span></td>
 
-<td><span>{</span>  
-<span>"name": "field1",</span>  
-<span>"type": "string",</span>  
-<span>"required": true</span>  
-<span>}</span></td>
+<td colspan="1">
 
+{  
+ "name": "field1",
+ 
+ "type": "string",
+ 
+ "required": true  
+}
+</td>
 </tr>
 
 <tr>
 
-<td>**Input Settings**</td>
+<td>Input Settings</td>
 
 <td><span>Any input field that has a **display** configuration and contributes a schema to the Input section for the value mapping. The **mappable** flag must be set to true.</span></td>
 
-<td>
+<td colspan="1">
 
-<span>{</span>  
-<span>"name": "field1",</span>  
-<span>"type": "string",</span>  
-<span>"required": true,</span>  
-**“display”: {**  
-**....**
+{  
+ "name": "field1",  
+ "type": "string", 
+ "required": true, 
+**"display": {**  
 
-"mappable": true  
+ **....**,
+ 
+ **"mappable": true**
 **}**
 
 }
@@ -357,21 +366,26 @@ The activity UI is divided into following 5 main sections. Based on definition i
 
 <tr>
 
-<td>**Output**</td>
+<td>Output</td>
 
 <td><span>Any output field with no</span> **display** <span>configuration. This field value can be used in <span>the Input section</span> of downstream activities in the flow.</span></td>
 
-<td><span>{</span>  
-<span>"name": "output",</span>  
-<span>"type": "string",</span>  
-<span>"required": true</span>  
-<span>}</span></td>
+<td colspan="1">
 
+{  
+ "name": "output",
+ 
+ "type": "string", 
+ 
+ "required": true  
+}
+
+</td>
 </tr>
 
 <tr>
 
-<td colspan="1">**Output Settings**</td>
+<td colspan="1">Output Settings</td>
 
 <td colspan="1"><span>Any output field that has a</span> **display** <span>configuration and contributes a schema to the Output section. <span>This field value can be used in the Input section of downstream activities in the flow.</span></span></td>
 
@@ -381,7 +395,7 @@ The activity UI is divided into following 5 main sections. Based on definition i
 "name": "output",  
 "type": "string",  
 "required": true,  
-**“display”: {**  
+**"display": {**  
 **....**
 
 **}**
@@ -715,15 +729,18 @@ Now, lets understand various display configurations that are applicable to contr
 
 </td>
 
-<td colspan="1">{  
+<td colspan="1">
+
+{  
 "name": "method",  
 "type": "string",  
-"required": true,  
-**“display”: {**  
-**“visible”:false**  
-**}**  
+**"display": {**  
+**"visible": false**   
+**}**,   
+"required": true  
 "value": "GET"  
-}</td>
+}
+</td>
 
 </tr>
 
@@ -738,21 +755,21 @@ Now, lets understand various display configurations that are applicable to contr
 “display”: {
 
 "readonly": true
-
 }
 
 </td>
 
-<td colspan="1">{  
+<td colspan="1">
+
+{  
 "name": "method",  
 "type": "string",  
-"required": true,  
-**“display”: {**  
-**“readonly”:true**  
-**},**  
-"value": "GET"  
-}</td>
-
+**"display": {**  
+**"readonly": true**   
+**}**,   
+"required": true  
+}
+</td>
 </tr>
 
 <tr>
@@ -771,22 +788,24 @@ Now, lets understand various display configurations that are applicable to contr
 <td colspan="1">
 
 “display”: {  
-"name": <DISPLAY LABEL>,  
-"description":<DESCRIPTION>  
+"name": \<DISPLAY LABEL\>,  
+"description": \<DESCRIPTION\>  
 }
 
 </td>
 
-<td colspan="1"><span>{</span>  
-<span>"name": "url",</span>  
-<span>"type": "string",</span>  
-<span>"required": true,</span>  
-**“display”: {**  
-****"name":"URL",**  
-**"description": "Enter service URL"****  
-**}**  
-<span>}</span></td>
+<td colspan="1">
 
+{  
+"name": "url",  
+"type": "string",  
+**"display": {**  
+**"name": "URL",**  
+**"description": "Select service URL"**  
+**}**,   
+"required": true  
+}
+</td>
 </tr>
 
 <tr>
@@ -806,9 +825,8 @@ Users will be presented with True or False choice.
 <td colspan="1">
 
 “display”: {  
-"name": <DISPLAY LABEL>,  
-"description":<DESCRIPTION>
-
+"name": \<DISPLAY LABEL\>,  
+"description":\<DESCRIPTION\>
 }
 
 "value": <DEFAULT CHOICE>
@@ -821,10 +839,9 @@ Users will be presented with True or False choice.
 "name": "logheaders",  
 "type": "boolean",  
 "required": true,  
-**“display”: {**  
-****"name":"Log Incoming headers ",**  
-**"description": "Log incoming headers"****
-
+**"display": {**  
+**"name":"Log Incoming headers ",**  
+**"description": "Log incoming headers"**
 **}**
 
 "value": false  
@@ -851,8 +868,8 @@ The field value would be a comma separated string of all options selected by the
 <td colspan="1">
 
 <span>“display”: {</span>  
-<span>"name": <DISPLAY LABEL>,</span>  
-<span>"description":<DESCRIPTION>,</span>
+<span>"name": \<DISPLAY LABEL\>,</span>  
+<span>"description":\<DESCRIPTION>,</span>
 
 "type": "checkbox"  
 <span>}</span>
@@ -877,7 +894,7 @@ The field value would be a comma separated string of all options selected by the
 
 **}**
 
-"allowed": ["Monday", "Wednesday", "Friday"]
+"allowed": ["Monday", "Wednesday", "Friday"],
 
 "value": "Monday"  
 <span>}</span>
@@ -903,13 +920,13 @@ The field type must be **string**.
 <div class="content-wrapper">
 
 “display”: {  
-"name": <DISPLAY LABEL>,  
-"description":<DESCRIPTION>,  
+"name": \<DISPLAY LABEL\>,  
+"description": \<DESCRIPTION\>,  
 "type": "dropdown",  
-"selection": "<single | multi>"  
+"selection": "\<single | multi\>"  
 }  
-"allowed":[<ZERO OR MORE ITEMS>]  
-"value": <DEFAULT VALUE TO BE SELECTED>
+"allowed":[\<ZERO OR MORE ITEMS\>]  
+"value": \<DEFAULT VALUE TO BE SELECTED\>
 
 </div>
 
@@ -921,10 +938,10 @@ The field type must be **string**.
 "name": "method",  
 "type": "string",  
 "required": true,  
-**“display”: {**  
+**"display": {**  
 **"name":"Method",**  
 **"description": "The REST method used for the requests",**  
-**“type”:”dropdown”,**  
+**"type":"dropdown",**  
 **“selection”:”single”**  
 **},**  
 "allowed": ["GET","POST","PUT","DELETE"],  
@@ -937,11 +954,11 @@ The field type must be **string**.
 "name": "businessobjects",  
 "type": "string",  
 "required": true,  
-**“display”: {**  
+**"display": {**  
 **"name":"Business Objects",**  
 **"description": "The Salesforce Business Objects for given connection",**  
-**“type”:”dropdown”,**  
-**“selection”:”single”**  
+**"type":"dropdown",**  
+**"selection":"single"**  
 **}**,  
 "allowed": []  
 }
@@ -965,13 +982,13 @@ The field type must be **string**.
 <td>
 
 “display”: {  
-"name": <DISPLAY LABEL>,
+"name": \<DISPLAY LABEL\>,
 
-"description":<DESCRIPTION>,
+"description": \<DESCRIPTION\>,
 
 "type": "fileselector",
 
-"fileExtensions":[<ONE OR MORE FILE EXTENSIONS>]
+"fileExtensions":[\<ONE OR MORE FILE EXTENSIONS\>]
 
 }
 
@@ -1014,8 +1031,8 @@ The connection configuration will be stored in this field for the runtime.
 "type": "object",  
 "display": {  
 "type":"connection",  
-"name":<DISPLAY LABEL>,  
-"description": <DESCRIPTION>  
+"name": \<DISPLAY LABEL\>,  
+"description": \<DESCRIPTION\>  
 },
 
 <span>"allowed":[]</span>
@@ -1056,12 +1073,12 @@ The field type must be **array**.
 
 "display": {  
 “type”: "table",  
-“name”:<DISPLAY LABEL>,  
-"description": <DESCRIPTION>,  
-"schema": <JSON BASED TABLE SCHEMA>
+“name”: \<DISPLAY LABEL\>,  
+"description": \<DESCRIPTION\>,  
+"schema": \<JSON BASED TABLE SCHEMA\>
 
 },  
-"value":[{<DEFAULT VALUE1>},{<<span>DEFAULT VALUE2</span>>}, ...]
+"value":[{\<DEFAULT VALUE1\>},{\<DEFAULT VALUE2\>}, ...]
 
 </td>
 
@@ -1074,13 +1091,8 @@ The field type must be **array**.
 **“type”: "table",**  
 **“name”:”Pick Books”,**  
 **"description": "The headers you want to send",**  
-**"schema": "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"BookName\":**
-
-**{\"type\":{\"enum\":[\"X\",\"Y\",\"Z\"]}},\"Quantity\":{\"type\":\"number\"}}}"**
-
-**}**,  
+**"schema": "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"BookName\":{\"type\":{\"enum\":[\"X\",\"Y\",\"Z\"]}},\"Quantity\":{\"type\":\"number\"}}}"}**,  
 "value": [{\"BookName\":\"X\",\"Quantity\":0},{\"BookName\":\"Z\",\"Quantity\":0}]
-
 }
 
 </td>
@@ -1104,11 +1116,11 @@ The field type must be **string**.
 <td colspan="1">
 
 “display”: {  
-"name": <DISPLAY LABEL>,
+"name": \<DISPLAY LABEL\>,
 
-"description":<DESCRIPTION>,
+"description": \<DESCRIPTION\>,
 
-"type": "p<span>assword</span>"
+"type": "password"
 
 }
 
@@ -1120,10 +1132,10 @@ The field type must be **string**.
 "name": "userpassword",  
 "type": "string",  
 "required": true,  
-**“display”: {**  
+**"display": {**  
 **"name":"Enter Password",**  
 **"description": "Enter Salesforce password",**  
-**“type”:”p<span>assword</span>”**  
+**"type":"password"**  
 **}**
 
 }
@@ -1149,9 +1161,9 @@ The field type must be **complex object**.
 <td colspan="1">
 
 “display”: {  
-"name": <DISPLAY LABEL>,
+"name": \<DISPLAY LABEL\>,
 
-"description":<DESCRIPTION>,
+"description": \<DESCRIPTION\>,
 
 "type": "texteditor",
 
