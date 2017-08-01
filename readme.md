@@ -148,6 +148,11 @@ where,
 
 <ConnectorX> -Lower case connector name
 
+## Setup development enviornment
+Follow below steps to setup your developement enviornment.
+- Design time: You would need [WI Studio SDK](wi-studio-docs/index.html) to develop and test contributions in local enviornment.
+- Runtime: Checkout [flogo-lib](https://github.com/TIBCOSoftware/flogo-lib) and [flogo-contrib](https://github.com/TIBCOSoftware/flogo-contrib) from [Project Flogo](http://www.flogo.io/) and add them into your $GOPATH.
+
 ## Activity Contribution
 
 * * *
