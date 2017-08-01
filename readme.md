@@ -135,11 +135,11 @@ Your contributions must follow below folder layout.
 
 where,
 
-<Category> - Name of category defined in the model
+\<Category\> - Name of category defined in the model
 
-<ActivityX> - Lower case activity name (In accordance with Golang package naming convention)
+\<ActivityX\> - Lower case activity name (In accordance with Golang package naming convention)
 
-<ConnectorX> -Lower case connector name
+\<ConnectorX\> -Lower case connector name
 
 ## Setup development enviornment
 Follow below steps to setup your developement enviornment.
