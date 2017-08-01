@@ -1804,7 +1804,7 @@ Lets start with the layout. We will create contribution related files as shown b
 Now, lets begin with the connector model.
 
 **connector.json**
-```typescript
+```
 {
     "name": "tibco-sqs",
     "title": "TIBCO SQS Connector",
@@ -1969,7 +1969,7 @@ Now, lets create the activity that will send a message on the queue.
 Lets begin with the model. We will refer [http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html) to model our activity.
 
 **activity.json**
-```json
+```
 {
     "name": "sqssendmessage",
     "version": "1.0.0",
@@ -2322,7 +2322,7 @@ Now, lets create the activity that will receive a message from the queue.
 Lets begin with the model. We will refer [http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html) to model our activity.
 
 **activity.json**
-```json
+```
 {
     "name": "sqsreceivemessage",
     "title": "Receive SQS Message",
