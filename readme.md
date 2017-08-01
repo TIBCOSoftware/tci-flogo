@@ -160,7 +160,7 @@ Follow below steps to setup your developement enviornment.
 It is very easy to develop an activity for Web Integrator. Just create the model and runtime files that adhere to following templates:
 
 **activity.json**
-```json
+```
 {
     //Unique activity name without spaces or special characters
     "name": "demo",
@@ -1616,7 +1616,7 @@ Like activities, contributing a connector is very easy.
 To contribute a connector, create model and typescript files that adhere to following template:
 
 **connector.json**
-```json
+```
 {
     // Unique connector name without spaces or special characters
     "name": "demo",
@@ -1799,7 +1799,7 @@ Before we start, make sure you have:
 
 Lets start with the layout. We will create contribution related files as shown below:
 
-<ac:image ac:height="250"><ri:attachment ri:filename="Screen Shot 2017-07-16 at 12.59.13 AM.png"></ri:attachment></ac:image>
+![](images/sqs.png)
 
 Now, lets begin with the connector model.
 
@@ -2014,16 +2014,16 @@ Lets begin with the model. We will refer [http://docs.aws.amazon.com/AWSSimpleQ
             //Set message attributes
             //JSON should be in the below format
             //{
-  			//	"<Attrubute1Name>": {
-    		//		DataType: "",
-    		//		StringValue: ""
-   			//	},
-  			// "<Attrubute2Name>": {
-    		//		DataType: "",
-    		//		StringValue: ""
-   			//	},
-  			//	...
- 			//}
+  		// "<Attrubute1Name>": {
+    		//	DataType: "",
+    		//	StringValue: ""
+   		// },
+  		// "<Attrubute2Name>": {
+    		//	DataType: "",
+    		//	StringValue: ""
+   		// },
+  		//	...
+ 	    //}
             "name": "MessageAttribute",
             "type": "complex_type",
             "required": false,
@@ -2171,8 +2171,8 @@ Now, lets write runtime for the activity.
 package sqssendmessage
 
 import (
-	"github.com/TIBCOSoftware/flogo-lib/core/activity"
-	"github.com/TIBCOSoftware/flogo-lib/logger"
+    "github.com/TIBCOSoftware/flogo-lib/core/activity"
+    "github.com/TIBCOSoftware/flogo-lib/logger"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/credentials"
     "github.com/aws/aws-sdk-go/aws/session"
@@ -2181,8 +2181,8 @@ import (
 )
 
 const (
-	ivConnection         = "sqsConnection"
-	ivQueueUrl           = "queueUrl"
+    ivConnection         = "sqsConnection"
+    ivQueueUrl           = "queueUrl"
     ivMessageAttributes  = "MessageAttributes"
     ivDelaySeconds       = "DelaySeconds"
     ivMessageBody        = "MessageBody"
@@ -2262,27 +2262,15 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 ```
 **activity_test.go**
 ```go
-
-    response, err1 := sqsSvc.SendMessage(sendMessageInput)
-    if err1 != nil {
-       return false, activity.NewError(fmt.Sprintf("Failed to send message to SQS due to error:%s",err1.Error()), "SQS-SENDMESSAGE-4005", nil)
-    }
-
-    //Set Message ID in the output
-    context.SetOutput(ovMessageId,*response.MessageId)    
-	return true, nil
-}
-
-
 package sqssendmessage
 
 import (
 	"testing"
 	"github.com/TIBCOSoftware/flogo-contrib/action/flow/test"
 	"github.com/TIBCOSoftware/flogo-lib/core/activity"
-    "github.com/stretchr/testify/assert"
+        "github.com/stretchr/testify/assert"
 	"io/ioutil"
-    "github.com/TIBCOSoftware/flogo-lib/core/data" 
+        "github.com/TIBCOSoftware/flogo-lib/core/data" 
 )
 
 var activityMetadata *activity.Metadata
@@ -2335,25 +2323,394 @@ Lets begin with the model. We will refer [http://docs.aws.amazon.com/AWSSimpleQ
 
 **activity.json**
 ```json
-
+{
+    "name": "sqsreceivemessage",
+    "title": "Receive SQS Message",
+    "version": "1.0.0",
+    "author": "TIBCO Software Inc.",
+    "type": "flogo:activity",
+      
+    "display": {
+       "category": "AWS",
+       "visible": true,
+       "smallIcon": "sqsreceivemessage-small-icon.png",
+       "largeIcon": "sqsreceivemessage-large-icon.png",
+       "description": "This activity receives a message from the queue",
+    },
+  
+    "ref": "AWS/activity/sqsreceivemessage",
+    "inputs": [
+           {
+            //Select SQS connection from the list
+            "name": "sqsConnection",
+            "type": "object",
+            "required": true,
+            "display":{
+              "name": "SQS Connection",
+              "description": "Select SQS Connection",
+              "type": "connection"
+            },
+            "allowed":[]
+           },
+           {
+            //Select Queue URL from the list
+            "name": "queueUrl",
+            "type": "string",
+            "required": true,
+            "display":{
+              "name": "Queue URL",
+              "description": "Select Queue URL"
+            },
+            "allowed":[]
+           },
+           {
+            "name": "AttributeNames",
+            "type": "array",
+            "required": false,
+            "display" {
+              "name": "Attribute Names",
+              "type": "table",
+               // Draw table with single column named "AttributeName"
+              "schema": "{\r\n    \"$schema\": \"http:\/\/json-schema.org\/draft-04\/schema#\",\r\n    \"definitions\": {},\r\n    \"id\": \"http:\/\/example.com\/example.json\",\r\n    \"items\": {\r\n        \"id\": \"\/items\",\r\n        \"properties\": {\r\n            \"AttributeName\": {\r\n                \"id\": \"\/items\/properties\/AttributeName\",\r\n                \"type\": \"string\"\r\n            }\r\n        },\r\n        \"type\": \"object\"\r\n    },\r\n    \"type\": \"array\"\r\n}"
+            }
+           },
+           {
+            "name": "MessageAttributeNames",
+            "type": "array",
+            "required": false,
+            "display" {
+              "name": "Message Attributes",
+              "type": "table",
+               // Draw table with single column named "MessageAttributeName"
+              "schema": "{\r\n    \"$schema\": \"http:\/\/json-schema.org\/draft-04\/schema#\",\r\n    \"definitions\": {},\r\n    \"id\": \"http:\/\/example.com\/example.json\",\r\n    \"items\": {\r\n        \"id\": \"\/items\",\r\n        \"properties\": {\r\n            \"AttributeName\": {\r\n                \"id\": \"\/items\/properties\/MessageAttributeName\",\r\n                \"type\": \"string\"\r\n            }\r\n        },\r\n        \"type\": \"object\"\r\n    },\r\n    \"type\": \"array\"\r\n}"
+            }
+           }
+           {
+            "name": "MaxNumberOfMessages",
+            "type": "integer",
+            "required": false,
+            "value": 1
+           },
+           {
+            "name": "VisibilityTimeout",
+            "type": "integer",
+            "required": false
+           },
+           {
+            "name": "WaitTimeSeconds",
+            "type": "integer",
+            "required": false
+           }
+    ],
+   
+    "outputs": [
+           {
+            "name": "Message",
+            "type": "complex_object",
+            //JSON object based on receive message output
+            "value": {
+               "metadata": "",
+               "value": "[\r\n  {\r\n    \"Attributes\": {},\r\n    \"Body\": \"\",\r\n    \"MD5OfBody\": \"\",\r\n    \"MD5OfMessageAttributes\": \"\",\r\n    \"MessageAttributes\": {},\r\n    \"MessageId\": \"\",\r\n    \"ReceiptHandle\": \"\"\r\n  }\r\n]"
+            }
+          }
+    ]
+}
 ```
 
 Now, lets create type script code to fetch SQS connection and Queue URLs.
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="18418e8b-36e8-4419-9c8f-ebf8eab9defe"><ac:parameter ac:name="title">activity.module.ts</ac:parameter><ac:plain-text-body></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="511e7f6a-8638-46c4-a905-1cb2fd3aecfb"><ac:parameter ac:name="title">activity.ts</ac:parameter> <ac:plain-text-body>| any => { if(fieldName === "sqsConnection") { //Connector ID must match with the name defined in connector.json return WIConnectorUtils.getConnectionNames("tibco-sqs"); } else if(fieldName === "queueUrl") { let connectionField: IFieldDefinition = context.getField("sqsConnection"); // Read connection name if(connectionField.value) { //Read connection configuration let connectionConfig: IConnectionContribution = WIConnectorUtils.getConnectionConfiguration(connectionField.value); if(connectionConfig) { let accessKeyId: IFieldDefinition = connectionConfig.getField("accessKeyId"); let secreteKey: IFieldDefinition = connectionConfig.getField("secreteAccessKey"); let region: IFieldDefinition = connectionConfig.getField("region"); AWS.config.update({ region: region.value, credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value) }); let sqs = new AWS.SQS(); let params = {}; sqs.listQueues(params, function(err, data) { if (err) { return string[]; } else { return data.QueueUrls; } }); } } } return null; } validate = (fieldName: string, context: IActivityContribution): Observable <ivalidationresult>| IValidationResult => { if(fieldName === "sqsConnection") { let connection: IFieldDefinition = context.getField("sqsConnection") if (connection.value === null) { return ValidationResult.newValidationResult().setError("SQS Connection must be configured"); } } else if(fieldName === "queueUrl") { let queueUrl: IFieldDefinition = context.getField("queueUrl") if (queueUrl.value === null) { return ValidationResult.newValidationResult().setError("Queue URL must be configured"); } } return null; } }]]></ivalidationresult></ac:plain-text-body></ac:structured-macro>
-
+**activity.module.ts**
+```typescript
+import { HttpModule } from "@angular/http";
+import { NgModule } from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { SQSReceiveMessageActivityContributionHandler} from "./activity";
+import { WiServiceContribution} from "wi-studio/app/contrib/wi-contrib";
+ 
+ 
+@NgModule({
+  imports: [
+    CommonModule,
+    HttpModule,
+    ],
+  providers: [
+    {
+       provide: WiServiceContribution,
+       useClass: SQSReceiveMessageActivityContributionHandler
+     }
+  ]
+})
+ 
+export default class ConcatActivityModule {
+ 
+}
+```
+**activity.ts**
+```typescript
+import {Observable} from "rxjs/Observable";
+import {Injectable, Injector, Inject} from "@angular/core";
+import {Http, Response, Headers} from "@angular/http";
+import {
+    WiContrib,
+    WiServiceHandlerContribution,
+    IValidationResult,
+    ValidationResult,
+    IFieldDefinition
+    IActivityContribution,
+    IConnectorContribution
+    ActionResult,
+    IActionResult,
+    ConnectorUtils,
+    CORSUtils
+} from "wi-studio/app/contrib/wi-contrib";
+import {AWS} from 'aws-sdk';
+ 
+@WiContrib({})
+@Injectable()
+export class SQSReceiveMessageActivityContributionHandler extends WiServiceHandlerContribution {
+    constructor( @Inject(Injector) injector) {
+        super(injector);
+    }
+ 
+    value = (fieldName: string, context: IActivityContribution): Observable<any> | any => {
+        if(fieldName === "sqsConnection") {
+           //Connector ID must match with the name defined in connector.json
+           return WIConnectorUtils.getConnectionNames("tibco-sqs");
+        } else if(fieldName === "queueUrl") {
+           let connectionField: IFieldDefinition = context.getField("sqsConnection");
+           // Read connection name
+           if(connectionField.value) {
+            //Read connection configuration
+            let connectionConfig: IConnectionContribution = WIConnectorUtils.getConnectionConfiguration(connectionField.value);
+            if(connectionConfig) {
+                let accessKeyId: IFieldDefinition = connectionConfig.getField("accessKeyId");
+                let secreteKey: IFieldDefinition = connectionConfig.getField("secreteAccessKey");
+                let region: IFieldDefinition = connectionConfig.getField("region");
+                AWS.config.update({
+                    region: region.value,
+                    credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value)
+                });
+                let sqs = new AWS.SQS();
+                let params = {};
+                sqs.listQueues(params, function(err, data) {
+                    if (err) {
+                        return string[];
+                    } else {
+                        return data.QueueUrls;
+                    }
+                });
+            }
+           }
+        }
+        return null;
+    }
+  
+    validate = (fieldName: string, context: IActivityContribution): Observable<IValidationResult> | IValidationResult => {
+       if(fieldName === "sqsConnection") {
+         let connection: IFieldDefinition = context.getField("sqsConnection")
+         if (connection.value === null) {
+              return ValidationResult.newValidationResult().setError("SQS Connection must be configured");
+         }
+       } else if(fieldName === "queueUrl") {
+         let queueUrl: IFieldDefinition = context.getField("queueUrl")
+         if (queueUrl.value === null) {
+              return ValidationResult.newValidationResult().setError("Queue URL must be configured");
+         }
+       }
+      return null;
+    }
+}
+```
 Now, lets write runtime for the activity.
 
-<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="88a6eb4e-7a14-4bb6-bcb5-2cfbeec0f337"><ac:parameter ac:name="title">activity.go</ac:parameter> <ac:plain-text-body>0 { for i, msg := range response.Messages { //read attributes if len(msg.Attributes) > 0 { msgs[i]["Attribute"] = make(map[string]string,len(msg.Attributes) ) attrs := msgs[i]["Attribute"].(map[string]string) for k, v := range msg.Attributes { attrs[k] = *v } } //read message attributes if len(msg.MessageAttributes) > 0 { msgs[i]["MessageAttributes"] = make(map[string]string,len(msg.MessageAttributes) ) attrs := msgs[i]["MessageAttributes"].(map[string]string) for k, v := range msg.MessageAttributes { attrs[k] = *v.StringValue } } msgs[i]["Body"] = *msg.Body msgs[i]["MD5OfBody"] = *msg.MD5OfBody msgs[i]["MD5OfMessageAttributes"] = *msg.MD5OfMessageAttributes msgs[i]["MessageId"] = *msg.MessageId msgs[i]["ReceiptHandle"] = *msg.ReceiptHandle } } output := &data.ComplexObject{Metadata:"", Value: msgs} context.SetOutput(ovMessage,output) return true, nil } ]]></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="6e3bc8e3-87d0-4ebb-8dad-2ac2ec40f56c"><ac:parameter ac:name="title">activity_test.go</ac:parameter><ac:plain-text-body>" dummyConnectionData["secreteAccessKey"] = "<your secrete="" access="" key="">" dummyConnectionData["region"] = "<region name="" where="" sqs="" is="" running="">" tc.SetInput(ivConnection, dummyConnectionData) tc.SetInput(ivQueueUrl, <your sqs="" queue="" url="">) done, err := act.Eval(tc) assert.Nil(t, err) }]]></your></region></your></ac:plain-text-body></ac:structured-macro>
+**activity.go**
+```go
+package sqsreceivemessage
+ 
+import (
+    "github.com/TIBCOSoftware/flogo-lib/core/activity"
+    "github.com/TIBCOSoftware/flogo-lib/logger"
+    "github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/aws/credentials"
+    "github.com/aws/aws-sdk-go/aws/session"
+    "github.com/aws/aws-sdk-go/service/sqs"
+    "github.com/TIBCOSoftware/flogo-lib/core/data"
+)
+ 
+const (
+    ivConnection             = "sqsConnection"
+    ivQueueUrl               = "queueUrl"
+    ivMessageAttributeNames  = "MessageAttributeNames"
+    ivAttributeNames         = "AttributeNames"
+    ivMaxNumberOfMessages    = "MaxNumberOfMessages"
+    ivVisibilityTimeout      = "VisibilityTimeout"
+    ivWaitTimeSeconds        = "WaitTimeSeconds"
+    ovMessage                = "Message"
+)
+ 
+var activityLog = logger.GetLogger("aws-activity-sqsreceivemessage")
+ 
+type SQSReceiveMessageActivity struct {
+    metadata *activity.Metadata
+}
+ 
+func NewActivity(metadata *activity.Metadata) activity.Activity {
+    return &SQSReceiveMessageActivity{metadata: metadata}
+}
+ 
+func (a *SQSReceiveMessageActivity) Metadata() *activity.Metadata {
+    return a.metadata
+}
+func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, err error) {
+    activityLog.Info("Executing SQS Send Message activity")
+    //Read Inputs
+    if context.GetInput(ivConnection) == nil {
+      return false, activity.NewError("SQS connection is not configured", "SQS-RECEIVEMESSAGE-4001", nil)
+    }
+     
+    if context.GetInput(ivQueueUrl) == nil {
+      return false, activity.NewError("SQS Queue URL is not configured", "SQS-RECEIVEMESSAGE-4002", nil)
+    }
+ 
+ 
+    //Read connection details
+    connectionInfo := context.GetInput(ivConnection).(map[string]interface{})
+    session, err := session.NewSession(aws.NewConfig().WithRegion(connectionInfo["region"].(string)).WithCredentials(credentials.NewStaticCredentials(connectionInfo["accessKeyId"].(string), connectionInfo["secreteAccessKey"].(string), "")))
+    if err != nil {
+      return false, activity.NewError(fmt.Sprintf("Failed to connect to AWS due to error:%s. Check credentials configured in the connection:%s.",err.Error(),connectionInfo["name"].(string)), "SQS-RECEIVEMESSAGE-4003", nil)
+    }
+    //Create SQS service instance
+    sqsSvc := sqs.New(session)
+    receiveMessageInput := &sqs.ReceiveMessageInput{}
+    receiveMessageInput.QueueUrl = aws.String(context.GetInput(ivQueueUrl).(string))
+     
+    if context.GetInput(ivAttributeNames) != nil {
+      //Add attribute names
+      attrs := make([]string, len(context.GetInput(ivAttributeNames)))
+      for i, v := range context.GetInput(ivAttributeNames).([]interface{}) {
+        attrs[i] = aws.String(v.(string))
+      }
+      receiveMessageInput.AttributeNames = attrs
+    }
+   
+    if context.GetInput(ivMessageAttributeNames) != nil {
+     //Add message attribute names
+      attrs := make([]string, len(context.GetInput(ivMessageAttributeNames)))
+      for i, v := range context.GetInput(ivMessageAttributeNames).([]interface{}) {
+        attrs[i] = aws.String(v.(string))
+      }
+      receiveMessageInput.MessageAttributeNames = attrs
+    }
+ 
+    maxNumberOfMessages := context.GetInput(ivMaxNumberOfMessages)
+    if maxNumberOfMessages != nil {
+      receiveMessageInput.MaxNumberOfMessages = aws.Int64(maxNumberOfMessages.(int64))
+    }
+     
+    visibilityTimeout := context.GetInput(ivVisibilityTimeout)
+    if visibilityTimeout != nil {
+      receiveMessageInput.VisibilityTimeout = aws.Int64(visibilityTimeout.(int64))
+    }
+ 
+ 
+    waitTimeSeconds := context.GetInput(ivWaitTimeSeconds)
+    if waitTimeSeconds != nil {
+      receiveMessageInput.WaitTimeSeconds = aws.Int64(waitTimeSeconds.(int64))
+    }
+ 
+    //Receive message from SQS
+    response, err1 := sqsSvc.ReceiveMessage(receiveMessageInput)
+    if err1 != nil {
+       return false, activity.NewError(fmt.Sprintf("Failed to receive message from SQS due to error:%s",err1.Error()), "SQS-RECEIVEMESSAGE-4004", nil)
+    }
+ 
+    //Set Message details in the output
+    msgs := make([]map[string]interface{}, len(response.Messages))
+    if len(response.Messages) > 0 {
+      for i, msg := range response.Messages {
+       //read attributes
+       if len(msg.Attributes) > 0 {
+         msgs[i]["Attribute"] = make(map[string]string,len(msg.Attributes) )
+         attrs := msgs[i]["Attribute"].(map[string]string)
+         for k, v := range msg.Attributes {
+          attrs[k] = *v
+         }
+       }
+       //read message attributes
+       if len(msg.MessageAttributes) > 0 {
+         msgs[i]["MessageAttributes"] = make(map[string]string,len(msg.MessageAttributes) )
+         attrs := msgs[i]["MessageAttributes"].(map[string]string)
+         for k, v := range msg.MessageAttributes {
+          attrs[k] = *v.StringValue
+         }
+       }
+       msgs[i]["Body"] = *msg.Body
+       msgs[i]["MD5OfBody"] = *msg.MD5OfBody
+       msgs[i]["MD5OfMessageAttributes"] = *msg.MD5OfMessageAttributes
+       msgs[i]["MessageId"] = *msg.MessageId
+       msgs[i]["ReceiptHandle"] = *msg.ReceiptHandle
+     }
+    }
+    output := &data.ComplexObject{Metadata:"", Value: msgs}
+    context.SetOutput(ovMessage,output)   
+    return true, nil
+}
+```
 
-
-
-
-
-
-
-
-
+**activity_test.go**
+```go
+package sqsreceivemessage
+ 
+import (
+    "testing"
+    "github.com/TIBCOSoftware/flogo-contrib/action/flow/test"
+    "github.com/TIBCOSoftware/flogo-lib/core/activity"
+    "github.com/stretchr/testify/assert"
+    "io/ioutil"
+    "github.com/TIBCOSoftware/flogo-lib/core/data"
+)
+ 
+var activityMetadata *activity.Metadata
+var connectionData = ``
+func getActivityMetadata() *activity.Metadata {
+    if activityMetadata == nil {
+        jsonMetadataBytes, err := ioutil.ReadFile("activity.json")
+        if err != nil {
+            panic("No Json Metadata found for activity.json path")
+        }
+        activityMetadata = activity.NewMetadata(string(jsonMetadataBytes))
+    }
+    return activityMetadata
+}
+ 
+func TestActivityRegistration(t *testing.T) {
+    act := NewActivity(getActivityMetadata())
+    if act == nil {
+        t.Error("Activity Not Registered")
+        t.Fail()
+        return
+    }
+}
+ 
+func TestEval(t *testing.T) {
+    act := NewActivity(getActivityMetadata())
+    tc := test.NewTestActivityContext(act.Metadata())
+ 
+ 
+    dummyConnectionData := make(map[string]string, 4)
+    //Use your AWS information
+    dummyConnectionData["name"] = "My SQS Connection"
+    dummyConnectionData["accesskeyId"] = "<YOUR ACCESS KEY ID>"
+    dummyConnectionData["secreteAccessKey"] = "<YOUR SECRETE ACCESS KEY>"
+    dummyConnectionData["region"] = "<REGION NAME WHERE SQS IS RUNNING>"
+ 
+    tc.SetInput(ivConnection, dummyConnectionData)
+    tc.SetInput(ivQueueUrl, <YOUR SQS QUEUE URL>)
+    done, err := act.Eval(tc)
+    assert.Nil(t, err)
+     
+}
+```
 
 
 
