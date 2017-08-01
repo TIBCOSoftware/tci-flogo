@@ -1,0 +1,41 @@
+import { ElementRef, SimpleChange, AfterViewInit } from "@angular/core";
+import { IFlowDiagram } from "../../common/models/diagram/diagram.model";
+import { IFlowDiagramTaskDictionary } from "../../common/models/diagram/dictionary.model";
+import { CanvasService } from "../canvas/canvas.service";
+import { TCIServices } from "../shared/services/TCIServices";
+import { ValidationService } from "../shared/services/validation/validation.service";
+export declare class FlowsDetailDiagramComponent implements AfterViewInit {
+    private elementRef;
+    private _canvasService;
+    private validationService;
+    private tciService;
+    id: string;
+    type: string;
+    private flow;
+    tasks: IFlowDiagramTaskDictionary;
+    diagram: IFlowDiagram;
+    private _elmRef;
+    private _diagram;
+    private hasRetry;
+    canvas_templ: any;
+    constructor(elementRef: ElementRef, _canvasService: CanvasService, validationService: ValidationService, tciService: TCIServices);
+    ngOnInit(): void;
+    ngAfterViewInit(): void;
+    ngOnDestroy(): void;
+    ngOnChanges(changes: {
+        [propKey: string]: SimpleChange;
+    }): void;
+    private initSub();
+    private initializeDiagram();
+    private getServiceErrors();
+    private analyseErrors(errors);
+    addTask($event: any): void;
+    private selectTask($event);
+    private unSelectTask();
+    onMenuItemClicked($event: any): void;
+    private _renderDone();
+    private draggable();
+    private closePaletteOnOutsideClick(destroy?);
+    private tileTitleFix();
+    private tileTitleFixElement(el);
+}

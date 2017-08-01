@@ -1,0 +1,30 @@
+import { IFlow } from "../../../common/models/app/flows";
+import { IAppModel } from "../../../common/models/app/app.model";
+import { IMapperContext, IMapping, IMapFunctionsLookup, IMapContextValidator, ISchemaProvider, IExpressionParser } from "../../../common/models/mapper/map-model";
+import { STRING_MAP } from "../../../common/index";
+import { IMessaging } from "../../../common/services/messaging";
+export declare class MapperContext implements IMapperContext {
+    id: string;
+    contextData: STRING_MAP<IAppModel | IFlow | any>;
+    mapping: IMapping;
+    mapFunctionsLookup: IMapFunctionsLookup;
+    mapContextValidator: IMapContextValidator;
+    scopedOutputSchemaProvider: ISchemaProvider;
+    contextInputSchemaProvider: ISchemaProvider;
+    expressionParser: IExpressionParser;
+    parentContext: IMapperContext;
+    childContexts: STRING_MAP<IMapperContext>;
+    messagingService: IMessaging;
+    constructor(contextData: STRING_MAP<IAppModel | IFlow | any>);
+    getId(): string;
+    getContextData(): any | IAppModel;
+    getMapping(): IMapping;
+    getMapFunctionsProvider(): IMapFunctionsLookup;
+    getMapContextValidator(): IMapContextValidator;
+    getScopedOutputSchemaProvider(): ISchemaProvider;
+    getContextInputSchemaProvider(): ISchemaProvider;
+    getExpressionParser(): IExpressionParser;
+    getParentContext(): IMapperContext;
+    getChildContexts(): STRING_MAP<IMapperContext>;
+    getMessagingService(): IMessaging;
+}

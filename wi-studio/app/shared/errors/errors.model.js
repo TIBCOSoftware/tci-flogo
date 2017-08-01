@@ -1,0 +1,1 @@
+"use strict";Object.defineProperty(exports,"__esModule",{value:!0});var ErrorType;!function(e){e[e.Comment=0]="Comment",e[e.Alert=1]="Alert",e[e.Code=2]="Code",e[e.Payment=3]="Payment"}(ErrorType=exports.ErrorType||(exports.ErrorType={}));var Error=function(){return function(){this.id="1234",this.date=new Date,this.message="Some Message Here!!!!!!"}}();exports.Error=Error;

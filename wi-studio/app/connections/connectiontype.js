@@ -1,0 +1,1 @@
+"use strict";Object.defineProperty(exports,"__esModule",{value:!0});var ConnectionType;!function(e){e.SALESFORCE="SALESFORCE",e.MARKETO="MARKETO"}(ConnectionType=exports.ConnectionType||(exports.ConnectionType={}));

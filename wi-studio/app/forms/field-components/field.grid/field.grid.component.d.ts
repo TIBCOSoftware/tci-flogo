@@ -1,0 +1,31 @@
+import { AfterViewInit, AfterViewChecked, EventEmitter } from "@angular/core";
+import { GridOptions } from "ag-grid/main";
+import { FormFieldBaseComponent } from "../field.base/field.base.component";
+export declare class FormFieldGridComponent extends FormFieldBaseComponent implements AfterViewInit, AfterViewChecked {
+    valueChanged: EventEmitter<any>;
+    value: string;
+    schema: string;
+    gridOptions: GridOptions;
+    isRowsSelected: boolean;
+    countGridChecked: number;
+    displayDeleteParamConfirmModal: boolean;
+    errorsFound: boolean;
+    constructor();
+    ngOnInit(): void;
+    ngAfterViewInit(): void;
+    ngAfterViewChecked(): void;
+    private updateGridSize();
+    private checkForBoolean(types);
+    private createColumnDefs();
+    private createRowData();
+    private onCellValueChanged($event);
+    private add();
+    delete(): void;
+    private getRowData();
+    private onRowEditStart($event);
+    private onRowValueChanged($event);
+    private rowSelected($event);
+    deleteParamConfirm(): void;
+    closeParamModalConfirm(): void;
+    private setModelValue();
+}

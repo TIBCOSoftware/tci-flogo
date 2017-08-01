@@ -1,0 +1,15 @@
+/// <reference types="monaco-editor" />
+export declare type Thenable<T> = monaco.Thenable<T>;
+export declare type MarkedString = monaco.MarkedString;
+export declare type CancellationToken = monaco.CancellationToken;
+export declare type MonacoHover = monaco.languages.Hover;
+export declare type LineRange = monaco.IRange;
+export declare type EditorOptions = monaco.editor.IEditorOptions;
+export declare type CompletionItem = monaco.languages.CompletionItem;
+export declare type CompletionList = monaco.languages.CompletionList;
+export declare type MonacoCompletionItemKind = monaco.languages.CompletionItemKind;
+export declare type ICursorPositionChangedEvent = monaco.editor.ICursorPositionChangedEvent;
+export declare type ICursorSelectionChangedEvent = monaco.editor.ICursorSelectionChangedEvent;
+export declare type IStandaloneCodeEditor = monaco.editor.IStandaloneCodeEditor;
+export declare type IReadOnlyModel = monaco.editor.IReadOnlyModel;
+export declare type IDisposable = monaco.IDisposable;
