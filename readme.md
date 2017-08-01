@@ -555,15 +555,14 @@ func TestEval(t *testing.T) {
 ```
 
 You can test your runtime code against [Project Flogo](http://www.flogo.io/) code.
-
-*   Ensure $GOPATH variable is set
-*   Ensure your <Category> folder is added to the <span>$GOPATH</span>
-*   <span>Pull <span>Flogo</span> code:</span>
-    *   <span>go get [github.com/TIBCOSoftware/flogo-lib](http://github.com/TIBCOSoftware/flogo-lib)</span>
-    *   <span>go get [github.com/TIBCOSoftware/flogo-contrib](http://github.com/TIBCOSoftware/flogo-contrib)</span>
-*   Run '<span style="color: rgb(0,0,255);">_**go test ./..**_</span>' from your <span><Category> folder.</span>
-
-</ac:rich-text-body></ac:structured-macro>
+```
+1. Ensure $GOPATH variable is set
+2. Add your <Category> folder to the $GOPATH
+3. Pull Flogo code:
+    -  go get github.com/TIBCOSoftware/flogo-lib
+    -  go get github.com/TIBCOSoftware/flogo-contrib
+4. Run - `go test ./..` from your <Category> folder
+```
 
 And your _**Concat**_ activity is ready for the use in Web Integrator. Wasn't that easy? 
 
