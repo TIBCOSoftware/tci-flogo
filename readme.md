@@ -138,7 +138,7 @@ Every activity contribution must write the runtime code in **Go** (_activity.g
 
 Your contributions must follow below folder layout.
 
-<ac:image ac:height="250"><ri:attachment ri:filename="Screen Shot 2017-07-12 at 4.19.50 PM.png"></ri:attachment></ac:image>
+![](images/layout.png)
 
 where,
 
@@ -406,6 +406,7 @@ The activity UI is divided into following 5 main sections. Based on definition i
 Now that you are familiar with the templates and UI sections, let's create a simple activity(we will call it **Concat**) that takes two input strings and returns a concatenated string.
 
 Create a folder named **concat** in the TIBCO categorywith following files:
+![](images/concat-activity.png)
 
 **activity.json**
 ```json
@@ -1388,7 +1389,7 @@ export class SampleActivityUIContributionHandler extends WiServiceHandlerContrib
 
 Now, lets create two type script files for our Concat activity. In type script, we will make the separator field visible only when users want to use it. We will also construct and return separator list.
 
-<ac:image ac:height="250"><ri:attachment ri:filename="Screen Shot 2017-07-12 at 4.22.02 PM.png"></ri:attachment></ac:image>
+![](images/concat-activity-updated.png)
 
 **activity.json**
 ```json
