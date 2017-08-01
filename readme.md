@@ -143,7 +143,8 @@ where,
 
 ## Setup development enviornment
 Follow below steps to setup your developement enviornment.
-- Design time: Refer [WI Studio SDK](wi-studio-docs/index.html) to develop and test contributions in local enviornment.
+- Clone repository: **git clone https://github.com/TIBCOSoftware/tci**
+- Design time: Refer WI Studio SDK(Follow **_wi-studio-docs/index.html_**) to develop and test contributions in local enviornment.
 - Runtime: Checkout [flogo-lib](https://github.com/TIBCOSoftware/flogo-lib) and [flogo-contrib](https://github.com/TIBCOSoftware/flogo-contrib) from [Project Flogo](http://www.flogo.io/) and add them into your $GOPATH. Refer runtime API docs at:     
 	- https://godoc.org/github.com/TIBCOSoftware/flogo-lib/core/activity
 	- https://godoc.org/github.com/TIBCOSoftware/flogo-lib/core/data
