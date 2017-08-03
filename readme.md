@@ -14,8 +14,6 @@ The [TCI](https://github.com/TIBCOSoftware/tci) repository is where we have an o
 ## Contributing
 If you want to build your own activities for Web Integrator please read the Wiki page on [Creating extensions for Web Integrator](https://github.com/TIBCOSoftware/tci/wiki).
 
-If you want to build projects and connectors for Business Studio, please follow the best practices for TIBCO ActiveMatrix BusinessWorks
-
 In order to have your project, connector or extension listed here, please follow the instructions below.
 * Fork this repo
 * Update the section you want to have your submission listed
