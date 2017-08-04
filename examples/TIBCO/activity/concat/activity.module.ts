@@ -12,7 +12,7 @@ import { WiServiceContribution} from "wi-studio/app/contrib/wi-contrib";
   providers: [
     {
        provide: WiServiceContribution,
-       useClass: ConcatActivityUIContributionHandler
+       useClass: ConcatActivityContributionHandler
      }
   ]
 })

@@ -6,7 +6,7 @@ import {
     WiServiceHandlerContribution,
     IValidationResult,
     ValidationResult,
-    IFieldDefinition
+    IFieldDefinition,
     IActivityContribution,
     ActionResult,
     IActionResult
@@ -30,14 +30,14 @@ export class ConcatActivityContributionHandler extends WiServiceHandlerContribut
     validate = (fieldName: string, context: IActivityContribution): Observable<IValidationResult> | IValidationResult => {
        if (fieldName === "separator") {
          let vresult: IValidationResult = ValidationResult.newValidationResult();
-         let useSeparatorFieldDef: IFieldDefinition = context.getField("useSeparator") 
-         let separatorFieldDef: IFieldDefinition = context.getField("separator")
+         let useSeparatorFieldDef: IFieldDefinition = context.getField("useSeparator"); 
+         let separatorFieldDef: IFieldDefinition = context.getField("separator");
          if (useSeparatorFieldDef.value && useSeparatorFieldDef.value === true) {
-             if (separatorFieldDef.display && separatorFieldDef.display.visible == false {
+             if (separatorFieldDef.display && separatorFieldDef.display.visible == false) {
                  vresult.setVisible(true);
              } 
              if (separatorFieldDef.value === null || separatorFieldDef.value === "") {
-               vresult.setError("Separator must be configured");
+               vresult.setError("TIBCO-CONCAT-1000", "Separator must be configured");
              } 
          } else {
             vresult.setVisible(false);
