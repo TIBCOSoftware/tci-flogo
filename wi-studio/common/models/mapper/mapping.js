@@ -1,1 +1,0 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0});var Mapping=function(){function e(){}return e.prototype.getMappings=function(){return null},e}();exports.Mapping=Mapping;

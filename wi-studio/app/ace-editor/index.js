@@ -1,1 +1,0 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0});var ace_editor_module_1=require("./ace-editor.module");exports.AceEditorModule=ace_editor_module_1.AceEditorModule;var ace_editor_component_1=require("./ace-editor.component");exports.AceEditorComponent=ace_editor_component_1.AceEditorComponent;

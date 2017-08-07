@@ -1,1 +1,0 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.flowList=[{name:"Flow1",description:"Description",triggerType:"Timer",connectionType:"SF"},{name:"Flow2",description:"Description",triggerType:"API",connectionType:"Or"}];

@@ -1,1 +1,0 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0});var platform_browser_dynamic_1=require("@angular/platform-browser-dynamic"),app_standalone_module_1=require("./app.standalone.module");platform_browser_dynamic_1.platformBrowserDynamic().bootstrapModule(app_standalone_module_1.WebIntegratorAppModule);

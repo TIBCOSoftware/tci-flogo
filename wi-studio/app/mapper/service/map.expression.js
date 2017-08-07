@@ -1,1 +1,0 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0});var MapExpression=function(){function e(){}return e.prototype.getExpression=function(){return this.expression},e.prototype.getMappings=function(){return this.mappings},e}();exports.MapExpression=MapExpression;

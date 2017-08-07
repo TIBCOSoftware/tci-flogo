@@ -1,1 +1,0 @@
-"use strict";function taskIconFinder(s){var i="/wistudio/dist/assets/svg/flogo.flows.detail.diagram.activity.icon.svg";return s.display&&s.display.category&&s.display.smallIcon&&(i="/wistudio/v1/contributions/"+s.display.category.toLowerCase()+"/"+s.name+"/"+s.display.smallIcon),i}Object.defineProperty(exports,"__esModule",{value:!0}),exports.taskIconFinder=taskIconFinder;
