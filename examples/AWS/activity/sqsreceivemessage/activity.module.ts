@@ -1,22 +1,22 @@
 import { HttpModule } from "@angular/http";
 import { NgModule } from "@angular/core";
 import { CommonModule } from "@angular/common";
-import { SQSReceiveMessageActivityContributionHandler} from "./activity";
+import { RecvMsgActivityContribution} from "./activity";
 import { WiServiceContribution} from "wi-studio/app/contrib/wi-contrib";
  
 @NgModule({
   imports: [
     CommonModule,
-    HttpModule,
+    HttpModule
     ],
   providers: [
     {
        provide: WiServiceContribution,
-       useClass: SQSReceiveMessageActivityContributionHandler
+       useClass: RecvMsgActivityContribution
      }
   ]
 })
  
-export default class ConcatActivityModule {
+export default class RecvMsgActivityModule {
  
 }

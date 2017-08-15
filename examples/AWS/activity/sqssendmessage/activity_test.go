@@ -36,12 +36,15 @@ func TestEval(t *testing.T) {
 	tc := test.NewTestActivityContext(act.Metadata())
 
 
-    dummyConnectionData := make(map[string]string, 4)
+    dummyConnectionData := make(map[string]interface{})
+    dummyConnectionSettings := make(map[string]interface{}, 4)
     //Use your AWS information
-    dummyConnectionData["name"] = "My SQS Connection"
-    dummyConnectionData["accesskeyId"] = "<YOUR ACCESS KEY ID>"
-    dummyConnectionData["secreteAccessKey"] = "<YOUR SECRETE ACCESS KEY>"
-    dummyConnectionData["region"] = "<REGION NAME WHERE SQS IS RUNNING>"
+    dummyConnectionSettings["accesskeyId"] = "<YOUR ACCESS KEY ID>"
+    dummyConnectionSettings["secreteAccessKey"] = "<YOUR SECRETE ACCESS KEY>"
+    dummyConnectionSettings["region"] = "<REGION NAME WHERE SQS IS RUNNING>"
+    
+    dummyConnectionData["settings"] = dummyConnectionSettings
+    dummyConnectionData["title"] = "My SQS Connection"
 
 
 	tc.SetInput(ivConnection, dummyConnectionData)

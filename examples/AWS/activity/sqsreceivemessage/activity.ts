@@ -1,73 +1,94 @@
-import {Observable} from "rxjs/Observable";
-import {Injectable, Injector, Inject} from "@angular/core";
-import {Http, Response, Headers} from "@angular/http";
+import { Observable } from "rxjs/Observable";
+import { Http } from "@angular/http";
+import { Injectable, Injector, Inject } from "@angular/core";
 import {
     WiContrib,
     WiServiceHandlerContribution,
     IValidationResult,
     ValidationResult,
-    IFieldDefinition
+    IFieldDefinition,
     IActivityContribution,
-    IConnectorContribution
-    ActionResult,
-    IActionResult,
-    ConnectorUtils,
-    CORSUtils
+    IConnectorContribution,
+    WiContributionUtils
 } from "wi-studio/app/contrib/wi-contrib";
-import {AWS} from 'aws-sdk';
- 
+import * as AWS from "aws-sdk";
+
 @WiContrib({})
 @Injectable()
-export class SQSReceiveMessageActivityContributionHandler extends WiServiceHandlerContribution {
-    constructor( @Inject(Injector) injector) {
-        super(injector);
+export class RecvMsgActivityContribution extends WiServiceHandlerContribution {
+    constructor( @Inject(Injector) injector, private http: Http) {
+        super(injector, http);
     }
- 
+
     value = (fieldName: string, context: IActivityContribution): Observable<any> | any => {
-        if(fieldName === "sqsConnection") {
-           //Connector ID must match with the name defined in connector.json
-           return WIConnectorUtils.getConnectionNames("tibco-sqs");
-        } else if(fieldName === "queueUrl") {
-           let connectionField: IFieldDefinition = context.getField("sqsConnection");
-           // Read connection name
-           if(connectionField.value) {
-            //Read connection configuration
-            let connectionConfig: IConnectionContribution = WIConnectorUtils.getConnectionConfiguration(connectionField.value);
-            if(connectionConfig) {
-                let accessKeyId: IFieldDefinition = connectionConfig.getField("accessKeyId");
-                let secreteKey: IFieldDefinition = connectionConfig.getField("secreteAccessKey");
-                let region: IFieldDefinition = connectionConfig.getField("region");
-                AWS.config.update({
-                    region: region.value,
-                    credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value)
+        if (fieldName === "sqsConnection") {
+            //Connector Type must match with the name defined in connector.json
+            return Observable.create(observer => {
+                let connectionRefs = [];
+                WiContributionUtils.getConnections(this.http, "AWS").subscribe((data: IConnectorContribution[]) => {
+                    data.forEach(connection => {
+                        connectionRefs.push({
+                            "unique_id": WiContributionUtils.getUniqueId(connection),
+                            "name": connection.title
+                        });
+                    });
+                    observer.next(connectionRefs);
                 });
-                let sqs = new AWS.SQS();
-                let params = {};
-                sqs.listQueues(params, function(err, data) {
-                    if (err) {
-                        return string[];
-                    } else {
-                        return data.QueueUrls;
-                    }
-                });
+            });
+        } else if (fieldName === "queueUrl") {
+            let connectionField: IFieldDefinition = context.getField("sqsConnection");
+            if (connectionField.value) {
+                return Observable.create(observer => {
+                    //Read connection configuration
+                    let queueUrls = [];
+                    WiContributionUtils.getConnection(this.http, connectionField.value)
+                        .map(data => data)
+                        .subscribe(data => {
+                            let accessKeyId: IFieldDefinition;
+                            let secreteKey: IFieldDefinition;
+                            let region: IFieldDefinition;
+                            for (let configuration of data.settings) {
+                                if (configuration.name === "accessKeyId") {
+                                    accessKeyId = configuration
+                                } else if (configuration.name === "secreteAccessKey") {
+                                    secreteKey = configuration
+                                } else if (configuration.name === "region") {
+                                    region = configuration
+                                }
+                            }
+
+                            var sqs = new AWS.SQS({
+                                credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value), region: region.value
+                            });
+                            var params = {};
+                            sqs.listQueues(params, function (err, data) {
+                                if (err) {
+                                    observer.next(queueUrls);
+                                } else {
+                                    observer.next(data.QueueUrls);
+                                }
+                            });
+
+                        });
+                }
+                );
             }
-           }
         }
         return null;
     }
-  
+
     validate = (fieldName: string, context: IActivityContribution): Observable<IValidationResult> | IValidationResult => {
-       if(fieldName === "sqsConnection") {
-         let connection: IFieldDefinition = context.getField("sqsConnection")
-         if (connection.value === null) {
-              return ValidationResult.newValidationResult().setError("SQS Connection must be configured");
-         }
-       } else if(fieldName === "queueUrl") {
-         let queueUrl: IFieldDefinition = context.getField("queueUrl")
-         if (queueUrl.value === null) {
-              return ValidationResult.newValidationResult().setError("Queue URL must be configured");
-         }
-       }
-      return null;
+        if (fieldName === "sqsConnection") {
+            let connection: IFieldDefinition = context.getField("sqsConnection")
+            if (connection.value === null) {
+                return ValidationResult.newValidationResult().setError("AWS-RECV-MSG-1000", "SQS Connection must be configured");
+            }
+        } else if (fieldName === "queueUrl") {
+            let queueUrl: IFieldDefinition = context.getField("queueUrl")
+            if (queueUrl.value === null) {
+                return ValidationResult.newValidationResult().setError("AWS-RECV-MSG-1001", "Queue URL must be configured");
+            }
+        }
+        return null;
     }
 }

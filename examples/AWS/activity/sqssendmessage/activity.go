@@ -8,6 +8,7 @@ import (
     "github.com/aws/aws-sdk-go/aws/session"
     "github.com/aws/aws-sdk-go/service/sqs"
     "github.com/TIBCOSoftware/flogo-lib/core/data"
+    "fmt"
 )
 
 const (
@@ -50,7 +51,21 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 
     //Read connection details
     connectionInfo := context.GetInput(ivConnection).(map[string]interface{})
-    session, err := session.NewSession(aws.NewConfig().WithRegion(connectionInfo["region"].(string)).WithCredentials(credentials.NewStaticCredentials(connectionInfo["accessKeyId"].(string), connectionInfo["secreteAccessKey"].(string), "")))
+    connectionSettings := connectionInfo["settings"].([]interface{})
+    var region string
+    var accesskey string
+    var secreteKey string
+    for _, v := range connectionSettings {
+    	setting := v.(map[string]interface{})
+    	if setting["name"] == "accessKeyId" {
+    		accesskey = setting["value"].(string)
+    	} else if setting["name"] == "region" {
+    		region = setting["value"].(string)
+    	} else if setting["name"] == "secreteAccessKey" {
+    		secreteKey = setting["value"].(string)
+    	}
+    }
+    session, err := session.NewSession(aws.NewConfig().WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accesskey, secreteKey, "")))
     if err != nil {
       return false, activity.NewError(fmt.Sprintf("Failed to connect to AWS due to error:%s. Check credentials configured in the connection:%s.",err.Error(),connectionInfo["name"].(string)), "SQS-SENDMESSAGE-4004", nil)
     }
@@ -60,15 +75,17 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
     sendMessageInput.QueueUrl = aws.String(context.GetInput(ivQueueUrl).(string))
     sendMessageInput.MessageBody = aws.String(context.GetInput(ivMessageBody).(string))
     
-    messageAttributes := context.GetInput(ivMessageAttributes).(*data.ComplexObject)
+   
     if context.GetInput(ivMessageAttributes) != nil {
       //Add message attributes
       messageAttributes := context.GetInput(ivMessageAttributes).(*data.ComplexObject)
-      attrs := make(map[string]*sqs.MessageAttributeValue, len(messageAttributes.Value))
-      for k, v := range messageAttributes.Value { 
+      msgAttrs := messageAttributes.Value.(map[string]interface{})
+      attrs := make(map[string]*sqs.MessageAttributeValue, len(msgAttrs))
+      for k, v := range msgAttrs { 
+      	attr := v.(map[string]interface{})
         attrs[k] = &sqs.MessageAttributeValue{
-          DataType: aws.String(v["DataType"].(string)),
-          StringValue:  aws.String(v["StringValue"].(string)),
+          DataType: aws.String(attr["DataType"].(string)),
+          StringValue:  aws.String(attr["StringValue"].(string)),
         }
       }
       sendMessageInput.MessageAttributes = attrs
@@ -76,7 +93,7 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 
     delaySeconds := context.GetInput(ivDelaySeconds)
     if delaySeconds != nil {
-      sendMessageInput.DelaySeconds = aws.Int64(delaySeconds.(int64))
+      sendMessageInput.DelaySeconds = aws.Int64(int64(delaySeconds.(int)))
     }
 
     //Send message to SQS
