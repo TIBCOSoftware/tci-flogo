@@ -35,6 +35,23 @@ export class SendMsgActivityContribution extends WiServiceHandlerContribution {
                     observer.next(connectionRefs);
                 });
             });
+        } else if (fieldName === "MessageAttributes") {
+            let msgAttrNames: IFieldDefinition = context.getField("MessageAttributeNames");
+            if (msgAttrNames.value) {
+                // Read message attrbutes and construct JSON schema on the fly for the activity input
+                var jsonSchema = {};
+                // Convert string value into JSON object
+                let data = JSON.parse(msgAttrNames.value);
+                for (var i = 0; i < data.length; i++) {
+                    if (data[i].Type === "String") {
+                        jsonSchema[data[i].Name] = "abc";
+                    } else if (data[i].Type === "Number") {
+                        jsonSchema[data[i].Name] = 0;
+                    }
+                }
+                return JSON.stringify(jsonSchema);
+            }
+            return "{}";
         } else if (fieldName === "queueUrl") {
             let connectionField: IFieldDefinition = context.getField("sqsConnection");
             if (connectionField.value) {
