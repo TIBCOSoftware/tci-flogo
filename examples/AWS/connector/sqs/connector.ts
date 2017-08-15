@@ -1,27 +1,20 @@
-import {AWS} from 'aws-sdk';
-
+/// <reference types="aws-sdk" />
+// import {SQS, Credentials} from 'aws-sdk';
+import * as AWS from "aws-sdk";
+import {Injectable} from "@angular/core";
+import {WiContrib, WiServiceHandlerContribution, AUTHENTICATION_TYPE} from "wi-studio/app/contrib/wi-contrib";
+import {IConnectorContribution, IFieldDefinition, IActionResult, ActionResult} from "wi-studio/common/models/contrib";
 import {Observable} from "rxjs/Observable";
-import {Injectable, Injector, Inject} from "@angular/core";
-import {Http, Response, Headers} from "@angular/http";
-import {
-    WiContrib,
-    WiServiceHandlerContribution,
-    IValidationResult,
-    ValidationResult,
-    IFieldDefinition
-    IActivityContribution,
-    IConnectorContribution
-    ActionResult,
-    IActionResult
-} from "wi-studio/app/contrib/wi-contrib";
+import {IValidationResult, ValidationResult, ValidationError} from "wi-studio/common/models/validation";
 
+// declare var window: any;
+// let AWSInstance: any = window.AWS;
 
 @WiContrib({})
-
 @Injectable()
 export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution {
-    constructor( @Inject(Injector) injector) {
-        super(injector);
+    constructor() {
+        super();
     }
 
    
@@ -31,34 +24,63 @@ export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution 
  
     validate = (name: string, context: IConnectorContribution): Observable<IValidationResult> | IValidationResult => {
       if( name === "Connect") {
-         let accessKeyId: IFieldDefinition = context.getField("accessKeyId");
-         let secreteKey: IFieldDefinition = context.getField("secreteAccessKey");
-         let region: IFieldDefinition = context.getField("region");
+         let accessKeyId: IFieldDefinition;
+         let secreteKey: IFieldDefinition;
+         let region: IFieldDefinition;
+         
+         for (let configuration of context.settings) {
+    		if( configuration.name === "accessKeyId") {
+    		   accessKeyId = configuration
+    		} else if( configuration.name === "secreteAccessKey") {
+    		   secreteKey = configuration
+    		} else if( configuration.name === "region") {
+    		   region = configuration
+    		}
+		 }
+		 
          if( accessKeyId.value && secreteKey.value && region.value) {
             // Enable Connect button
-            return ValidationResult.newValidationResult().setReadonly(false)
+            return ValidationResult.newValidationResult().setReadOnly(false)
+         } else {
+            return ValidationResult.newValidationResult().setReadOnly(true)
          }
       }
        return null;
     }
 
-    action = (actionId: string, context: IConnectorContribution): Observable<IActionResult> | IActionResult => {
-       if( actionId == "connect") {
-         let accessKeyId: IFieldDefinition = context.getField("accessKeyId");
-         let secreteKey: IFieldDefinition = context.getField("secreteAccessKey");
-         let region: IFieldDefinition = context.getField("region");
-         AWS.config.update({
-               region: region.value,
-               credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value)
-         });
-         let sqs = new AWS.SQS();
-         let params = {};
-		 sqs.listQueues(params, function(err, data) {
-  		    if (err) {
-    		   return ActionResult.newResult().setError("Failed to connect to SQS service due to error: ".concat(err));
-  		    } else {
-    		  return ActionResult.newResult().setError("Successfully connected to SQS service");
-  		    }
+    action = (actionName: string, context: IConnectorContribution): Observable<IActionResult> | IActionResult => {
+       if( actionName == "Connect") {
+          return Observable.create(observer => {
+         	let accessKeyId: IFieldDefinition;
+         	let secreteKey: IFieldDefinition;
+         	let region: IFieldDefinition;
+         
+         	for (let configuration of context.settings) {
+    			if( configuration.name === "accessKeyId") {
+    		   		accessKeyId = configuration;
+    			} else if( configuration.name === "secreteAccessKey") {
+    		   		secreteKey = configuration;
+    			} else if( configuration.name === "region") {
+    		   		region = configuration;
+    			}
+		 	}
+		 
+			var sqs =  new AWS.SQS({
+  				credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value), region: region.value
+			});
+         	var params = {};
+		 	sqs.listQueues(params, function(err, data) {
+  		    	if (err) {
+    		   		observer.next(ActionResult.newActionResult().setResult(new ValidationError("AWS-SQS-1000","Failed to connect to SQS service due to error: ".concat(err.message))));
+  		    	} else {
+  		    		let actionResult = {
+                				context: context,
+                				authType: AUTHENTICATION_TYPE.BASIC,
+                				authData: {}
+            			}
+            		observer.next(ActionResult.newActionResult().setResult(actionResult));
+            	}
+		 	});
 		 });
        }
        return null;
