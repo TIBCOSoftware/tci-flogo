@@ -77,30 +77,34 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 
 	if context.GetInput(ivMessageAttributes) != nil && context.GetInput(ivMessageAttributeNames) != nil {
 		//Add message attributes
-		
+
 		//Read mapped values
 		messageAttributes := context.GetInput(ivMessageAttributes).(*data.ComplexObject)
-		msgAttrs := messageAttributes.Value.(map[string]interface{})
-		
-		//Read table values
-		attrsName := context.GetInput(ivMessageAttributeNames).([]interface{})
-		
-		attrs := make(map[string]*sqs.MessageAttributeValue, len(msgAttrs))
-		for _, v := range attrsName {
-			attr := v.(map[string]interface{})
-			// Has mapped value??
-			if msgAttrs[attr["Name"].(string)] != nil {
-				attrVal, err := data.CoerceToString(msgAttrs[attr["Name"].(string)])
-				if err != nil && attr["Type"].(string) == "Number" {
-					attrVal, err = data.CoerceToString(int(msgAttrs[attr["Name"].(string)].(int64)))
+		if messageAttributes.Value != nil {
+			switch messageAttributes.Value.(type) {
+			case map[string]interface{}:
+				msgAttrs := messageAttributes.Value.(map[string]interface{})
+
+				//Read table values
+				attrsName := context.GetInput(ivMessageAttributeNames).([]interface{})
+				attrs := make(map[string]*sqs.MessageAttributeValue, len(msgAttrs))
+				for _, v := range attrsName {
+					attr := v.(map[string]interface{})
+					// Has mapped value??
+					if msgAttrs[attr["Name"].(string)] != nil {
+						attrVal, err := data.CoerceToString(msgAttrs[attr["Name"].(string)])
+						if err != nil && attr["Type"].(string) == "Number" {
+							attrVal, err = data.CoerceToString(int(msgAttrs[attr["Name"].(string)].(int64)))
+						}
+						attrs[attr["Name"].(string)] = &sqs.MessageAttributeValue{
+							DataType:    aws.String(attr["Type"].(string)),
+							StringValue: aws.String(attrVal),
+						}
+					}
 				}
-				attrs[attr["Name"].(string)] = &sqs.MessageAttributeValue{
-					DataType:    aws.String(attr["Type"].(string)),
-					StringValue: aws.String(attrVal),
-				}
+				sendMessageInput.MessageAttributes = attrs
 			}
 		}
-		sendMessageInput.MessageAttributes = attrs
 	}
 
 	delaySeconds := context.GetInput(ivDelaySeconds)
