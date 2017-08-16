@@ -35,6 +35,46 @@ export class RecvMsgActivityContribution extends WiServiceHandlerContribution {
                     observer.next(connectionRefs);
                 });
             });
+        } else if (fieldName === "Message") {
+            var jsonSchema = {};
+            jsonSchema["Attributes"] = {};
+            jsonSchema["MessageAttributes"] = {};
+            let attrNames: IFieldDefinition = context.getField("AttributeNames");
+            if (attrNames.value) {
+                var attrJsonSchema = {};
+                // Convert string value into JSON object
+                let data = JSON.parse(attrNames.value);
+                for (var i = 0; i < data.length; i++) {
+                    if (data[i].Type === "String") {
+                        attrJsonSchema[data[i].Name] = "abc";
+                    } else if (data[i].Type === "Integer") {
+                        attrJsonSchema[data[i].Name] = 0;
+                    }
+                }
+                jsonSchema["Attributes"] = attrJsonSchema;
+            }
+
+            let msgAttrNames: IFieldDefinition = context.getField("MessageAttributeNames");
+            if (msgAttrNames.value) {
+                // Read message attrbutes and construct JSON schema on the fly for the activity input
+                var msgAttrJsonSchema = {};
+                // Convert string value into JSON object
+                let data = JSON.parse(msgAttrNames.value);
+                for (var i = 0; i < data.length; i++) {
+                    if (data[i].Type === "String") {
+                        msgAttrJsonSchema[data[i].Name] = "abc";
+                    } else if (data[i].Type === "Number") {
+                        msgAttrJsonSchema[data[i].Name] = 0;
+                    }
+                }
+                jsonSchema["MessageAttributes"] = msgAttrJsonSchema;
+            }
+            jsonSchema["Body"] = "";
+            jsonSchema["MD5OfBody"] = "";
+            jsonSchema["MD5OfMessageAttributes"] = "";
+            jsonSchema["MessageId"] = "";
+            jsonSchema["ReceiptHandle"] = "";
+            return "[" + JSON.stringify(jsonSchema) + "]";
         } else if (fieldName === "queueUrl") {
             let connectionField: IFieldDefinition = context.getField("sqsConnection");
             if (connectionField.value) {

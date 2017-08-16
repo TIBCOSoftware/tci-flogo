@@ -90,7 +90,10 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 			attr := v.(map[string]interface{})
 			// Has mapped value??
 			if msgAttrs[attr["Name"].(string)] != nil {
-				attrVal, _ := data.CoerceToString(msgAttrs[attr["Name"].(string)])
+				attrVal, err := data.CoerceToString(msgAttrs[attr["Name"].(string)])
+				if err != nil && attr["Type"].(string) == "Number" {
+					attrVal, err = data.CoerceToString(int(msgAttrs[attr["Name"].(string)].(int64)))
+				}
 				attrs[attr["Name"].(string)] = &sqs.MessageAttributeValue{
 					DataType:    aws.String(attr["Type"].(string)),
 					StringValue: aws.String(attrVal),

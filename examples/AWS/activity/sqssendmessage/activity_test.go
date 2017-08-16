@@ -1,16 +1,17 @@
 package sqssendmessage
 
 import (
+	"io/ioutil"
 	"testing"
+
 	"github.com/TIBCOSoftware/flogo-contrib/action/flow/test"
 	"github.com/TIBCOSoftware/flogo-lib/core/activity"
-    "github.com/stretchr/testify/assert"
-	"io/ioutil"
-    "github.com/TIBCOSoftware/flogo-lib/core/data" 
+	"github.com/stretchr/testify/assert"
 )
 
 var activityMetadata *activity.Metadata
 var connectionData = ``
+
 func getActivityMetadata() *activity.Metadata {
 	if activityMetadata == nil {
 		jsonMetadataBytes, err := ioutil.ReadFile("activity.json")
@@ -35,23 +36,20 @@ func TestEval(t *testing.T) {
 	act := NewActivity(getActivityMetadata())
 	tc := test.NewTestActivityContext(act.Metadata())
 
+	dummyConnectionData := make(map[string]interface{})
+	dummyConnectionSettings := make(map[string]interface{}, 4)
+	//Use your AWS information
+	dummyConnectionSettings["accesskeyId"] = "<YOUR ACCESS KEY ID>"
+	dummyConnectionSettings["secreteAccessKey"] = "<YOUR SECRETE ACCESS KEY>"
+	dummyConnectionSettings["region"] = "<REGION NAME WHERE SQS IS RUNNING>"
 
-    dummyConnectionData := make(map[string]interface{})
-    dummyConnectionSettings := make(map[string]interface{}, 4)
-    //Use your AWS information
-    dummyConnectionSettings["accesskeyId"] = "<YOUR ACCESS KEY ID>"
-    dummyConnectionSettings["secreteAccessKey"] = "<YOUR SECRETE ACCESS KEY>"
-    dummyConnectionSettings["region"] = "<REGION NAME WHERE SQS IS RUNNING>"
-    
-    dummyConnectionData["settings"] = dummyConnectionSettings
-    dummyConnectionData["title"] = "My SQS Connection"
-
+	dummyConnectionData["settings"] = dummyConnectionSettings
+	dummyConnectionData["title"] = "My SQS Connection"
 
 	tc.SetInput(ivConnection, dummyConnectionData)
-    tc.SetInput(ivQueueUrl, <YOUR SQS QUEUE URL>)
-    tc.SetInput(ivMessageBody, "Message from TIBCO")
+	tc.SetInput(ivQueueUrl, "<YOUR SQS QUEUE URL>")
+	tc.SetInput(ivMessageBody, "Message from TIBCO")
 
-
-	done, err := act.Eval(tc)
-    assert.Nil(t, err)
+	_, err := act.Eval(tc)
+	assert.Nil(t, err)
 }
