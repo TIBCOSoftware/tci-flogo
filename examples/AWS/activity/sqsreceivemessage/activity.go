@@ -115,8 +115,8 @@ func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, e
 		return false, activity.NewError(fmt.Sprintf("Failed to receive message from SQS due to error:%s", err1.Error()), "SQS-RECEIVEMESSAGE-4004", nil)
 	}
 
-    deleteMsgs := context.GetInput(ivDeleteMessage).(bool)
-    
+	deleteMsgs := context.GetInput(ivDeleteMessage).(bool)
+
 	//Set Message details in the output
 	msgs := make([]map[string]interface{}, len(response.Messages))
 	if len(response.Messages) > 0 {
@@ -146,11 +146,16 @@ func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, e
 				for k, v := range msg.MessageAttributes {
 					attrs[k] = *v.StringValue
 				}
+				msgs[i]["MD5OfMessageAttributes"] = *msg.MD5OfMessageAttributes
 			}
-			msgs[i]["Body"] = *msg.Body
-			msgs[i]["MD5OfBody"] = *msg.MD5OfBody
-			msgs[i]["MD5OfMessageAttributes"] = *msg.MD5OfMessageAttributes
-			msgs[i]["MessageId"] = *msg.MessageId
+
+			if msg.Body != nil {
+				msgs[i]["Body"] = *msg.Body
+				msgs[i]["MD5OfBody"] = *msg.MD5OfBody
+			}
+			if msg.MessageId != nil {
+				msgs[i]["MessageId"] = *msg.MessageId
+			}
 			msgs[i]["ReceiptHandle"] = *msg.ReceiptHandle
 		}
 	}
