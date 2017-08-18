@@ -1,14 +1,10 @@
 /// <reference types="aws-sdk" />
-// import {SQS, Credentials} from 'aws-sdk';
 import * as AWS from "aws-sdk";
 import {Injectable} from "@angular/core";
 import {WiContrib, WiServiceHandlerContribution, AUTHENTICATION_TYPE} from "wi-studio/app/contrib/wi-contrib";
 import {IConnectorContribution, IFieldDefinition, IActionResult, ActionResult} from "wi-studio/common/models/contrib";
 import {Observable} from "rxjs/Observable";
 import {IValidationResult, ValidationResult, ValidationError} from "wi-studio/common/models/validation";
-
-// declare var window: any;
-// let AWSInstance: any = window.AWS;
 
 @WiContrib({})
 @Injectable()
@@ -71,14 +67,16 @@ export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution 
          	var params = {};
 		 	sqs.listQueues(params, function(err, data) {
   		    	if (err) {
-    		   		observer.next(ActionResult.newActionResult().setResult(new ValidationError("AWS-SQS-1000","Failed to connect to SQS service due to error: ".concat(err.message))));
+					// Return error 
+    		   		observer.next(ActionResult.newActionResult().setSuccess(false).setResult(new ValidationError("AWS-SQS-1000","Failed to connect to SQS service due to error: ".concat(err.message))));
   		    	} else {
+					// Successfully connected. Lets save the configuration.	
   		    		let actionResult = {
                 				context: context,
                 				authType: AUTHENTICATION_TYPE.BASIC,
                 				authData: {}
             			}
-            		observer.next(ActionResult.newActionResult().setResult(actionResult));
+            		observer.next(ActionResult.newActionResult().setSuccess(true).setResult(actionResult));
             	}
 		 	});
 		 });

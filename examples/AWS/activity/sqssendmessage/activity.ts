@@ -27,10 +27,15 @@ export class SendMsgActivityContribution extends WiServiceHandlerContribution {
                 let connectionRefs = [];
                 WiContributionUtils.getConnections(this.http, "AWS").subscribe((data: IConnectorContribution[]) => {
                     data.forEach(connection => {
-                        connectionRefs.push({
-                            "unique_id": WiContributionUtils.getUniqueId(connection),
-                            "name": connection.title
-                        });
+                        for (let i = 0; i < connection.settings.length; i++) {
+                            if (connection.settings[i].name === "name") {
+                                connectionRefs.push({
+                                    "unique_id": WiContributionUtils.getUniqueId(connection),
+                                    "name": connection.settings[i].value
+                                });
+                                break;
+                            }
+                        }
                     });
                     observer.next(connectionRefs);
                 });
