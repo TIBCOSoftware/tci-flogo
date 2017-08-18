@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2017. TIBCO Software Inc.
+ * This file is subject to the license terms contained
+ * in the license file that is distributed with this file.
+ */
 /// <reference types="aws-sdk" />
 import * as AWS from "aws-sdk";
 import {Injectable} from "@angular/core";
