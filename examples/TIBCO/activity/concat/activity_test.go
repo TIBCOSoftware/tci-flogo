@@ -40,10 +40,10 @@ func TestEval(t *testing.T) {
 	tc := test.NewTestActivityContext(act.Metadata())
 	//setup attrs
 	tc.SetInput("firstString", "Hello")
-    tc.SetInput("secondString", "World! ")
+    tc.SetInput("secondString", "World!")
     tc.SetInput("useSeparator", true)
     tc.SetInput("separator", "#")
-	done, err := act.Eval(tc)
+	_, err := act.Eval(tc)
     assert.Nil(t, err)
     result := tc.GetOutput("result")
     assert.Equal(t, result, "Hello#World!")
