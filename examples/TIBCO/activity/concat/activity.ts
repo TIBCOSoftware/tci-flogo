@@ -7,9 +7,7 @@ import {
     IValidationResult,
     ValidationResult,
     IFieldDefinition,
-    IActivityContribution,
-    ActionResult,
-    IActionResult
+    IActivityContribution
 } from "wi-studio/app/contrib/wi-contrib";
 
 @WiContrib({})
