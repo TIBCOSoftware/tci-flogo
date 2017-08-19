@@ -31,6 +31,10 @@ If you have feedback, don't hesitate to talk to us!
 ## Other TIBCO Cloud Integration repos
 You might also want to visit our other repos
 * [Connectors for TIBCO Business Studio - Cloud Edition](https://github.com/TIBCOSoftware/tci-studio-samples)
+* [Visual Studio Code extension for Node.js](https://github.com/TIBCOSoftware/vscode-extension-tci)
+
+## License
+This project is licensed under a BSD-type license. See license.txt.
 
 ## Note
 
