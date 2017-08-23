@@ -47,9 +47,9 @@ func TestEval(t *testing.T) {
 	dummyConnectionSettings["accesskeyId"] = "<YOUR ACCESS KEY ID>"
 	dummyConnectionSettings["secreteAccessKey"] = "<YOUR SECRETE ACCESS KEY>"
 	dummyConnectionSettings["region"] = "<REGION NAME WHERE SQS IS RUNNING>"
+	dummyConnectionSettings["name"] = "My SQS Connection"
 
 	dummyConnectionData["settings"] = dummyConnectionSettings
-	dummyConnectionData["title"] = "My SQS Connection"
 
 	tc.SetInput(ivConnection, dummyConnectionData)
 	tc.SetInput(ivQueueUrl, "<YOUR SQS QUEUE URL>")
