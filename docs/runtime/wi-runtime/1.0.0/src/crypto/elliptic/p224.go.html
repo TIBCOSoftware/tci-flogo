@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/elliptic/p224.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="p224.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/crypto/elliptic/p224.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2012 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package elliptic
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span><span class="comment">// This is a constant-time, 32-bit implementation of P224. See FIPS 186-3,</span>
+<span id="L8" class="ln">     8	</span><span class="comment">// section D.2.2.</span>
+<span id="L9" class="ln">     9	</span><span class="comment">//</span>
+<span id="L10" class="ln">    10	</span><span class="comment">// See http://www.imperialviolet.org/2010/12/04/ecc.html ([1]) for background.</span>
+<span id="L11" class="ln">    11	</span>
+<span id="L12" class="ln">    12	</span>import (
+<span id="L13" class="ln">    13	</span>	&#34;math/big&#34;
+<span id="L14" class="ln">    14	</span>)
+<span id="L15" class="ln">    15	</span>
+<span id="L16" class="ln">    16	</span>var p224 p224Curve
+<span id="L17" class="ln">    17	</span>
+<span id="L18" class="ln">    18	</span>type p224Curve struct {
+<span id="L19" class="ln">    19	</span>	*CurveParams
+<span id="L20" class="ln">    20	</span>	gx, gy, b p224FieldElement
+<span id="L21" class="ln">    21	</span>}
+<span id="L22" class="ln">    22	</span>
+<span id="L23" class="ln">    23	</span>func initP224() {
+<span id="L24" class="ln">    24	</span>	<span class="comment">// See FIPS 186-3, section D.2.2</span>
+<span id="L25" class="ln">    25	</span>	p224.CurveParams = &amp;CurveParams{Name: &#34;P-224&#34;}
+<span id="L26" class="ln">    26	</span>	p224.P, _ = new(big.Int).SetString(&#34;26959946667150639794667015087019630673557916260026308143510066298881&#34;, 10)
+<span id="L27" class="ln">    27	</span>	p224.N, _ = new(big.Int).SetString(&#34;26959946667150639794667015087019625940457807714424391721682722368061&#34;, 10)
+<span id="L28" class="ln">    28	</span>	p224.B, _ = new(big.Int).SetString(&#34;b4050a850c04b3abf54132565044b0b7d7bfd8ba270b39432355ffb4&#34;, 16)
+<span id="L29" class="ln">    29	</span>	p224.Gx, _ = new(big.Int).SetString(&#34;b70e0cbd6bb4bf7f321390b94a03c1d356c21122343280d6115c1d21&#34;, 16)
+<span id="L30" class="ln">    30	</span>	p224.Gy, _ = new(big.Int).SetString(&#34;bd376388b5f723fb4c22dfe6cd4375a05a07476444d5819985007e34&#34;, 16)
+<span id="L31" class="ln">    31	</span>	p224.BitSize = 224
+<span id="L32" class="ln">    32	</span>
+<span id="L33" class="ln">    33	</span>	p224FromBig(&amp;p224.gx, p224.Gx)
+<span id="L34" class="ln">    34	</span>	p224FromBig(&amp;p224.gy, p224.Gy)
+<span id="L35" class="ln">    35	</span>	p224FromBig(&amp;p224.b, p224.B)
+<span id="L36" class="ln">    36	</span>}
+<span id="L37" class="ln">    37	</span>
+<span id="L38" class="ln">    38	</span><span class="comment">// P224 returns a Curve which implements P-224 (see FIPS 186-3, section D.2.2).</span>
+<span id="L39" class="ln">    39	</span><span class="comment">//</span>
+<span id="L40" class="ln">    40	</span><span class="comment">// The cryptographic operations are implemented using constant-time algorithms.</span>
+<span id="L41" class="ln">    41	</span>func P224() Curve {
+<span id="L42" class="ln">    42	</span>	initonce.Do(initAll)
+<span id="L43" class="ln">    43	</span>	return p224
+<span id="L44" class="ln">    44	</span>}
+<span id="L45" class="ln">    45	</span>
+<span id="L46" class="ln">    46	</span>func (curve p224Curve) Params() *CurveParams {
+<span id="L47" class="ln">    47	</span>	return curve.CurveParams
+<span id="L48" class="ln">    48	</span>}
+<span id="L49" class="ln">    49	</span>
+<span id="L50" class="ln">    50	</span>func (curve p224Curve) IsOnCurve(bigX, bigY *big.Int) bool {
+<span id="L51" class="ln">    51	</span>	var x, y p224FieldElement
+<span id="L52" class="ln">    52	</span>	p224FromBig(&amp;x, bigX)
+<span id="L53" class="ln">    53	</span>	p224FromBig(&amp;y, bigY)
+<span id="L54" class="ln">    54	</span>
+<span id="L55" class="ln">    55	</span>	<span class="comment">// y² = x³ - 3x + b</span>
+<span id="L56" class="ln">    56	</span>	var tmp p224LargeFieldElement
+<span id="L57" class="ln">    57	</span>	var x3 p224FieldElement
+<span id="L58" class="ln">    58	</span>	p224Square(&amp;x3, &amp;x, &amp;tmp)
+<span id="L59" class="ln">    59	</span>	p224Mul(&amp;x3, &amp;x3, &amp;x, &amp;tmp)
+<span id="L60" class="ln">    60	</span>
+<span id="L61" class="ln">    61	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L62" class="ln">    62	</span>		x[i] *= 3
+<span id="L63" class="ln">    63	</span>	}
+<span id="L64" class="ln">    64	</span>	p224Sub(&amp;x3, &amp;x3, &amp;x)
+<span id="L65" class="ln">    65	</span>	p224Reduce(&amp;x3)
+<span id="L66" class="ln">    66	</span>	p224Add(&amp;x3, &amp;x3, &amp;curve.b)
+<span id="L67" class="ln">    67	</span>	p224Contract(&amp;x3, &amp;x3)
+<span id="L68" class="ln">    68	</span>
+<span id="L69" class="ln">    69	</span>	p224Square(&amp;y, &amp;y, &amp;tmp)
+<span id="L70" class="ln">    70	</span>	p224Contract(&amp;y, &amp;y)
+<span id="L71" class="ln">    71	</span>
+<span id="L72" class="ln">    72	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L73" class="ln">    73	</span>		if y[i] != x3[i] {
+<span id="L74" class="ln">    74	</span>			return false
+<span id="L75" class="ln">    75	</span>		}
+<span id="L76" class="ln">    76	</span>	}
+<span id="L77" class="ln">    77	</span>	return true
+<span id="L78" class="ln">    78	</span>}
+<span id="L79" class="ln">    79	</span>
+<span id="L80" class="ln">    80	</span>func (p224Curve) Add(bigX1, bigY1, bigX2, bigY2 *big.Int) (x, y *big.Int) {
+<span id="L81" class="ln">    81	</span>	var x1, y1, z1, x2, y2, z2, x3, y3, z3 p224FieldElement
+<span id="L82" class="ln">    82	</span>
+<span id="L83" class="ln">    83	</span>	p224FromBig(&amp;x1, bigX1)
+<span id="L84" class="ln">    84	</span>	p224FromBig(&amp;y1, bigY1)
+<span id="L85" class="ln">    85	</span>	if bigX1.Sign() != 0 || bigY1.Sign() != 0 {
+<span id="L86" class="ln">    86	</span>		z1[0] = 1
+<span id="L87" class="ln">    87	</span>	}
+<span id="L88" class="ln">    88	</span>	p224FromBig(&amp;x2, bigX2)
+<span id="L89" class="ln">    89	</span>	p224FromBig(&amp;y2, bigY2)
+<span id="L90" class="ln">    90	</span>	if bigX2.Sign() != 0 || bigY2.Sign() != 0 {
+<span id="L91" class="ln">    91	</span>		z2[0] = 1
+<span id="L92" class="ln">    92	</span>	}
+<span id="L93" class="ln">    93	</span>
+<span id="L94" class="ln">    94	</span>	p224AddJacobian(&amp;x3, &amp;y3, &amp;z3, &amp;x1, &amp;y1, &amp;z1, &amp;x2, &amp;y2, &amp;z2)
+<span id="L95" class="ln">    95	</span>	return p224ToAffine(&amp;x3, &amp;y3, &amp;z3)
+<span id="L96" class="ln">    96	</span>}
+<span id="L97" class="ln">    97	</span>
+<span id="L98" class="ln">    98	</span>func (p224Curve) Double(bigX1, bigY1 *big.Int) (x, y *big.Int) {
+<span id="L99" class="ln">    99	</span>	var x1, y1, z1, x2, y2, z2 p224FieldElement
+<span id="L100" class="ln">   100	</span>
+<span id="L101" class="ln">   101	</span>	p224FromBig(&amp;x1, bigX1)
+<span id="L102" class="ln">   102	</span>	p224FromBig(&amp;y1, bigY1)
+<span id="L103" class="ln">   103	</span>	z1[0] = 1
+<span id="L104" class="ln">   104	</span>
+<span id="L105" class="ln">   105	</span>	p224DoubleJacobian(&amp;x2, &amp;y2, &amp;z2, &amp;x1, &amp;y1, &amp;z1)
+<span id="L106" class="ln">   106	</span>	return p224ToAffine(&amp;x2, &amp;y2, &amp;z2)
+<span id="L107" class="ln">   107	</span>}
+<span id="L108" class="ln">   108	</span>
+<span id="L109" class="ln">   109	</span>func (p224Curve) ScalarMult(bigX1, bigY1 *big.Int, scalar []byte) (x, y *big.Int) {
+<span id="L110" class="ln">   110	</span>	var x1, y1, z1, x2, y2, z2 p224FieldElement
+<span id="L111" class="ln">   111	</span>
+<span id="L112" class="ln">   112	</span>	p224FromBig(&amp;x1, bigX1)
+<span id="L113" class="ln">   113	</span>	p224FromBig(&amp;y1, bigY1)
+<span id="L114" class="ln">   114	</span>	z1[0] = 1
+<span id="L115" class="ln">   115	</span>
+<span id="L116" class="ln">   116	</span>	p224ScalarMult(&amp;x2, &amp;y2, &amp;z2, &amp;x1, &amp;y1, &amp;z1, scalar)
+<span id="L117" class="ln">   117	</span>	return p224ToAffine(&amp;x2, &amp;y2, &amp;z2)
+<span id="L118" class="ln">   118	</span>}
+<span id="L119" class="ln">   119	</span>
+<span id="L120" class="ln">   120	</span>func (curve p224Curve) ScalarBaseMult(scalar []byte) (x, y *big.Int) {
+<span id="L121" class="ln">   121	</span>	var z1, x2, y2, z2 p224FieldElement
+<span id="L122" class="ln">   122	</span>
+<span id="L123" class="ln">   123	</span>	z1[0] = 1
+<span id="L124" class="ln">   124	</span>	p224ScalarMult(&amp;x2, &amp;y2, &amp;z2, &amp;curve.gx, &amp;curve.gy, &amp;z1, scalar)
+<span id="L125" class="ln">   125	</span>	return p224ToAffine(&amp;x2, &amp;y2, &amp;z2)
+<span id="L126" class="ln">   126	</span>}
+<span id="L127" class="ln">   127	</span>
+<span id="L128" class="ln">   128	</span><span class="comment">// Field element functions.</span>
+<span id="L129" class="ln">   129	</span><span class="comment">//</span>
+<span id="L130" class="ln">   130	</span><span class="comment">// The field that we&#39;re dealing with is ℤ/pℤ where p = 2**224 - 2**96 + 1.</span>
+<span id="L131" class="ln">   131	</span><span class="comment">//</span>
+<span id="L132" class="ln">   132	</span><span class="comment">// Field elements are represented by a FieldElement, which is a typedef to an</span>
+<span id="L133" class="ln">   133	</span><span class="comment">// array of 8 uint32&#39;s. The value of a FieldElement, a, is:</span>
+<span id="L134" class="ln">   134	</span><span class="comment">//   a[0] + 2**28·a[1] + 2**56·a[1] + ... + 2**196·a[7]</span>
+<span id="L135" class="ln">   135	</span><span class="comment">//</span>
+<span id="L136" class="ln">   136	</span><span class="comment">// Using 28-bit limbs means that there&#39;s only 4 bits of headroom, which is less</span>
+<span id="L137" class="ln">   137	</span><span class="comment">// than we would really like. But it has the useful feature that we hit 2**224</span>
+<span id="L138" class="ln">   138	</span><span class="comment">// exactly, making the reflections during a reduce much nicer.</span>
+<span id="L139" class="ln">   139	</span>type p224FieldElement [8]uint32
+<span id="L140" class="ln">   140	</span>
+<span id="L141" class="ln">   141	</span><span class="comment">// p224P is the order of the field, represented as a p224FieldElement.</span>
+<span id="L142" class="ln">   142	</span>var p224P = [8]uint32{1, 0, 0, 0xffff000, 0xfffffff, 0xfffffff, 0xfffffff, 0xfffffff}
+<span id="L143" class="ln">   143	</span>
+<span id="L144" class="ln">   144	</span><span class="comment">// p224IsZero returns 1 if a == 0 mod p and 0 otherwise.</span>
+<span id="L145" class="ln">   145	</span><span class="comment">//</span>
+<span id="L146" class="ln">   146	</span><span class="comment">// a[i] &lt; 2**29</span>
+<span id="L147" class="ln">   147	</span>func p224IsZero(a *p224FieldElement) uint32 {
+<span id="L148" class="ln">   148	</span>	<span class="comment">// Since a p224FieldElement contains 224 bits there are two possible</span>
+<span id="L149" class="ln">   149	</span>	<span class="comment">// representations of 0: 0 and p.</span>
+<span id="L150" class="ln">   150	</span>	var minimal p224FieldElement
+<span id="L151" class="ln">   151	</span>	p224Contract(&amp;minimal, a)
+<span id="L152" class="ln">   152	</span>
+<span id="L153" class="ln">   153	</span>	var isZero, isP uint32
+<span id="L154" class="ln">   154	</span>	for i, v := range minimal {
+<span id="L155" class="ln">   155	</span>		isZero |= v
+<span id="L156" class="ln">   156	</span>		isP |= v - p224P[i]
+<span id="L157" class="ln">   157	</span>	}
+<span id="L158" class="ln">   158	</span>
+<span id="L159" class="ln">   159	</span>	<span class="comment">// If either isZero or isP is 0, then we should return 1.</span>
+<span id="L160" class="ln">   160	</span>	isZero |= isZero &gt;&gt; 16
+<span id="L161" class="ln">   161	</span>	isZero |= isZero &gt;&gt; 8
+<span id="L162" class="ln">   162	</span>	isZero |= isZero &gt;&gt; 4
+<span id="L163" class="ln">   163	</span>	isZero |= isZero &gt;&gt; 2
+<span id="L164" class="ln">   164	</span>	isZero |= isZero &gt;&gt; 1
+<span id="L165" class="ln">   165	</span>
+<span id="L166" class="ln">   166	</span>	isP |= isP &gt;&gt; 16
+<span id="L167" class="ln">   167	</span>	isP |= isP &gt;&gt; 8
+<span id="L168" class="ln">   168	</span>	isP |= isP &gt;&gt; 4
+<span id="L169" class="ln">   169	</span>	isP |= isP &gt;&gt; 2
+<span id="L170" class="ln">   170	</span>	isP |= isP &gt;&gt; 1
+<span id="L171" class="ln">   171	</span>
+<span id="L172" class="ln">   172	</span>	<span class="comment">// For isZero and isP, the LSB is 0 iff all the bits are zero.</span>
+<span id="L173" class="ln">   173	</span>	result := isZero &amp; isP
+<span id="L174" class="ln">   174	</span>	result = (^result) &amp; 1
+<span id="L175" class="ln">   175	</span>
+<span id="L176" class="ln">   176	</span>	return result
+<span id="L177" class="ln">   177	</span>}
+<span id="L178" class="ln">   178	</span>
+<span id="L179" class="ln">   179	</span><span class="comment">// p224Add computes *out = a+b</span>
+<span id="L180" class="ln">   180	</span><span class="comment">//</span>
+<span id="L181" class="ln">   181	</span><span class="comment">// a[i] + b[i] &lt; 2**32</span>
+<span id="L182" class="ln">   182	</span>func p224Add(out, a, b *p224FieldElement) {
+<span id="L183" class="ln">   183	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L184" class="ln">   184	</span>		out[i] = a[i] + b[i]
+<span id="L185" class="ln">   185	</span>	}
+<span id="L186" class="ln">   186	</span>}
+<span id="L187" class="ln">   187	</span>
+<span id="L188" class="ln">   188	</span>const two31p3 = 1&lt;&lt;31 + 1&lt;&lt;3
+<span id="L189" class="ln">   189	</span>const two31m3 = 1&lt;&lt;31 - 1&lt;&lt;3
+<span id="L190" class="ln">   190	</span>const two31m15m3 = 1&lt;&lt;31 - 1&lt;&lt;15 - 1&lt;&lt;3
+<span id="L191" class="ln">   191	</span>
+<span id="L192" class="ln">   192	</span><span class="comment">// p224ZeroModP31 is 0 mod p where bit 31 is set in all limbs so that we can</span>
+<span id="L193" class="ln">   193	</span><span class="comment">// subtract smaller amounts without underflow. See the section &#34;Subtraction&#34; in</span>
+<span id="L194" class="ln">   194	</span><span class="comment">// [1] for reasoning.</span>
+<span id="L195" class="ln">   195	</span>var p224ZeroModP31 = []uint32{two31p3, two31m3, two31m3, two31m15m3, two31m3, two31m3, two31m3, two31m3}
+<span id="L196" class="ln">   196	</span>
+<span id="L197" class="ln">   197	</span><span class="comment">// p224Sub computes *out = a-b</span>
+<span id="L198" class="ln">   198	</span><span class="comment">//</span>
+<span id="L199" class="ln">   199	</span><span class="comment">// a[i], b[i] &lt; 2**30</span>
+<span id="L200" class="ln">   200	</span><span class="comment">// out[i] &lt; 2**32</span>
+<span id="L201" class="ln">   201	</span>func p224Sub(out, a, b *p224FieldElement) {
+<span id="L202" class="ln">   202	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L203" class="ln">   203	</span>		out[i] = a[i] + p224ZeroModP31[i] - b[i]
+<span id="L204" class="ln">   204	</span>	}
+<span id="L205" class="ln">   205	</span>}
+<span id="L206" class="ln">   206	</span>
+<span id="L207" class="ln">   207	</span><span class="comment">// LargeFieldElement also represents an element of the field. The limbs are</span>
+<span id="L208" class="ln">   208	</span><span class="comment">// still spaced 28-bits apart and in little-endian order. So the limbs are at</span>
+<span id="L209" class="ln">   209	</span><span class="comment">// 0, 28, 56, ..., 392 bits, each 64-bits wide.</span>
+<span id="L210" class="ln">   210	</span>type p224LargeFieldElement [15]uint64
+<span id="L211" class="ln">   211	</span>
+<span id="L212" class="ln">   212	</span>const two63p35 = 1&lt;&lt;63 + 1&lt;&lt;35
+<span id="L213" class="ln">   213	</span>const two63m35 = 1&lt;&lt;63 - 1&lt;&lt;35
+<span id="L214" class="ln">   214	</span>const two63m35m19 = 1&lt;&lt;63 - 1&lt;&lt;35 - 1&lt;&lt;19
+<span id="L215" class="ln">   215	</span>
+<span id="L216" class="ln">   216	</span><span class="comment">// p224ZeroModP63 is 0 mod p where bit 63 is set in all limbs. See the section</span>
+<span id="L217" class="ln">   217	</span><span class="comment">// &#34;Subtraction&#34; in [1] for why.</span>
+<span id="L218" class="ln">   218	</span>var p224ZeroModP63 = [8]uint64{two63p35, two63m35, two63m35, two63m35, two63m35m19, two63m35, two63m35, two63m35}
+<span id="L219" class="ln">   219	</span>
+<span id="L220" class="ln">   220	</span>const bottom12Bits = 0xfff
+<span id="L221" class="ln">   221	</span>const bottom28Bits = 0xfffffff
+<span id="L222" class="ln">   222	</span>
+<span id="L223" class="ln">   223	</span><span class="comment">// p224Mul computes *out = a*b</span>
+<span id="L224" class="ln">   224	</span><span class="comment">//</span>
+<span id="L225" class="ln">   225	</span><span class="comment">// a[i] &lt; 2**29, b[i] &lt; 2**30 (or vice versa)</span>
+<span id="L226" class="ln">   226	</span><span class="comment">// out[i] &lt; 2**29</span>
+<span id="L227" class="ln">   227	</span>func p224Mul(out, a, b *p224FieldElement, tmp *p224LargeFieldElement) {
+<span id="L228" class="ln">   228	</span>	for i := 0; i &lt; 15; i++ {
+<span id="L229" class="ln">   229	</span>		tmp[i] = 0
+<span id="L230" class="ln">   230	</span>	}
+<span id="L231" class="ln">   231	</span>
+<span id="L232" class="ln">   232	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L233" class="ln">   233	</span>		for j := 0; j &lt; 8; j++ {
+<span id="L234" class="ln">   234	</span>			tmp[i+j] += uint64(a[i]) * uint64(b[j])
+<span id="L235" class="ln">   235	</span>		}
+<span id="L236" class="ln">   236	</span>	}
+<span id="L237" class="ln">   237	</span>
+<span id="L238" class="ln">   238	</span>	p224ReduceLarge(out, tmp)
+<span id="L239" class="ln">   239	</span>}
+<span id="L240" class="ln">   240	</span>
+<span id="L241" class="ln">   241	</span><span class="comment">// Square computes *out = a*a</span>
+<span id="L242" class="ln">   242	</span><span class="comment">//</span>
+<span id="L243" class="ln">   243	</span><span class="comment">// a[i] &lt; 2**29</span>
+<span id="L244" class="ln">   244	</span><span class="comment">// out[i] &lt; 2**29</span>
+<span id="L245" class="ln">   245	</span>func p224Square(out, a *p224FieldElement, tmp *p224LargeFieldElement) {
+<span id="L246" class="ln">   246	</span>	for i := 0; i &lt; 15; i++ {
+<span id="L247" class="ln">   247	</span>		tmp[i] = 0
+<span id="L248" class="ln">   248	</span>	}
+<span id="L249" class="ln">   249	</span>
+<span id="L250" class="ln">   250	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L251" class="ln">   251	</span>		for j := 0; j &lt;= i; j++ {
+<span id="L252" class="ln">   252	</span>			r := uint64(a[i]) * uint64(a[j])
+<span id="L253" class="ln">   253	</span>			if i == j {
+<span id="L254" class="ln">   254	</span>				tmp[i+j] += r
+<span id="L255" class="ln">   255	</span>			} else {
+<span id="L256" class="ln">   256	</span>				tmp[i+j] += r &lt;&lt; 1
+<span id="L257" class="ln">   257	</span>			}
+<span id="L258" class="ln">   258	</span>		}
+<span id="L259" class="ln">   259	</span>	}
+<span id="L260" class="ln">   260	</span>
+<span id="L261" class="ln">   261	</span>	p224ReduceLarge(out, tmp)
+<span id="L262" class="ln">   262	</span>}
+<span id="L263" class="ln">   263	</span>
+<span id="L264" class="ln">   264	</span><span class="comment">// ReduceLarge converts a p224LargeFieldElement to a p224FieldElement.</span>
+<span id="L265" class="ln">   265	</span><span class="comment">//</span>
+<span id="L266" class="ln">   266	</span><span class="comment">// in[i] &lt; 2**62</span>
+<span id="L267" class="ln">   267	</span>func p224ReduceLarge(out *p224FieldElement, in *p224LargeFieldElement) {
+<span id="L268" class="ln">   268	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L269" class="ln">   269	</span>		in[i] += p224ZeroModP63[i]
+<span id="L270" class="ln">   270	</span>	}
+<span id="L271" class="ln">   271	</span>
+<span id="L272" class="ln">   272	</span>	<span class="comment">// Eliminate the coefficients at 2**224 and greater.</span>
+<span id="L273" class="ln">   273	</span>	for i := 14; i &gt;= 8; i-- {
+<span id="L274" class="ln">   274	</span>		in[i-8] -= in[i]
+<span id="L275" class="ln">   275	</span>		in[i-5] += (in[i] &amp; 0xffff) &lt;&lt; 12
+<span id="L276" class="ln">   276	</span>		in[i-4] += in[i] &gt;&gt; 16
+<span id="L277" class="ln">   277	</span>	}
+<span id="L278" class="ln">   278	</span>	in[8] = 0
+<span id="L279" class="ln">   279	</span>	<span class="comment">// in[0..8] &lt; 2**64</span>
+<span id="L280" class="ln">   280	</span>
+<span id="L281" class="ln">   281	</span>	<span class="comment">// As the values become small enough, we start to store them in |out|</span>
+<span id="L282" class="ln">   282	</span>	<span class="comment">// and use 32-bit operations.</span>
+<span id="L283" class="ln">   283	</span>	for i := 1; i &lt; 8; i++ {
+<span id="L284" class="ln">   284	</span>		in[i+1] += in[i] &gt;&gt; 28
+<span id="L285" class="ln">   285	</span>		out[i] = uint32(in[i] &amp; bottom28Bits)
+<span id="L286" class="ln">   286	</span>	}
+<span id="L287" class="ln">   287	</span>	in[0] -= in[8]
+<span id="L288" class="ln">   288	</span>	out[3] += uint32(in[8]&amp;0xffff) &lt;&lt; 12
+<span id="L289" class="ln">   289	</span>	out[4] += uint32(in[8] &gt;&gt; 16)
+<span id="L290" class="ln">   290	</span>	<span class="comment">// in[0] &lt; 2**64</span>
+<span id="L291" class="ln">   291	</span>	<span class="comment">// out[3] &lt; 2**29</span>
+<span id="L292" class="ln">   292	</span>	<span class="comment">// out[4] &lt; 2**29</span>
+<span id="L293" class="ln">   293	</span>	<span class="comment">// out[1,2,5..7] &lt; 2**28</span>
+<span id="L294" class="ln">   294	</span>
+<span id="L295" class="ln">   295	</span>	out[0] = uint32(in[0] &amp; bottom28Bits)
+<span id="L296" class="ln">   296	</span>	out[1] += uint32((in[0] &gt;&gt; 28) &amp; bottom28Bits)
+<span id="L297" class="ln">   297	</span>	out[2] += uint32(in[0] &gt;&gt; 56)
+<span id="L298" class="ln">   298	</span>	<span class="comment">// out[0] &lt; 2**28</span>
+<span id="L299" class="ln">   299	</span>	<span class="comment">// out[1..4] &lt; 2**29</span>
+<span id="L300" class="ln">   300	</span>	<span class="comment">// out[5..7] &lt; 2**28</span>
+<span id="L301" class="ln">   301	</span>}
+<span id="L302" class="ln">   302	</span>
+<span id="L303" class="ln">   303	</span><span class="comment">// Reduce reduces the coefficients of a to smaller bounds.</span>
+<span id="L304" class="ln">   304	</span><span class="comment">//</span>
+<span id="L305" class="ln">   305	</span><span class="comment">// On entry: a[i] &lt; 2**31 + 2**30</span>
+<span id="L306" class="ln">   306	</span><span class="comment">// On exit: a[i] &lt; 2**29</span>
+<span id="L307" class="ln">   307	</span>func p224Reduce(a *p224FieldElement) {
+<span id="L308" class="ln">   308	</span>	for i := 0; i &lt; 7; i++ {
+<span id="L309" class="ln">   309	</span>		a[i+1] += a[i] &gt;&gt; 28
+<span id="L310" class="ln">   310	</span>		a[i] &amp;= bottom28Bits
+<span id="L311" class="ln">   311	</span>	}
+<span id="L312" class="ln">   312	</span>	top := a[7] &gt;&gt; 28
+<span id="L313" class="ln">   313	</span>	a[7] &amp;= bottom28Bits
+<span id="L314" class="ln">   314	</span>
+<span id="L315" class="ln">   315	</span>	<span class="comment">// top &lt; 2**4</span>
+<span id="L316" class="ln">   316	</span>	mask := top
+<span id="L317" class="ln">   317	</span>	mask |= mask &gt;&gt; 2
+<span id="L318" class="ln">   318	</span>	mask |= mask &gt;&gt; 1
+<span id="L319" class="ln">   319	</span>	mask &lt;&lt;= 31
+<span id="L320" class="ln">   320	</span>	mask = uint32(int32(mask) &gt;&gt; 31)
+<span id="L321" class="ln">   321	</span>	<span class="comment">// Mask is all ones if top != 0, all zero otherwise</span>
+<span id="L322" class="ln">   322	</span>
+<span id="L323" class="ln">   323	</span>	a[0] -= top
+<span id="L324" class="ln">   324	</span>	a[3] += top &lt;&lt; 12
+<span id="L325" class="ln">   325	</span>
+<span id="L326" class="ln">   326	</span>	<span class="comment">// We may have just made a[0] negative but, if we did, then we must</span>
+<span id="L327" class="ln">   327	</span>	<span class="comment">// have added something to a[3], this it&#39;s &gt; 2**12. Therefore we can</span>
+<span id="L328" class="ln">   328	</span>	<span class="comment">// carry down to a[0].</span>
+<span id="L329" class="ln">   329	</span>	a[3] -= 1 &amp; mask
+<span id="L330" class="ln">   330	</span>	a[2] += mask &amp; (1&lt;&lt;28 - 1)
+<span id="L331" class="ln">   331	</span>	a[1] += mask &amp; (1&lt;&lt;28 - 1)
+<span id="L332" class="ln">   332	</span>	a[0] += mask &amp; (1 &lt;&lt; 28)
+<span id="L333" class="ln">   333	</span>}
+<span id="L334" class="ln">   334	</span>
+<span id="L335" class="ln">   335	</span><span class="comment">// p224Invert calculates *out = in**-1 by computing in**(2**224 - 2**96 - 1),</span>
+<span id="L336" class="ln">   336	</span><span class="comment">// i.e. Fermat&#39;s little theorem.</span>
+<span id="L337" class="ln">   337	</span>func p224Invert(out, in *p224FieldElement) {
+<span id="L338" class="ln">   338	</span>	var f1, f2, f3, f4 p224FieldElement
+<span id="L339" class="ln">   339	</span>	var c p224LargeFieldElement
+<span id="L340" class="ln">   340	</span>
+<span id="L341" class="ln">   341	</span>	p224Square(&amp;f1, in, &amp;c)    <span class="comment">// 2</span>
+<span id="L342" class="ln">   342	</span>	p224Mul(&amp;f1, &amp;f1, in, &amp;c)  <span class="comment">// 2**2 - 1</span>
+<span id="L343" class="ln">   343	</span>	p224Square(&amp;f1, &amp;f1, &amp;c)   <span class="comment">// 2**3 - 2</span>
+<span id="L344" class="ln">   344	</span>	p224Mul(&amp;f1, &amp;f1, in, &amp;c)  <span class="comment">// 2**3 - 1</span>
+<span id="L345" class="ln">   345	</span>	p224Square(&amp;f2, &amp;f1, &amp;c)   <span class="comment">// 2**4 - 2</span>
+<span id="L346" class="ln">   346	</span>	p224Square(&amp;f2, &amp;f2, &amp;c)   <span class="comment">// 2**5 - 4</span>
+<span id="L347" class="ln">   347	</span>	p224Square(&amp;f2, &amp;f2, &amp;c)   <span class="comment">// 2**6 - 8</span>
+<span id="L348" class="ln">   348	</span>	p224Mul(&amp;f1, &amp;f1, &amp;f2, &amp;c) <span class="comment">// 2**6 - 1</span>
+<span id="L349" class="ln">   349	</span>	p224Square(&amp;f2, &amp;f1, &amp;c)   <span class="comment">// 2**7 - 2</span>
+<span id="L350" class="ln">   350	</span>	for i := 0; i &lt; 5; i++ {   <span class="comment">// 2**12 - 2**6</span>
+<span id="L351" class="ln">   351	</span>		p224Square(&amp;f2, &amp;f2, &amp;c)
+<span id="L352" class="ln">   352	</span>	}
+<span id="L353" class="ln">   353	</span>	p224Mul(&amp;f2, &amp;f2, &amp;f1, &amp;c) <span class="comment">// 2**12 - 1</span>
+<span id="L354" class="ln">   354	</span>	p224Square(&amp;f3, &amp;f2, &amp;c)   <span class="comment">// 2**13 - 2</span>
+<span id="L355" class="ln">   355	</span>	for i := 0; i &lt; 11; i++ {  <span class="comment">// 2**24 - 2**12</span>
+<span id="L356" class="ln">   356	</span>		p224Square(&amp;f3, &amp;f3, &amp;c)
+<span id="L357" class="ln">   357	</span>	}
+<span id="L358" class="ln">   358	</span>	p224Mul(&amp;f2, &amp;f3, &amp;f2, &amp;c) <span class="comment">// 2**24 - 1</span>
+<span id="L359" class="ln">   359	</span>	p224Square(&amp;f3, &amp;f2, &amp;c)   <span class="comment">// 2**25 - 2</span>
+<span id="L360" class="ln">   360	</span>	for i := 0; i &lt; 23; i++ {  <span class="comment">// 2**48 - 2**24</span>
+<span id="L361" class="ln">   361	</span>		p224Square(&amp;f3, &amp;f3, &amp;c)
+<span id="L362" class="ln">   362	</span>	}
+<span id="L363" class="ln">   363	</span>	p224Mul(&amp;f3, &amp;f3, &amp;f2, &amp;c) <span class="comment">// 2**48 - 1</span>
+<span id="L364" class="ln">   364	</span>	p224Square(&amp;f4, &amp;f3, &amp;c)   <span class="comment">// 2**49 - 2</span>
+<span id="L365" class="ln">   365	</span>	for i := 0; i &lt; 47; i++ {  <span class="comment">// 2**96 - 2**48</span>
+<span id="L366" class="ln">   366	</span>		p224Square(&amp;f4, &amp;f4, &amp;c)
+<span id="L367" class="ln">   367	</span>	}
+<span id="L368" class="ln">   368	</span>	p224Mul(&amp;f3, &amp;f3, &amp;f4, &amp;c) <span class="comment">// 2**96 - 1</span>
+<span id="L369" class="ln">   369	</span>	p224Square(&amp;f4, &amp;f3, &amp;c)   <span class="comment">// 2**97 - 2</span>
+<span id="L370" class="ln">   370	</span>	for i := 0; i &lt; 23; i++ {  <span class="comment">// 2**120 - 2**24</span>
+<span id="L371" class="ln">   371	</span>		p224Square(&amp;f4, &amp;f4, &amp;c)
+<span id="L372" class="ln">   372	</span>	}
+<span id="L373" class="ln">   373	</span>	p224Mul(&amp;f2, &amp;f4, &amp;f2, &amp;c) <span class="comment">// 2**120 - 1</span>
+<span id="L374" class="ln">   374	</span>	for i := 0; i &lt; 6; i++ {   <span class="comment">// 2**126 - 2**6</span>
+<span id="L375" class="ln">   375	</span>		p224Square(&amp;f2, &amp;f2, &amp;c)
+<span id="L376" class="ln">   376	</span>	}
+<span id="L377" class="ln">   377	</span>	p224Mul(&amp;f1, &amp;f1, &amp;f2, &amp;c) <span class="comment">// 2**126 - 1</span>
+<span id="L378" class="ln">   378	</span>	p224Square(&amp;f1, &amp;f1, &amp;c)   <span class="comment">// 2**127 - 2</span>
+<span id="L379" class="ln">   379	</span>	p224Mul(&amp;f1, &amp;f1, in, &amp;c)  <span class="comment">// 2**127 - 1</span>
+<span id="L380" class="ln">   380	</span>	for i := 0; i &lt; 97; i++ {  <span class="comment">// 2**224 - 2**97</span>
+<span id="L381" class="ln">   381	</span>		p224Square(&amp;f1, &amp;f1, &amp;c)
+<span id="L382" class="ln">   382	</span>	}
+<span id="L383" class="ln">   383	</span>	p224Mul(out, &amp;f1, &amp;f3, &amp;c) <span class="comment">// 2**224 - 2**96 - 1</span>
+<span id="L384" class="ln">   384	</span>}
+<span id="L385" class="ln">   385	</span>
+<span id="L386" class="ln">   386	</span><span class="comment">// p224Contract converts a FieldElement to its unique, minimal form.</span>
+<span id="L387" class="ln">   387	</span><span class="comment">//</span>
+<span id="L388" class="ln">   388	</span><span class="comment">// On entry, in[i] &lt; 2**29</span>
+<span id="L389" class="ln">   389	</span><span class="comment">// On exit, in[i] &lt; 2**28</span>
+<span id="L390" class="ln">   390	</span>func p224Contract(out, in *p224FieldElement) {
+<span id="L391" class="ln">   391	</span>	copy(out[:], in[:])
+<span id="L392" class="ln">   392	</span>
+<span id="L393" class="ln">   393	</span>	for i := 0; i &lt; 7; i++ {
+<span id="L394" class="ln">   394	</span>		out[i+1] += out[i] &gt;&gt; 28
+<span id="L395" class="ln">   395	</span>		out[i] &amp;= bottom28Bits
+<span id="L396" class="ln">   396	</span>	}
+<span id="L397" class="ln">   397	</span>	top := out[7] &gt;&gt; 28
+<span id="L398" class="ln">   398	</span>	out[7] &amp;= bottom28Bits
+<span id="L399" class="ln">   399	</span>
+<span id="L400" class="ln">   400	</span>	out[0] -= top
+<span id="L401" class="ln">   401	</span>	out[3] += top &lt;&lt; 12
+<span id="L402" class="ln">   402	</span>
+<span id="L403" class="ln">   403	</span>	<span class="comment">// We may just have made out[i] negative. So we carry down. If we made</span>
+<span id="L404" class="ln">   404	</span>	<span class="comment">// out[0] negative then we know that out[3] is sufficiently positive</span>
+<span id="L405" class="ln">   405	</span>	<span class="comment">// because we just added to it.</span>
+<span id="L406" class="ln">   406	</span>	for i := 0; i &lt; 3; i++ {
+<span id="L407" class="ln">   407	</span>		mask := uint32(int32(out[i]) &gt;&gt; 31)
+<span id="L408" class="ln">   408	</span>		out[i] += (1 &lt;&lt; 28) &amp; mask
+<span id="L409" class="ln">   409	</span>		out[i+1] -= 1 &amp; mask
+<span id="L410" class="ln">   410	</span>	}
+<span id="L411" class="ln">   411	</span>
+<span id="L412" class="ln">   412	</span>	<span class="comment">// We might have pushed out[3] over 2**28 so we perform another, partial,</span>
+<span id="L413" class="ln">   413	</span>	<span class="comment">// carry chain.</span>
+<span id="L414" class="ln">   414	</span>	for i := 3; i &lt; 7; i++ {
+<span id="L415" class="ln">   415	</span>		out[i+1] += out[i] &gt;&gt; 28
+<span id="L416" class="ln">   416	</span>		out[i] &amp;= bottom28Bits
+<span id="L417" class="ln">   417	</span>	}
+<span id="L418" class="ln">   418	</span>	top = out[7] &gt;&gt; 28
+<span id="L419" class="ln">   419	</span>	out[7] &amp;= bottom28Bits
+<span id="L420" class="ln">   420	</span>
+<span id="L421" class="ln">   421	</span>	<span class="comment">// Eliminate top while maintaining the same value mod p.</span>
+<span id="L422" class="ln">   422	</span>	out[0] -= top
+<span id="L423" class="ln">   423	</span>	out[3] += top &lt;&lt; 12
+<span id="L424" class="ln">   424	</span>
+<span id="L425" class="ln">   425	</span>	<span class="comment">// There are two cases to consider for out[3]:</span>
+<span id="L426" class="ln">   426	</span>	<span class="comment">//   1) The first time that we eliminated top, we didn&#39;t push out[3] over</span>
+<span id="L427" class="ln">   427	</span>	<span class="comment">//      2**28. In this case, the partial carry chain didn&#39;t change any values</span>
+<span id="L428" class="ln">   428	</span>	<span class="comment">//      and top is zero.</span>
+<span id="L429" class="ln">   429	</span>	<span class="comment">//   2) We did push out[3] over 2**28 the first time that we eliminated top.</span>
+<span id="L430" class="ln">   430	</span>	<span class="comment">//      The first value of top was in [0..16), therefore, prior to eliminating</span>
+<span id="L431" class="ln">   431	</span>	<span class="comment">//      the first top, 0xfff1000 &lt;= out[3] &lt;= 0xfffffff. Therefore, after</span>
+<span id="L432" class="ln">   432	</span>	<span class="comment">//      overflowing and being reduced by the second carry chain, out[3] &lt;=</span>
+<span id="L433" class="ln">   433	</span>	<span class="comment">//      0xf000. Thus it cannot have overflowed when we eliminated top for the</span>
+<span id="L434" class="ln">   434	</span>	<span class="comment">//      second time.</span>
+<span id="L435" class="ln">   435	</span>
+<span id="L436" class="ln">   436	</span>	<span class="comment">// Again, we may just have made out[0] negative, so do the same carry down.</span>
+<span id="L437" class="ln">   437	</span>	<span class="comment">// As before, if we made out[0] negative then we know that out[3] is</span>
+<span id="L438" class="ln">   438	</span>	<span class="comment">// sufficiently positive.</span>
+<span id="L439" class="ln">   439	</span>	for i := 0; i &lt; 3; i++ {
+<span id="L440" class="ln">   440	</span>		mask := uint32(int32(out[i]) &gt;&gt; 31)
+<span id="L441" class="ln">   441	</span>		out[i] += (1 &lt;&lt; 28) &amp; mask
+<span id="L442" class="ln">   442	</span>		out[i+1] -= 1 &amp; mask
+<span id="L443" class="ln">   443	</span>	}
+<span id="L444" class="ln">   444	</span>
+<span id="L445" class="ln">   445	</span>	<span class="comment">// Now we see if the value is &gt;= p and, if so, subtract p.</span>
+<span id="L446" class="ln">   446	</span>
+<span id="L447" class="ln">   447	</span>	<span class="comment">// First we build a mask from the top four limbs, which must all be</span>
+<span id="L448" class="ln">   448	</span>	<span class="comment">// equal to bottom28Bits if the whole value is &gt;= p. If top4AllOnes</span>
+<span id="L449" class="ln">   449	</span>	<span class="comment">// ends up with any zero bits in the bottom 28 bits, then this wasn&#39;t</span>
+<span id="L450" class="ln">   450	</span>	<span class="comment">// true.</span>
+<span id="L451" class="ln">   451	</span>	top4AllOnes := uint32(0xffffffff)
+<span id="L452" class="ln">   452	</span>	for i := 4; i &lt; 8; i++ {
+<span id="L453" class="ln">   453	</span>		top4AllOnes &amp;= out[i]
+<span id="L454" class="ln">   454	</span>	}
+<span id="L455" class="ln">   455	</span>	top4AllOnes |= 0xf0000000
+<span id="L456" class="ln">   456	</span>	<span class="comment">// Now we replicate any zero bits to all the bits in top4AllOnes.</span>
+<span id="L457" class="ln">   457	</span>	top4AllOnes &amp;= top4AllOnes &gt;&gt; 16
+<span id="L458" class="ln">   458	</span>	top4AllOnes &amp;= top4AllOnes &gt;&gt; 8
+<span id="L459" class="ln">   459	</span>	top4AllOnes &amp;= top4AllOnes &gt;&gt; 4
+<span id="L460" class="ln">   460	</span>	top4AllOnes &amp;= top4AllOnes &gt;&gt; 2
+<span id="L461" class="ln">   461	</span>	top4AllOnes &amp;= top4AllOnes &gt;&gt; 1
+<span id="L462" class="ln">   462	</span>	top4AllOnes = uint32(int32(top4AllOnes&lt;&lt;31) &gt;&gt; 31)
+<span id="L463" class="ln">   463	</span>
+<span id="L464" class="ln">   464	</span>	<span class="comment">// Now we test whether the bottom three limbs are non-zero.</span>
+<span id="L465" class="ln">   465	</span>	bottom3NonZero := out[0] | out[1] | out[2]
+<span id="L466" class="ln">   466	</span>	bottom3NonZero |= bottom3NonZero &gt;&gt; 16
+<span id="L467" class="ln">   467	</span>	bottom3NonZero |= bottom3NonZero &gt;&gt; 8
+<span id="L468" class="ln">   468	</span>	bottom3NonZero |= bottom3NonZero &gt;&gt; 4
+<span id="L469" class="ln">   469	</span>	bottom3NonZero |= bottom3NonZero &gt;&gt; 2
+<span id="L470" class="ln">   470	</span>	bottom3NonZero |= bottom3NonZero &gt;&gt; 1
+<span id="L471" class="ln">   471	</span>	bottom3NonZero = uint32(int32(bottom3NonZero&lt;&lt;31) &gt;&gt; 31)
+<span id="L472" class="ln">   472	</span>
+<span id="L473" class="ln">   473	</span>	<span class="comment">// Everything depends on the value of out[3].</span>
+<span id="L474" class="ln">   474	</span>	<span class="comment">//    If it&#39;s &gt; 0xffff000 and top4AllOnes != 0 then the whole value is &gt;= p</span>
+<span id="L475" class="ln">   475	</span>	<span class="comment">//    If it&#39;s = 0xffff000 and top4AllOnes != 0 and bottom3NonZero != 0,</span>
+<span id="L476" class="ln">   476	</span>	<span class="comment">//      then the whole value is &gt;= p</span>
+<span id="L477" class="ln">   477	</span>	<span class="comment">//    If it&#39;s &lt; 0xffff000, then the whole value is &lt; p</span>
+<span id="L478" class="ln">   478	</span>	n := out[3] - 0xffff000
+<span id="L479" class="ln">   479	</span>	out3Equal := n
+<span id="L480" class="ln">   480	</span>	out3Equal |= out3Equal &gt;&gt; 16
+<span id="L481" class="ln">   481	</span>	out3Equal |= out3Equal &gt;&gt; 8
+<span id="L482" class="ln">   482	</span>	out3Equal |= out3Equal &gt;&gt; 4
+<span id="L483" class="ln">   483	</span>	out3Equal |= out3Equal &gt;&gt; 2
+<span id="L484" class="ln">   484	</span>	out3Equal |= out3Equal &gt;&gt; 1
+<span id="L485" class="ln">   485	</span>	out3Equal = ^uint32(int32(out3Equal&lt;&lt;31) &gt;&gt; 31)
+<span id="L486" class="ln">   486	</span>
+<span id="L487" class="ln">   487	</span>	<span class="comment">// If out[3] &gt; 0xffff000 then n&#39;s MSB will be zero.</span>
+<span id="L488" class="ln">   488	</span>	out3GT := ^uint32(int32(n) &gt;&gt; 31)
+<span id="L489" class="ln">   489	</span>
+<span id="L490" class="ln">   490	</span>	mask := top4AllOnes &amp; ((out3Equal &amp; bottom3NonZero) | out3GT)
+<span id="L491" class="ln">   491	</span>	out[0] -= 1 &amp; mask
+<span id="L492" class="ln">   492	</span>	out[3] -= 0xffff000 &amp; mask
+<span id="L493" class="ln">   493	</span>	out[4] -= 0xfffffff &amp; mask
+<span id="L494" class="ln">   494	</span>	out[5] -= 0xfffffff &amp; mask
+<span id="L495" class="ln">   495	</span>	out[6] -= 0xfffffff &amp; mask
+<span id="L496" class="ln">   496	</span>	out[7] -= 0xfffffff &amp; mask
+<span id="L497" class="ln">   497	</span>}
+<span id="L498" class="ln">   498	</span>
+<span id="L499" class="ln">   499	</span><span class="comment">// Group element functions.</span>
+<span id="L500" class="ln">   500	</span><span class="comment">//</span>
+<span id="L501" class="ln">   501	</span><span class="comment">// These functions deal with group elements. The group is an elliptic curve</span>
+<span id="L502" class="ln">   502	</span><span class="comment">// group with a = -3 defined in FIPS 186-3, section D.2.2.</span>
+<span id="L503" class="ln">   503	</span>
+<span id="L504" class="ln">   504	</span><span class="comment">// p224AddJacobian computes *out = a+b where a != b.</span>
+<span id="L505" class="ln">   505	</span>func p224AddJacobian(x3, y3, z3, x1, y1, z1, x2, y2, z2 *p224FieldElement) {
+<span id="L506" class="ln">   506	</span>	<span class="comment">// See http://hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#addition-p224Add-2007-bl</span>
+<span id="L507" class="ln">   507	</span>	var z1z1, z2z2, u1, u2, s1, s2, h, i, j, r, v p224FieldElement
+<span id="L508" class="ln">   508	</span>	var c p224LargeFieldElement
+<span id="L509" class="ln">   509	</span>
+<span id="L510" class="ln">   510	</span>	z1IsZero := p224IsZero(z1)
+<span id="L511" class="ln">   511	</span>	z2IsZero := p224IsZero(z2)
+<span id="L512" class="ln">   512	</span>
+<span id="L513" class="ln">   513	</span>	<span class="comment">// Z1Z1 = Z1²</span>
+<span id="L514" class="ln">   514	</span>	p224Square(&amp;z1z1, z1, &amp;c)
+<span id="L515" class="ln">   515	</span>	<span class="comment">// Z2Z2 = Z2²</span>
+<span id="L516" class="ln">   516	</span>	p224Square(&amp;z2z2, z2, &amp;c)
+<span id="L517" class="ln">   517	</span>	<span class="comment">// U1 = X1*Z2Z2</span>
+<span id="L518" class="ln">   518	</span>	p224Mul(&amp;u1, x1, &amp;z2z2, &amp;c)
+<span id="L519" class="ln">   519	</span>	<span class="comment">// U2 = X2*Z1Z1</span>
+<span id="L520" class="ln">   520	</span>	p224Mul(&amp;u2, x2, &amp;z1z1, &amp;c)
+<span id="L521" class="ln">   521	</span>	<span class="comment">// S1 = Y1*Z2*Z2Z2</span>
+<span id="L522" class="ln">   522	</span>	p224Mul(&amp;s1, z2, &amp;z2z2, &amp;c)
+<span id="L523" class="ln">   523	</span>	p224Mul(&amp;s1, y1, &amp;s1, &amp;c)
+<span id="L524" class="ln">   524	</span>	<span class="comment">// S2 = Y2*Z1*Z1Z1</span>
+<span id="L525" class="ln">   525	</span>	p224Mul(&amp;s2, z1, &amp;z1z1, &amp;c)
+<span id="L526" class="ln">   526	</span>	p224Mul(&amp;s2, y2, &amp;s2, &amp;c)
+<span id="L527" class="ln">   527	</span>	<span class="comment">// H = U2-U1</span>
+<span id="L528" class="ln">   528	</span>	p224Sub(&amp;h, &amp;u2, &amp;u1)
+<span id="L529" class="ln">   529	</span>	p224Reduce(&amp;h)
+<span id="L530" class="ln">   530	</span>	xEqual := p224IsZero(&amp;h)
+<span id="L531" class="ln">   531	</span>	<span class="comment">// I = (2*H)²</span>
+<span id="L532" class="ln">   532	</span>	for j := 0; j &lt; 8; j++ {
+<span id="L533" class="ln">   533	</span>		i[j] = h[j] &lt;&lt; 1
+<span id="L534" class="ln">   534	</span>	}
+<span id="L535" class="ln">   535	</span>	p224Reduce(&amp;i)
+<span id="L536" class="ln">   536	</span>	p224Square(&amp;i, &amp;i, &amp;c)
+<span id="L537" class="ln">   537	</span>	<span class="comment">// J = H*I</span>
+<span id="L538" class="ln">   538	</span>	p224Mul(&amp;j, &amp;h, &amp;i, &amp;c)
+<span id="L539" class="ln">   539	</span>	<span class="comment">// r = 2*(S2-S1)</span>
+<span id="L540" class="ln">   540	</span>	p224Sub(&amp;r, &amp;s2, &amp;s1)
+<span id="L541" class="ln">   541	</span>	p224Reduce(&amp;r)
+<span id="L542" class="ln">   542	</span>	yEqual := p224IsZero(&amp;r)
+<span id="L543" class="ln">   543	</span>	if xEqual == 1 &amp;&amp; yEqual == 1 &amp;&amp; z1IsZero == 0 &amp;&amp; z2IsZero == 0 {
+<span id="L544" class="ln">   544	</span>		p224DoubleJacobian(x3, y3, z3, x1, y1, z1)
+<span id="L545" class="ln">   545	</span>		return
+<span id="L546" class="ln">   546	</span>	}
+<span id="L547" class="ln">   547	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L548" class="ln">   548	</span>		r[i] &lt;&lt;= 1
+<span id="L549" class="ln">   549	</span>	}
+<span id="L550" class="ln">   550	</span>	p224Reduce(&amp;r)
+<span id="L551" class="ln">   551	</span>	<span class="comment">// V = U1*I</span>
+<span id="L552" class="ln">   552	</span>	p224Mul(&amp;v, &amp;u1, &amp;i, &amp;c)
+<span id="L553" class="ln">   553	</span>	<span class="comment">// Z3 = ((Z1+Z2)²-Z1Z1-Z2Z2)*H</span>
+<span id="L554" class="ln">   554	</span>	p224Add(&amp;z1z1, &amp;z1z1, &amp;z2z2)
+<span id="L555" class="ln">   555	</span>	p224Add(&amp;z2z2, z1, z2)
+<span id="L556" class="ln">   556	</span>	p224Reduce(&amp;z2z2)
+<span id="L557" class="ln">   557	</span>	p224Square(&amp;z2z2, &amp;z2z2, &amp;c)
+<span id="L558" class="ln">   558	</span>	p224Sub(z3, &amp;z2z2, &amp;z1z1)
+<span id="L559" class="ln">   559	</span>	p224Reduce(z3)
+<span id="L560" class="ln">   560	</span>	p224Mul(z3, z3, &amp;h, &amp;c)
+<span id="L561" class="ln">   561	</span>	<span class="comment">// X3 = r²-J-2*V</span>
+<span id="L562" class="ln">   562	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L563" class="ln">   563	</span>		z1z1[i] = v[i] &lt;&lt; 1
+<span id="L564" class="ln">   564	</span>	}
+<span id="L565" class="ln">   565	</span>	p224Add(&amp;z1z1, &amp;j, &amp;z1z1)
+<span id="L566" class="ln">   566	</span>	p224Reduce(&amp;z1z1)
+<span id="L567" class="ln">   567	</span>	p224Square(x3, &amp;r, &amp;c)
+<span id="L568" class="ln">   568	</span>	p224Sub(x3, x3, &amp;z1z1)
+<span id="L569" class="ln">   569	</span>	p224Reduce(x3)
+<span id="L570" class="ln">   570	</span>	<span class="comment">// Y3 = r*(V-X3)-2*S1*J</span>
+<span id="L571" class="ln">   571	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L572" class="ln">   572	</span>		s1[i] &lt;&lt;= 1
+<span id="L573" class="ln">   573	</span>	}
+<span id="L574" class="ln">   574	</span>	p224Mul(&amp;s1, &amp;s1, &amp;j, &amp;c)
+<span id="L575" class="ln">   575	</span>	p224Sub(&amp;z1z1, &amp;v, x3)
+<span id="L576" class="ln">   576	</span>	p224Reduce(&amp;z1z1)
+<span id="L577" class="ln">   577	</span>	p224Mul(&amp;z1z1, &amp;z1z1, &amp;r, &amp;c)
+<span id="L578" class="ln">   578	</span>	p224Sub(y3, &amp;z1z1, &amp;s1)
+<span id="L579" class="ln">   579	</span>	p224Reduce(y3)
+<span id="L580" class="ln">   580	</span>
+<span id="L581" class="ln">   581	</span>	p224CopyConditional(x3, x2, z1IsZero)
+<span id="L582" class="ln">   582	</span>	p224CopyConditional(x3, x1, z2IsZero)
+<span id="L583" class="ln">   583	</span>	p224CopyConditional(y3, y2, z1IsZero)
+<span id="L584" class="ln">   584	</span>	p224CopyConditional(y3, y1, z2IsZero)
+<span id="L585" class="ln">   585	</span>	p224CopyConditional(z3, z2, z1IsZero)
+<span id="L586" class="ln">   586	</span>	p224CopyConditional(z3, z1, z2IsZero)
+<span id="L587" class="ln">   587	</span>}
+<span id="L588" class="ln">   588	</span>
+<span id="L589" class="ln">   589	</span><span class="comment">// p224DoubleJacobian computes *out = a+a.</span>
+<span id="L590" class="ln">   590	</span>func p224DoubleJacobian(x3, y3, z3, x1, y1, z1 *p224FieldElement) {
+<span id="L591" class="ln">   591	</span>	var delta, gamma, beta, alpha, t p224FieldElement
+<span id="L592" class="ln">   592	</span>	var c p224LargeFieldElement
+<span id="L593" class="ln">   593	</span>
+<span id="L594" class="ln">   594	</span>	p224Square(&amp;delta, z1, &amp;c)
+<span id="L595" class="ln">   595	</span>	p224Square(&amp;gamma, y1, &amp;c)
+<span id="L596" class="ln">   596	</span>	p224Mul(&amp;beta, x1, &amp;gamma, &amp;c)
+<span id="L597" class="ln">   597	</span>
+<span id="L598" class="ln">   598	</span>	<span class="comment">// alpha = 3*(X1-delta)*(X1+delta)</span>
+<span id="L599" class="ln">   599	</span>	p224Add(&amp;t, x1, &amp;delta)
+<span id="L600" class="ln">   600	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L601" class="ln">   601	</span>		t[i] += t[i] &lt;&lt; 1
+<span id="L602" class="ln">   602	</span>	}
+<span id="L603" class="ln">   603	</span>	p224Reduce(&amp;t)
+<span id="L604" class="ln">   604	</span>	p224Sub(&amp;alpha, x1, &amp;delta)
+<span id="L605" class="ln">   605	</span>	p224Reduce(&amp;alpha)
+<span id="L606" class="ln">   606	</span>	p224Mul(&amp;alpha, &amp;alpha, &amp;t, &amp;c)
+<span id="L607" class="ln">   607	</span>
+<span id="L608" class="ln">   608	</span>	<span class="comment">// Z3 = (Y1+Z1)²-gamma-delta</span>
+<span id="L609" class="ln">   609	</span>	p224Add(z3, y1, z1)
+<span id="L610" class="ln">   610	</span>	p224Reduce(z3)
+<span id="L611" class="ln">   611	</span>	p224Square(z3, z3, &amp;c)
+<span id="L612" class="ln">   612	</span>	p224Sub(z3, z3, &amp;gamma)
+<span id="L613" class="ln">   613	</span>	p224Reduce(z3)
+<span id="L614" class="ln">   614	</span>	p224Sub(z3, z3, &amp;delta)
+<span id="L615" class="ln">   615	</span>	p224Reduce(z3)
+<span id="L616" class="ln">   616	</span>
+<span id="L617" class="ln">   617	</span>	<span class="comment">// X3 = alpha²-8*beta</span>
+<span id="L618" class="ln">   618	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L619" class="ln">   619	</span>		delta[i] = beta[i] &lt;&lt; 3
+<span id="L620" class="ln">   620	</span>	}
+<span id="L621" class="ln">   621	</span>	p224Reduce(&amp;delta)
+<span id="L622" class="ln">   622	</span>	p224Square(x3, &amp;alpha, &amp;c)
+<span id="L623" class="ln">   623	</span>	p224Sub(x3, x3, &amp;delta)
+<span id="L624" class="ln">   624	</span>	p224Reduce(x3)
+<span id="L625" class="ln">   625	</span>
+<span id="L626" class="ln">   626	</span>	<span class="comment">// Y3 = alpha*(4*beta-X3)-8*gamma²</span>
+<span id="L627" class="ln">   627	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L628" class="ln">   628	</span>		beta[i] &lt;&lt;= 2
+<span id="L629" class="ln">   629	</span>	}
+<span id="L630" class="ln">   630	</span>	p224Sub(&amp;beta, &amp;beta, x3)
+<span id="L631" class="ln">   631	</span>	p224Reduce(&amp;beta)
+<span id="L632" class="ln">   632	</span>	p224Square(&amp;gamma, &amp;gamma, &amp;c)
+<span id="L633" class="ln">   633	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L634" class="ln">   634	</span>		gamma[i] &lt;&lt;= 3
+<span id="L635" class="ln">   635	</span>	}
+<span id="L636" class="ln">   636	</span>	p224Reduce(&amp;gamma)
+<span id="L637" class="ln">   637	</span>	p224Mul(y3, &amp;alpha, &amp;beta, &amp;c)
+<span id="L638" class="ln">   638	</span>	p224Sub(y3, y3, &amp;gamma)
+<span id="L639" class="ln">   639	</span>	p224Reduce(y3)
+<span id="L640" class="ln">   640	</span>}
+<span id="L641" class="ln">   641	</span>
+<span id="L642" class="ln">   642	</span><span class="comment">// p224CopyConditional sets *out = *in iff the least-significant-bit of control</span>
+<span id="L643" class="ln">   643	</span><span class="comment">// is true, and it runs in constant time.</span>
+<span id="L644" class="ln">   644	</span>func p224CopyConditional(out, in *p224FieldElement, control uint32) {
+<span id="L645" class="ln">   645	</span>	control &lt;&lt;= 31
+<span id="L646" class="ln">   646	</span>	control = uint32(int32(control) &gt;&gt; 31)
+<span id="L647" class="ln">   647	</span>
+<span id="L648" class="ln">   648	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L649" class="ln">   649	</span>		out[i] ^= (out[i] ^ in[i]) &amp; control
+<span id="L650" class="ln">   650	</span>	}
+<span id="L651" class="ln">   651	</span>}
+<span id="L652" class="ln">   652	</span>
+<span id="L653" class="ln">   653	</span>func p224ScalarMult(outX, outY, outZ, inX, inY, inZ *p224FieldElement, scalar []byte) {
+<span id="L654" class="ln">   654	</span>	var xx, yy, zz p224FieldElement
+<span id="L655" class="ln">   655	</span>	for i := 0; i &lt; 8; i++ {
+<span id="L656" class="ln">   656	</span>		outX[i] = 0
+<span id="L657" class="ln">   657	</span>		outY[i] = 0
+<span id="L658" class="ln">   658	</span>		outZ[i] = 0
+<span id="L659" class="ln">   659	</span>	}
+<span id="L660" class="ln">   660	</span>
+<span id="L661" class="ln">   661	</span>	for _, byte := range scalar {
+<span id="L662" class="ln">   662	</span>		for bitNum := uint(0); bitNum &lt; 8; bitNum++ {
+<span id="L663" class="ln">   663	</span>			p224DoubleJacobian(outX, outY, outZ, outX, outY, outZ)
+<span id="L664" class="ln">   664	</span>			bit := uint32((byte &gt;&gt; (7 - bitNum)) &amp; 1)
+<span id="L665" class="ln">   665	</span>			p224AddJacobian(&amp;xx, &amp;yy, &amp;zz, inX, inY, inZ, outX, outY, outZ)
+<span id="L666" class="ln">   666	</span>			p224CopyConditional(outX, &amp;xx, bit)
+<span id="L667" class="ln">   667	</span>			p224CopyConditional(outY, &amp;yy, bit)
+<span id="L668" class="ln">   668	</span>			p224CopyConditional(outZ, &amp;zz, bit)
+<span id="L669" class="ln">   669	</span>		}
+<span id="L670" class="ln">   670	</span>	}
+<span id="L671" class="ln">   671	</span>}
+<span id="L672" class="ln">   672	</span>
+<span id="L673" class="ln">   673	</span><span class="comment">// p224ToAffine converts from Jacobian to affine form.</span>
+<span id="L674" class="ln">   674	</span>func p224ToAffine(x, y, z *p224FieldElement) (*big.Int, *big.Int) {
+<span id="L675" class="ln">   675	</span>	var zinv, zinvsq, outx, outy p224FieldElement
+<span id="L676" class="ln">   676	</span>	var tmp p224LargeFieldElement
+<span id="L677" class="ln">   677	</span>
+<span id="L678" class="ln">   678	</span>	if isPointAtInfinity := p224IsZero(z); isPointAtInfinity == 1 {
+<span id="L679" class="ln">   679	</span>		return new(big.Int), new(big.Int)
+<span id="L680" class="ln">   680	</span>	}
+<span id="L681" class="ln">   681	</span>
+<span id="L682" class="ln">   682	</span>	p224Invert(&amp;zinv, z)
+<span id="L683" class="ln">   683	</span>	p224Square(&amp;zinvsq, &amp;zinv, &amp;tmp)
+<span id="L684" class="ln">   684	</span>	p224Mul(x, x, &amp;zinvsq, &amp;tmp)
+<span id="L685" class="ln">   685	</span>	p224Mul(&amp;zinvsq, &amp;zinvsq, &amp;zinv, &amp;tmp)
+<span id="L686" class="ln">   686	</span>	p224Mul(y, y, &amp;zinvsq, &amp;tmp)
+<span id="L687" class="ln">   687	</span>
+<span id="L688" class="ln">   688	</span>	p224Contract(&amp;outx, x)
+<span id="L689" class="ln">   689	</span>	p224Contract(&amp;outy, y)
+<span id="L690" class="ln">   690	</span>	return p224ToBig(&amp;outx), p224ToBig(&amp;outy)
+<span id="L691" class="ln">   691	</span>}
+<span id="L692" class="ln">   692	</span>
+<span id="L693" class="ln">   693	</span><span class="comment">// get28BitsFromEnd returns the least-significant 28 bits from buf&gt;&gt;shift,</span>
+<span id="L694" class="ln">   694	</span><span class="comment">// where buf is interpreted as a big-endian number.</span>
+<span id="L695" class="ln">   695	</span>func get28BitsFromEnd(buf []byte, shift uint) (uint32, []byte) {
+<span id="L696" class="ln">   696	</span>	var ret uint32
+<span id="L697" class="ln">   697	</span>
+<span id="L698" class="ln">   698	</span>	for i := uint(0); i &lt; 4; i++ {
+<span id="L699" class="ln">   699	</span>		var b byte
+<span id="L700" class="ln">   700	</span>		if l := len(buf); l &gt; 0 {
+<span id="L701" class="ln">   701	</span>			b = buf[l-1]
+<span id="L702" class="ln">   702	</span>			<span class="comment">// We don&#39;t remove the byte if we&#39;re about to return and we&#39;re not</span>
+<span id="L703" class="ln">   703	</span>			<span class="comment">// reading all of it.</span>
+<span id="L704" class="ln">   704	</span>			if i != 3 || shift == 4 {
+<span id="L705" class="ln">   705	</span>				buf = buf[:l-1]
+<span id="L706" class="ln">   706	</span>			}
+<span id="L707" class="ln">   707	</span>		}
+<span id="L708" class="ln">   708	</span>		ret |= uint32(b) &lt;&lt; (8 * i) &gt;&gt; shift
+<span id="L709" class="ln">   709	</span>	}
+<span id="L710" class="ln">   710	</span>	ret &amp;= bottom28Bits
+<span id="L711" class="ln">   711	</span>	return ret, buf
+<span id="L712" class="ln">   712	</span>}
+<span id="L713" class="ln">   713	</span>
+<span id="L714" class="ln">   714	</span><span class="comment">// p224FromBig sets *out = *in.</span>
+<span id="L715" class="ln">   715	</span>func p224FromBig(out *p224FieldElement, in *big.Int) {
+<span id="L716" class="ln">   716	</span>	bytes := in.Bytes()
+<span id="L717" class="ln">   717	</span>	out[0], bytes = get28BitsFromEnd(bytes, 0)
+<span id="L718" class="ln">   718	</span>	out[1], bytes = get28BitsFromEnd(bytes, 4)
+<span id="L719" class="ln">   719	</span>	out[2], bytes = get28BitsFromEnd(bytes, 0)
+<span id="L720" class="ln">   720	</span>	out[3], bytes = get28BitsFromEnd(bytes, 4)
+<span id="L721" class="ln">   721	</span>	out[4], bytes = get28BitsFromEnd(bytes, 0)
+<span id="L722" class="ln">   722	</span>	out[5], bytes = get28BitsFromEnd(bytes, 4)
+<span id="L723" class="ln">   723	</span>	out[6], bytes = get28BitsFromEnd(bytes, 0)
+<span id="L724" class="ln">   724	</span>	out[7], bytes = get28BitsFromEnd(bytes, 4)
+<span id="L725" class="ln">   725	</span>}
+<span id="L726" class="ln">   726	</span>
+<span id="L727" class="ln">   727	</span><span class="comment">// p224ToBig returns in as a big.Int.</span>
+<span id="L728" class="ln">   728	</span>func p224ToBig(in *p224FieldElement) *big.Int {
+<span id="L729" class="ln">   729	</span>	var buf [28]byte
+<span id="L730" class="ln">   730	</span>	buf[27] = byte(in[0])
+<span id="L731" class="ln">   731	</span>	buf[26] = byte(in[0] &gt;&gt; 8)
+<span id="L732" class="ln">   732	</span>	buf[25] = byte(in[0] &gt;&gt; 16)
+<span id="L733" class="ln">   733	</span>	buf[24] = byte(((in[0] &gt;&gt; 24) &amp; 0x0f) | (in[1]&lt;&lt;4)&amp;0xf0)
+<span id="L734" class="ln">   734	</span>
+<span id="L735" class="ln">   735	</span>	buf[23] = byte(in[1] &gt;&gt; 4)
+<span id="L736" class="ln">   736	</span>	buf[22] = byte(in[1] &gt;&gt; 12)
+<span id="L737" class="ln">   737	</span>	buf[21] = byte(in[1] &gt;&gt; 20)
+<span id="L738" class="ln">   738	</span>
+<span id="L739" class="ln">   739	</span>	buf[20] = byte(in[2])
+<span id="L740" class="ln">   740	</span>	buf[19] = byte(in[2] &gt;&gt; 8)
+<span id="L741" class="ln">   741	</span>	buf[18] = byte(in[2] &gt;&gt; 16)
+<span id="L742" class="ln">   742	</span>	buf[17] = byte(((in[2] &gt;&gt; 24) &amp; 0x0f) | (in[3]&lt;&lt;4)&amp;0xf0)
+<span id="L743" class="ln">   743	</span>
+<span id="L744" class="ln">   744	</span>	buf[16] = byte(in[3] &gt;&gt; 4)
+<span id="L745" class="ln">   745	</span>	buf[15] = byte(in[3] &gt;&gt; 12)
+<span id="L746" class="ln">   746	</span>	buf[14] = byte(in[3] &gt;&gt; 20)
+<span id="L747" class="ln">   747	</span>
+<span id="L748" class="ln">   748	</span>	buf[13] = byte(in[4])
+<span id="L749" class="ln">   749	</span>	buf[12] = byte(in[4] &gt;&gt; 8)
+<span id="L750" class="ln">   750	</span>	buf[11] = byte(in[4] &gt;&gt; 16)
+<span id="L751" class="ln">   751	</span>	buf[10] = byte(((in[4] &gt;&gt; 24) &amp; 0x0f) | (in[5]&lt;&lt;4)&amp;0xf0)
+<span id="L752" class="ln">   752	</span>
+<span id="L753" class="ln">   753	</span>	buf[9] = byte(in[5] &gt;&gt; 4)
+<span id="L754" class="ln">   754	</span>	buf[8] = byte(in[5] &gt;&gt; 12)
+<span id="L755" class="ln">   755	</span>	buf[7] = byte(in[5] &gt;&gt; 20)
+<span id="L756" class="ln">   756	</span>
+<span id="L757" class="ln">   757	</span>	buf[6] = byte(in[6])
+<span id="L758" class="ln">   758	</span>	buf[5] = byte(in[6] &gt;&gt; 8)
+<span id="L759" class="ln">   759	</span>	buf[4] = byte(in[6] &gt;&gt; 16)
+<span id="L760" class="ln">   760	</span>	buf[3] = byte(((in[6] &gt;&gt; 24) &amp; 0x0f) | (in[7]&lt;&lt;4)&amp;0xf0)
+<span id="L761" class="ln">   761	</span>
+<span id="L762" class="ln">   762	</span>	buf[2] = byte(in[7] &gt;&gt; 4)
+<span id="L763" class="ln">   763	</span>	buf[1] = byte(in[7] &gt;&gt; 12)
+<span id="L764" class="ln">   764	</span>	buf[0] = byte(in[7] &gt;&gt; 20)
+<span id="L765" class="ln">   765	</span>
+<span id="L766" class="ln">   766	</span>	return new(big.Int).SetBytes(buf[:])
+<span id="L767" class="ln">   767	</span>}
+<span id="L768" class="ln">   768	</span>
+</pre><p><a href="p224.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

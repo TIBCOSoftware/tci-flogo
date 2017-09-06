@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/syscall/lsf_linux.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./lsf_linux.go%3Fs=1935:1963.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/syscall/lsf_linux.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// Linux socket filter</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package syscall
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;unsafe&#34;
+<span id="L11" class="ln">    11	</span>)
+<span id="L12" class="ln">    12	</span>
+<span id="L13" class="ln">    13	</span><span class="comment">// Deprecated: Use golang.org/x/net/bpf instead.</span>
+<span id="L14" class="ln">    14	</span>func LsfStmt(code, k int) *SockFilter {
+<span id="L15" class="ln">    15	</span>	return &amp;SockFilter{Code: uint16(code), K: uint32(k)}
+<span id="L16" class="ln">    16	</span>}
+<span id="L17" class="ln">    17	</span>
+<span id="L18" class="ln">    18	</span><span class="comment">// Deprecated: Use golang.org/x/net/bpf instead.</span>
+<span id="L19" class="ln">    19	</span>func LsfJump(code, k, jt, jf int) *SockFilter {
+<span id="L20" class="ln">    20	</span>	return &amp;SockFilter{Code: uint16(code), Jt: uint8(jt), Jf: uint8(jf), K: uint32(k)}
+<span id="L21" class="ln">    21	</span>}
+<span id="L22" class="ln">    22	</span>
+<span id="L23" class="ln">    23	</span><span class="comment">// Deprecated: Use golang.org/x/net/bpf instead.</span>
+<span id="L24" class="ln">    24	</span>func LsfSocket(ifindex, proto int) (int, error) {
+<span id="L25" class="ln">    25	</span>	var lsall SockaddrLinklayer
+<span id="L26" class="ln">    26	</span>	s, e := Socket(AF_PACKET, SOCK_RAW, proto)
+<span id="L27" class="ln">    27	</span>	if e != nil {
+<span id="L28" class="ln">    28	</span>		return 0, e
+<span id="L29" class="ln">    29	</span>	}
+<span id="L30" class="ln">    30	</span>	p := (*[2]byte)(unsafe.Pointer(&amp;lsall.Protocol))
+<span id="L31" class="ln">    31	</span>	p[0] = byte(proto &gt;&gt; 8)
+<span id="L32" class="ln">    32	</span>	p[1] = byte(proto)
+<span id="L33" class="ln">    33	</span>	lsall.Ifindex = ifindex
+<span id="L34" class="ln">    34	</span>	e = Bind(s, &amp;lsall)
+<span id="L35" class="ln">    35	</span>	if e != nil {
+<span id="L36" class="ln">    36	</span>		Close(s)
+<span id="L37" class="ln">    37	</span>		return 0, e
+<span id="L38" class="ln">    38	</span>	}
+<span id="L39" class="ln">    39	</span>	return s, nil
+<span id="L40" class="ln">    40	</span>}
+<span id="L41" class="ln">    41	</span>
+<span id="L42" class="ln">    42	</span>type iflags struct {
+<span id="L43" class="ln">    43	</span>	name  [IFNAMSIZ]byte
+<span id="L44" class="ln">    44	</span>	flags uint16
+<span id="L45" class="ln">    45	</span>}
+<span id="L46" class="ln">    46	</span>
+<span id="L47" class="ln">    47	</span><span class="comment">// Deprecated: Use golang.org/x/net/bpf instead.</span>
+<span id="L48" class="ln">    48	</span>func SetLsfPromisc(name string, m bool) error {
+<span id="L49" class="ln">    49	</span>	s, e := Socket(AF_INET, SOCK_DGRAM, 0)
+<span id="L50" class="ln">    50	</span>	if e != nil {
+<span id="L51" class="ln">    51	</span>		return e
+<span id="L52" class="ln">    52	</span>	}
+<span id="L53" class="ln">    53	</span>	defer Close(s)
+<span id="L54" class="ln">    54	</span>	var ifl iflags
+<span id="L55" class="ln">    55	</span>	copy(ifl.name[:], []byte(name))
+<span id="L56" class="ln">    56	</span>	_, _, ep := Syscall(SYS_IOCTL, uintptr(s), SIOCGIFFLAGS, uintptr(unsafe.Pointer(&amp;ifl)))
+<span id="L57" class="ln">    57	</span>	if ep != 0 {
+<span id="L58" class="ln">    58	</span>		return Errno(ep)
+<span id="L59" class="ln">    59	</span>	}
+<span id="L60" class="ln">    60	</span>	if m {
+<span id="L61" class="ln">    61	</span>		ifl.flags |= uint16(IFF_PROMISC)
+<span id="L62" class="ln">    62	</span>	} else {
+<span id="L63" class="ln">    63	</span>		ifl.flags &amp;^= uint16(IFF_PROMISC)
+<span id="L64" class="ln">    64	</span>	}
+<span id="L65" class="ln">    65	</span>	_, _, ep = Syscall(SYS_IOCTL, uintptr(s), SIOCSIFFLAGS, uintptr(unsafe.Pointer(&amp;ifl)))
+<span id="L66" class="ln">    66	</span>	if ep != 0 {
+<span id="L67" class="ln">    67	</span>		return Errno(ep)
+<span id="L68" class="ln">    68	</span>	}
+<span id="L69" class="ln">    69	</span>	return nil
+<span id="L70" class="ln">    70	</span>}
+<span id="L71" class="ln">    71	</span>
+<span id="L72" class="ln">    72	</span><span class="comment">// Deprecated: Use golang.org/x/net/bpf instead.</span>
+<span id="L73" class="ln">    73	</span>func AttachLsf(fd int, i []SockFilter) error {
+<span id="L74" class="ln">    74	</span>	var p SockFprog
+<span id="L75" class="ln">    75	</span>	p.Len = uint16(len(i))
+<span id="L76" class="ln">    76	</span>	p.Filter = (*SockFilter)(unsafe.Pointer(&amp;i[0]))
+<span id="L77" class="ln">    77	</span>	return setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, unsafe.Pointer(&amp;p), unsafe.Sizeof(p))
+<span id="L78" class="ln">    78	</span>}
+<span id="L79" class="ln">    79	</span>
+<span id="L80" class="ln">    80	</span><span class="comment">// Deprecated: Use golang.org/x/net/bpf instead.</span>
+<span id="L81" class="ln">    81	</span><span class="selection">func DetachLsf(fd int) error</span> {
+<span id="L82" class="ln">    82	</span>	var dummy int
+<span id="L83" class="ln">    83	</span>	return setsockopt(fd, SOL_SOCKET, SO_DETACH_FILTER, unsafe.Pointer(&amp;dummy), unsafe.Sizeof(dummy))
+<span id="L84" class="ln">    84	</span>}
+<span id="L85" class="ln">    85	</span>
+</pre><p><a href="lsf_linux.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

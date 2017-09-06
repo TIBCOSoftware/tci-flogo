@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/j0.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="j0.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/math/j0.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package math
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span><span class="comment">/*
+<span id="L8" class="ln">     8	</span>	Bessel function of the first and second kinds of order zero.
+<span id="L9" class="ln">     9	</span>*/</span>
+<span id="L10" class="ln">    10	</span>
+<span id="L11" class="ln">    11	</span><span class="comment">// The original C code and the long comment below are</span>
+<span id="L12" class="ln">    12	</span><span class="comment">// from FreeBSD&#39;s /usr/src/lib/msun/src/e_j0.c and</span>
+<span id="L13" class="ln">    13	</span><span class="comment">// came with this notice. The go code is a simplified</span>
+<span id="L14" class="ln">    14	</span><span class="comment">// version of the original C.</span>
+<span id="L15" class="ln">    15	</span><span class="comment">//</span>
+<span id="L16" class="ln">    16	</span><span class="comment">// ====================================================</span>
+<span id="L17" class="ln">    17	</span><span class="comment">// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.</span>
+<span id="L18" class="ln">    18	</span><span class="comment">//</span>
+<span id="L19" class="ln">    19	</span><span class="comment">// Developed at SunPro, a Sun Microsystems, Inc. business.</span>
+<span id="L20" class="ln">    20	</span><span class="comment">// Permission to use, copy, modify, and distribute this</span>
+<span id="L21" class="ln">    21	</span><span class="comment">// software is freely granted, provided that this notice</span>
+<span id="L22" class="ln">    22	</span><span class="comment">// is preserved.</span>
+<span id="L23" class="ln">    23	</span><span class="comment">// ====================================================</span>
+<span id="L24" class="ln">    24	</span><span class="comment">//</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// __ieee754_j0(x), __ieee754_y0(x)</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// Bessel function of the first and second kinds of order zero.</span>
+<span id="L27" class="ln">    27	</span><span class="comment">// Method -- j0(x):</span>
+<span id="L28" class="ln">    28	</span><span class="comment">//      1. For tiny x, we use j0(x) = 1 - x**2/4 + x**4/64 - ...</span>
+<span id="L29" class="ln">    29	</span><span class="comment">//      2. Reduce x to |x| since j0(x)=j0(-x),  and</span>
+<span id="L30" class="ln">    30	</span><span class="comment">//         for x in (0,2)</span>
+<span id="L31" class="ln">    31	</span><span class="comment">//              j0(x) = 1-z/4+ z**2*R0/S0,  where z = x*x;</span>
+<span id="L32" class="ln">    32	</span><span class="comment">//         (precision:  |j0-1+z/4-z**2R0/S0 |&lt;2**-63.67 )</span>
+<span id="L33" class="ln">    33	</span><span class="comment">//         for x in (2,inf)</span>
+<span id="L34" class="ln">    34	</span><span class="comment">//              j0(x) = sqrt(2/(pi*x))*(p0(x)*cos(x0)-q0(x)*sin(x0))</span>
+<span id="L35" class="ln">    35	</span><span class="comment">//         where x0 = x-pi/4. It is better to compute sin(x0),cos(x0)</span>
+<span id="L36" class="ln">    36	</span><span class="comment">//         as follow:</span>
+<span id="L37" class="ln">    37	</span><span class="comment">//              cos(x0) = cos(x)cos(pi/4)+sin(x)sin(pi/4)</span>
+<span id="L38" class="ln">    38	</span><span class="comment">//                      = 1/sqrt(2) * (cos(x) + sin(x))</span>
+<span id="L39" class="ln">    39	</span><span class="comment">//              sin(x0) = sin(x)cos(pi/4)-cos(x)sin(pi/4)</span>
+<span id="L40" class="ln">    40	</span><span class="comment">//                      = 1/sqrt(2) * (sin(x) - cos(x))</span>
+<span id="L41" class="ln">    41	</span><span class="comment">//         (To avoid cancelation, use</span>
+<span id="L42" class="ln">    42	</span><span class="comment">//              sin(x) +- cos(x) = -cos(2x)/(sin(x) -+ cos(x))</span>
+<span id="L43" class="ln">    43	</span><span class="comment">//         to compute the worse one.)</span>
+<span id="L44" class="ln">    44	</span><span class="comment">//</span>
+<span id="L45" class="ln">    45	</span><span class="comment">//      3 Special cases</span>
+<span id="L46" class="ln">    46	</span><span class="comment">//              j0(nan)= nan</span>
+<span id="L47" class="ln">    47	</span><span class="comment">//              j0(0) = 1</span>
+<span id="L48" class="ln">    48	</span><span class="comment">//              j0(inf) = 0</span>
+<span id="L49" class="ln">    49	</span><span class="comment">//</span>
+<span id="L50" class="ln">    50	</span><span class="comment">// Method -- y0(x):</span>
+<span id="L51" class="ln">    51	</span><span class="comment">//      1. For x&lt;2.</span>
+<span id="L52" class="ln">    52	</span><span class="comment">//         Since</span>
+<span id="L53" class="ln">    53	</span><span class="comment">//              y0(x) = 2/pi*(j0(x)*(ln(x/2)+Euler) + x**2/4 - ...)</span>
+<span id="L54" class="ln">    54	</span><span class="comment">//         therefore y0(x)-2/pi*j0(x)*ln(x) is an even function.</span>
+<span id="L55" class="ln">    55	</span><span class="comment">//         We use the following function to approximate y0,</span>
+<span id="L56" class="ln">    56	</span><span class="comment">//              y0(x) = U(z)/V(z) + (2/pi)*(j0(x)*ln(x)), z= x**2</span>
+<span id="L57" class="ln">    57	</span><span class="comment">//         where</span>
+<span id="L58" class="ln">    58	</span><span class="comment">//              U(z) = u00 + u01*z + ... + u06*z**6</span>
+<span id="L59" class="ln">    59	</span><span class="comment">//              V(z) = 1  + v01*z + ... + v04*z**4</span>
+<span id="L60" class="ln">    60	</span><span class="comment">//         with absolute approximation error bounded by 2**-72.</span>
+<span id="L61" class="ln">    61	</span><span class="comment">//         Note: For tiny x, U/V = u0 and j0(x)~1, hence</span>
+<span id="L62" class="ln">    62	</span><span class="comment">//              y0(tiny) = u0 + (2/pi)*ln(tiny), (choose tiny&lt;2**-27)</span>
+<span id="L63" class="ln">    63	</span><span class="comment">//      2. For x&gt;=2.</span>
+<span id="L64" class="ln">    64	</span><span class="comment">//              y0(x) = sqrt(2/(pi*x))*(p0(x)*cos(x0)+q0(x)*sin(x0))</span>
+<span id="L65" class="ln">    65	</span><span class="comment">//         where x0 = x-pi/4. It is better to compute sin(x0),cos(x0)</span>
+<span id="L66" class="ln">    66	</span><span class="comment">//         by the method mentioned above.</span>
+<span id="L67" class="ln">    67	</span><span class="comment">//      3. Special cases: y0(0)=-inf, y0(x&lt;0)=NaN, y0(inf)=0.</span>
+<span id="L68" class="ln">    68	</span><span class="comment">//</span>
+<span id="L69" class="ln">    69	</span>
+<span id="L70" class="ln">    70	</span><span class="comment">// J0 returns the order-zero Bessel function of the first kind.</span>
+<span id="L71" class="ln">    71	</span><span class="comment">//</span>
+<span id="L72" class="ln">    72	</span><span class="comment">// Special cases are:</span>
+<span id="L73" class="ln">    73	</span><span class="comment">//	J0(±Inf) = 0</span>
+<span id="L74" class="ln">    74	</span><span class="comment">//	J0(0) = 1</span>
+<span id="L75" class="ln">    75	</span><span class="comment">//	J0(NaN) = NaN</span>
+<span id="L76" class="ln">    76	</span>func J0(x float64) float64 {
+<span id="L77" class="ln">    77	</span>	const (
+<span id="L78" class="ln">    78	</span>		Huge   = 1e300
+<span id="L79" class="ln">    79	</span>		TwoM27 = 1.0 / (1 &lt;&lt; 27) <span class="comment">// 2**-27 0x3e40000000000000</span>
+<span id="L80" class="ln">    80	</span>		TwoM13 = 1.0 / (1 &lt;&lt; 13) <span class="comment">// 2**-13 0x3f20000000000000</span>
+<span id="L81" class="ln">    81	</span>		Two129 = 1 &lt;&lt; 129        <span class="comment">// 2**129 0x4800000000000000</span>
+<span id="L82" class="ln">    82	</span>		<span class="comment">// R0/S0 on [0, 2]</span>
+<span id="L83" class="ln">    83	</span>		R02 = 1.56249999999999947958e-02  <span class="comment">// 0x3F8FFFFFFFFFFFFD</span>
+<span id="L84" class="ln">    84	</span>		R03 = -1.89979294238854721751e-04 <span class="comment">// 0xBF28E6A5B61AC6E9</span>
+<span id="L85" class="ln">    85	</span>		R04 = 1.82954049532700665670e-06  <span class="comment">// 0x3EBEB1D10C503919</span>
+<span id="L86" class="ln">    86	</span>		R05 = -4.61832688532103189199e-09 <span class="comment">// 0xBE33D5E773D63FCE</span>
+<span id="L87" class="ln">    87	</span>		S01 = 1.56191029464890010492e-02  <span class="comment">// 0x3F8FFCE882C8C2A4</span>
+<span id="L88" class="ln">    88	</span>		S02 = 1.16926784663337450260e-04  <span class="comment">// 0x3F1EA6D2DD57DBF4</span>
+<span id="L89" class="ln">    89	</span>		S03 = 5.13546550207318111446e-07  <span class="comment">// 0x3EA13B54CE84D5A9</span>
+<span id="L90" class="ln">    90	</span>		S04 = 1.16614003333790000205e-09  <span class="comment">// 0x3E1408BCF4745D8F</span>
+<span id="L91" class="ln">    91	</span>	)
+<span id="L92" class="ln">    92	</span>	<span class="comment">// special cases</span>
+<span id="L93" class="ln">    93	</span>	switch {
+<span id="L94" class="ln">    94	</span>	case IsNaN(x):
+<span id="L95" class="ln">    95	</span>		return x
+<span id="L96" class="ln">    96	</span>	case IsInf(x, 0):
+<span id="L97" class="ln">    97	</span>		return 0
+<span id="L98" class="ln">    98	</span>	case x == 0:
+<span id="L99" class="ln">    99	</span>		return 1
+<span id="L100" class="ln">   100	</span>	}
+<span id="L101" class="ln">   101	</span>
+<span id="L102" class="ln">   102	</span>	if x &lt; 0 {
+<span id="L103" class="ln">   103	</span>		x = -x
+<span id="L104" class="ln">   104	</span>	}
+<span id="L105" class="ln">   105	</span>	if x &gt;= 2 {
+<span id="L106" class="ln">   106	</span>		s, c := Sincos(x)
+<span id="L107" class="ln">   107	</span>		ss := s - c
+<span id="L108" class="ln">   108	</span>		cc := s + c
+<span id="L109" class="ln">   109	</span>
+<span id="L110" class="ln">   110	</span>		<span class="comment">// make sure x+x does not overflow</span>
+<span id="L111" class="ln">   111	</span>		if x &lt; MaxFloat64/2 {
+<span id="L112" class="ln">   112	</span>			z := -Cos(x + x)
+<span id="L113" class="ln">   113	</span>			if s*c &lt; 0 {
+<span id="L114" class="ln">   114	</span>				cc = z / ss
+<span id="L115" class="ln">   115	</span>			} else {
+<span id="L116" class="ln">   116	</span>				ss = z / cc
+<span id="L117" class="ln">   117	</span>			}
+<span id="L118" class="ln">   118	</span>		}
+<span id="L119" class="ln">   119	</span>
+<span id="L120" class="ln">   120	</span>		<span class="comment">// j0(x) = 1/sqrt(pi) * (P(0,x)*cc - Q(0,x)*ss) / sqrt(x)</span>
+<span id="L121" class="ln">   121	</span>		<span class="comment">// y0(x) = 1/sqrt(pi) * (P(0,x)*ss + Q(0,x)*cc) / sqrt(x)</span>
+<span id="L122" class="ln">   122	</span>
+<span id="L123" class="ln">   123	</span>		var z float64
+<span id="L124" class="ln">   124	</span>		if x &gt; Two129 { <span class="comment">// |x| &gt; ~6.8056e+38</span>
+<span id="L125" class="ln">   125	</span>			z = (1 / SqrtPi) * cc / Sqrt(x)
+<span id="L126" class="ln">   126	</span>		} else {
+<span id="L127" class="ln">   127	</span>			u := pzero(x)
+<span id="L128" class="ln">   128	</span>			v := qzero(x)
+<span id="L129" class="ln">   129	</span>			z = (1 / SqrtPi) * (u*cc - v*ss) / Sqrt(x)
+<span id="L130" class="ln">   130	</span>		}
+<span id="L131" class="ln">   131	</span>		return z <span class="comment">// |x| &gt;= 2.0</span>
+<span id="L132" class="ln">   132	</span>	}
+<span id="L133" class="ln">   133	</span>	if x &lt; TwoM13 { <span class="comment">// |x| &lt; ~1.2207e-4</span>
+<span id="L134" class="ln">   134	</span>		if x &lt; TwoM27 {
+<span id="L135" class="ln">   135	</span>			return 1 <span class="comment">// |x| &lt; ~7.4506e-9</span>
+<span id="L136" class="ln">   136	</span>		}
+<span id="L137" class="ln">   137	</span>		return 1 - 0.25*x*x <span class="comment">// ~7.4506e-9 &lt; |x| &lt; ~1.2207e-4</span>
+<span id="L138" class="ln">   138	</span>	}
+<span id="L139" class="ln">   139	</span>	z := x * x
+<span id="L140" class="ln">   140	</span>	r := z * (R02 + z*(R03+z*(R04+z*R05)))
+<span id="L141" class="ln">   141	</span>	s := 1 + z*(S01+z*(S02+z*(S03+z*S04)))
+<span id="L142" class="ln">   142	</span>	if x &lt; 1 {
+<span id="L143" class="ln">   143	</span>		return 1 + z*(-0.25+(r/s)) <span class="comment">// |x| &lt; 1.00</span>
+<span id="L144" class="ln">   144	</span>	}
+<span id="L145" class="ln">   145	</span>	u := 0.5 * x
+<span id="L146" class="ln">   146	</span>	return (1+u)*(1-u) + z*(r/s) <span class="comment">// 1.0 &lt; |x| &lt; 2.0</span>
+<span id="L147" class="ln">   147	</span>}
+<span id="L148" class="ln">   148	</span>
+<span id="L149" class="ln">   149	</span><span class="comment">// Y0 returns the order-zero Bessel function of the second kind.</span>
+<span id="L150" class="ln">   150	</span><span class="comment">//</span>
+<span id="L151" class="ln">   151	</span><span class="comment">// Special cases are:</span>
+<span id="L152" class="ln">   152	</span><span class="comment">//	Y0(+Inf) = 0</span>
+<span id="L153" class="ln">   153	</span><span class="comment">//	Y0(0) = -Inf</span>
+<span id="L154" class="ln">   154	</span><span class="comment">//	Y0(x &lt; 0) = NaN</span>
+<span id="L155" class="ln">   155	</span><span class="comment">//	Y0(NaN) = NaN</span>
+<span id="L156" class="ln">   156	</span>func Y0(x float64) float64 {
+<span id="L157" class="ln">   157	</span>	const (
+<span id="L158" class="ln">   158	</span>		TwoM27 = 1.0 / (1 &lt;&lt; 27)             <span class="comment">// 2**-27 0x3e40000000000000</span>
+<span id="L159" class="ln">   159	</span>		Two129 = 1 &lt;&lt; 129                    <span class="comment">// 2**129 0x4800000000000000</span>
+<span id="L160" class="ln">   160	</span>		U00    = -7.38042951086872317523e-02 <span class="comment">// 0xBFB2E4D699CBD01F</span>
+<span id="L161" class="ln">   161	</span>		U01    = 1.76666452509181115538e-01  <span class="comment">// 0x3FC69D019DE9E3FC</span>
+<span id="L162" class="ln">   162	</span>		U02    = -1.38185671945596898896e-02 <span class="comment">// 0xBF8C4CE8B16CFA97</span>
+<span id="L163" class="ln">   163	</span>		U03    = 3.47453432093683650238e-04  <span class="comment">// 0x3F36C54D20B29B6B</span>
+<span id="L164" class="ln">   164	</span>		U04    = -3.81407053724364161125e-06 <span class="comment">// 0xBECFFEA773D25CAD</span>
+<span id="L165" class="ln">   165	</span>		U05    = 1.95590137035022920206e-08  <span class="comment">// 0x3E5500573B4EABD4</span>
+<span id="L166" class="ln">   166	</span>		U06    = -3.98205194132103398453e-11 <span class="comment">// 0xBDC5E43D693FB3C8</span>
+<span id="L167" class="ln">   167	</span>		V01    = 1.27304834834123699328e-02  <span class="comment">// 0x3F8A127091C9C71A</span>
+<span id="L168" class="ln">   168	</span>		V02    = 7.60068627350353253702e-05  <span class="comment">// 0x3F13ECBBF578C6C1</span>
+<span id="L169" class="ln">   169	</span>		V03    = 2.59150851840457805467e-07  <span class="comment">// 0x3E91642D7FF202FD</span>
+<span id="L170" class="ln">   170	</span>		V04    = 4.41110311332675467403e-10  <span class="comment">// 0x3DFE50183BD6D9EF</span>
+<span id="L171" class="ln">   171	</span>	)
+<span id="L172" class="ln">   172	</span>	<span class="comment">// special cases</span>
+<span id="L173" class="ln">   173	</span>	switch {
+<span id="L174" class="ln">   174	</span>	case x &lt; 0 || IsNaN(x):
+<span id="L175" class="ln">   175	</span>		return NaN()
+<span id="L176" class="ln">   176	</span>	case IsInf(x, 1):
+<span id="L177" class="ln">   177	</span>		return 0
+<span id="L178" class="ln">   178	</span>	case x == 0:
+<span id="L179" class="ln">   179	</span>		return Inf(-1)
+<span id="L180" class="ln">   180	</span>	}
+<span id="L181" class="ln">   181	</span>
+<span id="L182" class="ln">   182	</span>	if x &gt;= 2 { <span class="comment">// |x| &gt;= 2.0</span>
+<span id="L183" class="ln">   183	</span>
+<span id="L184" class="ln">   184	</span>		<span class="comment">// y0(x) = sqrt(2/(pi*x))*(p0(x)*sin(x0)+q0(x)*cos(x0))</span>
+<span id="L185" class="ln">   185	</span>		<span class="comment">//     where x0 = x-pi/4</span>
+<span id="L186" class="ln">   186	</span>		<span class="comment">// Better formula:</span>
+<span id="L187" class="ln">   187	</span>		<span class="comment">//     cos(x0) = cos(x)cos(pi/4)+sin(x)sin(pi/4)</span>
+<span id="L188" class="ln">   188	</span>		<span class="comment">//             =  1/sqrt(2) * (sin(x) + cos(x))</span>
+<span id="L189" class="ln">   189	</span>		<span class="comment">//     sin(x0) = sin(x)cos(3pi/4)-cos(x)sin(3pi/4)</span>
+<span id="L190" class="ln">   190	</span>		<span class="comment">//             =  1/sqrt(2) * (sin(x) - cos(x))</span>
+<span id="L191" class="ln">   191	</span>		<span class="comment">// To avoid cancelation, use</span>
+<span id="L192" class="ln">   192	</span>		<span class="comment">//     sin(x) +- cos(x) = -cos(2x)/(sin(x) -+ cos(x))</span>
+<span id="L193" class="ln">   193	</span>		<span class="comment">// to compute the worse one.</span>
+<span id="L194" class="ln">   194	</span>
+<span id="L195" class="ln">   195	</span>		s, c := Sincos(x)
+<span id="L196" class="ln">   196	</span>		ss := s - c
+<span id="L197" class="ln">   197	</span>		cc := s + c
+<span id="L198" class="ln">   198	</span>
+<span id="L199" class="ln">   199	</span>		<span class="comment">// j0(x) = 1/sqrt(pi) * (P(0,x)*cc - Q(0,x)*ss) / sqrt(x)</span>
+<span id="L200" class="ln">   200	</span>		<span class="comment">// y0(x) = 1/sqrt(pi) * (P(0,x)*ss + Q(0,x)*cc) / sqrt(x)</span>
+<span id="L201" class="ln">   201	</span>
+<span id="L202" class="ln">   202	</span>		<span class="comment">// make sure x+x does not overflow</span>
+<span id="L203" class="ln">   203	</span>		if x &lt; MaxFloat64/2 {
+<span id="L204" class="ln">   204	</span>			z := -Cos(x + x)
+<span id="L205" class="ln">   205	</span>			if s*c &lt; 0 {
+<span id="L206" class="ln">   206	</span>				cc = z / ss
+<span id="L207" class="ln">   207	</span>			} else {
+<span id="L208" class="ln">   208	</span>				ss = z / cc
+<span id="L209" class="ln">   209	</span>			}
+<span id="L210" class="ln">   210	</span>		}
+<span id="L211" class="ln">   211	</span>		var z float64
+<span id="L212" class="ln">   212	</span>		if x &gt; Two129 { <span class="comment">// |x| &gt; ~6.8056e+38</span>
+<span id="L213" class="ln">   213	</span>			z = (1 / SqrtPi) * ss / Sqrt(x)
+<span id="L214" class="ln">   214	</span>		} else {
+<span id="L215" class="ln">   215	</span>			u := pzero(x)
+<span id="L216" class="ln">   216	</span>			v := qzero(x)
+<span id="L217" class="ln">   217	</span>			z = (1 / SqrtPi) * (u*ss + v*cc) / Sqrt(x)
+<span id="L218" class="ln">   218	</span>		}
+<span id="L219" class="ln">   219	</span>		return z <span class="comment">// |x| &gt;= 2.0</span>
+<span id="L220" class="ln">   220	</span>	}
+<span id="L221" class="ln">   221	</span>	if x &lt;= TwoM27 {
+<span id="L222" class="ln">   222	</span>		return U00 + (2/Pi)*Log(x) <span class="comment">// |x| &lt; ~7.4506e-9</span>
+<span id="L223" class="ln">   223	</span>	}
+<span id="L224" class="ln">   224	</span>	z := x * x
+<span id="L225" class="ln">   225	</span>	u := U00 + z*(U01+z*(U02+z*(U03+z*(U04+z*(U05+z*U06)))))
+<span id="L226" class="ln">   226	</span>	v := 1 + z*(V01+z*(V02+z*(V03+z*V04)))
+<span id="L227" class="ln">   227	</span>	return u/v + (2/Pi)*J0(x)*Log(x) <span class="comment">// ~7.4506e-9 &lt; |x| &lt; 2.0</span>
+<span id="L228" class="ln">   228	</span>}
+<span id="L229" class="ln">   229	</span>
+<span id="L230" class="ln">   230	</span><span class="comment">// The asymptotic expansions of pzero is</span>
+<span id="L231" class="ln">   231	</span><span class="comment">//      1 - 9/128 s**2 + 11025/98304 s**4 - ..., where s = 1/x.</span>
+<span id="L232" class="ln">   232	</span><span class="comment">// For x &gt;= 2, We approximate pzero by</span>
+<span id="L233" class="ln">   233	</span><span class="comment">// 	pzero(x) = 1 + (R/S)</span>
+<span id="L234" class="ln">   234	</span><span class="comment">// where  R = pR0 + pR1*s**2 + pR2*s**4 + ... + pR5*s**10</span>
+<span id="L235" class="ln">   235	</span><span class="comment">// 	  S = 1 + pS0*s**2 + ... + pS4*s**10</span>
+<span id="L236" class="ln">   236	</span><span class="comment">// and</span>
+<span id="L237" class="ln">   237	</span><span class="comment">//      | pzero(x)-1-R/S | &lt;= 2  ** ( -60.26)</span>
+<span id="L238" class="ln">   238	</span>
+<span id="L239" class="ln">   239	</span><span class="comment">// for x in [inf, 8]=1/[0,0.125]</span>
+<span id="L240" class="ln">   240	</span>var p0R8 = [6]float64{
+<span id="L241" class="ln">   241	</span>	0.00000000000000000000e+00,  <span class="comment">// 0x0000000000000000</span>
+<span id="L242" class="ln">   242	</span>	-7.03124999999900357484e-02, <span class="comment">// 0xBFB1FFFFFFFFFD32</span>
+<span id="L243" class="ln">   243	</span>	-8.08167041275349795626e+00, <span class="comment">// 0xC02029D0B44FA779</span>
+<span id="L244" class="ln">   244	</span>	-2.57063105679704847262e+02, <span class="comment">// 0xC07011027B19E863</span>
+<span id="L245" class="ln">   245	</span>	-2.48521641009428822144e+03, <span class="comment">// 0xC0A36A6ECD4DCAFC</span>
+<span id="L246" class="ln">   246	</span>	-5.25304380490729545272e+03, <span class="comment">// 0xC0B4850B36CC643D</span>
+<span id="L247" class="ln">   247	</span>}
+<span id="L248" class="ln">   248	</span>var p0S8 = [5]float64{
+<span id="L249" class="ln">   249	</span>	1.16534364619668181717e+02, <span class="comment">// 0x405D223307A96751</span>
+<span id="L250" class="ln">   250	</span>	3.83374475364121826715e+03, <span class="comment">// 0x40ADF37D50596938</span>
+<span id="L251" class="ln">   251	</span>	4.05978572648472545552e+04, <span class="comment">// 0x40E3D2BB6EB6B05F</span>
+<span id="L252" class="ln">   252	</span>	1.16752972564375915681e+05, <span class="comment">// 0x40FC810F8F9FA9BD</span>
+<span id="L253" class="ln">   253	</span>	4.76277284146730962675e+04, <span class="comment">// 0x40E741774F2C49DC</span>
+<span id="L254" class="ln">   254	</span>}
+<span id="L255" class="ln">   255	</span>
+<span id="L256" class="ln">   256	</span><span class="comment">// for x in [8,4.5454]=1/[0.125,0.22001]</span>
+<span id="L257" class="ln">   257	</span>var p0R5 = [6]float64{
+<span id="L258" class="ln">   258	</span>	-1.14125464691894502584e-11, <span class="comment">// 0xBDA918B147E495CC</span>
+<span id="L259" class="ln">   259	</span>	-7.03124940873599280078e-02, <span class="comment">// 0xBFB1FFFFE69AFBC6</span>
+<span id="L260" class="ln">   260	</span>	-4.15961064470587782438e+00, <span class="comment">// 0xC010A370F90C6BBF</span>
+<span id="L261" class="ln">   261	</span>	-6.76747652265167261021e+01, <span class="comment">// 0xC050EB2F5A7D1783</span>
+<span id="L262" class="ln">   262	</span>	-3.31231299649172967747e+02, <span class="comment">// 0xC074B3B36742CC63</span>
+<span id="L263" class="ln">   263	</span>	-3.46433388365604912451e+02, <span class="comment">// 0xC075A6EF28A38BD7</span>
+<span id="L264" class="ln">   264	</span>}
+<span id="L265" class="ln">   265	</span>var p0S5 = [5]float64{
+<span id="L266" class="ln">   266	</span>	6.07539382692300335975e+01, <span class="comment">// 0x404E60810C98C5DE</span>
+<span id="L267" class="ln">   267	</span>	1.05125230595704579173e+03, <span class="comment">// 0x40906D025C7E2864</span>
+<span id="L268" class="ln">   268	</span>	5.97897094333855784498e+03, <span class="comment">// 0x40B75AF88FBE1D60</span>
+<span id="L269" class="ln">   269	</span>	9.62544514357774460223e+03, <span class="comment">// 0x40C2CCB8FA76FA38</span>
+<span id="L270" class="ln">   270	</span>	2.40605815922939109441e+03, <span class="comment">// 0x40A2CC1DC70BE864</span>
+<span id="L271" class="ln">   271	</span>}
+<span id="L272" class="ln">   272	</span>
+<span id="L273" class="ln">   273	</span><span class="comment">// for x in [4.547,2.8571]=1/[0.2199,0.35001]</span>
+<span id="L274" class="ln">   274	</span>var p0R3 = [6]float64{
+<span id="L275" class="ln">   275	</span>	-2.54704601771951915620e-09, <span class="comment">// 0xBE25E1036FE1AA86</span>
+<span id="L276" class="ln">   276	</span>	-7.03119616381481654654e-02, <span class="comment">// 0xBFB1FFF6F7C0E24B</span>
+<span id="L277" class="ln">   277	</span>	-2.40903221549529611423e+00, <span class="comment">// 0xC00345B2AEA48074</span>
+<span id="L278" class="ln">   278	</span>	-2.19659774734883086467e+01, <span class="comment">// 0xC035F74A4CB94E14</span>
+<span id="L279" class="ln">   279	</span>	-5.80791704701737572236e+01, <span class="comment">// 0xC04D0A22420A1A45</span>
+<span id="L280" class="ln">   280	</span>	-3.14479470594888503854e+01, <span class="comment">// 0xC03F72ACA892D80F</span>
+<span id="L281" class="ln">   281	</span>}
+<span id="L282" class="ln">   282	</span>var p0S3 = [5]float64{
+<span id="L283" class="ln">   283	</span>	3.58560338055209726349e+01, <span class="comment">// 0x4041ED9284077DD3</span>
+<span id="L284" class="ln">   284	</span>	3.61513983050303863820e+02, <span class="comment">// 0x40769839464A7C0E</span>
+<span id="L285" class="ln">   285	</span>	1.19360783792111533330e+03, <span class="comment">// 0x4092A66E6D1061D6</span>
+<span id="L286" class="ln">   286	</span>	1.12799679856907414432e+03, <span class="comment">// 0x40919FFCB8C39B7E</span>
+<span id="L287" class="ln">   287	</span>	1.73580930813335754692e+02, <span class="comment">// 0x4065B296FC379081</span>
+<span id="L288" class="ln">   288	</span>}
+<span id="L289" class="ln">   289	</span>
+<span id="L290" class="ln">   290	</span><span class="comment">// for x in [2.8570,2]=1/[0.3499,0.5]</span>
+<span id="L291" class="ln">   291	</span>var p0R2 = [6]float64{
+<span id="L292" class="ln">   292	</span>	-8.87534333032526411254e-08, <span class="comment">// 0xBE77D316E927026D</span>
+<span id="L293" class="ln">   293	</span>	-7.03030995483624743247e-02, <span class="comment">// 0xBFB1FF62495E1E42</span>
+<span id="L294" class="ln">   294	</span>	-1.45073846780952986357e+00, <span class="comment">// 0xBFF736398A24A843</span>
+<span id="L295" class="ln">   295	</span>	-7.63569613823527770791e+00, <span class="comment">// 0xC01E8AF3EDAFA7F3</span>
+<span id="L296" class="ln">   296	</span>	-1.11931668860356747786e+01, <span class="comment">// 0xC02662E6C5246303</span>
+<span id="L297" class="ln">   297	</span>	-3.23364579351335335033e+00, <span class="comment">// 0xC009DE81AF8FE70F</span>
+<span id="L298" class="ln">   298	</span>}
+<span id="L299" class="ln">   299	</span>var p0S2 = [5]float64{
+<span id="L300" class="ln">   300	</span>	2.22202997532088808441e+01, <span class="comment">// 0x40363865908B5959</span>
+<span id="L301" class="ln">   301	</span>	1.36206794218215208048e+02, <span class="comment">// 0x4061069E0EE8878F</span>
+<span id="L302" class="ln">   302	</span>	2.70470278658083486789e+02, <span class="comment">// 0x4070E78642EA079B</span>
+<span id="L303" class="ln">   303	</span>	1.53875394208320329881e+02, <span class="comment">// 0x40633C033AB6FAFF</span>
+<span id="L304" class="ln">   304	</span>	1.46576176948256193810e+01, <span class="comment">// 0x402D50B344391809</span>
+<span id="L305" class="ln">   305	</span>}
+<span id="L306" class="ln">   306	</span>
+<span id="L307" class="ln">   307	</span>func pzero(x float64) float64 {
+<span id="L308" class="ln">   308	</span>	var p *[6]float64
+<span id="L309" class="ln">   309	</span>	var q *[5]float64
+<span id="L310" class="ln">   310	</span>	if x &gt;= 8 {
+<span id="L311" class="ln">   311	</span>		p = &amp;p0R8
+<span id="L312" class="ln">   312	</span>		q = &amp;p0S8
+<span id="L313" class="ln">   313	</span>	} else if x &gt;= 4.5454 {
+<span id="L314" class="ln">   314	</span>		p = &amp;p0R5
+<span id="L315" class="ln">   315	</span>		q = &amp;p0S5
+<span id="L316" class="ln">   316	</span>	} else if x &gt;= 2.8571 {
+<span id="L317" class="ln">   317	</span>		p = &amp;p0R3
+<span id="L318" class="ln">   318	</span>		q = &amp;p0S3
+<span id="L319" class="ln">   319	</span>	} else if x &gt;= 2 {
+<span id="L320" class="ln">   320	</span>		p = &amp;p0R2
+<span id="L321" class="ln">   321	</span>		q = &amp;p0S2
+<span id="L322" class="ln">   322	</span>	}
+<span id="L323" class="ln">   323	</span>	z := 1 / (x * x)
+<span id="L324" class="ln">   324	</span>	r := p[0] + z*(p[1]+z*(p[2]+z*(p[3]+z*(p[4]+z*p[5]))))
+<span id="L325" class="ln">   325	</span>	s := 1 + z*(q[0]+z*(q[1]+z*(q[2]+z*(q[3]+z*q[4]))))
+<span id="L326" class="ln">   326	</span>	return 1 + r/s
+<span id="L327" class="ln">   327	</span>}
+<span id="L328" class="ln">   328	</span>
+<span id="L329" class="ln">   329	</span><span class="comment">// For x &gt;= 8, the asymptotic expansions of qzero is</span>
+<span id="L330" class="ln">   330	</span><span class="comment">//      -1/8 s + 75/1024 s**3 - ..., where s = 1/x.</span>
+<span id="L331" class="ln">   331	</span><span class="comment">// We approximate pzero by</span>
+<span id="L332" class="ln">   332	</span><span class="comment">//      qzero(x) = s*(-1.25 + (R/S))</span>
+<span id="L333" class="ln">   333	</span><span class="comment">// where R = qR0 + qR1*s**2 + qR2*s**4 + ... + qR5*s**10</span>
+<span id="L334" class="ln">   334	</span><span class="comment">//       S = 1 + qS0*s**2 + ... + qS5*s**12</span>
+<span id="L335" class="ln">   335	</span><span class="comment">// and</span>
+<span id="L336" class="ln">   336	</span><span class="comment">//      | qzero(x)/s +1.25-R/S | &lt;= 2**(-61.22)</span>
+<span id="L337" class="ln">   337	</span>
+<span id="L338" class="ln">   338	</span><span class="comment">// for x in [inf, 8]=1/[0,0.125]</span>
+<span id="L339" class="ln">   339	</span>var q0R8 = [6]float64{
+<span id="L340" class="ln">   340	</span>	0.00000000000000000000e+00, <span class="comment">// 0x0000000000000000</span>
+<span id="L341" class="ln">   341	</span>	7.32421874999935051953e-02, <span class="comment">// 0x3FB2BFFFFFFFFE2C</span>
+<span id="L342" class="ln">   342	</span>	1.17682064682252693899e+01, <span class="comment">// 0x402789525BB334D6</span>
+<span id="L343" class="ln">   343	</span>	5.57673380256401856059e+02, <span class="comment">// 0x40816D6315301825</span>
+<span id="L344" class="ln">   344	</span>	8.85919720756468632317e+03, <span class="comment">// 0x40C14D993E18F46D</span>
+<span id="L345" class="ln">   345	</span>	3.70146267776887834771e+04, <span class="comment">// 0x40E212D40E901566</span>
+<span id="L346" class="ln">   346	</span>}
+<span id="L347" class="ln">   347	</span>var q0S8 = [6]float64{
+<span id="L348" class="ln">   348	</span>	1.63776026895689824414e+02,  <span class="comment">// 0x406478D5365B39BC</span>
+<span id="L349" class="ln">   349	</span>	8.09834494656449805916e+03,  <span class="comment">// 0x40BFA2584E6B0563</span>
+<span id="L350" class="ln">   350	</span>	1.42538291419120476348e+05,  <span class="comment">// 0x4101665254D38C3F</span>
+<span id="L351" class="ln">   351	</span>	8.03309257119514397345e+05,  <span class="comment">// 0x412883DA83A52B43</span>
+<span id="L352" class="ln">   352	</span>	8.40501579819060512818e+05,  <span class="comment">// 0x4129A66B28DE0B3D</span>
+<span id="L353" class="ln">   353	</span>	-3.43899293537866615225e+05, <span class="comment">// 0xC114FD6D2C9530C5</span>
+<span id="L354" class="ln">   354	</span>}
+<span id="L355" class="ln">   355	</span>
+<span id="L356" class="ln">   356	</span><span class="comment">// for x in [8,4.5454]=1/[0.125,0.22001]</span>
+<span id="L357" class="ln">   357	</span>var q0R5 = [6]float64{
+<span id="L358" class="ln">   358	</span>	1.84085963594515531381e-11, <span class="comment">// 0x3DB43D8F29CC8CD9</span>
+<span id="L359" class="ln">   359	</span>	7.32421766612684765896e-02, <span class="comment">// 0x3FB2BFFFD172B04C</span>
+<span id="L360" class="ln">   360	</span>	5.83563508962056953777e+00, <span class="comment">// 0x401757B0B9953DD3</span>
+<span id="L361" class="ln">   361	</span>	1.35111577286449829671e+02, <span class="comment">// 0x4060E3920A8788E9</span>
+<span id="L362" class="ln">   362	</span>	1.02724376596164097464e+03, <span class="comment">// 0x40900CF99DC8C481</span>
+<span id="L363" class="ln">   363	</span>	1.98997785864605384631e+03, <span class="comment">// 0x409F17E953C6E3A6</span>
+<span id="L364" class="ln">   364	</span>}
+<span id="L365" class="ln">   365	</span>var q0S5 = [6]float64{
+<span id="L366" class="ln">   366	</span>	8.27766102236537761883e+01,  <span class="comment">// 0x4054B1B3FB5E1543</span>
+<span id="L367" class="ln">   367	</span>	2.07781416421392987104e+03,  <span class="comment">// 0x40A03BA0DA21C0CE</span>
+<span id="L368" class="ln">   368	</span>	1.88472887785718085070e+04,  <span class="comment">// 0x40D267D27B591E6D</span>
+<span id="L369" class="ln">   369	</span>	5.67511122894947329769e+04,  <span class="comment">// 0x40EBB5E397E02372</span>
+<span id="L370" class="ln">   370	</span>	3.59767538425114471465e+04,  <span class="comment">// 0x40E191181F7A54A0</span>
+<span id="L371" class="ln">   371	</span>	-5.35434275601944773371e+03, <span class="comment">// 0xC0B4EA57BEDBC609</span>
+<span id="L372" class="ln">   372	</span>}
+<span id="L373" class="ln">   373	</span>
+<span id="L374" class="ln">   374	</span><span class="comment">// for x in [4.547,2.8571]=1/[0.2199,0.35001]</span>
+<span id="L375" class="ln">   375	</span>var q0R3 = [6]float64{
+<span id="L376" class="ln">   376	</span>	4.37741014089738620906e-09, <span class="comment">// 0x3E32CD036ADECB82</span>
+<span id="L377" class="ln">   377	</span>	7.32411180042911447163e-02, <span class="comment">// 0x3FB2BFEE0E8D0842</span>
+<span id="L378" class="ln">   378	</span>	3.34423137516170720929e+00, <span class="comment">// 0x400AC0FC61149CF5</span>
+<span id="L379" class="ln">   379	</span>	4.26218440745412650017e+01, <span class="comment">// 0x40454F98962DAEDD</span>
+<span id="L380" class="ln">   380	</span>	1.70808091340565596283e+02, <span class="comment">// 0x406559DBE25EFD1F</span>
+<span id="L381" class="ln">   381	</span>	1.66733948696651168575e+02, <span class="comment">// 0x4064D77C81FA21E0</span>
+<span id="L382" class="ln">   382	</span>}
+<span id="L383" class="ln">   383	</span>var q0S3 = [6]float64{
+<span id="L384" class="ln">   384	</span>	4.87588729724587182091e+01,  <span class="comment">// 0x40486122BFE343A6</span>
+<span id="L385" class="ln">   385	</span>	7.09689221056606015736e+02,  <span class="comment">// 0x40862D8386544EB3</span>
+<span id="L386" class="ln">   386	</span>	3.70414822620111362994e+03,  <span class="comment">// 0x40ACF04BE44DFC63</span>
+<span id="L387" class="ln">   387	</span>	6.46042516752568917582e+03,  <span class="comment">// 0x40B93C6CD7C76A28</span>
+<span id="L388" class="ln">   388	</span>	2.51633368920368957333e+03,  <span class="comment">// 0x40A3A8AAD94FB1C0</span>
+<span id="L389" class="ln">   389	</span>	-1.49247451836156386662e+02, <span class="comment">// 0xC062A7EB201CF40F</span>
+<span id="L390" class="ln">   390	</span>}
+<span id="L391" class="ln">   391	</span>
+<span id="L392" class="ln">   392	</span><span class="comment">// for x in [2.8570,2]=1/[0.3499,0.5]</span>
+<span id="L393" class="ln">   393	</span>var q0R2 = [6]float64{
+<span id="L394" class="ln">   394	</span>	1.50444444886983272379e-07, <span class="comment">// 0x3E84313B54F76BDB</span>
+<span id="L395" class="ln">   395	</span>	7.32234265963079278272e-02, <span class="comment">// 0x3FB2BEC53E883E34</span>
+<span id="L396" class="ln">   396	</span>	1.99819174093815998816e+00, <span class="comment">// 0x3FFFF897E727779C</span>
+<span id="L397" class="ln">   397	</span>	1.44956029347885735348e+01, <span class="comment">// 0x402CFDBFAAF96FE5</span>
+<span id="L398" class="ln">   398	</span>	3.16662317504781540833e+01, <span class="comment">// 0x403FAA8E29FBDC4A</span>
+<span id="L399" class="ln">   399	</span>	1.62527075710929267416e+01, <span class="comment">// 0x403040B171814BB4</span>
+<span id="L400" class="ln">   400	</span>}
+<span id="L401" class="ln">   401	</span>var q0S2 = [6]float64{
+<span id="L402" class="ln">   402	</span>	3.03655848355219184498e+01,  <span class="comment">// 0x403E5D96F7C07AED</span>
+<span id="L403" class="ln">   403	</span>	2.69348118608049844624e+02,  <span class="comment">// 0x4070D591E4D14B40</span>
+<span id="L404" class="ln">   404	</span>	8.44783757595320139444e+02,  <span class="comment">// 0x408A664522B3BF22</span>
+<span id="L405" class="ln">   405	</span>	8.82935845112488550512e+02,  <span class="comment">// 0x408B977C9C5CC214</span>
+<span id="L406" class="ln">   406	</span>	2.12666388511798828631e+02,  <span class="comment">// 0x406A95530E001365</span>
+<span id="L407" class="ln">   407	</span>	-5.31095493882666946917e+00, <span class="comment">// 0xC0153E6AF8B32931</span>
+<span id="L408" class="ln">   408	</span>}
+<span id="L409" class="ln">   409	</span>
+<span id="L410" class="ln">   410	</span>func qzero(x float64) float64 {
+<span id="L411" class="ln">   411	</span>	var p, q *[6]float64
+<span id="L412" class="ln">   412	</span>	if x &gt;= 8 {
+<span id="L413" class="ln">   413	</span>		p = &amp;q0R8
+<span id="L414" class="ln">   414	</span>		q = &amp;q0S8
+<span id="L415" class="ln">   415	</span>	} else if x &gt;= 4.5454 {
+<span id="L416" class="ln">   416	</span>		p = &amp;q0R5
+<span id="L417" class="ln">   417	</span>		q = &amp;q0S5
+<span id="L418" class="ln">   418	</span>	} else if x &gt;= 2.8571 {
+<span id="L419" class="ln">   419	</span>		p = &amp;q0R3
+<span id="L420" class="ln">   420	</span>		q = &amp;q0S3
+<span id="L421" class="ln">   421	</span>	} else if x &gt;= 2 {
+<span id="L422" class="ln">   422	</span>		p = &amp;q0R2
+<span id="L423" class="ln">   423	</span>		q = &amp;q0S2
+<span id="L424" class="ln">   424	</span>	}
+<span id="L425" class="ln">   425	</span>	z := 1 / (x * x)
+<span id="L426" class="ln">   426	</span>	r := p[0] + z*(p[1]+z*(p[2]+z*(p[3]+z*(p[4]+z*p[5]))))
+<span id="L427" class="ln">   427	</span>	s := 1 + z*(q[0]+z*(q[1]+z*(q[2]+z*(q[3]+z*(q[4]+z*q[5])))))
+<span id="L428" class="ln">   428	</span>	return (-0.125 + r/s) / x
+<span id="L429" class="ln">   429	</span>}
+<span id="L430" class="ln">   430	</span>
+</pre><p><a href="j0.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

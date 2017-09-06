@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/time/sleep.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./sleep.go%3Fs=3886:3924.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/time/sleep.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package time
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span><span class="comment">// Sleep pauses the current goroutine for at least the duration d.</span>
+<span id="L8" class="ln">     8	</span><span class="comment">// A negative or zero duration causes Sleep to return immediately.</span>
+<span id="L9" class="ln">     9	</span>func Sleep(d Duration)
+<span id="L10" class="ln">    10	</span>
+<span id="L11" class="ln">    11	</span><span class="comment">// runtimeNano returns the current value of the runtime clock in nanoseconds.</span>
+<span id="L12" class="ln">    12	</span>func runtimeNano() int64
+<span id="L13" class="ln">    13	</span>
+<span id="L14" class="ln">    14	</span><span class="comment">// Interface to timers implemented in package runtime.</span>
+<span id="L15" class="ln">    15	</span><span class="comment">// Must be in sync with ../runtime/time.go:/^type timer</span>
+<span id="L16" class="ln">    16	</span>type runtimeTimer struct {
+<span id="L17" class="ln">    17	</span>	i      int
+<span id="L18" class="ln">    18	</span>	when   int64
+<span id="L19" class="ln">    19	</span>	period int64
+<span id="L20" class="ln">    20	</span>	f      func(interface{}, uintptr) <span class="comment">// NOTE: must not be closure</span>
+<span id="L21" class="ln">    21	</span>	arg    interface{}
+<span id="L22" class="ln">    22	</span>	seq    uintptr
+<span id="L23" class="ln">    23	</span>}
+<span id="L24" class="ln">    24	</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// when is a helper function for setting the &#39;when&#39; field of a runtimeTimer.</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// It returns what the time will be, in nanoseconds, Duration d in the future.</span>
+<span id="L27" class="ln">    27	</span><span class="comment">// If d is negative, it is ignored. If the returned value would be less than</span>
+<span id="L28" class="ln">    28	</span><span class="comment">// zero because of an overflow, MaxInt64 is returned.</span>
+<span id="L29" class="ln">    29	</span>func when(d Duration) int64 {
+<span id="L30" class="ln">    30	</span>	if d &lt;= 0 {
+<span id="L31" class="ln">    31	</span>		return runtimeNano()
+<span id="L32" class="ln">    32	</span>	}
+<span id="L33" class="ln">    33	</span>	t := runtimeNano() + int64(d)
+<span id="L34" class="ln">    34	</span>	if t &lt; 0 {
+<span id="L35" class="ln">    35	</span>		t = 1&lt;&lt;63 - 1 <span class="comment">// math.MaxInt64</span>
+<span id="L36" class="ln">    36	</span>	}
+<span id="L37" class="ln">    37	</span>	return t
+<span id="L38" class="ln">    38	</span>}
+<span id="L39" class="ln">    39	</span>
+<span id="L40" class="ln">    40	</span>func startTimer(*runtimeTimer)
+<span id="L41" class="ln">    41	</span>func stopTimer(*runtimeTimer) bool
+<span id="L42" class="ln">    42	</span>
+<span id="L43" class="ln">    43	</span><span class="comment">// The Timer type represents a single event.</span>
+<span id="L44" class="ln">    44	</span><span class="comment">// When the Timer expires, the current time will be sent on C,</span>
+<span id="L45" class="ln">    45	</span><span class="comment">// unless the Timer was created by AfterFunc.</span>
+<span id="L46" class="ln">    46	</span><span class="comment">// A Timer must be created with NewTimer or AfterFunc.</span>
+<span id="L47" class="ln">    47	</span>type Timer struct {
+<span id="L48" class="ln">    48	</span>	C &lt;-chan Time
+<span id="L49" class="ln">    49	</span>	r runtimeTimer
+<span id="L50" class="ln">    50	</span>}
+<span id="L51" class="ln">    51	</span>
+<span id="L52" class="ln">    52	</span><span class="comment">// Stop prevents the Timer from firing.</span>
+<span id="L53" class="ln">    53	</span><span class="comment">// It returns true if the call stops the timer, false if the timer has already</span>
+<span id="L54" class="ln">    54	</span><span class="comment">// expired or been stopped.</span>
+<span id="L55" class="ln">    55	</span><span class="comment">// Stop does not close the channel, to prevent a read from the channel succeeding</span>
+<span id="L56" class="ln">    56	</span><span class="comment">// incorrectly.</span>
+<span id="L57" class="ln">    57	</span><span class="comment">//</span>
+<span id="L58" class="ln">    58	</span><span class="comment">// To prevent a timer created with NewTimer from firing after a call to Stop,</span>
+<span id="L59" class="ln">    59	</span><span class="comment">// check the return value and drain the channel.</span>
+<span id="L60" class="ln">    60	</span><span class="comment">// For example, assuming the program has not received from t.C already:</span>
+<span id="L61" class="ln">    61	</span><span class="comment">//</span>
+<span id="L62" class="ln">    62	</span><span class="comment">// 	if !t.Stop() {</span>
+<span id="L63" class="ln">    63	</span><span class="comment">// 		&lt;-t.C</span>
+<span id="L64" class="ln">    64	</span><span class="comment">// 	}</span>
+<span id="L65" class="ln">    65	</span><span class="comment">//</span>
+<span id="L66" class="ln">    66	</span><span class="comment">// This cannot be done concurrent to other receives from the Timer&#39;s</span>
+<span id="L67" class="ln">    67	</span><span class="comment">// channel.</span>
+<span id="L68" class="ln">    68	</span><span class="comment">//</span>
+<span id="L69" class="ln">    69	</span><span class="comment">// For a timer created with AfterFunc(d, f), if t.Stop returns false, then the timer</span>
+<span id="L70" class="ln">    70	</span><span class="comment">// has already expired and the function f has been started in its own goroutine;</span>
+<span id="L71" class="ln">    71	</span><span class="comment">// Stop does not wait for f to complete before returning.</span>
+<span id="L72" class="ln">    72	</span><span class="comment">// If the caller needs to know whether f is completed, it must coordinate</span>
+<span id="L73" class="ln">    73	</span><span class="comment">// with f explicitly.</span>
+<span id="L74" class="ln">    74	</span>func (t *Timer) Stop() bool {
+<span id="L75" class="ln">    75	</span>	if t.r.f == nil {
+<span id="L76" class="ln">    76	</span>		panic(&#34;time: Stop called on uninitialized Timer&#34;)
+<span id="L77" class="ln">    77	</span>	}
+<span id="L78" class="ln">    78	</span>	return stopTimer(&amp;t.r)
+<span id="L79" class="ln">    79	</span>}
+<span id="L80" class="ln">    80	</span>
+<span id="L81" class="ln">    81	</span><span class="comment">// NewTimer creates a new Timer that will send</span>
+<span id="L82" class="ln">    82	</span><span class="comment">// the current time on its channel after at least duration d.</span>
+<span id="L83" class="ln">    83	</span>func NewTimer(d Duration) *Timer {
+<span id="L84" class="ln">    84	</span>	c := make(chan Time, 1)
+<span id="L85" class="ln">    85	</span>	t := &amp;Timer{
+<span id="L86" class="ln">    86	</span>		C: c,
+<span id="L87" class="ln">    87	</span>		r: runtimeTimer{
+<span id="L88" class="ln">    88	</span>			when: when(d),
+<span id="L89" class="ln">    89	</span>			f:    sendTime,
+<span id="L90" class="ln">    90	</span>			arg:  c,
+<span id="L91" class="ln">    91	</span>		},
+<span id="L92" class="ln">    92	</span>	}
+<span id="L93" class="ln">    93	</span>	startTimer(&amp;t.r)
+<span id="L94" class="ln">    94	</span>	return t
+<span id="L95" class="ln">    95	</span>}
+<span id="L96" class="ln">    96	</span>
+<span id="L97" class="ln">    97	</span><span class="comment">// Reset changes the timer to expire after duration d.</span>
+<span id="L98" class="ln">    98	</span><span class="comment">// It returns true if the timer had been active, false if the timer had</span>
+<span id="L99" class="ln">    99	</span><span class="comment">// expired or been stopped.</span>
+<span id="L100" class="ln">   100	</span><span class="comment">//</span>
+<span id="L101" class="ln">   101	</span><span class="comment">// Resetting a timer must take care not to race with the send into t.C</span>
+<span id="L102" class="ln">   102	</span><span class="comment">// that happens when the current timer expires.</span>
+<span id="L103" class="ln">   103	</span><span class="comment">// If a program has already received a value from t.C, the timer is known</span>
+<span id="L104" class="ln">   104	</span><span class="comment">// to have expired, and t.Reset can be used directly.</span>
+<span id="L105" class="ln">   105	</span><span class="comment">// If a program has not yet received a value from t.C, however,</span>
+<span id="L106" class="ln">   106	</span><span class="comment">// the timer must be stopped and—if Stop reports that the timer expired</span>
+<span id="L107" class="ln">   107	</span><span class="comment">// before being stopped—the channel explicitly drained:</span>
+<span id="L108" class="ln">   108	</span><span class="comment">//</span>
+<span id="L109" class="ln">   109	</span><span class="comment">// 	if !t.Stop() {</span>
+<span id="L110" class="ln">   110	</span><span class="comment">// 		&lt;-t.C</span>
+<span id="L111" class="ln">   111	</span><span class="comment">// 	}</span>
+<span id="L112" class="ln">   112	</span><span class="comment">// 	t.Reset(d)</span>
+<span id="L113" class="ln">   113	</span><span class="comment">//</span>
+<span id="L114" class="ln">   114	</span><span class="comment">// This should not be done concurrent to other receives from the Timer&#39;s</span>
+<span id="L115" class="ln">   115	</span><span class="comment">// channel.</span>
+<span id="L116" class="ln">   116	</span><span class="comment">//</span>
+<span id="L117" class="ln">   117	</span><span class="comment">// Note that it is not possible to use Reset&#39;s return value correctly, as there</span>
+<span id="L118" class="ln">   118	</span><span class="comment">// is a race condition between draining the channel and the new timer expiring.</span>
+<span id="L119" class="ln">   119	</span><span class="comment">// Reset should always be invoked on stopped or expired channels, as described above.</span>
+<span id="L120" class="ln">   120	</span><span class="comment">// The return value exists to preserve compatibility with existing programs.</span>
+<span id="L121" class="ln">   121	</span><span class="selection">func (t *Timer) Reset(d Duration) bool</span> {
+<span id="L122" class="ln">   122	</span>	if t.r.f == nil {
+<span id="L123" class="ln">   123	</span>		panic(&#34;time: Reset called on uninitialized Timer&#34;)
+<span id="L124" class="ln">   124	</span>	}
+<span id="L125" class="ln">   125	</span>	w := when(d)
+<span id="L126" class="ln">   126	</span>	active := stopTimer(&amp;t.r)
+<span id="L127" class="ln">   127	</span>	t.r.when = w
+<span id="L128" class="ln">   128	</span>	startTimer(&amp;t.r)
+<span id="L129" class="ln">   129	</span>	return active
+<span id="L130" class="ln">   130	</span>}
+<span id="L131" class="ln">   131	</span>
+<span id="L132" class="ln">   132	</span>func sendTime(c interface{}, seq uintptr) {
+<span id="L133" class="ln">   133	</span>	<span class="comment">// Non-blocking send of time on c.</span>
+<span id="L134" class="ln">   134	</span>	<span class="comment">// Used in NewTimer, it cannot block anyway (buffer).</span>
+<span id="L135" class="ln">   135	</span>	<span class="comment">// Used in NewTicker, dropping sends on the floor is</span>
+<span id="L136" class="ln">   136	</span>	<span class="comment">// the desired behavior when the reader gets behind,</span>
+<span id="L137" class="ln">   137	</span>	<span class="comment">// because the sends are periodic.</span>
+<span id="L138" class="ln">   138	</span>	select {
+<span id="L139" class="ln">   139	</span>	case c.(chan Time) &lt;- Now():
+<span id="L140" class="ln">   140	</span>	default:
+<span id="L141" class="ln">   141	</span>	}
+<span id="L142" class="ln">   142	</span>}
+<span id="L143" class="ln">   143	</span>
+<span id="L144" class="ln">   144	</span><span class="comment">// After waits for the duration to elapse and then sends the current time</span>
+<span id="L145" class="ln">   145	</span><span class="comment">// on the returned channel.</span>
+<span id="L146" class="ln">   146	</span><span class="comment">// It is equivalent to NewTimer(d).C.</span>
+<span id="L147" class="ln">   147	</span><span class="comment">// The underlying Timer is not recovered by the garbage collector</span>
+<span id="L148" class="ln">   148	</span><span class="comment">// until the timer fires. If efficiency is a concern, use NewTimer</span>
+<span id="L149" class="ln">   149	</span><span class="comment">// instead and call Timer.Stop if the timer is no longer needed.</span>
+<span id="L150" class="ln">   150	</span>func After(d Duration) &lt;-chan Time {
+<span id="L151" class="ln">   151	</span>	return NewTimer(d).C
+<span id="L152" class="ln">   152	</span>}
+<span id="L153" class="ln">   153	</span>
+<span id="L154" class="ln">   154	</span><span class="comment">// AfterFunc waits for the duration to elapse and then calls f</span>
+<span id="L155" class="ln">   155	</span><span class="comment">// in its own goroutine. It returns a Timer that can</span>
+<span id="L156" class="ln">   156	</span><span class="comment">// be used to cancel the call using its Stop method.</span>
+<span id="L157" class="ln">   157	</span>func AfterFunc(d Duration, f func()) *Timer {
+<span id="L158" class="ln">   158	</span>	t := &amp;Timer{
+<span id="L159" class="ln">   159	</span>		r: runtimeTimer{
+<span id="L160" class="ln">   160	</span>			when: when(d),
+<span id="L161" class="ln">   161	</span>			f:    goFunc,
+<span id="L162" class="ln">   162	</span>			arg:  f,
+<span id="L163" class="ln">   163	</span>		},
+<span id="L164" class="ln">   164	</span>	}
+<span id="L165" class="ln">   165	</span>	startTimer(&amp;t.r)
+<span id="L166" class="ln">   166	</span>	return t
+<span id="L167" class="ln">   167	</span>}
+<span id="L168" class="ln">   168	</span>
+<span id="L169" class="ln">   169	</span>func goFunc(arg interface{}, seq uintptr) {
+<span id="L170" class="ln">   170	</span>	go arg.(func())()
+<span id="L171" class="ln">   171	</span>}
+<span id="L172" class="ln">   172	</span>
+</pre><p><a href="sleep.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

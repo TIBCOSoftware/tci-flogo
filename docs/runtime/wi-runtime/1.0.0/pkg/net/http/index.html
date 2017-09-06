@@ -1,0 +1,4522 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>http - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="index.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Package http</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script type='text/javascript'>
+	document.ANALYSIS_DATA = null;
+	document.CALLGRAPH = null;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import "net/http"</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="index.html#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="index.html#pkg-index" class="indexLink">Index</a></dd>
+			
+				<dd><a href="index.html#pkg-examples" class="examplesLink">Examples</a></dd>
+			
+			
+				<dd><a href="index.html#pkg-subdirectories">Subdirectories</a></dd>
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				<p>
+Package http provides HTTP client and server implementations.
+</p>
+<p>
+Get, Head, Post, and PostForm make HTTP (or HTTPS) requests:
+</p>
+<pre>resp, err := http.Get(&#34;<a href="http://example.com/">http://example.com/</a>&#34;)
+...
+resp, err := http.Post(&#34;<a href="http://example.com/upload">http://example.com/upload</a>&#34;, &#34;image/jpeg&#34;, &amp;buf)
+...
+resp, err := http.PostForm(&#34;<a href="http://example.com/form">http://example.com/form</a>&#34;,
+	url.Values{&#34;key&#34;: {&#34;Value&#34;}, &#34;id&#34;: {&#34;123&#34;}})
+</pre>
+<p>
+The client must close the response body when finished with it:
+</p>
+<pre>resp, err := http.Get(&#34;<a href="http://example.com/">http://example.com/</a>&#34;)
+if err != nil {
+	// handle error
+}
+defer resp.Body.Close()
+body, err := ioutil.ReadAll(resp.Body)
+// ...
+</pre>
+<p>
+For control over HTTP client headers, redirect policy, and other
+settings, create a Client:
+</p>
+<pre>client := &amp;http.Client{
+	CheckRedirect: redirectPolicyFunc,
+}
+
+resp, err := client.Get(&#34;<a href="http://example.com">http://example.com</a>&#34;)
+// ...
+
+req, err := http.NewRequest(&#34;GET&#34;, &#34;<a href="http://example.com">http://example.com</a>&#34;, nil)
+// ...
+req.Header.Add(&#34;If-None-Match&#34;, `W/&#34;wyzzy&#34;`)
+resp, err := client.Do(req)
+// ...
+</pre>
+<p>
+For control over proxies, TLS configuration, keep-alives,
+compression, and other settings, create a Transport:
+</p>
+<pre>tr := &amp;http.Transport{
+	MaxIdleConns:       10,
+	IdleConnTimeout:    30 * time.Second,
+	DisableCompression: true,
+}
+client := &amp;http.Client{Transport: tr}
+resp, err := client.Get(&#34;<a href="https://example.com">https://example.com</a>&#34;)
+</pre>
+<p>
+Clients and Transports are safe for concurrent use by multiple
+goroutines and for efficiency should only be created once and re-used.
+</p>
+<p>
+ListenAndServe starts an HTTP server with a given address and handler.
+The handler is usually nil, which means to use DefaultServeMux.
+Handle and HandleFunc add handlers to DefaultServeMux:
+</p>
+<pre>http.Handle(&#34;/foo&#34;, fooHandler)
+
+http.HandleFunc(&#34;/bar&#34;, func(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, &#34;Hello, %q&#34;, html.EscapeString(r.URL.Path))
+})
+
+log.Fatal(http.ListenAndServe(&#34;:8080&#34;, nil))
+</pre>
+<p>
+More control over the server&#39;s behavior is available by creating a
+custom Server:
+</p>
+<pre>s := &amp;http.Server{
+	Addr:           &#34;:8080&#34;,
+	Handler:        myHandler,
+	ReadTimeout:    10 * time.Second,
+	WriteTimeout:   10 * time.Second,
+	MaxHeaderBytes: 1 &lt;&lt; 20,
+}
+log.Fatal(s.ListenAndServe())
+</pre>
+<p>
+Starting with Go 1.6, the http package has transparent support for the
+HTTP/2 protocol when using HTTPS. Programs that must disable HTTP/2
+can do so by setting Transport.TLSNextProto (for clients) or
+Server.TLSNextProto (for servers) to a non-nil, empty
+map. Alternatively, the following GODEBUG environment variables are
+currently supported:
+</p>
+<pre>GODEBUG=http2client=0  # disable HTTP/2 client support
+GODEBUG=http2server=0  # disable HTTP/2 server support
+GODEBUG=http2debug=1   # enable verbose HTTP/2 debug logs
+GODEBUG=http2debug=2   # ... even more verbose, with frame dumps
+</pre>
+<p>
+The GODEBUG variables are not covered by Go&#39;s API compatibility
+promise. Please report any issues before disabling HTTP/2
+support: <a href="https://golang.org/s/http2bug">https://golang.org/s/http2bug</a>
+</p>
+<p>
+The http package&#39;s Transport and Server both automatically enable
+HTTP/2 support for simple configurations. To enable HTTP/2 for more
+complex configurations, to use lower-level HTTP/2 features, or to use
+a newer version of Go&#39;s http2 package, import &#34;golang.org/x/net/http2&#34;
+directly and use its ConfigureTransport and/or ConfigureServer
+functions. Manually configuring HTTP/2 via the golang.org/x/net/http2
+package takes precedence over the net/http package&#39;s built-in HTTP/2
+support.
+</p>
+
+			</div>
+		</div>
+		
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+				<dd><a href="index.html#pkg-constants">Constants</a></dd>
+			
+			
+				<dd><a href="index.html#pkg-variables">Variables</a></dd>
+			
+			
+				
+				<dd><a href="index.html#CanonicalHeaderKey">func CanonicalHeaderKey(s string) string</a></dd>
+			
+				
+				<dd><a href="index.html#DetectContentType">func DetectContentType(data []byte) string</a></dd>
+			
+				
+				<dd><a href="index.html#Error">func Error(w ResponseWriter, error string, code int)</a></dd>
+			
+				
+				<dd><a href="index.html#Handle">func Handle(pattern string, handler Handler)</a></dd>
+			
+				
+				<dd><a href="index.html#HandleFunc">func HandleFunc(pattern string, handler func(ResponseWriter, *Request))</a></dd>
+			
+				
+				<dd><a href="index.html#ListenAndServe">func ListenAndServe(addr string, handler Handler) error</a></dd>
+			
+				
+				<dd><a href="index.html#ListenAndServeTLS">func ListenAndServeTLS(addr, certFile, keyFile string, handler Handler) error</a></dd>
+			
+				
+				<dd><a href="index.html#MaxBytesReader">func MaxBytesReader(w ResponseWriter, r io.ReadCloser, n int64) io.ReadCloser</a></dd>
+			
+				
+				<dd><a href="index.html#NotFound">func NotFound(w ResponseWriter, r *Request)</a></dd>
+			
+				
+				<dd><a href="index.html#ParseHTTPVersion">func ParseHTTPVersion(vers string) (major, minor int, ok bool)</a></dd>
+			
+				
+				<dd><a href="index.html#ParseTime">func ParseTime(text string) (t time.Time, err error)</a></dd>
+			
+				
+				<dd><a href="index.html#ProxyFromEnvironment">func ProxyFromEnvironment(req *Request) (*url.URL, error)</a></dd>
+			
+				
+				<dd><a href="index.html#ProxyURL">func ProxyURL(fixedURL *url.URL) func(*Request) (*url.URL, error)</a></dd>
+			
+				
+				<dd><a href="index.html#Redirect">func Redirect(w ResponseWriter, r *Request, urlStr string, code int)</a></dd>
+			
+				
+				<dd><a href="index.html#Serve">func Serve(l net.Listener, handler Handler) error</a></dd>
+			
+				
+				<dd><a href="index.html#ServeContent">func ServeContent(w ResponseWriter, req *Request, name string, modtime time.Time, content io.ReadSeeker)</a></dd>
+			
+				
+				<dd><a href="index.html#ServeFile">func ServeFile(w ResponseWriter, r *Request, name string)</a></dd>
+			
+				
+				<dd><a href="index.html#SetCookie">func SetCookie(w ResponseWriter, cookie *Cookie)</a></dd>
+			
+				
+				<dd><a href="index.html#StatusText">func StatusText(code int) string</a></dd>
+			
+			
+				
+				<dd><a href="index.html#Client">type Client</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Client.Do">func (c *Client) Do(req *Request) (*Response, error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Client.Get">func (c *Client) Get(url string) (resp *Response, err error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Client.Head">func (c *Client) Head(url string) (resp *Response, err error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Client.Post">func (c *Client) Post(url string, contentType string, body io.Reader) (resp *Response, err error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Client.PostForm">func (c *Client) PostForm(url string, data url.Values) (resp *Response, err error)</a></dd>
+				
+			
+				
+				<dd><a href="index.html#CloseNotifier">type CloseNotifier</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#ConnState">type ConnState</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#ConnState.String">func (c ConnState) String() string</a></dd>
+				
+			
+				
+				<dd><a href="index.html#Cookie">type Cookie</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Cookie.String">func (c *Cookie) String() string</a></dd>
+				
+			
+				
+				<dd><a href="index.html#CookieJar">type CookieJar</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#Dir">type Dir</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Dir.Open">func (d Dir) Open(name string) (File, error)</a></dd>
+				
+			
+				
+				<dd><a href="index.html#File">type File</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#FileSystem">type FileSystem</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#Flusher">type Flusher</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#Handler">type Handler</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#FileServer">func FileServer(root FileSystem) Handler</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#NotFoundHandler">func NotFoundHandler() Handler</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#RedirectHandler">func RedirectHandler(url string, code int) Handler</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#StripPrefix">func StripPrefix(prefix string, h Handler) Handler</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#TimeoutHandler">func TimeoutHandler(h Handler, dt time.Duration, msg string) Handler</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#HandlerFunc">type HandlerFunc</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#HandlerFunc.ServeHTTP">func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request)</a></dd>
+				
+			
+				
+				<dd><a href="index.html#Header">type Header</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Header.Add">func (h Header) Add(key, value string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Header.Del">func (h Header) Del(key string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Header.Get">func (h Header) Get(key string) string</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Header.Set">func (h Header) Set(key, value string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Header.Write">func (h Header) Write(w io.Writer) error</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Header.WriteSubset">func (h Header) WriteSubset(w io.Writer, exclude map[string]bool) error</a></dd>
+				
+			
+				
+				<dd><a href="index.html#Hijacker">type Hijacker</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#ProtocolError">type ProtocolError</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#ProtocolError.Error">func (pe *ProtocolError) Error() string</a></dd>
+				
+			
+				
+				<dd><a href="index.html#PushOptions">type PushOptions</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#Pusher">type Pusher</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#Request">type Request</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#NewRequest">func NewRequest(method, urlStr string, body io.Reader) (*Request, error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#ReadRequest">func ReadRequest(b *bufio.Reader) (*Request, error)</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.AddCookie">func (r *Request) AddCookie(c *Cookie)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.BasicAuth">func (r *Request) BasicAuth() (username, password string, ok bool)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.Context">func (r *Request) Context() context.Context</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.Cookie">func (r *Request) Cookie(name string) (*Cookie, error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.Cookies">func (r *Request) Cookies() []*Cookie</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.FormFile">func (r *Request) FormFile(key string) (multipart.File, *multipart.FileHeader, error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.FormValue">func (r *Request) FormValue(key string) string</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.MultipartReader">func (r *Request) MultipartReader() (*multipart.Reader, error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.ParseForm">func (r *Request) ParseForm() error</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.ParseMultipartForm">func (r *Request) ParseMultipartForm(maxMemory int64) error</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.PostFormValue">func (r *Request) PostFormValue(key string) string</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.ProtoAtLeast">func (r *Request) ProtoAtLeast(major, minor int) bool</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.Referer">func (r *Request) Referer() string</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.SetBasicAuth">func (r *Request) SetBasicAuth(username, password string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.UserAgent">func (r *Request) UserAgent() string</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.WithContext">func (r *Request) WithContext(ctx context.Context) *Request</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.Write">func (r *Request) Write(w io.Writer) error</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Request.WriteProxy">func (r *Request) WriteProxy(w io.Writer) error</a></dd>
+				
+			
+				
+				<dd><a href="index.html#Response">type Response</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Get">func Get(url string) (resp *Response, err error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Head">func Head(url string) (resp *Response, err error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Post">func Post(url string, contentType string, body io.Reader) (resp *Response, err error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#PostForm">func PostForm(url string, data url.Values) (resp *Response, err error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#ReadResponse">func ReadResponse(r *bufio.Reader, req *Request) (*Response, error)</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Response.Cookies">func (r *Response) Cookies() []*Cookie</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Response.Location">func (r *Response) Location() (*url.URL, error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Response.ProtoAtLeast">func (r *Response) ProtoAtLeast(major, minor int) bool</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Response.Write">func (r *Response) Write(w io.Writer) error</a></dd>
+				
+			
+				
+				<dd><a href="index.html#ResponseWriter">type ResponseWriter</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#RoundTripper">type RoundTripper</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#NewFileTransport">func NewFileTransport(fs FileSystem) RoundTripper</a></dd>
+				
+				
+			
+				
+				<dd><a href="index.html#ServeMux">type ServeMux</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#NewServeMux">func NewServeMux() *ServeMux</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#ServeMux.Handle">func (mux *ServeMux) Handle(pattern string, handler Handler)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#ServeMux.HandleFunc">func (mux *ServeMux) HandleFunc(pattern string, handler func(ResponseWriter, *Request))</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#ServeMux.Handler">func (mux *ServeMux) Handler(r *Request) (h Handler, pattern string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#ServeMux.ServeHTTP">func (mux *ServeMux) ServeHTTP(w ResponseWriter, r *Request)</a></dd>
+				
+			
+				
+				<dd><a href="index.html#Server">type Server</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Server.Close">func (srv *Server) Close() error</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Server.ListenAndServe">func (srv *Server) ListenAndServe() error</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Server.ListenAndServeTLS">func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Server.Serve">func (srv *Server) Serve(l net.Listener) error</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Server.SetKeepAlivesEnabled">func (srv *Server) SetKeepAlivesEnabled(v bool)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Server.Shutdown">func (srv *Server) Shutdown(ctx context.Context) error</a></dd>
+				
+			
+				
+				<dd><a href="index.html#Transport">type Transport</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Transport.CancelRequest">func (t *Transport) CancelRequest(req *Request)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Transport.CloseIdleConnections">func (t *Transport) CloseIdleConnections()</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Transport.RegisterProtocol">func (t *Transport) RegisterProtocol(scheme string, rt RoundTripper)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Transport.RoundTrip">func (t *Transport) RoundTrip(req *Request) (*Response, error)</a></dd>
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+		<div id="pkg-examples">
+			<h4>Examples</h4>
+			<dl>
+			
+			<dd><a class="exampleLink" href="index.html#example_FileServer">FileServer</a></dd>
+			
+			<dd><a class="exampleLink" href="index.html#example_FileServer_stripPrefix">FileServer (StripPrefix)</a></dd>
+			
+			<dd><a class="exampleLink" href="index.html#example_Get">Get</a></dd>
+			
+			<dd><a class="exampleLink" href="index.html#example_Hijacker">Hijacker</a></dd>
+			
+			<dd><a class="exampleLink" href="index.html#example_ResponseWriter_trailers">ResponseWriter (Trailers)</a></dd>
+			
+			<dd><a class="exampleLink" href="index.html#example_ServeMux_Handle">ServeMux.Handle</a></dd>
+			
+			<dd><a class="exampleLink" href="index.html#example_StripPrefix">StripPrefix</a></dd>
+			
+			</dl>
+		</div>
+		
+
+		
+			<h4>Package files</h4>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="../../../src/net/http/client.go.html">client.go</a>
+			
+				<a href="../../../src/net/http/cookie.go.html">cookie.go</a>
+			
+				<a href="../../../src/net/http/doc.go.html">doc.go</a>
+			
+				<a href="../../../src/net/http/filetransport.go.html">filetransport.go</a>
+			
+				<a href="../../../src/net/http/fs.go.html">fs.go</a>
+			
+				<a href="../../../src/net/http/h2_bundle.go.html">h2_bundle.go</a>
+			
+				<a href="../../../src/net/http/header.go.html">header.go</a>
+			
+				<a href="../../../src/net/http/http.go.html">http.go</a>
+			
+				<a href="../../../src/net/http/jar.go.html">jar.go</a>
+			
+				<a href="../../../src/net/http/method.go.html">method.go</a>
+			
+				<a href="../../../src/net/http/request.go.html">request.go</a>
+			
+				<a href="../../../src/net/http/response.go.html">response.go</a>
+			
+				<a href="../../../src/net/http/server.go.html">server.go</a>
+			
+				<a href="../../../src/net/http/sniff.go.html">sniff.go</a>
+			
+				<a href="../../../src/net/http/status.go.html">status.go</a>
+			
+				<a href="../../../src/net/http/transfer.go.html">transfer.go</a>
+			
+				<a href="../../../src/net/http/transport.go.html">transport.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		<div id="pkg-callgraph" class="toggle" style="display: none">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Internal Call Graph section">Internal call graph ▹</h2>
+		</div> <!-- .expanded -->
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Internal Call Graph section">Internal call graph ▾</h2>
+			<p>
+			  In the call graph viewer below, each node
+			  is a function belonging to this package
+			  and its children are the functions it
+			  calls&mdash;perhaps dynamically.
+			</p>
+			<p>
+			  The root nodes are the entry points of the
+			  package: functions that may be called from
+			  outside the package.
+			  There may be non-exported or anonymous
+			  functions among them if they are called
+			  dynamically from another package.
+			</p>
+			<p>
+			  Click a node to visit that function's source code.
+			  From there you can visit its callers by
+			  clicking its declaring <code>func</code>
+			  token.
+			</p>
+			<p>
+			  Functions may be omitted if they were
+			  determined to be unreachable in the
+			  particular programs or tests that were
+			  analyzed.
+			</p>
+			<!-- Zero means show all package entry points. -->
+			<ul style="margin-left: 0.5in" id="callgraph-0" class="treeview"></ul>
+		</div>
+		</div> <!-- #pkg-callgraph -->
+
+		
+			<h2 id="pkg-constants">Constants</h2>
+			
+				<p>
+Common HTTP methods.
+</p>
+<p>
+Unless otherwise noted, these are defined in RFC 7231 section 4.3.
+</p>
+
+				<pre>const (
+    <span id="MethodGet">MethodGet</span>     = &#34;GET&#34;
+    <span id="MethodHead">MethodHead</span>    = &#34;HEAD&#34;
+    <span id="MethodPost">MethodPost</span>    = &#34;POST&#34;
+    <span id="MethodPut">MethodPut</span>     = &#34;PUT&#34;
+    <span id="MethodPatch">MethodPatch</span>   = &#34;PATCH&#34; <span class="comment">// RFC 5789</span>
+    <span id="MethodDelete">MethodDelete</span>  = &#34;DELETE&#34;
+    <span id="MethodConnect">MethodConnect</span> = &#34;CONNECT&#34;
+    <span id="MethodOptions">MethodOptions</span> = &#34;OPTIONS&#34;
+    <span id="MethodTrace">MethodTrace</span>   = &#34;TRACE&#34;
+)</pre>
+			
+				<p>
+HTTP status codes as registered with IANA.
+See: <a href="http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml">http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml</a>
+</p>
+
+				<pre>const (
+    <span id="StatusContinue">StatusContinue</span>           = 100 <span class="comment">// RFC 7231, 6.2.1</span>
+    <span id="StatusSwitchingProtocols">StatusSwitchingProtocols</span> = 101 <span class="comment">// RFC 7231, 6.2.2</span>
+    <span id="StatusProcessing">StatusProcessing</span>         = 102 <span class="comment">// RFC 2518, 10.1</span>
+
+    <span id="StatusOK">StatusOK</span>                   = 200 <span class="comment">// RFC 7231, 6.3.1</span>
+    <span id="StatusCreated">StatusCreated</span>              = 201 <span class="comment">// RFC 7231, 6.3.2</span>
+    <span id="StatusAccepted">StatusAccepted</span>             = 202 <span class="comment">// RFC 7231, 6.3.3</span>
+    <span id="StatusNonAuthoritativeInfo">StatusNonAuthoritativeInfo</span> = 203 <span class="comment">// RFC 7231, 6.3.4</span>
+    <span id="StatusNoContent">StatusNoContent</span>            = 204 <span class="comment">// RFC 7231, 6.3.5</span>
+    <span id="StatusResetContent">StatusResetContent</span>         = 205 <span class="comment">// RFC 7231, 6.3.6</span>
+    <span id="StatusPartialContent">StatusPartialContent</span>       = 206 <span class="comment">// RFC 7233, 4.1</span>
+    <span id="StatusMultiStatus">StatusMultiStatus</span>          = 207 <span class="comment">// RFC 4918, 11.1</span>
+    <span id="StatusAlreadyReported">StatusAlreadyReported</span>      = 208 <span class="comment">// RFC 5842, 7.1</span>
+    <span id="StatusIMUsed">StatusIMUsed</span>               = 226 <span class="comment">// RFC 3229, 10.4.1</span>
+
+    <span id="StatusMultipleChoices">StatusMultipleChoices</span>  = 300 <span class="comment">// RFC 7231, 6.4.1</span>
+    <span id="StatusMovedPermanently">StatusMovedPermanently</span> = 301 <span class="comment">// RFC 7231, 6.4.2</span>
+    <span id="StatusFound">StatusFound</span>            = 302 <span class="comment">// RFC 7231, 6.4.3</span>
+    <span id="StatusSeeOther">StatusSeeOther</span>         = 303 <span class="comment">// RFC 7231, 6.4.4</span>
+    <span id="StatusNotModified">StatusNotModified</span>      = 304 <span class="comment">// RFC 7232, 4.1</span>
+    <span id="StatusUseProxy">StatusUseProxy</span>         = 305 <span class="comment">// RFC 7231, 6.4.5</span>
+
+    <span id="StatusTemporaryRedirect">StatusTemporaryRedirect</span> = 307 <span class="comment">// RFC 7231, 6.4.7</span>
+    <span id="StatusPermanentRedirect">StatusPermanentRedirect</span> = 308 <span class="comment">// RFC 7538, 3</span>
+
+    <span id="StatusBadRequest">StatusBadRequest</span>                   = 400 <span class="comment">// RFC 7231, 6.5.1</span>
+    <span id="StatusUnauthorized">StatusUnauthorized</span>                 = 401 <span class="comment">// RFC 7235, 3.1</span>
+    <span id="StatusPaymentRequired">StatusPaymentRequired</span>              = 402 <span class="comment">// RFC 7231, 6.5.2</span>
+    <span id="StatusForbidden">StatusForbidden</span>                    = 403 <span class="comment">// RFC 7231, 6.5.3</span>
+    <span id="StatusNotFound">StatusNotFound</span>                     = 404 <span class="comment">// RFC 7231, 6.5.4</span>
+    <span id="StatusMethodNotAllowed">StatusMethodNotAllowed</span>             = 405 <span class="comment">// RFC 7231, 6.5.5</span>
+    <span id="StatusNotAcceptable">StatusNotAcceptable</span>                = 406 <span class="comment">// RFC 7231, 6.5.6</span>
+    <span id="StatusProxyAuthRequired">StatusProxyAuthRequired</span>            = 407 <span class="comment">// RFC 7235, 3.2</span>
+    <span id="StatusRequestTimeout">StatusRequestTimeout</span>               = 408 <span class="comment">// RFC 7231, 6.5.7</span>
+    <span id="StatusConflict">StatusConflict</span>                     = 409 <span class="comment">// RFC 7231, 6.5.8</span>
+    <span id="StatusGone">StatusGone</span>                         = 410 <span class="comment">// RFC 7231, 6.5.9</span>
+    <span id="StatusLengthRequired">StatusLengthRequired</span>               = 411 <span class="comment">// RFC 7231, 6.5.10</span>
+    <span id="StatusPreconditionFailed">StatusPreconditionFailed</span>           = 412 <span class="comment">// RFC 7232, 4.2</span>
+    <span id="StatusRequestEntityTooLarge">StatusRequestEntityTooLarge</span>        = 413 <span class="comment">// RFC 7231, 6.5.11</span>
+    <span id="StatusRequestURITooLong">StatusRequestURITooLong</span>            = 414 <span class="comment">// RFC 7231, 6.5.12</span>
+    <span id="StatusUnsupportedMediaType">StatusUnsupportedMediaType</span>         = 415 <span class="comment">// RFC 7231, 6.5.13</span>
+    <span id="StatusRequestedRangeNotSatisfiable">StatusRequestedRangeNotSatisfiable</span> = 416 <span class="comment">// RFC 7233, 4.4</span>
+    <span id="StatusExpectationFailed">StatusExpectationFailed</span>            = 417 <span class="comment">// RFC 7231, 6.5.14</span>
+    <span id="StatusTeapot">StatusTeapot</span>                       = 418 <span class="comment">// RFC 7168, 2.3.3</span>
+    <span id="StatusUnprocessableEntity">StatusUnprocessableEntity</span>          = 422 <span class="comment">// RFC 4918, 11.2</span>
+    <span id="StatusLocked">StatusLocked</span>                       = 423 <span class="comment">// RFC 4918, 11.3</span>
+    <span id="StatusFailedDependency">StatusFailedDependency</span>             = 424 <span class="comment">// RFC 4918, 11.4</span>
+    <span id="StatusUpgradeRequired">StatusUpgradeRequired</span>              = 426 <span class="comment">// RFC 7231, 6.5.15</span>
+    <span id="StatusPreconditionRequired">StatusPreconditionRequired</span>         = 428 <span class="comment">// RFC 6585, 3</span>
+    <span id="StatusTooManyRequests">StatusTooManyRequests</span>              = 429 <span class="comment">// RFC 6585, 4</span>
+    <span id="StatusRequestHeaderFieldsTooLarge">StatusRequestHeaderFieldsTooLarge</span>  = 431 <span class="comment">// RFC 6585, 5</span>
+    <span id="StatusUnavailableForLegalReasons">StatusUnavailableForLegalReasons</span>   = 451 <span class="comment">// RFC 7725, 3</span>
+
+    <span id="StatusInternalServerError">StatusInternalServerError</span>           = 500 <span class="comment">// RFC 7231, 6.6.1</span>
+    <span id="StatusNotImplemented">StatusNotImplemented</span>                = 501 <span class="comment">// RFC 7231, 6.6.2</span>
+    <span id="StatusBadGateway">StatusBadGateway</span>                    = 502 <span class="comment">// RFC 7231, 6.6.3</span>
+    <span id="StatusServiceUnavailable">StatusServiceUnavailable</span>            = 503 <span class="comment">// RFC 7231, 6.6.4</span>
+    <span id="StatusGatewayTimeout">StatusGatewayTimeout</span>                = 504 <span class="comment">// RFC 7231, 6.6.5</span>
+    <span id="StatusHTTPVersionNotSupported">StatusHTTPVersionNotSupported</span>       = 505 <span class="comment">// RFC 7231, 6.6.6</span>
+    <span id="StatusVariantAlsoNegotiates">StatusVariantAlsoNegotiates</span>         = 506 <span class="comment">// RFC 2295, 8.1</span>
+    <span id="StatusInsufficientStorage">StatusInsufficientStorage</span>           = 507 <span class="comment">// RFC 4918, 11.5</span>
+    <span id="StatusLoopDetected">StatusLoopDetected</span>                  = 508 <span class="comment">// RFC 5842, 7.2</span>
+    <span id="StatusNotExtended">StatusNotExtended</span>                   = 510 <span class="comment">// RFC 2774, 7</span>
+    <span id="StatusNetworkAuthenticationRequired">StatusNetworkAuthenticationRequired</span> = 511 <span class="comment">// RFC 6585, 6</span>
+)</pre>
+			
+				<p>
+DefaultMaxHeaderBytes is the maximum permitted size of the headers
+in an HTTP request.
+This can be overridden by setting Server.MaxHeaderBytes.
+</p>
+
+				<pre>const <span id="DefaultMaxHeaderBytes">DefaultMaxHeaderBytes</span> = 1 &lt;&lt; 20 <span class="comment">// 1 MB</span>
+</pre>
+			
+				<p>
+DefaultMaxIdleConnsPerHost is the default value of Transport&#39;s
+MaxIdleConnsPerHost.
+</p>
+
+				<pre>const <span id="DefaultMaxIdleConnsPerHost">DefaultMaxIdleConnsPerHost</span> = 2</pre>
+			
+				<p>
+TimeFormat is the time format to use when generating times in HTTP
+headers. It is like time.RFC1123 but hard-codes GMT as the time
+zone. The time being formatted must be in UTC for Format to
+generate the correct format.
+</p>
+<p>
+For parsing this time format, see ParseTime.
+</p>
+
+				<pre>const <span id="TimeFormat">TimeFormat</span> = &#34;Mon, 02 Jan 2006 15:04:05 GMT&#34;</pre>
+			
+				<p>
+TrailerPrefix is a magic prefix for ResponseWriter.Header map keys
+that, if present, signals that the map entry is actually for
+the response trailers, and not the response headers. The prefix
+is stripped after the ServeHTTP call finishes and the values are
+sent in the trailers.
+</p>
+<p>
+This mechanism is intended only for trailers that are not known
+prior to the headers being written. If the set of trailers is fixed
+or known before the header is written, the normal Go trailers mechanism
+is preferred:
+</p>
+<pre><a href="https://golang.org/pkg/net/http/#ResponseWriter">https://golang.org/pkg/net/http/#ResponseWriter</a>
+<a href="https://golang.org/pkg/net/http/#example_ResponseWriter_trailers">https://golang.org/pkg/net/http/#example_ResponseWriter_trailers</a>
+</pre>
+
+				<pre>const <span id="TrailerPrefix">TrailerPrefix</span> = &#34;Trailer:&#34;</pre>
+			
+		
+		
+			<h2 id="pkg-variables">Variables</h2>
+			
+				
+				<pre>var (
+    <span class="comment">// ErrNotSupported is returned by the Push method of Pusher</span>
+    <span class="comment">// implementations to indicate that HTTP/2 Push support is not</span>
+    <span class="comment">// available.</span>
+    <span id="ErrNotSupported">ErrNotSupported</span> = &amp;<a href="index.html#ProtocolError">ProtocolError</a>{&#34;feature not supported&#34;}
+
+    <span class="comment">// ErrUnexpectedTrailer is returned by the Transport when a server</span>
+    <span class="comment">// replies with a Trailer header, but without a chunked reply.</span>
+    <span id="ErrUnexpectedTrailer">ErrUnexpectedTrailer</span> = &amp;<a href="index.html#ProtocolError">ProtocolError</a>{&#34;trailer header without chunked transfer encoding&#34;}
+
+    <span class="comment">// ErrMissingBoundary is returned by Request.MultipartReader when the</span>
+    <span class="comment">// request&#39;s Content-Type does not include a &#34;boundary&#34; parameter.</span>
+    <span id="ErrMissingBoundary">ErrMissingBoundary</span> = &amp;<a href="index.html#ProtocolError">ProtocolError</a>{&#34;no multipart boundary param in Content-Type&#34;}
+
+    <span class="comment">// ErrNotMultipart is returned by Request.MultipartReader when the</span>
+    <span class="comment">// request&#39;s Content-Type is not multipart/form-data.</span>
+    <span id="ErrNotMultipart">ErrNotMultipart</span> = &amp;<a href="index.html#ProtocolError">ProtocolError</a>{&#34;request Content-Type isn&#39;t multipart/form-data&#34;}
+
+    <span class="comment">// Deprecated: ErrHeaderTooLong is not used.</span>
+    <span id="ErrHeaderTooLong">ErrHeaderTooLong</span> = &amp;<a href="index.html#ProtocolError">ProtocolError</a>{&#34;header too long&#34;}
+    <span class="comment">// Deprecated: ErrShortBody is not used.</span>
+    <span id="ErrShortBody">ErrShortBody</span> = &amp;<a href="index.html#ProtocolError">ProtocolError</a>{&#34;entity body too short&#34;}
+    <span class="comment">// Deprecated: ErrMissingContentLength is not used.</span>
+    <span id="ErrMissingContentLength">ErrMissingContentLength</span> = &amp;<a href="index.html#ProtocolError">ProtocolError</a>{&#34;missing ContentLength in HEAD response&#34;}
+)</pre>
+			
+				<p>
+Errors used by the HTTP server.
+</p>
+
+				<pre>var (
+    <span class="comment">// ErrBodyNotAllowed is returned by ResponseWriter.Write calls</span>
+    <span class="comment">// when the HTTP method or response code does not permit a</span>
+    <span class="comment">// body.</span>
+    <span id="ErrBodyNotAllowed">ErrBodyNotAllowed</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: request method or response status code does not allow body&#34;)
+
+    <span class="comment">// ErrHijacked is returned by ResponseWriter.Write calls when</span>
+    <span class="comment">// the underlying connection has been hijacked using the</span>
+    <span class="comment">// Hijacker interface. A zero-byte write on a hijacked</span>
+    <span class="comment">// connection will return ErrHijacked without any other side</span>
+    <span class="comment">// effects.</span>
+    <span id="ErrHijacked">ErrHijacked</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: connection has been hijacked&#34;)
+
+    <span class="comment">// ErrContentLength is returned by ResponseWriter.Write calls</span>
+    <span class="comment">// when a Handler set a Content-Length response header with a</span>
+    <span class="comment">// declared size and then attempted to write more bytes than</span>
+    <span class="comment">// declared.</span>
+    <span id="ErrContentLength">ErrContentLength</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: wrote more than the declared Content-Length&#34;)
+
+    <span class="comment">// Deprecated: ErrWriteAfterFlush is no longer used.</span>
+    <span id="ErrWriteAfterFlush">ErrWriteAfterFlush</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;unused&#34;)
+)</pre>
+			
+				
+				<pre>var (
+    <span class="comment">// ServerContextKey is a context key. It can be used in HTTP</span>
+    <span class="comment">// handlers with context.WithValue to access the server that</span>
+    <span class="comment">// started the handler. The associated value will be of</span>
+    <span class="comment">// type *Server.</span>
+    <span id="ServerContextKey">ServerContextKey</span> = &amp;contextKey{&#34;http-server&#34;}
+
+    <span class="comment">// LocalAddrContextKey is a context key. It can be used in</span>
+    <span class="comment">// HTTP handlers with context.WithValue to access the address</span>
+    <span class="comment">// the local address the connection arrived on.</span>
+    <span class="comment">// The associated value will be of type net.Addr.</span>
+    <span id="LocalAddrContextKey">LocalAddrContextKey</span> = &amp;contextKey{&#34;local-addr&#34;}
+)</pre>
+			
+				<p>
+DefaultClient is the default Client and is used by Get, Head, and Post.
+</p>
+
+				<pre>var <span id="DefaultClient">DefaultClient</span> = &amp;<a href="index.html#Client">Client</a>{}</pre>
+			
+				<p>
+DefaultServeMux is the default ServeMux used by Serve.
+</p>
+
+				<pre>var <span id="DefaultServeMux">DefaultServeMux</span> = &amp;defaultServeMux</pre>
+			
+				<p>
+ErrAbortHandler is a sentinel panic value to abort a handler.
+While any panic from ServeHTTP aborts the response to the client,
+panicking with ErrAbortHandler also suppresses logging of a stack
+trace to the server&#39;s error log.
+</p>
+
+				<pre>var <span id="ErrAbortHandler">ErrAbortHandler</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;net/http: abort Handler&#34;)</pre>
+			
+				<p>
+ErrBodyReadAfterClose is returned when reading a Request or Response
+Body after the body has been closed. This typically happens when the body is
+read after an HTTP Handler calls WriteHeader or Write on its
+ResponseWriter.
+</p>
+
+				<pre>var <span id="ErrBodyReadAfterClose">ErrBodyReadAfterClose</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: invalid Read on closed Body&#34;)</pre>
+			
+				<p>
+ErrHandlerTimeout is returned on ResponseWriter Write calls
+in handlers which have timed out.
+</p>
+
+				<pre>var <span id="ErrHandlerTimeout">ErrHandlerTimeout</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: Handler timeout&#34;)</pre>
+			
+				<p>
+ErrLineTooLong is returned when reading request or response bodies
+with malformed chunked encoding.
+</p>
+
+				<pre>var <span id="ErrLineTooLong">ErrLineTooLong</span> = <a href="internal/index.html">internal</a>.<a href="internal/index.html#ErrLineTooLong">ErrLineTooLong</a></pre>
+			
+				<p>
+ErrMissingFile is returned by FormFile when the provided file field name
+is either not present in the request or not a file field.
+</p>
+
+				<pre>var <span id="ErrMissingFile">ErrMissingFile</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: no such file&#34;)</pre>
+			
+				<p>
+ErrNoCookie is returned by Request&#39;s Cookie method when a cookie is not found.
+</p>
+
+				<pre>var <span id="ErrNoCookie">ErrNoCookie</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: named cookie not present&#34;)</pre>
+			
+				<p>
+ErrNoLocation is returned by Response&#39;s Location method
+when no Location header is present.
+</p>
+
+				<pre>var <span id="ErrNoLocation">ErrNoLocation</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: no Location header in response&#34;)</pre>
+			
+				
+				<pre>var <span id="ErrServerClosed">ErrServerClosed</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;http: Server closed&#34;)</pre>
+			
+				<p>
+ErrSkipAltProtocol is a sentinel error value defined by Transport.RegisterProtocol.
+</p>
+
+				<pre>var <span id="ErrSkipAltProtocol">ErrSkipAltProtocol</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;net/http: skip alternate protocol&#34;)</pre>
+			
+				<p>
+ErrUseLastResponse can be returned by Client.CheckRedirect hooks to
+control how redirects are processed. If returned, the next request
+is not sent and the most recent response is returned with its body
+unclosed.
+</p>
+
+				<pre>var <span id="ErrUseLastResponse">ErrUseLastResponse</span> = <a href="../../errors/index.html">errors</a>.<a href="../../errors/index.html#New">New</a>(&#34;net/http: use last response&#34;)</pre>
+			
+				<p>
+NoBody is an io.ReadCloser with no bytes. Read always returns EOF
+and Close always returns nil. It can be used in an outgoing client
+request to explicitly signal that a request has zero bytes.
+An alternative, however, is to simply set Request.Body to nil.
+</p>
+
+				<pre>var <span id="NoBody">NoBody</span> = noBody{}</pre>
+			
+		
+		
+			
+			
+			<h2 id="CanonicalHeaderKey">func <a href="../../../src/net/http/header.go%3Fs=4669:4709.html#L165">CanonicalHeaderKey</a>
+				<a class="permalink" href="index.html#CanonicalHeaderKey">&#xb6;</a>
+			</h2>
+			<pre>func CanonicalHeaderKey(s <a href="../../builtin/index.html#string">string</a>) <a href="../../builtin/index.html#string">string</a></pre>
+			<p>
+CanonicalHeaderKey returns the canonical format of the
+header key s. The canonicalization converts the first
+letter and any letter following a hyphen to upper case;
+the rest are converted to lowercase. For example, the
+canonical key for &#34;accept-encoding&#34; is &#34;Accept-Encoding&#34;.
+If s contains a space or invalid header field bytes, it is
+returned without modifications.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="DetectContentType">func <a href="../../../src/net/http/sniff.go%3Fs=645:687.html#L11">DetectContentType</a>
+				<a class="permalink" href="index.html#DetectContentType">&#xb6;</a>
+			</h2>
+			<pre>func DetectContentType(data []<a href="../../builtin/index.html#byte">byte</a>) <a href="../../builtin/index.html#string">string</a></pre>
+			<p>
+DetectContentType implements the algorithm described
+at <a href="http://mimesniff.spec.whatwg.org/">http://mimesniff.spec.whatwg.org/</a> to determine the
+Content-Type of the given data. It considers at most the
+first 512 bytes of data. DetectContentType always returns
+a valid MIME type: if it cannot determine a more specific one, it
+returns &#34;application/octet-stream&#34;.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Error">func <a href="../../../src/net/http/server.go%3Fs=57618:57670.html#L1941">Error</a>
+				<a class="permalink" href="index.html#Error">&#xb6;</a>
+			</h2>
+			<pre>func Error(w <a href="index.html#ResponseWriter">ResponseWriter</a>, error <a href="../../builtin/index.html#string">string</a>, code <a href="../../builtin/index.html#int">int</a>)</pre>
+			<p>
+Error replies to the request with the specified error message and HTTP code.
+It does not otherwise end the request; the caller should ensure no further
+writes are done to w.
+The error message should be plain text.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Handle">func <a href="../../../src/net/http/server.go%3Fs=68327:68371.html#L2282">Handle</a>
+				<a class="permalink" href="index.html#Handle">&#xb6;</a>
+			</h2>
+			<pre>func Handle(pattern <a href="../../builtin/index.html#string">string</a>, handler <a href="index.html#Handler">Handler</a>)</pre>
+			<p>
+Handle registers the handler for the given pattern
+in the DefaultServeMux.
+The documentation for ServeMux explains how patterns are matched.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="HandleFunc">func <a href="../../../src/net/http/server.go%3Fs=68581:68652.html#L2287">HandleFunc</a>
+				<a class="permalink" href="index.html#HandleFunc">&#xb6;</a>
+			</h2>
+			<pre>func HandleFunc(pattern <a href="../../builtin/index.html#string">string</a>, handler func(<a href="index.html#ResponseWriter">ResponseWriter</a>, *<a href="index.html#Request">Request</a>))</pre>
+			<p>
+HandleFunc registers the handler function for the given pattern
+in the DefaultServeMux.
+The documentation for ServeMux explains how patterns are matched.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ListenAndServe">func <a href="../../../src/net/http/server.go%3Fs=83696:83751.html#L2775">ListenAndServe</a>
+				<a class="permalink" href="index.html#ListenAndServe">&#xb6;</a>
+			</h2>
+			<pre>func ListenAndServe(addr <a href="../../builtin/index.html#string">string</a>, handler <a href="index.html#Handler">Handler</a>) <a href="../../builtin/index.html#error">error</a></pre>
+			<p>
+ListenAndServe listens on the TCP network address addr
+and then calls Serve with handler to handle requests
+on incoming connections.
+Accepted connections are configured to enable TCP keep-alives.
+Handler is typically nil, in which case the DefaultServeMux is
+used.
+</p>
+<p>
+A trivial example server is:
+</p>
+<pre>package main
+
+import (
+	&#34;io&#34;
+	&#34;net/http&#34;
+	&#34;log&#34;
+)
+
+// hello world, the web server
+func HelloServer(w http.ResponseWriter, req *http.Request) {
+	io.WriteString(w, &#34;hello, world!\n&#34;)
+}
+
+func main() {
+	http.HandleFunc(&#34;/hello&#34;, HelloServer)
+	log.Fatal(http.ListenAndServe(&#34;:12345&#34;, nil))
+}
+</pre>
+<p>
+ListenAndServe always returns a non-nil error.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ListenAndServeTLS">func <a href="../../../src/net/http/server.go%3Fs=84837:84914.html#L2808">ListenAndServeTLS</a>
+				<a class="permalink" href="index.html#ListenAndServeTLS">&#xb6;</a>
+			</h2>
+			<pre>func ListenAndServeTLS(addr, certFile, keyFile <a href="../../builtin/index.html#string">string</a>, handler <a href="index.html#Handler">Handler</a>) <a href="../../builtin/index.html#error">error</a></pre>
+			<p>
+ListenAndServeTLS acts identically to ListenAndServe, except that it
+expects HTTPS connections. Additionally, files containing a certificate and
+matching private key for the server must be provided. If the certificate
+is signed by a certificate authority, the certFile should be the concatenation
+of the server&#39;s certificate, any intermediates, and the CA&#39;s certificate.
+</p>
+<p>
+A trivial example server is:
+</p>
+<pre>import (
+	&#34;log&#34;
+	&#34;net/http&#34;
+)
+
+func handler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set(&#34;Content-Type&#34;, &#34;text/plain&#34;)
+	w.Write([]byte(&#34;This is an example server.\n&#34;))
+}
+
+func main() {
+	http.HandleFunc(&#34;/&#34;, handler)
+	log.Printf(&#34;About to listen on 10443. Go to <a href="https://127.0.0.1:10443/">https://127.0.0.1:10443/</a>&#34;)
+	err := http.ListenAndServeTLS(&#34;:10443&#34;, &#34;cert.pem&#34;, &#34;key.pem&#34;, nil)
+	log.Fatal(err)
+}
+</pre>
+<p>
+One can use generate_cert.go in crypto/tls to generate cert.pem and key.pem.
+</p>
+<p>
+ListenAndServeTLS always returns a non-nil error.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="MaxBytesReader">func <a href="../../../src/net/http/request.go%3Fs=32343:32420.html#L1003">MaxBytesReader</a>
+				<a class="permalink" href="index.html#MaxBytesReader">&#xb6;</a>
+			</h2>
+			<pre>func MaxBytesReader(w <a href="index.html#ResponseWriter">ResponseWriter</a>, r <a href="../../io/index.html">io</a>.<a href="../../io/index.html#ReadCloser">ReadCloser</a>, n <a href="../../builtin/index.html#int64">int64</a>) <a href="../../io/index.html">io</a>.<a href="../../io/index.html#ReadCloser">ReadCloser</a></pre>
+			<p>
+MaxBytesReader is similar to io.LimitReader but is intended for
+limiting the size of incoming request bodies. In contrast to
+io.LimitReader, MaxBytesReader&#39;s result is a ReadCloser, returns a
+non-EOF error for a Read beyond the limit, and closes the
+underlying reader when its Close method is called.
+</p>
+<p>
+MaxBytesReader prevents clients from accidentally or maliciously
+sending a large request and wasting server resources.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="NotFound">func <a href="../../../src/net/http/server.go%3Fs=57904:57947.html#L1949">NotFound</a>
+				<a class="permalink" href="index.html#NotFound">&#xb6;</a>
+			</h2>
+			<pre>func NotFound(w <a href="index.html#ResponseWriter">ResponseWriter</a>, r *<a href="index.html#Request">Request</a>)</pre>
+			<p>
+NotFound replies to the request with an HTTP 404 not found error.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ParseHTTPVersion">func <a href="../../../src/net/http/request.go%3Fs=22614:22676.html#L687">ParseHTTPVersion</a>
+				<a class="permalink" href="index.html#ParseHTTPVersion">&#xb6;</a>
+			</h2>
+			<pre>func ParseHTTPVersion(vers <a href="../../builtin/index.html#string">string</a>) (major, minor <a href="../../builtin/index.html#int">int</a>, ok <a href="../../builtin/index.html#bool">bool</a>)</pre>
+			<p>
+ParseHTTPVersion parses a HTTP version string.
+&#34;HTTP/1.0&#34; returns (1, 0, true).
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ParseTime">func <a href="../../../src/net/http/header.go%3Fs=2017:2069.html#L71">ParseTime</a>
+				<a class="permalink" href="index.html#ParseTime">&#xb6;</a>
+			</h2>
+			<pre>func ParseTime(text <a href="../../builtin/index.html#string">string</a>) (t <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Time">Time</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+			<p>
+ParseTime parses a time header (such as the Date: header),
+trying each of the three formats allowed by HTTP/1.1:
+TimeFormat, time.RFC850, and time.ANSIC.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ProxyFromEnvironment">func <a href="../../../src/net/http/transport.go%3Fs=9778:9835.html#L250">ProxyFromEnvironment</a>
+				<a class="permalink" href="index.html#ProxyFromEnvironment">&#xb6;</a>
+			</h2>
+			<pre>func ProxyFromEnvironment(req *<a href="index.html#Request">Request</a>) (*<a href="../url/index.html">url</a>.<a href="../url/index.html#URL">URL</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+			<p>
+ProxyFromEnvironment returns the URL of the proxy to use for a
+given request, as indicated by the environment variables
+HTTP_PROXY, HTTPS_PROXY and NO_PROXY (or the lowercase versions
+thereof). HTTPS_PROXY takes precedence over HTTP_PROXY for https
+requests.
+</p>
+<p>
+The environment values may be either a complete URL or a
+&#34;host[:port]&#34;, in which case the &#34;http&#34; scheme is assumed.
+An error is returned if the value is a different form.
+</p>
+<p>
+A nil URL and nil error are returned if no proxy is defined in the
+environment, or a proxy should not be used for the given request,
+as defined by NO_PROXY.
+</p>
+<p>
+As a special case, if req.URL.Host is &#34;localhost&#34; (with or without
+a port number), then a nil URL and nil error will be returned.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ProxyURL">func <a href="../../../src/net/http/transport.go%3Fs=10819:10884.html#L284">ProxyURL</a>
+				<a class="permalink" href="index.html#ProxyURL">&#xb6;</a>
+			</h2>
+			<pre>func ProxyURL(fixedURL *<a href="../url/index.html">url</a>.<a href="../url/index.html#URL">URL</a>) func(*<a href="index.html#Request">Request</a>) (*<a href="../url/index.html">url</a>.<a href="../url/index.html#URL">URL</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+			<p>
+ProxyURL returns a proxy function (for use in a Transport)
+that always returns the same URL.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Redirect">func <a href="../../../src/net/http/server.go%3Fs=58995:59063.html#L1979">Redirect</a>
+				<a class="permalink" href="index.html#Redirect">&#xb6;</a>
+			</h2>
+			<pre>func Redirect(w <a href="index.html#ResponseWriter">ResponseWriter</a>, r *<a href="index.html#Request">Request</a>, urlStr <a href="../../builtin/index.html#string">string</a>, code <a href="../../builtin/index.html#int">int</a>)</pre>
+			<p>
+Redirect replies to the request with a redirect to url,
+which may be a path relative to the request path.
+</p>
+<p>
+The provided code should be in the 3xx range and is usually
+StatusMovedPermanently, StatusFound or StatusSeeOther.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Serve">func <a href="../../../src/net/http/server.go%3Fs=68964:69013.html#L2295">Serve</a>
+				<a class="permalink" href="index.html#Serve">&#xb6;</a>
+			</h2>
+			<pre>func Serve(l <a href="../index.html">net</a>.<a href="../index.html#Listener">Listener</a>, handler <a href="index.html#Handler">Handler</a>) <a href="../../builtin/index.html#error">error</a></pre>
+			<p>
+Serve accepts incoming HTTP connections on the listener l,
+creating a new service goroutine for each. The service goroutines
+read requests and then call handler to reply to them.
+Handler is typically nil, in which case the DefaultServeMux is used.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ServeContent">func <a href="../../../src/net/http/fs.go%3Fs=3873:3977.html#L113">ServeContent</a>
+				<a class="permalink" href="index.html#ServeContent">&#xb6;</a>
+			</h2>
+			<pre>func ServeContent(w <a href="index.html#ResponseWriter">ResponseWriter</a>, req *<a href="index.html#Request">Request</a>, name <a href="../../builtin/index.html#string">string</a>, modtime <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Time">Time</a>, content <a href="../../io/index.html">io</a>.<a href="../../io/index.html#ReadSeeker">ReadSeeker</a>)</pre>
+			<p>
+ServeContent replies to the request using the content in the
+provided ReadSeeker. The main benefit of ServeContent over io.Copy
+is that it handles Range requests properly, sets the MIME type, and
+handles If-Match, If-Unmodified-Since, If-None-Match, If-Modified-Since,
+and If-Range requests.
+</p>
+<p>
+If the response&#39;s Content-Type header is not set, ServeContent
+first tries to deduce the type from name&#39;s file extension and,
+if that fails, falls back to reading the first block of the content
+and passing it to DetectContentType.
+The name is otherwise unused; in particular it can be empty and is
+never sent in the response.
+</p>
+<p>
+If modtime is not the zero time or Unix epoch, ServeContent
+includes it in a Last-Modified header in the response. If the
+request includes an If-Modified-Since header, ServeContent uses
+modtime to decide whether the content needs to be sent at all.
+</p>
+<p>
+The content&#39;s Seek method must work: ServeContent uses
+a seek to the end of the content to determine its size.
+</p>
+<p>
+If the caller has set w&#39;s ETag header formatted per RFC 7232, section 2.3,
+ServeContent uses it to handle requests using If-Match, If-None-Match, or If-Range.
+</p>
+<p>
+Note that *os.File implements the io.ReadSeeker interface.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ServeFile">func <a href="../../../src/net/http/fs.go%3Fs=18015:18072.html#L626">ServeFile</a>
+				<a class="permalink" href="index.html#ServeFile">&#xb6;</a>
+			</h2>
+			<pre>func ServeFile(w <a href="index.html#ResponseWriter">ResponseWriter</a>, r *<a href="index.html#Request">Request</a>, name <a href="../../builtin/index.html#string">string</a>)</pre>
+			<p>
+ServeFile replies to the request with the contents of the named
+file or directory.
+</p>
+<p>
+If the provided file or directory name is a relative path, it is
+interpreted relative to the current directory and may ascend to parent
+directories. If the provided name is constructed from user input, it
+should be sanitized before calling ServeFile. As a precaution, ServeFile
+will reject requests where r.URL.Path contains a &#34;..&#34; path element.
+</p>
+<p>
+As a special case, ServeFile redirects any request where r.URL.Path
+ends in &#34;/index.html&#34; to the same path, without the final
+&#34;index.html&#34;. To avoid such redirects either modify the path or
+use ServeContent.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="SetCookie">func <a href="../../../src/net/http/cookie.go%3Fs=3118:3166.html#L122">SetCookie</a>
+				<a class="permalink" href="index.html#SetCookie">&#xb6;</a>
+			</h2>
+			<pre>func SetCookie(w <a href="index.html#ResponseWriter">ResponseWriter</a>, cookie *<a href="index.html#Cookie">Cookie</a>)</pre>
+			<p>
+SetCookie adds a Set-Cookie header to the provided ResponseWriter&#39;s headers.
+The provided cookie must have a valid Name. Invalid cookies may be
+silently dropped.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="StatusText">func <a href="../../../src/net/http/status.go%3Fs=7054:7086.html#L134">StatusText</a>
+				<a class="permalink" href="index.html#StatusText">&#xb6;</a>
+			</h2>
+			<pre>func StatusText(code <a href="../../builtin/index.html#int">int</a>) <a href="../../builtin/index.html#string">string</a></pre>
+			<p>
+StatusText returns a text for the HTTP status code. It returns the empty
+string if the code is unknown.
+</p>
+
+			
+			
+
+		
+		
+			
+			
+			<h2 id="Client">type <a href="../../../src/net/http/client.go%3Fs=1933:4055.html#L46">Client</a>
+				<a class="permalink" href="index.html#Client">&#xb6;</a>
+			</h2>
+			<p>
+A Client is an HTTP client. Its zero value (DefaultClient) is a
+usable client that uses DefaultTransport.
+</p>
+<p>
+The Client&#39;s Transport typically has internal state (cached TCP
+connections), so Clients should be reused instead of created as
+needed. Clients are safe for concurrent use by multiple goroutines.
+</p>
+<p>
+A Client is higher-level than a RoundTripper (such as Transport)
+and additionally handles HTTP details such as cookies and
+redirects.
+</p>
+<p>
+When following redirects, the Client will forward all headers set on the
+initial Request except:
+</p>
+<pre>* when forwarding sensitive headers like &#34;Authorization&#34;,
+  &#34;WWW-Authenticate&#34;, and &#34;Cookie&#34; to untrusted targets.
+  These headers will be ignored when following a redirect to a domain
+  that is not a subdomain match or exact match of the initial domain.
+  For example, a redirect from &#34;foo.com&#34; to either &#34;foo.com&#34; or &#34;sub.foo.com&#34;
+  will forward the sensitive headers, but a redirect to &#34;bar.com&#34; will not.
+
+* when forwarding the &#34;Cookie&#34; header with a non-nil cookie Jar.
+  Since each redirect may mutate the state of the cookie jar,
+  a redirect may possibly alter a cookie set in the initial request.
+  When forwarding the &#34;Cookie&#34; header, any mutated cookies will be omitted,
+  with the expectation that the Jar will insert those mutated cookies
+  with the updated values (assuming the origin matches).
+  If Jar is nil, the initial cookies are forwarded without change.
+</pre>
+
+			<pre>type Client struct {
+<span id="Client.Transport"></span>    <span class="comment">// Transport specifies the mechanism by which individual</span>
+    <span class="comment">// HTTP requests are made.</span>
+    <span class="comment">// If nil, DefaultTransport is used.</span>
+    Transport <a href="index.html#RoundTripper">RoundTripper</a>
+
+<span id="Client.CheckRedirect"></span>    <span class="comment">// CheckRedirect specifies the policy for handling redirects.</span>
+    <span class="comment">// If CheckRedirect is not nil, the client calls it before</span>
+    <span class="comment">// following an HTTP redirect. The arguments req and via are</span>
+    <span class="comment">// the upcoming request and the requests made already, oldest</span>
+    <span class="comment">// first. If CheckRedirect returns an error, the Client&#39;s Get</span>
+    <span class="comment">// method returns both the previous Response (with its Body</span>
+    <span class="comment">// closed) and CheckRedirect&#39;s error (wrapped in a url.Error)</span>
+    <span class="comment">// instead of issuing the Request req.</span>
+    <span class="comment">// As a special case, if CheckRedirect returns ErrUseLastResponse,</span>
+    <span class="comment">// then the most recent response is returned with its body</span>
+    <span class="comment">// unclosed, along with a nil error.</span>
+    <span class="comment">//</span>
+    <span class="comment">// If CheckRedirect is nil, the Client uses its default policy,</span>
+    <span class="comment">// which is to stop after 10 consecutive requests.</span>
+    CheckRedirect func(req *<a href="index.html#Request">Request</a>, via []*<a href="index.html#Request">Request</a>) <a href="../../builtin/index.html#error">error</a>
+
+<span id="Client.Jar"></span>    <span class="comment">// Jar specifies the cookie jar.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The Jar is used to insert relevant cookies into every</span>
+    <span class="comment">// outbound Request and is updated with the cookie values</span>
+    <span class="comment">// of every inbound Response. The Jar is consulted for every</span>
+    <span class="comment">// redirect that the Client follows.</span>
+    <span class="comment">//</span>
+    <span class="comment">// If Jar is nil, cookies are only sent if they are explicitly</span>
+    <span class="comment">// set on the Request.</span>
+    Jar <a href="index.html#CookieJar">CookieJar</a>
+
+<span id="Client.Timeout"></span>    <span class="comment">// Timeout specifies a time limit for requests made by this</span>
+    <span class="comment">// Client. The timeout includes connection time, any</span>
+    <span class="comment">// redirects, and reading the response body. The timer remains</span>
+    <span class="comment">// running after Get, Head, Post, or Do return and will</span>
+    <span class="comment">// interrupt reading of the Response.Body.</span>
+    <span class="comment">//</span>
+    <span class="comment">// A Timeout of zero means no timeout.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The Client cancels requests to the underlying Transport</span>
+    <span class="comment">// using the Request.Cancel mechanism. Requests passed</span>
+    <span class="comment">// to Client.Do may still set Request.Cancel; both will</span>
+    <span class="comment">// cancel the request.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For compatibility, the Client will also use the deprecated</span>
+    <span class="comment">// CancelRequest method on Transport if found. New</span>
+    <span class="comment">// RoundTripper implementations should use Request.Cancel</span>
+    <span class="comment">// instead of implementing CancelRequest.</span>
+    Timeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Client.Do">func (*Client) <a href="../../../src/net/http/client.go%3Fs=16536:16588.html#L480">Do</a>
+					<a class="permalink" href="index.html#Client.Do">&#xb6;</a>
+				</h3>
+				<pre>func (c *<a href="index.html#Client">Client</a>) Do(req *<a href="index.html#Request">Request</a>) (*<a href="index.html#Response">Response</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Do sends an HTTP request and returns an HTTP response, following
+policy (such as redirects, cookies, auth) as configured on the
+client.
+</p>
+<p>
+An error is returned if caused by client policy (such as
+CheckRedirect), or failure to speak HTTP (such as a network
+connectivity problem). A non-2xx status code doesn&#39;t cause an
+error.
+</p>
+<p>
+If the returned error is nil, the Response will contain a non-nil
+Body which the user is expected to close. If the Body is not
+closed, the Client&#39;s underlying RoundTripper (typically Transport)
+may not be able to re-use a persistent TCP connection to the server
+for a subsequent &#34;keep-alive&#34; request.
+</p>
+<p>
+The request Body, if non-nil, will be closed by the underlying
+Transport, even on errors.
+</p>
+<p>
+On error, any Response can be ignored. A non-nil Response with a
+non-nil error only occurs when CheckRedirect fails, and even then
+the returned Response.Body is already closed.
+</p>
+<p>
+Generally Get, Post, or PostForm will be used instead of Do.
+</p>
+<p>
+If the server replies with a redirect, the Client first uses the
+CheckRedirect function to determine whether the redirect should be
+followed. If permitted, a 301, 302, or 303 redirect causes
+subsequent requests to use HTTP method GET
+(or HEAD if the original request was HEAD), with no body.
+A 307 or 308 redirect preserves the original HTTP method and body,
+provided that the Request.GetBody function is defined.
+The NewRequest function automatically sets GetBody for common
+standard library body types.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Client.Get">func (*Client) <a href="../../../src/net/http/client.go%3Fs=12706:12766.html#L378">Get</a>
+					<a class="permalink" href="index.html#Client.Get">&#xb6;</a>
+				</h3>
+				<pre>func (c *<a href="index.html#Client">Client</a>) Get(url <a href="../../builtin/index.html#string">string</a>) (resp *<a href="index.html#Response">Response</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Get issues a GET to the specified URL. If the response is one of the
+following redirect codes, Get follows the redirect after calling the
+Client&#39;s CheckRedirect function:
+</p>
+<pre>301 (Moved Permanently)
+302 (Found)
+303 (See Other)
+307 (Temporary Redirect)
+308 (Permanent Redirect)
+</pre>
+<p>
+An error is returned if the Client&#39;s CheckRedirect function fails
+or if there was an HTTP protocol error. A non-2xx response doesn&#39;t
+cause an error.
+</p>
+<p>
+When err is nil, resp always contains a non-nil resp.Body.
+Caller should close resp.Body when done reading from it.
+</p>
+<p>
+To make a request with custom headers, use NewRequest and Client.Do.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Client.Head">func (*Client) <a href="../../../src/net/http/client.go%3Fs=25360:25421.html#L769">Head</a>
+					<a class="permalink" href="index.html#Client.Head">&#xb6;</a>
+				</h3>
+				<pre>func (c *<a href="index.html#Client">Client</a>) Head(url <a href="../../builtin/index.html#string">string</a>) (resp *<a href="index.html#Response">Response</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Head issues a HEAD to the specified URL. If the response is one of the
+following redirect codes, Head follows the redirect after calling the
+Client&#39;s CheckRedirect function:
+</p>
+<pre>301 (Moved Permanently)
+302 (Found)
+303 (See Other)
+307 (Temporary Redirect)
+308 (Permanent Redirect)
+</pre>
+
+				
+				
+				
+			
+				
+				<h3 id="Client.Post">func (*Client) <a href="../../../src/net/http/client.go%3Fs=23073:23170.html#L704">Post</a>
+					<a class="permalink" href="index.html#Client.Post">&#xb6;</a>
+				</h3>
+				<pre>func (c *<a href="index.html#Client">Client</a>) Post(url <a href="../../builtin/index.html#string">string</a>, contentType <a href="../../builtin/index.html#string">string</a>, body <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Reader">Reader</a>) (resp *<a href="index.html#Response">Response</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Post issues a POST to the specified URL.
+</p>
+<p>
+Caller should close resp.Body when done reading from it.
+</p>
+<p>
+If the provided body is an io.Closer, it is closed after the
+request.
+</p>
+<p>
+To set custom headers, use NewRequest and Client.Do.
+</p>
+<p>
+See the Client.Do method documentation for details on how redirects
+are handled.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Client.PostForm">func (*Client) <a href="../../../src/net/http/client.go%3Fs=24425:24507.html#L741">PostForm</a>
+					<a class="permalink" href="index.html#Client.PostForm">&#xb6;</a>
+				</h3>
+				<pre>func (c *<a href="index.html#Client">Client</a>) PostForm(url <a href="../../builtin/index.html#string">string</a>, data <a href="../url/index.html">url</a>.<a href="../url/index.html#Values">Values</a>) (resp *<a href="index.html#Response">Response</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+PostForm issues a POST to the specified URL,
+with data&#39;s keys and values URL-encoded as the request body.
+</p>
+<p>
+The Content-Type header is set to application/x-www-form-urlencoded.
+To set other headers, use NewRequest and DefaultClient.Do.
+</p>
+<p>
+When err is nil, resp always contains a non-nil resp.Body.
+Caller should close resp.Body when done reading from it.
+</p>
+<p>
+See the Client.Do method documentation for details on how redirects
+are handled.
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="CloseNotifier">type <a href="../../../src/net/http/server.go%3Fs=6990:7813.html#L178">CloseNotifier</a>
+				<a class="permalink" href="index.html#CloseNotifier">&#xb6;</a>
+			</h2>
+			<p>
+The CloseNotifier interface is implemented by ResponseWriters which
+allow detecting when the underlying connection has gone away.
+</p>
+<p>
+This mechanism can be used to cancel long operations on the server
+if the client has disconnected before the response is ready.
+</p>
+
+			<pre>type CloseNotifier interface {
+    <span class="comment">// CloseNotify returns a channel that receives at most a</span>
+    <span class="comment">// single value (true) when the client connection has gone</span>
+    <span class="comment">// away.</span>
+    <span class="comment">//</span>
+    <span class="comment">// CloseNotify may wait to notify until Request.Body has been</span>
+    <span class="comment">// fully read.</span>
+    <span class="comment">//</span>
+    <span class="comment">// After the Handler has returned, there is no guarantee</span>
+    <span class="comment">// that the channel receives a value.</span>
+    <span class="comment">//</span>
+    <span class="comment">// If the protocol is HTTP/1.1 and CloseNotify is called while</span>
+    <span class="comment">// processing an idempotent request (such a GET) while</span>
+    <span class="comment">// HTTP/1.1 pipelining is in use, the arrival of a subsequent</span>
+    <span class="comment">// pipelined request may cause a value to be sent on the</span>
+    <span class="comment">// returned channel. In practice HTTP/1.1 pipelining is not</span>
+    <span class="comment">// enabled in browsers and not seen often in the wild. If this</span>
+    <span class="comment">// is a problem, use HTTP/2 or only use CloseNotify on methods</span>
+    <span class="comment">// such as POST.</span>
+    CloseNotify() &lt;-chan <a href="../../builtin/index.html#bool">bool</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="ConnState">type <a href="../../../src/net/http/server.go%3Fs=75472:75490.html#L2494">ConnState</a>
+				<a class="permalink" href="index.html#ConnState">&#xb6;</a>
+			</h2>
+			<p>
+A ConnState represents the state of a client connection to a server.
+It&#39;s used by the optional Server.ConnState hook.
+</p>
+
+			<pre>type ConnState <a href="../../builtin/index.html#int">int</a></pre>
+
+			
+				
+				<pre>const (
+    <span class="comment">// StateNew represents a new connection that is expected to</span>
+    <span class="comment">// send a request immediately. Connections begin at this</span>
+    <span class="comment">// state and then transition to either StateActive or</span>
+    <span class="comment">// StateClosed.</span>
+    <span id="StateNew">StateNew</span> <a href="index.html#ConnState">ConnState</a> = <a href="../../builtin/index.html#iota">iota</a>
+
+    <span class="comment">// StateActive represents a connection that has read 1 or more</span>
+    <span class="comment">// bytes of a request. The Server.ConnState hook for</span>
+    <span class="comment">// StateActive fires before the request has entered a handler</span>
+    <span class="comment">// and doesn&#39;t fire again until the request has been</span>
+    <span class="comment">// handled. After the request is handled, the state</span>
+    <span class="comment">// transitions to StateClosed, StateHijacked, or StateIdle.</span>
+    <span class="comment">// For HTTP/2, StateActive fires on the transition from zero</span>
+    <span class="comment">// to one active request, and only transitions away once all</span>
+    <span class="comment">// active requests are complete. That means that ConnState</span>
+    <span class="comment">// cannot be used to do per-request work; ConnState only notes</span>
+    <span class="comment">// the overall state of the connection.</span>
+    <span id="StateActive">StateActive</span>
+
+    <span class="comment">// StateIdle represents a connection that has finished</span>
+    <span class="comment">// handling a request and is in the keep-alive state, waiting</span>
+    <span class="comment">// for a new request. Connections transition from StateIdle</span>
+    <span class="comment">// to either StateActive or StateClosed.</span>
+    <span id="StateIdle">StateIdle</span>
+
+    <span class="comment">// StateHijacked represents a hijacked connection.</span>
+    <span class="comment">// This is a terminal state. It does not transition to StateClosed.</span>
+    <span id="StateHijacked">StateHijacked</span>
+
+    <span class="comment">// StateClosed represents a closed connection.</span>
+    <span class="comment">// This is a terminal state. Hijacked connections do not</span>
+    <span class="comment">// transition to StateClosed.</span>
+    <span id="StateClosed">StateClosed</span>
+)</pre>
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="ConnState.String">func (ConnState) <a href="../../../src/net/http/server.go%3Fs=77063:77097.html#L2540">String</a>
+					<a class="permalink" href="index.html#ConnState.String">&#xb6;</a>
+				</h3>
+				<pre>func (c <a href="index.html#ConnState">ConnState</a>) String() <a href="../../builtin/index.html#string">string</a></pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Cookie">type <a href="../../../src/net/http/cookie.go%3Fs=432:945.html#L10">Cookie</a>
+				<a class="permalink" href="index.html#Cookie">&#xb6;</a>
+			</h2>
+			<p>
+A Cookie represents an HTTP cookie as sent in the Set-Cookie header of an
+HTTP response or the Cookie header of an HTTP request.
+</p>
+<p>
+See <a href="http://tools.ietf.org/html/rfc6265">http://tools.ietf.org/html/rfc6265</a> for details.
+</p>
+
+			<pre>type Cookie struct {
+<span id="Cookie.Name"></span>    Name  <a href="../../builtin/index.html#string">string</a>
+<span id="Cookie.Value"></span>    Value <a href="../../builtin/index.html#string">string</a>
+
+<span id="Cookie.Path"></span>    Path       <a href="../../builtin/index.html#string">string</a>    <span class="comment">// optional</span>
+<span id="Cookie.Domain"></span>    Domain     <a href="../../builtin/index.html#string">string</a>    <span class="comment">// optional</span>
+<span id="Cookie.Expires"></span>    Expires    <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Time">Time</a> <span class="comment">// optional</span>
+<span id="Cookie.RawExpires"></span>    RawExpires <a href="../../builtin/index.html#string">string</a>    <span class="comment">// for reading cookies only</span>
+
+<span id="Cookie.MaxAge"></span>    <span class="comment">// MaxAge=0 means no &#39;Max-Age&#39; attribute specified.</span>
+    <span class="comment">// MaxAge&lt;0 means delete cookie now, equivalently &#39;Max-Age: 0&#39;</span>
+    <span class="comment">// MaxAge&gt;0 means Max-Age attribute present and given in seconds</span>
+    MaxAge   <a href="../../builtin/index.html#int">int</a>
+<span id="Cookie.Secure"></span>    Secure   <a href="../../builtin/index.html#bool">bool</a>
+<span id="Cookie.HttpOnly"></span>    HttpOnly <a href="../../builtin/index.html#bool">bool</a>
+<span id="Cookie.Raw"></span>    Raw      <a href="../../builtin/index.html#string">string</a>
+<span id="Cookie.Unparsed"></span>    Unparsed []<a href="../../builtin/index.html#string">string</a> <span class="comment">// Raw text of unparsed attribute-value pairs</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Cookie.String">func (*Cookie) <a href="../../../src/net/http/cookie.go%3Fs=3487:3519.html#L132">String</a>
+					<a class="permalink" href="index.html#Cookie.String">&#xb6;</a>
+				</h3>
+				<pre>func (c *<a href="index.html#Cookie">Cookie</a>) String() <a href="../../builtin/index.html#string">string</a></pre>
+				<p>
+String returns the serialization of the cookie for use in a Cookie
+header (if only Name and Value are set) or a Set-Cookie response
+header (if other fields are set).
+If c is nil or c.Name is invalid, the empty string is returned.
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="CookieJar">type <a href="../../../src/net/http/jar.go%3Fs=433:899.html#L7">CookieJar</a>
+				<a class="permalink" href="index.html#CookieJar">&#xb6;</a>
+			</h2>
+			<p>
+A CookieJar manages storage and use of cookies in HTTP requests.
+</p>
+<p>
+Implementations of CookieJar must be safe for concurrent use by multiple
+goroutines.
+</p>
+<p>
+The net/http/cookiejar package provides a CookieJar implementation.
+</p>
+
+			<pre>type CookieJar interface {
+    <span class="comment">// SetCookies handles the receipt of the cookies in a reply for the</span>
+    <span class="comment">// given URL.  It may or may not choose to save the cookies, depending</span>
+    <span class="comment">// on the jar&#39;s policy and implementation.</span>
+    SetCookies(u *<a href="../url/index.html">url</a>.<a href="../url/index.html#URL">URL</a>, cookies []*<a href="index.html#Cookie">Cookie</a>)
+
+    <span class="comment">// Cookies returns the cookies to send in a request for the given URL.</span>
+    <span class="comment">// It is up to the implementation to honor the standard cookie use</span>
+    <span class="comment">// restrictions such as in RFC 6265.</span>
+    Cookies(u *<a href="../url/index.html">url</a>.<a href="../url/index.html#URL">URL</a>) []*<a href="index.html#Cookie">Cookie</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Dir">type <a href="../../../src/net/http/fs.go%3Fs=727:742.html#L24">Dir</a>
+				<a class="permalink" href="index.html#Dir">&#xb6;</a>
+			</h2>
+			<p>
+A Dir implements FileSystem using the native file system restricted to a
+specific directory tree.
+</p>
+<p>
+While the FileSystem.Open method takes &#39;/&#39;-separated paths, a Dir&#39;s string
+value is a filename on the native file system, not a URL, so it is separated
+by filepath.Separator, which isn&#39;t necessarily &#39;/&#39;.
+</p>
+<p>
+An empty Dir is treated as &#34;.&#34;.
+</p>
+
+			<pre>type Dir <a href="../../builtin/index.html#string">string</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Dir.Open">func (Dir) <a href="../../../src/net/http/fs.go%3Fs=744:788.html#L26">Open</a>
+					<a class="permalink" href="index.html#Dir.Open">&#xb6;</a>
+				</h3>
+				<pre>func (d <a href="index.html#Dir">Dir</a>) Open(name <a href="../../builtin/index.html#string">string</a>) (<a href="index.html#File">File</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="File">type <a href="../../../src/net/http/fs.go%3Fs=1597:1725.html#L53">File</a>
+				<a class="permalink" href="index.html#File">&#xb6;</a>
+			</h2>
+			<p>
+A File is returned by a FileSystem&#39;s Open method and can be
+served by the FileServer implementation.
+</p>
+<p>
+The methods should behave the same as those on an *os.File.
+</p>
+
+			<pre>type File interface {
+    <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Closer">Closer</a>
+    <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Reader">Reader</a>
+    <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Seeker">Seeker</a>
+    Readdir(count <a href="../../builtin/index.html#int">int</a>) ([]<a href="../../os/index.html">os</a>.<a href="../../os/index.html#FileInfo">FileInfo</a>, <a href="../../builtin/index.html#error">error</a>)
+    Stat() (<a href="../../os/index.html">os</a>.<a href="../../os/index.html#FileInfo">FileInfo</a>, <a href="../../builtin/index.html#error">error</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="FileSystem">type <a href="../../../src/net/http/fs.go%3Fs=1360:1422.html#L45">FileSystem</a>
+				<a class="permalink" href="index.html#FileSystem">&#xb6;</a>
+			</h2>
+			<p>
+A FileSystem implements access to a collection of named files.
+The elements in a file path are separated by slash (&#39;/&#39;, U+002F)
+characters, regardless of host operating system convention.
+</p>
+
+			<pre>type FileSystem interface {
+    Open(name <a href="../../builtin/index.html#string">string</a>) (<a href="index.html#File">File</a>, <a href="../../builtin/index.html#error">error</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Flusher">type <a href="../../../src/net/http/server.go%3Fs=5647:5731.html#L143">Flusher</a>
+				<a class="permalink" href="index.html#Flusher">&#xb6;</a>
+			</h2>
+			<p>
+The Flusher interface is implemented by ResponseWriters that allow
+an HTTP handler to flush buffered data to the client.
+</p>
+<p>
+The default HTTP/1.x and HTTP/2 ResponseWriter implementations
+support Flusher, but ResponseWriter wrappers may not. Handlers
+should always test for this ability at runtime.
+</p>
+<p>
+Note that even for ResponseWriters that support Flush,
+if the client is connected through an HTTP proxy,
+the buffered data may not reach the client until the response
+completes.
+</p>
+
+			<pre>type Flusher interface {
+    <span class="comment">// Flush sends any buffered data to the client.</span>
+    Flush()
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Handler">type <a href="../../../src/net/http/server.go%3Fs=2532:2595.html#L71">Handler</a>
+				<a class="permalink" href="index.html#Handler">&#xb6;</a>
+			</h2>
+			<p>
+A Handler responds to an HTTP request.
+</p>
+<p>
+ServeHTTP should write reply headers and data to the ResponseWriter
+and then return. Returning signals that the request is finished; it
+is not valid to use the ResponseWriter or read from the
+Request.Body after or concurrently with the completion of the
+ServeHTTP call.
+</p>
+<p>
+Depending on the HTTP client software, HTTP protocol version, and
+any intermediaries between the client and the Go server, it may not
+be possible to read from the Request.Body after writing to the
+ResponseWriter. Cautious handlers should read the Request.Body
+first, and then reply.
+</p>
+<p>
+Except for reading the body, handlers should not modify the
+provided Request.
+</p>
+<p>
+If ServeHTTP panics, the server (the caller of ServeHTTP) assumes
+that the effect of the panic was isolated to the active request.
+It recovers the panic, logs a stack trace to the server error log,
+and hangs up the connection. To abort a handler so the client sees
+an interrupted response but the server doesn&#39;t log an error, panic
+with the value ErrAbortHandler.
+</p>
+
+			<pre>type Handler interface {
+    ServeHTTP(<a href="index.html#ResponseWriter">ResponseWriter</a>, *<a href="index.html#Request">Request</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="FileServer">func <a href="../../../src/net/http/fs.go%3Fs=19273:19313.html#L669">FileServer</a>
+					<a class="permalink" href="index.html#FileServer">&#xb6;</a>
+				</h3>
+				<pre>func FileServer(root <a href="index.html#FileSystem">FileSystem</a>) <a href="index.html#Handler">Handler</a></pre>
+				<p>
+FileServer returns a handler that serves HTTP requests
+with the contents of the file system rooted at root.
+</p>
+<p>
+To use the operating system&#39;s file system implementation,
+use http.Dir:
+</p>
+<pre>http.Handle(&#34;/&#34;, http.FileServer(http.Dir(&#34;/tmp&#34;)))
+</pre>
+<p>
+As a special case, the returned file server redirects any request
+ending in &#34;/index.html&#34; to the same path, without the final
+&#34;index.html&#34;.
+</p>
+
+				<div id="example_FileServer" class="toggle">
+	<div class="collapsed">
+		<p class="exampleHeading toggleButton">▹ <span class="text">Example</span></p>
+	</div>
+	<div class="expanded">
+		<p class="exampleHeading toggleButton">▾ <span class="text">Example</span></p>
+		
+		
+		
+			<p>Code:</p>
+			<pre class="code">
+<span class="comment">// Simple static webserver:</span>
+log.Fatal(http.ListenAndServe(&#34;:8080&#34;, http.FileServer(http.Dir(&#34;/usr/share/doc&#34;))))
+</pre>
+			
+		
+	</div>
+</div>
+<div id="example_FileServer_stripPrefix" class="toggle">
+	<div class="collapsed">
+		<p class="exampleHeading toggleButton">▹ <span class="text">Example (StripPrefix)</span></p>
+	</div>
+	<div class="expanded">
+		<p class="exampleHeading toggleButton">▾ <span class="text">Example (StripPrefix)</span></p>
+		
+		
+		
+			<p>Code:</p>
+			<pre class="code">
+<span class="comment">// To serve a directory on disk (/tmp) under an alternate URL</span>
+<span class="comment">// path (/tmpfiles/), use StripPrefix to modify the request</span>
+<span class="comment">// URL&#39;s path before the FileServer sees it:</span>
+http.Handle(&#34;/tmpfiles/&#34;, http.StripPrefix(&#34;/tmpfiles/&#34;, http.FileServer(http.Dir(&#34;/tmp&#34;))))
+</pre>
+			
+		
+	</div>
+</div>
+
+				
+			
+				
+				<h3 id="NotFoundHandler">func <a href="../../../src/net/http/server.go%3Fs=58121:58151.html#L1953">NotFoundHandler</a>
+					<a class="permalink" href="index.html#NotFoundHandler">&#xb6;</a>
+				</h3>
+				<pre>func NotFoundHandler() <a href="index.html#Handler">Handler</a></pre>
+				<p>
+NotFoundHandler returns a simple request handler
+that replies to each request with a &ldquo;404 page not found&rdquo; reply.
+</p>
+
+				
+				
+			
+				
+				<h3 id="RedirectHandler">func <a href="../../../src/net/http/server.go%3Fs=61594:61644.html#L2067">RedirectHandler</a>
+					<a class="permalink" href="index.html#RedirectHandler">&#xb6;</a>
+				</h3>
+				<pre>func RedirectHandler(url <a href="../../builtin/index.html#string">string</a>, code <a href="../../builtin/index.html#int">int</a>) <a href="index.html#Handler">Handler</a></pre>
+				<p>
+RedirectHandler returns a request handler that redirects
+each request it receives to the given url using the given
+status code.
+</p>
+<p>
+The provided code should be in the 3xx range and is usually
+StatusMovedPermanently, StatusFound or StatusSeeOther.
+</p>
+
+				
+				
+			
+				
+				<h3 id="StripPrefix">func <a href="../../../src/net/http/server.go%3Fs=58460:58510.html#L1960">StripPrefix</a>
+					<a class="permalink" href="index.html#StripPrefix">&#xb6;</a>
+				</h3>
+				<pre>func StripPrefix(prefix <a href="../../builtin/index.html#string">string</a>, h <a href="index.html#Handler">Handler</a>) <a href="index.html#Handler">Handler</a></pre>
+				<p>
+StripPrefix returns a handler that serves HTTP requests
+by removing the given prefix from the request URL&#39;s Path
+and invoking the handler h. StripPrefix handles a
+request for a path that doesn&#39;t begin with prefix by
+replying with an HTTP 404 not found error.
+</p>
+
+				<div id="example_StripPrefix" class="toggle">
+	<div class="collapsed">
+		<p class="exampleHeading toggleButton">▹ <span class="text">Example</span></p>
+	</div>
+	<div class="expanded">
+		<p class="exampleHeading toggleButton">▾ <span class="text">Example</span></p>
+		
+		
+		
+			<p>Code:</p>
+			<pre class="code">
+<span class="comment">// To serve a directory on disk (/tmp) under an alternate URL</span>
+<span class="comment">// path (/tmpfiles/), use StripPrefix to modify the request</span>
+<span class="comment">// URL&#39;s path before the FileServer sees it:</span>
+http.Handle(&#34;/tmpfiles/&#34;, http.StripPrefix(&#34;/tmpfiles/&#34;, http.FileServer(http.Dir(&#34;/tmp&#34;))))
+</pre>
+			
+		
+	</div>
+</div>
+
+				
+			
+				
+				<h3 id="TimeoutHandler">func <a href="../../../src/net/http/server.go%3Fs=88729:88797.html#L2915">TimeoutHandler</a>
+					<a class="permalink" href="index.html#TimeoutHandler">&#xb6;</a>
+				</h3>
+				<pre>func TimeoutHandler(h <a href="index.html#Handler">Handler</a>, dt <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>, msg <a href="../../builtin/index.html#string">string</a>) <a href="index.html#Handler">Handler</a></pre>
+				<p>
+TimeoutHandler returns a Handler that runs h with the given time limit.
+</p>
+<p>
+The new Handler calls h.ServeHTTP to handle each request, but if a
+call runs for longer than its time limit, the handler responds with
+a 503 Service Unavailable error and the given message in its body.
+(If msg is empty, a suitable default message will be sent.)
+After such a timeout, writes by h to its ResponseWriter will return
+ErrHandlerTimeout.
+</p>
+<p>
+TimeoutHandler buffers all Handler writes to memory and does not
+support the Hijacker or Flusher interfaces.
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="HandlerFunc">type <a href="../../../src/net/http/server.go%3Fs=57220:57267.html#L1928">HandlerFunc</a>
+				<a class="permalink" href="index.html#HandlerFunc">&#xb6;</a>
+			</h2>
+			<p>
+The HandlerFunc type is an adapter to allow the use of
+ordinary functions as HTTP handlers. If f is a function
+with the appropriate signature, HandlerFunc(f) is a
+Handler that calls f.
+</p>
+
+			<pre>type HandlerFunc func(<a href="index.html#ResponseWriter">ResponseWriter</a>, *<a href="index.html#Request">Request</a>)</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="HandlerFunc.ServeHTTP">func (HandlerFunc) <a href="../../../src/net/http/server.go%3Fs=57297:57357.html#L1931">ServeHTTP</a>
+					<a class="permalink" href="index.html#HandlerFunc.ServeHTTP">&#xb6;</a>
+				</h3>
+				<pre>func (f <a href="index.html#HandlerFunc">HandlerFunc</a>) ServeHTTP(w <a href="index.html#ResponseWriter">ResponseWriter</a>, r *<a href="index.html#Request">Request</a>)</pre>
+				<p>
+ServeHTTP calls f(w, r).
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Header">type <a href="../../../src/net/http/header.go%3Fs=349:380.html#L9">Header</a>
+				<a class="permalink" href="index.html#Header">&#xb6;</a>
+			</h2>
+			<p>
+A Header represents the key-value pairs in an HTTP header.
+</p>
+
+			<pre>type Header map[<a href="../../builtin/index.html#string">string</a>][]<a href="../../builtin/index.html#string">string</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Header.Add">func (Header) <a href="../../../src/net/http/header.go%3Fs=487:525.html#L13">Add</a>
+					<a class="permalink" href="index.html#Header.Add">&#xb6;</a>
+				</h3>
+				<pre>func (h <a href="index.html#Header">Header</a>) Add(key, value <a href="../../builtin/index.html#string">string</a>)</pre>
+				<p>
+Add adds the key, value pair to the header.
+It appends to any existing values associated with key.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Header.Del">func (Header) <a href="../../../src/net/http/header.go%3Fs=1430:1461.html#L43">Del</a>
+					<a class="permalink" href="index.html#Header.Del">&#xb6;</a>
+				</h3>
+				<pre>func (h <a href="index.html#Header">Header</a>) Del(key <a href="../../builtin/index.html#string">string</a>)</pre>
+				<p>
+Del deletes the values associated with key.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Header.Get">func (Header) <a href="../../../src/net/http/header.go%3Fs=1124:1162.html#L30">Get</a>
+					<a class="permalink" href="index.html#Header.Get">&#xb6;</a>
+				</h3>
+				<pre>func (h <a href="index.html#Header">Header</a>) Get(key <a href="../../builtin/index.html#string">string</a>) <a href="../../builtin/index.html#string">string</a></pre>
+				<p>
+Get gets the first value associated with the given key.
+It is case insensitive; textproto.CanonicalMIMEHeaderKey is used
+to canonicalize the provided key.
+If there are no values associated with the key, Get returns &#34;&#34;.
+To access multiple values of a key, or to use non-canonical keys,
+access the map directly.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Header.Set">func (Header) <a href="../../../src/net/http/header.go%3Fs=711:749.html#L20">Set</a>
+					<a class="permalink" href="index.html#Header.Set">&#xb6;</a>
+				</h3>
+				<pre>func (h <a href="index.html#Header">Header</a>) Set(key, value <a href="../../builtin/index.html#string">string</a>)</pre>
+				<p>
+Set sets the header entries associated with key to
+the single element value. It replaces any existing
+values associated with key.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Header.Write">func (Header) <a href="../../../src/net/http/header.go%3Fs=1542:1582.html#L48">Write</a>
+					<a class="permalink" href="index.html#Header.Write">&#xb6;</a>
+				</h3>
+				<pre>func (h <a href="index.html#Header">Header</a>) Write(w <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Writer">Writer</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+Write writes a header in wire format.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Header.WriteSubset">func (Header) <a href="../../../src/net/http/header.go%3Fs=3785:3856.html#L137">WriteSubset</a>
+					<a class="permalink" href="index.html#Header.WriteSubset">&#xb6;</a>
+				</h3>
+				<pre>func (h <a href="index.html#Header">Header</a>) WriteSubset(w <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Writer">Writer</a>, exclude map[<a href="../../builtin/index.html#string">string</a>]<a href="../../builtin/index.html#bool">bool</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+WriteSubset writes a header in wire format.
+If exclude is not nil, keys where exclude[key] == true are not written.
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Hijacker">type <a href="../../../src/net/http/server.go%3Fs=6095:6715.html#L155">Hijacker</a>
+				<a class="permalink" href="index.html#Hijacker">&#xb6;</a>
+			</h2>
+			<p>
+The Hijacker interface is implemented by ResponseWriters that allow
+an HTTP handler to take over the connection.
+</p>
+<p>
+The default ResponseWriter for HTTP/1.x connections supports
+Hijacker, but HTTP/2 connections intentionally do not.
+ResponseWriter wrappers may also not support Hijacker. Handlers
+should always test for this ability at runtime.
+</p>
+
+			<pre>type Hijacker interface {
+    <span class="comment">// Hijack lets the caller take over the connection.</span>
+    <span class="comment">// After a call to Hijack the HTTP server library</span>
+    <span class="comment">// will not do anything else with the connection.</span>
+    <span class="comment">//</span>
+    <span class="comment">// It becomes the caller&#39;s responsibility to manage</span>
+    <span class="comment">// and close the connection.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The returned net.Conn may have read or write deadlines</span>
+    <span class="comment">// already set, depending on the configuration of the</span>
+    <span class="comment">// Server. It is the caller&#39;s responsibility to set</span>
+    <span class="comment">// or clear those deadlines as needed.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The returned bufio.Reader may contain unprocessed buffered</span>
+    <span class="comment">// data from the client.</span>
+    Hijack() (<a href="../index.html">net</a>.<a href="../index.html#Conn">Conn</a>, *<a href="../../bufio/index.html">bufio</a>.<a href="../../bufio/index.html#ReadWriter">ReadWriter</a>, <a href="../../builtin/index.html#error">error</a>)
+}</pre>
+
+			
+
+			
+
+			<div id="example_Hijacker" class="toggle">
+	<div class="collapsed">
+		<p class="exampleHeading toggleButton">▹ <span class="text">Example</span></p>
+	</div>
+	<div class="expanded">
+		<p class="exampleHeading toggleButton">▾ <span class="text">Example</span></p>
+		
+		
+		
+			<p>Code:</p>
+			<pre class="code">
+http.HandleFunc(&#34;/hijack&#34;, func(w http.ResponseWriter, r *http.Request) {
+    hj, ok := w.(http.Hijacker)
+    if !ok {
+        http.Error(w, &#34;webserver doesn&#39;t support hijacking&#34;, http.StatusInternalServerError)
+        return
+    }
+    conn, bufrw, err := hj.Hijack()
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    <span class="comment">// Don&#39;t forget to close the connection:</span>
+    defer conn.Close()
+    bufrw.WriteString(&#34;Now we&#39;re speaking raw TCP. Say hi: &#34;)
+    bufrw.Flush()
+    s, err := bufrw.ReadString(&#39;\n&#39;)
+    if err != nil {
+        log.Printf(&#34;error reading string: %v&#34;, err)
+        return
+    }
+    fmt.Fprintf(bufrw, &#34;You said: %q\nBye.\n&#34;, s)
+    bufrw.Flush()
+})
+</pre>
+			
+		
+	</div>
+</div>
+
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="ProtocolError">type <a href="../../../src/net/http/request.go%3Fs=925:974.html#L36">ProtocolError</a>
+				<a class="permalink" href="index.html#ProtocolError">&#xb6;</a>
+			</h2>
+			<p>
+ProtocolError represents an HTTP protocol error.
+</p>
+<p>
+Deprecated: Not all errors in the http package related to protocol errors
+are of type ProtocolError.
+</p>
+
+			<pre>type ProtocolError struct {
+<span id="ProtocolError.ErrorString"></span>    ErrorString <a href="../../builtin/index.html#string">string</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="ProtocolError.Error">func (*ProtocolError) <a href="../../../src/net/http/request.go%3Fs=976:1015.html#L40">Error</a>
+					<a class="permalink" href="index.html#ProtocolError.Error">&#xb6;</a>
+				</h3>
+				<pre>func (pe *<a href="index.html#ProtocolError">ProtocolError</a>) Error() <a href="../../builtin/index.html#string">string</a></pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="PushOptions">type <a href="../../../src/net/http/http.go%3Fs=2658:3015.html#L95">PushOptions</a>
+				<a class="permalink" href="index.html#PushOptions">&#xb6;</a>
+			</h2>
+			<p>
+PushOptions describes options for Pusher.Push.
+</p>
+
+			<pre>type PushOptions struct {
+<span id="PushOptions.Method"></span>    <span class="comment">// Method specifies the HTTP method for the promised request.</span>
+    <span class="comment">// If set, it must be &#34;GET&#34; or &#34;HEAD&#34;. Empty means &#34;GET&#34;.</span>
+    Method <a href="../../builtin/index.html#string">string</a>
+
+<span id="PushOptions.Header"></span>    <span class="comment">// Header specifies additional promised request headers. This cannot</span>
+    <span class="comment">// include HTTP/2 pseudo header fields like &#34;:path&#34; and &#34;:scheme&#34;,</span>
+    <span class="comment">// which will be added automatically.</span>
+    Header <a href="index.html#Header">Header</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Pusher">type <a href="../../../src/net/http/http.go%3Fs=3188:4365.html#L109">Pusher</a>
+				<a class="permalink" href="index.html#Pusher">&#xb6;</a>
+			</h2>
+			<p>
+Pusher is the interface implemented by ResponseWriters that support
+HTTP/2 server push. For more background, see
+<a href="https://tools.ietf.org/html/rfc7540#section-8.2">https://tools.ietf.org/html/rfc7540#section-8.2</a>.
+</p>
+
+			<pre>type Pusher interface {
+    <span class="comment">// Push initiates an HTTP/2 server push. This constructs a synthetic</span>
+    <span class="comment">// request using the given target and options, serializes that request</span>
+    <span class="comment">// into a PUSH_PROMISE frame, then dispatches that request using the</span>
+    <span class="comment">// server&#39;s request handler. If opts is nil, default options are used.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The target must either be an absolute path (like &#34;/path&#34;) or an absolute</span>
+    <span class="comment">// URL that contains a valid host and the same scheme as the parent request.</span>
+    <span class="comment">// If the target is a path, it will inherit the scheme and host of the</span>
+    <span class="comment">// parent request.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The HTTP/2 spec disallows recursive pushes and cross-authority pushes.</span>
+    <span class="comment">// Push may or may not detect these invalid pushes; however, invalid</span>
+    <span class="comment">// pushes will be detected and canceled by conforming clients.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Handlers that wish to push URL X should call Push before sending any</span>
+    <span class="comment">// data that may trigger a request for URL X. This avoids a race where the</span>
+    <span class="comment">// client issues requests for X before receiving the PUSH_PROMISE for X.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Push returns ErrNotSupported if the client has disabled push or if push</span>
+    <span class="comment">// is not supported on the underlying connection.</span>
+    Push(target <a href="../../builtin/index.html#string">string</a>, opts *<a href="index.html#PushOptions">PushOptions</a>) <a href="../../builtin/index.html#error">error</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Request">type <a href="../../../src/net/http/request.go%3Fs=2949:11026.html#L90">Request</a>
+				<a class="permalink" href="index.html#Request">&#xb6;</a>
+			</h2>
+			<p>
+A Request represents an HTTP request received by a server
+or to be sent by a client.
+</p>
+<p>
+The field semantics differ slightly between client and server
+usage. In addition to the notes on the fields below, see the
+documentation for Request.Write and RoundTripper.
+</p>
+
+			<pre>type Request struct {
+<span id="Request.Method"></span>    <span class="comment">// Method specifies the HTTP method (GET, POST, PUT, etc.).</span>
+    <span class="comment">// For client requests an empty string means GET.</span>
+    Method <a href="../../builtin/index.html#string">string</a>
+
+<span id="Request.URL"></span>    <span class="comment">// URL specifies either the URI being requested (for server</span>
+    <span class="comment">// requests) or the URL to access (for client requests).</span>
+    <span class="comment">//</span>
+    <span class="comment">// For server requests the URL is parsed from the URI</span>
+    <span class="comment">// supplied on the Request-Line as stored in RequestURI.  For</span>
+    <span class="comment">// most requests, fields other than Path and RawQuery will be</span>
+    <span class="comment">// empty. (See RFC 2616, Section 5.1.2)</span>
+    <span class="comment">//</span>
+    <span class="comment">// For client requests, the URL&#39;s Host specifies the server to</span>
+    <span class="comment">// connect to, while the Request&#39;s Host field optionally</span>
+    <span class="comment">// specifies the Host header value to send in the HTTP</span>
+    <span class="comment">// request.</span>
+    URL *<a href="../url/index.html">url</a>.<a href="../url/index.html#URL">URL</a>
+
+    <span class="comment">// The protocol version for incoming server requests.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For client requests these fields are ignored. The HTTP</span>
+    <span class="comment">// client code always uses either HTTP/1.1 or HTTP/2.</span>
+    <span class="comment">// See the docs on Transport for details.</span>
+<span id="Request.Proto"></span>    Proto      <a href="../../builtin/index.html#string">string</a> <span class="comment">// &#34;HTTP/1.0&#34;</span>
+<span id="Request.ProtoMajor"></span>    ProtoMajor <a href="../../builtin/index.html#int">int</a>    <span class="comment">// 1</span>
+<span id="Request.ProtoMinor"></span>    ProtoMinor <a href="../../builtin/index.html#int">int</a>    <span class="comment">// 0</span>
+
+<span id="Request.Header"></span>    <span class="comment">// Header contains the request header fields either received</span>
+    <span class="comment">// by the server or to be sent by the client.</span>
+    <span class="comment">//</span>
+    <span class="comment">// If a server received a request with header lines,</span>
+    <span class="comment">//</span>
+    <span class="comment">//	Host: example.com</span>
+    <span class="comment">//	accept-encoding: gzip, deflate</span>
+    <span class="comment">//	Accept-Language: en-us</span>
+    <span class="comment">//	fOO: Bar</span>
+    <span class="comment">//	foo: two</span>
+    <span class="comment">//</span>
+    <span class="comment">// then</span>
+    <span class="comment">//</span>
+    <span class="comment">//	Header = map[string][]string{</span>
+    <span class="comment">//		&#34;Accept-Encoding&#34;: {&#34;gzip, deflate&#34;},</span>
+    <span class="comment">//		&#34;Accept-Language&#34;: {&#34;en-us&#34;},</span>
+    <span class="comment">//		&#34;Foo&#34;: {&#34;Bar&#34;, &#34;two&#34;},</span>
+    <span class="comment">//	}</span>
+    <span class="comment">//</span>
+    <span class="comment">// For incoming requests, the Host header is promoted to the</span>
+    <span class="comment">// Request.Host field and removed from the Header map.</span>
+    <span class="comment">//</span>
+    <span class="comment">// HTTP defines that header names are case-insensitive. The</span>
+    <span class="comment">// request parser implements this by using CanonicalHeaderKey,</span>
+    <span class="comment">// making the first character and any characters following a</span>
+    <span class="comment">// hyphen uppercase and the rest lowercase.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For client requests, certain headers such as Content-Length</span>
+    <span class="comment">// and Connection are automatically written when needed and</span>
+    <span class="comment">// values in Header may be ignored. See the documentation</span>
+    <span class="comment">// for the Request.Write method.</span>
+    Header <a href="index.html#Header">Header</a>
+
+<span id="Request.Body"></span>    <span class="comment">// Body is the request&#39;s body.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For client requests a nil body means the request has no</span>
+    <span class="comment">// body, such as a GET request. The HTTP Client&#39;s Transport</span>
+    <span class="comment">// is responsible for calling the Close method.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For server requests the Request Body is always non-nil</span>
+    <span class="comment">// but will return EOF immediately when no body is present.</span>
+    <span class="comment">// The Server will close the request body. The ServeHTTP</span>
+    <span class="comment">// Handler does not need to.</span>
+    Body <a href="../../io/index.html">io</a>.<a href="../../io/index.html#ReadCloser">ReadCloser</a>
+
+<span id="Request.GetBody"></span>    <span class="comment">// GetBody defines an optional func to return a new copy of</span>
+    <span class="comment">// Body. It is used for client requests when a redirect requires</span>
+    <span class="comment">// reading the body more than once. Use of GetBody still</span>
+    <span class="comment">// requires setting Body.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For server requests it is unused.</span>
+    GetBody func() (<a href="../../io/index.html">io</a>.<a href="../../io/index.html#ReadCloser">ReadCloser</a>, <a href="../../builtin/index.html#error">error</a>)
+
+<span id="Request.ContentLength"></span>    <span class="comment">// ContentLength records the length of the associated content.</span>
+    <span class="comment">// The value -1 indicates that the length is unknown.</span>
+    <span class="comment">// Values &gt;= 0 indicate that the given number of bytes may</span>
+    <span class="comment">// be read from Body.</span>
+    <span class="comment">// For client requests, a value of 0 with a non-nil Body is</span>
+    <span class="comment">// also treated as unknown.</span>
+    ContentLength <a href="../../builtin/index.html#int64">int64</a>
+
+<span id="Request.TransferEncoding"></span>    <span class="comment">// TransferEncoding lists the transfer encodings from outermost to</span>
+    <span class="comment">// innermost. An empty list denotes the &#34;identity&#34; encoding.</span>
+    <span class="comment">// TransferEncoding can usually be ignored; chunked encoding is</span>
+    <span class="comment">// automatically added and removed as necessary when sending and</span>
+    <span class="comment">// receiving requests.</span>
+    TransferEncoding []<a href="../../builtin/index.html#string">string</a>
+
+<span id="Request.Close"></span>    <span class="comment">// Close indicates whether to close the connection after</span>
+    <span class="comment">// replying to this request (for servers) or after sending this</span>
+    <span class="comment">// request and reading its response (for clients).</span>
+    <span class="comment">//</span>
+    <span class="comment">// For server requests, the HTTP server handles this automatically</span>
+    <span class="comment">// and this field is not needed by Handlers.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For client requests, setting this field prevents re-use of</span>
+    <span class="comment">// TCP connections between requests to the same hosts, as if</span>
+    <span class="comment">// Transport.DisableKeepAlives were set.</span>
+    Close <a href="../../builtin/index.html#bool">bool</a>
+
+    <span class="comment">// For server requests Host specifies the host on which the</span>
+    <span class="comment">// URL is sought. Per RFC 2616, this is either the value of</span>
+    <span class="comment">// the &#34;Host&#34; header or the host name given in the URL itself.</span>
+    <span class="comment">// It may be of the form &#34;host:port&#34;. For international domain</span>
+    <span class="comment">// names, Host may be in Punycode or Unicode form. Use</span>
+    <span class="comment">// golang.org/x/net/idna to convert it to either format if</span>
+    <span class="comment">// needed.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For client requests Host optionally overrides the Host</span>
+    <span class="comment">// header to send. If empty, the Request.Write method uses</span>
+    <span class="comment">// the value of URL.Host. Host may contain an international</span>
+    <span class="comment">// domain name.</span>
+<span id="Request.Host"></span>    Host <a href="../../builtin/index.html#string">string</a>
+
+<span id="Request.Form"></span>    <span class="comment">// Form contains the parsed form data, including both the URL</span>
+    <span class="comment">// field&#39;s query parameters and the POST or PUT form data.</span>
+    <span class="comment">// This field is only available after ParseForm is called.</span>
+    <span class="comment">// The HTTP client ignores Form and uses Body instead.</span>
+    Form <a href="../url/index.html">url</a>.<a href="../url/index.html#Values">Values</a>
+
+<span id="Request.PostForm"></span>    <span class="comment">// PostForm contains the parsed form data from POST, PATCH,</span>
+    <span class="comment">// or PUT body parameters.</span>
+    <span class="comment">//</span>
+    <span class="comment">// This field is only available after ParseForm is called.</span>
+    <span class="comment">// The HTTP client ignores PostForm and uses Body instead.</span>
+    PostForm <a href="../url/index.html">url</a>.<a href="../url/index.html#Values">Values</a>
+
+<span id="Request.MultipartForm"></span>    <span class="comment">// MultipartForm is the parsed multipart form, including file uploads.</span>
+    <span class="comment">// This field is only available after ParseMultipartForm is called.</span>
+    <span class="comment">// The HTTP client ignores MultipartForm and uses Body instead.</span>
+    MultipartForm *<a href="../../mime/multipart/index.html">multipart</a>.<a href="../../mime/multipart/index.html#Form">Form</a>
+
+<span id="Request.Trailer"></span>    <span class="comment">// Trailer specifies additional headers that are sent after the request</span>
+    <span class="comment">// body.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For server requests the Trailer map initially contains only the</span>
+    <span class="comment">// trailer keys, with nil values. (The client declares which trailers it</span>
+    <span class="comment">// will later send.)  While the handler is reading from Body, it must</span>
+    <span class="comment">// not reference Trailer. After reading from Body returns EOF, Trailer</span>
+    <span class="comment">// can be read again and will contain non-nil values, if they were sent</span>
+    <span class="comment">// by the client.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For client requests Trailer must be initialized to a map containing</span>
+    <span class="comment">// the trailer keys to later send. The values may be nil or their final</span>
+    <span class="comment">// values. The ContentLength must be 0 or -1, to send a chunked request.</span>
+    <span class="comment">// After the HTTP request is sent the map values can be updated while</span>
+    <span class="comment">// the request body is read. Once the body returns EOF, the caller must</span>
+    <span class="comment">// not mutate Trailer.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Few HTTP clients, servers, or proxies support HTTP trailers.</span>
+    Trailer <a href="index.html#Header">Header</a>
+
+<span id="Request.RemoteAddr"></span>    <span class="comment">// RemoteAddr allows HTTP servers and other software to record</span>
+    <span class="comment">// the network address that sent the request, usually for</span>
+    <span class="comment">// logging. This field is not filled in by ReadRequest and</span>
+    <span class="comment">// has no defined format. The HTTP server in this package</span>
+    <span class="comment">// sets RemoteAddr to an &#34;IP:port&#34; address before invoking a</span>
+    <span class="comment">// handler.</span>
+    <span class="comment">// This field is ignored by the HTTP client.</span>
+    RemoteAddr <a href="../../builtin/index.html#string">string</a>
+
+<span id="Request.RequestURI"></span>    <span class="comment">// RequestURI is the unmodified Request-URI of the</span>
+    <span class="comment">// Request-Line (RFC 2616, Section 5.1) as sent by the client</span>
+    <span class="comment">// to a server. Usually the URL field should be used instead.</span>
+    <span class="comment">// It is an error to set this field in an HTTP client request.</span>
+    RequestURI <a href="../../builtin/index.html#string">string</a>
+
+<span id="Request.TLS"></span>    <span class="comment">// TLS allows HTTP servers and other software to record</span>
+    <span class="comment">// information about the TLS connection on which the request</span>
+    <span class="comment">// was received. This field is not filled in by ReadRequest.</span>
+    <span class="comment">// The HTTP server in this package sets the field for</span>
+    <span class="comment">// TLS-enabled connections before invoking a handler;</span>
+    <span class="comment">// otherwise it leaves the field nil.</span>
+    <span class="comment">// This field is ignored by the HTTP client.</span>
+    TLS *<a href="../../crypto/tls/index.html">tls</a>.<a href="../../crypto/tls/index.html#ConnectionState">ConnectionState</a>
+
+<span id="Request.Cancel"></span>    <span class="comment">// Cancel is an optional channel whose closure indicates that the client</span>
+    <span class="comment">// request should be regarded as canceled. Not all implementations of</span>
+    <span class="comment">// RoundTripper may support Cancel.</span>
+    <span class="comment">//</span>
+    <span class="comment">// For server requests, this field is not applicable.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Deprecated: Use the Context and WithContext methods</span>
+    <span class="comment">// instead. If a Request&#39;s Cancel field and context are both</span>
+    <span class="comment">// set, it is undefined whether Cancel is respected.</span>
+    Cancel &lt;-chan struct{}
+
+<span id="Request.Response"></span>    <span class="comment">// Response is the redirect response which caused this request</span>
+    <span class="comment">// to be created. This field is only populated during client</span>
+    <span class="comment">// redirects.</span>
+    Response *<a href="index.html#Response">Response</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewRequest">func <a href="../../../src/net/http/request.go%3Fs=24894:24966.html#L748">NewRequest</a>
+					<a class="permalink" href="index.html#NewRequest">&#xb6;</a>
+				</h3>
+				<pre>func NewRequest(method, urlStr <a href="../../builtin/index.html#string">string</a>, body <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Reader">Reader</a>) (*<a href="index.html#Request">Request</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+NewRequest returns a new Request given a method, URL, and optional body.
+</p>
+<p>
+If the provided body is also an io.Closer, the returned
+Request.Body is set to body and will be closed by the Client
+methods Do, Post, and PostForm, and Transport.RoundTrip.
+</p>
+<p>
+NewRequest returns a Request suitable for use with Client.Do or
+Transport.RoundTrip. To create a request for use with testing a
+Server Handler, either use the NewRequest function in the
+net/http/httptest package, use ReadRequest, or manually update the
+Request fields. See the Request type&#39;s documentation for the
+difference between inbound and outbound request fields.
+</p>
+<p>
+If body is of type *bytes.Buffer, *bytes.Reader, or
+*strings.Reader, the returned request&#39;s ContentLength is set to its
+exact value (instead of -1), GetBody is populated (so 307 and 308
+redirects can replay the body), and Body is set to NoBody if the
+ContentLength is 0.
+</p>
+
+				
+				
+			
+				
+				<h3 id="ReadRequest">func <a href="../../../src/net/http/request.go%3Fs=29113:29164.html#L892">ReadRequest</a>
+					<a class="permalink" href="index.html#ReadRequest">&#xb6;</a>
+				</h3>
+				<pre>func ReadRequest(b *<a href="../../bufio/index.html">bufio</a>.<a href="../../bufio/index.html#Reader">Reader</a>) (*<a href="index.html#Request">Request</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+ReadRequest reads and parses an incoming request from b.
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Request.AddCookie">func (*Request) <a href="../../../src/net/http/request.go%3Fs=13598:13636.html#L374">AddCookie</a>
+					<a class="permalink" href="index.html#Request.AddCookie">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) AddCookie(c *<a href="index.html#Cookie">Cookie</a>)</pre>
+				<p>
+AddCookie adds a cookie to the request. Per RFC 6265 section 5.4,
+AddCookie does not attach more than one Cookie header field. That
+means all cookies, if any, are written into the same line,
+separated by semicolon.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.BasicAuth">func (*Request) <a href="../../../src/net/http/request.go%3Fs=27379:27445.html#L828">BasicAuth</a>
+					<a class="permalink" href="index.html#Request.BasicAuth">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) BasicAuth() (username, password <a href="../../builtin/index.html#string">string</a>, ok <a href="../../builtin/index.html#bool">bool</a>)</pre>
+				<p>
+BasicAuth returns the username and password provided in the request&#39;s
+Authorization header, if the request uses HTTP Basic Authentication.
+See RFC 2617, Section 2.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.Context">func (*Request) <a href="../../../src/net/http/request.go%3Fs=11451:11494.html#L308">Context</a>
+					<a class="permalink" href="index.html#Request.Context">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) Context() <a href="../../context/index.html">context</a>.<a href="../../context/index.html#Context">Context</a></pre>
+				<p>
+Context returns the request&#39;s context. To change the context, use
+WithContext.
+</p>
+<p>
+The returned context is always non-nil; it defaults to the
+background context.
+</p>
+<p>
+For outgoing client requests, the context controls cancelation.
+</p>
+<p>
+For incoming server requests, the context is canceled when the
+client&#39;s connection closes, the request is canceled (with HTTP/2),
+or when the ServeHTTP method returns.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.Cookie">func (*Request) <a href="../../../src/net/http/request.go%3Fs=13218:13272.html#L363">Cookie</a>
+					<a class="permalink" href="index.html#Request.Cookie">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) Cookie(name <a href="../../builtin/index.html#string">string</a>) (*<a href="index.html#Cookie">Cookie</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Cookie returns the named cookie provided in the request or
+ErrNoCookie if not found.
+If multiple cookies match the given name, only one cookie will
+be returned.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.Cookies">func (*Request) <a href="../../../src/net/http/request.go%3Fs=12822:12859.html#L352">Cookies</a>
+					<a class="permalink" href="index.html#Request.Cookies">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) Cookies() []*<a href="index.html#Cookie">Cookie</a></pre>
+				<p>
+Cookies parses and returns the HTTP cookies sent with the request.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.FormFile">func (*Request) <a href="../../../src/net/http/request.go%3Fs=39022:39107.html#L1249">FormFile</a>
+					<a class="permalink" href="index.html#Request.FormFile">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) FormFile(key <a href="../../builtin/index.html#string">string</a>) (<a href="../../mime/multipart/index.html">multipart</a>.<a href="../../mime/multipart/index.html#File">File</a>, *<a href="../../mime/multipart/index.html">multipart</a>.<a href="../../mime/multipart/index.html#FileHeader">FileHeader</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+FormFile returns the first file for the provided form key.
+FormFile calls ParseMultipartForm and ParseForm if necessary.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.FormValue">func (*Request) <a href="../../../src/net/http/request.go%3Fs=38194:38240.html#L1222">FormValue</a>
+					<a class="permalink" href="index.html#Request.FormValue">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) FormValue(key <a href="../../builtin/index.html#string">string</a>) <a href="../../builtin/index.html#string">string</a></pre>
+				<p>
+FormValue returns the first value for the named component of the query.
+POST and PUT body parameters take precedence over URL query string values.
+FormValue calls ParseMultipartForm and ParseForm if necessary and ignores
+any errors returned by these functions.
+If key is not present, FormValue returns the empty string.
+To access multiple values of the same key, call ParseForm and
+then inspect Request.Form directly.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.MultipartReader">func (*Request) <a href="../../../src/net/http/request.go%3Fs=14935:14997.html#L407">MultipartReader</a>
+					<a class="permalink" href="index.html#Request.MultipartReader">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) MultipartReader() (*<a href="../../mime/multipart/index.html">multipart</a>.<a href="../../mime/multipart/index.html#Reader">Reader</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+MultipartReader returns a MIME multipart reader if this is a
+multipart/form-data POST request, else returns nil and an error.
+Use this function instead of ParseMultipartForm to
+process the request body as a stream.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.ParseForm">func (*Request) <a href="../../../src/net/http/request.go%3Fs=35993:36028.html#L1136">ParseForm</a>
+					<a class="permalink" href="index.html#Request.ParseForm">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) ParseForm() <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+ParseForm populates r.Form and r.PostForm.
+</p>
+<p>
+For all requests, ParseForm parses the raw query from the URL and updates
+r.Form.
+</p>
+<p>
+For POST, PUT, and PATCH requests, it also parses the request body as a form
+and puts the results into both r.PostForm and r.Form. Request body parameters
+take precedence over URL query string values in r.Form.
+</p>
+<p>
+For other HTTP methods, or when the Content-Type is not
+application/x-www-form-urlencoded, the request Body is not read, and
+r.PostForm is initialized to a non-nil, empty value.
+</p>
+<p>
+If the request Body&#39;s size has not already been limited by MaxBytesReader,
+the size is capped at 10MB.
+</p>
+<p>
+ParseMultipartForm calls ParseForm automatically.
+ParseForm is idempotent.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.ParseMultipartForm">func (*Request) <a href="../../../src/net/http/request.go%3Fs=37048:37107.html#L1177">ParseMultipartForm</a>
+					<a class="permalink" href="index.html#Request.ParseMultipartForm">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) ParseMultipartForm(maxMemory <a href="../../builtin/index.html#int64">int64</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+ParseMultipartForm parses a request body as multipart/form-data.
+The whole request body is parsed and up to a total of maxMemory bytes of
+its file parts are stored in memory, with the remainder stored on
+disk in temporary files.
+ParseMultipartForm calls ParseForm if necessary.
+After one call to ParseMultipartForm, subsequent calls have no effect.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.PostFormValue">func (*Request) <a href="../../../src/net/http/request.go%3Fs=38701:38751.html#L1237">PostFormValue</a>
+					<a class="permalink" href="index.html#Request.PostFormValue">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) PostFormValue(key <a href="../../builtin/index.html#string">string</a>) <a href="../../builtin/index.html#string">string</a></pre>
+				<p>
+PostFormValue returns the first value for the named component of the POST
+or PUT request body. URL query parameters are ignored.
+PostFormValue calls ParseMultipartForm and ParseForm if necessary and ignores
+any errors returned by these functions.
+If key is not present, PostFormValue returns the empty string.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.ProtoAtLeast">func (*Request) <a href="../../../src/net/http/request.go%3Fs=11940:11993.html#L329">ProtoAtLeast</a>
+					<a class="permalink" href="index.html#Request.ProtoAtLeast">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) ProtoAtLeast(major, minor <a href="../../builtin/index.html#int">int</a>) <a href="../../builtin/index.html#bool">bool</a></pre>
+				<p>
+ProtoAtLeast reports whether the HTTP protocol used
+in the request is at least major.minor.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.Referer">func (*Request) <a href="../../../src/net/http/request.go%3Fs=14306:14340.html#L391">Referer</a>
+					<a class="permalink" href="index.html#Request.Referer">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) Referer() <a href="../../builtin/index.html#string">string</a></pre>
+				<p>
+Referer returns the referring URL, if sent in the request.
+</p>
+<p>
+Referer is misspelled as in the request itself, a mistake from the
+earliest days of HTTP.  This value can also be fetched from the
+Header map as Header[&#34;Referer&#34;]; the benefit of making it available
+as a method is that the compiler can diagnose programs that use the
+alternate (correct English) spelling req.Referrer() but cannot
+diagnose programs that use Header[&#34;Referrer&#34;].
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.SetBasicAuth">func (*Request) <a href="../../../src/net/http/request.go%3Fs=28267:28324.html#L860">SetBasicAuth</a>
+					<a class="permalink" href="index.html#Request.SetBasicAuth">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) SetBasicAuth(username, password <a href="../../builtin/index.html#string">string</a>)</pre>
+				<p>
+SetBasicAuth sets the request&#39;s Authorization header to use HTTP
+Basic Authentication with the provided username and password.
+</p>
+<p>
+With HTTP Basic Authentication the provided username and password
+are not encrypted.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.UserAgent">func (*Request) <a href="../../../src/net/http/request.go%3Fs=12675:12711.html#L347">UserAgent</a>
+					<a class="permalink" href="index.html#Request.UserAgent">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) UserAgent() <a href="../../builtin/index.html#string">string</a></pre>
+				<p>
+UserAgent returns the client&#39;s User-Agent, if sent in the request.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.WithContext">func (*Request) <a href="../../../src/net/http/request.go%3Fs=11679:11738.html#L317">WithContext</a>
+					<a class="permalink" href="index.html#Request.WithContext">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) WithContext(ctx <a href="../../context/index.html">context</a>.<a href="../../context/index.html#Context">Context</a>) *<a href="index.html#Request">Request</a></pre>
+				<p>
+WithContext returns a shallow copy of r with its context changed
+to ctx. The provided ctx must be non-nil.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.Write">func (*Request) <a href="../../../src/net/http/request.go%3Fs=16810:16852.html#L467">Write</a>
+					<a class="permalink" href="index.html#Request.Write">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) Write(w <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Writer">Writer</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+Write writes an HTTP/1.1 request, which is the header and body, in wire format.
+This method consults the following fields of the request:
+</p>
+<pre>Host
+URL
+Method (defaults to &#34;GET&#34;)
+Header
+ContentLength
+TransferEncoding
+Body
+</pre>
+<p>
+If Body is present, Content-Length is &lt;= 0 and TransferEncoding
+hasn&#39;t been set to &#34;identity&#34;, Write adds &#34;Transfer-Encoding:
+chunked&#34; to the header. Body is closed after it is sent.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Request.WriteProxy">func (*Request) <a href="../../../src/net/http/request.go%3Fs=17249:17296.html#L477">WriteProxy</a>
+					<a class="permalink" href="index.html#Request.WriteProxy">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Request">Request</a>) WriteProxy(w <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Writer">Writer</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+WriteProxy is like Write but writes the request in the form
+expected by an HTTP proxy. In particular, WriteProxy writes the
+initial Request-URI line of the request with an absolute URI, per
+section 5.1.2 of RFC 2616, including the scheme and host.
+In either case, WriteProxy also writes a Host header, using
+either r.Host or r.URL.Host.
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Response">type <a href="../../../src/net/http/response.go%3Fs=519:3704.html#L20">Response</a>
+				<a class="permalink" href="index.html#Response">&#xb6;</a>
+			</h2>
+			<p>
+Response represents the response from an HTTP request.
+</p>
+
+			<pre>type Response struct {
+<span id="Response.Status"></span>    Status     <a href="../../builtin/index.html#string">string</a> <span class="comment">// e.g. &#34;200 OK&#34;</span>
+<span id="Response.StatusCode"></span>    StatusCode <a href="../../builtin/index.html#int">int</a>    <span class="comment">// e.g. 200</span>
+<span id="Response.Proto"></span>    Proto      <a href="../../builtin/index.html#string">string</a> <span class="comment">// e.g. &#34;HTTP/1.0&#34;</span>
+<span id="Response.ProtoMajor"></span>    ProtoMajor <a href="../../builtin/index.html#int">int</a>    <span class="comment">// e.g. 1</span>
+<span id="Response.ProtoMinor"></span>    ProtoMinor <a href="../../builtin/index.html#int">int</a>    <span class="comment">// e.g. 0</span>
+
+<span id="Response.Header"></span>    <span class="comment">// Header maps header keys to values. If the response had multiple</span>
+    <span class="comment">// headers with the same key, they may be concatenated, with comma</span>
+    <span class="comment">// delimiters.  (Section 4.2 of RFC 2616 requires that multiple headers</span>
+    <span class="comment">// be semantically equivalent to a comma-delimited sequence.) Values</span>
+    <span class="comment">// duplicated by other fields in this struct (e.g., ContentLength) are</span>
+    <span class="comment">// omitted from Header.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Keys in the map are canonicalized (see CanonicalHeaderKey).</span>
+    Header <a href="index.html#Header">Header</a>
+
+<span id="Response.Body"></span>    <span class="comment">// Body represents the response body.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The http Client and Transport guarantee that Body is always</span>
+    <span class="comment">// non-nil, even on responses without a body or responses with</span>
+    <span class="comment">// a zero-length body. It is the caller&#39;s responsibility to</span>
+    <span class="comment">// close Body. The default HTTP client&#39;s Transport does not</span>
+    <span class="comment">// attempt to reuse HTTP/1.0 or HTTP/1.1 TCP connections</span>
+    <span class="comment">// (&#34;keep-alive&#34;) unless the Body is read to completion and is</span>
+    <span class="comment">// closed.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The Body is automatically dechunked if the server replied</span>
+    <span class="comment">// with a &#34;chunked&#34; Transfer-Encoding.</span>
+    Body <a href="../../io/index.html">io</a>.<a href="../../io/index.html#ReadCloser">ReadCloser</a>
+
+<span id="Response.ContentLength"></span>    <span class="comment">// ContentLength records the length of the associated content. The</span>
+    <span class="comment">// value -1 indicates that the length is unknown. Unless Request.Method</span>
+    <span class="comment">// is &#34;HEAD&#34;, values &gt;= 0 indicate that the given number of bytes may</span>
+    <span class="comment">// be read from Body.</span>
+    ContentLength <a href="../../builtin/index.html#int64">int64</a>
+
+    <span class="comment">// Contains transfer encodings from outer-most to inner-most. Value is</span>
+    <span class="comment">// nil, means that &#34;identity&#34; encoding is used.</span>
+<span id="Response.TransferEncoding"></span>    TransferEncoding []<a href="../../builtin/index.html#string">string</a>
+
+<span id="Response.Close"></span>    <span class="comment">// Close records whether the header directed that the connection be</span>
+    <span class="comment">// closed after reading Body. The value is advice for clients: neither</span>
+    <span class="comment">// ReadResponse nor Response.Write ever closes a connection.</span>
+    Close <a href="../../builtin/index.html#bool">bool</a>
+
+<span id="Response.Uncompressed"></span>    <span class="comment">// Uncompressed reports whether the response was sent compressed but</span>
+    <span class="comment">// was decompressed by the http package. When true, reading from</span>
+    <span class="comment">// Body yields the uncompressed content instead of the compressed</span>
+    <span class="comment">// content actually set from the server, ContentLength is set to -1,</span>
+    <span class="comment">// and the &#34;Content-Length&#34; and &#34;Content-Encoding&#34; fields are deleted</span>
+    <span class="comment">// from the responseHeader. To get the original response from</span>
+    <span class="comment">// the server, set Transport.DisableCompression to true.</span>
+    Uncompressed <a href="../../builtin/index.html#bool">bool</a>
+
+<span id="Response.Trailer"></span>    <span class="comment">// Trailer maps trailer keys to values in the same</span>
+    <span class="comment">// format as Header.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The Trailer initially contains only nil values, one for</span>
+    <span class="comment">// each key specified in the server&#39;s &#34;Trailer&#34; header</span>
+    <span class="comment">// value. Those values are not added to Header.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Trailer must not be accessed concurrently with Read calls</span>
+    <span class="comment">// on the Body.</span>
+    <span class="comment">//</span>
+    <span class="comment">// After Body.Read has returned io.EOF, Trailer will contain</span>
+    <span class="comment">// any trailer values sent by the server.</span>
+    Trailer <a href="index.html#Header">Header</a>
+
+<span id="Response.Request"></span>    <span class="comment">// Request is the request that was sent to obtain this Response.</span>
+    <span class="comment">// Request&#39;s Body is nil (having already been consumed).</span>
+    <span class="comment">// This is only populated for Client requests.</span>
+    Request *<a href="index.html#Request">Request</a>
+
+<span id="Response.TLS"></span>    <span class="comment">// TLS contains information about the TLS connection on which the</span>
+    <span class="comment">// response was received. It is nil for unencrypted responses.</span>
+    <span class="comment">// The pointer is shared between responses and should not be</span>
+    <span class="comment">// modified.</span>
+    TLS *<a href="../../crypto/tls/index.html">tls</a>.<a href="../../crypto/tls/index.html#ConnectionState">ConnectionState</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="Get">func <a href="../../../src/net/http/client.go%3Fs=11945:11993.html#L356">Get</a>
+					<a class="permalink" href="index.html#Get">&#xb6;</a>
+				</h3>
+				<pre>func Get(url <a href="../../builtin/index.html#string">string</a>) (resp *<a href="index.html#Response">Response</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Get issues a GET to the specified URL. If the response is one of
+the following redirect codes, Get follows the redirect, up to a
+maximum of 10 redirects:
+</p>
+<pre>301 (Moved Permanently)
+302 (Found)
+303 (See Other)
+307 (Temporary Redirect)
+308 (Permanent Redirect)
+</pre>
+<p>
+An error is returned if there were too many redirects or if there
+was an HTTP protocol error. A non-2xx response doesn&#39;t cause an
+error.
+</p>
+<p>
+When err is nil, resp always contains a non-nil resp.Body.
+Caller should close resp.Body when done reading from it.
+</p>
+<p>
+Get is a wrapper around DefaultClient.Get.
+</p>
+<p>
+To make a request with custom headers, use NewRequest and
+DefaultClient.Do.
+</p>
+
+				<div id="example_Get" class="toggle">
+	<div class="collapsed">
+		<p class="exampleHeading toggleButton">▹ <span class="text">Example</span></p>
+	</div>
+	<div class="expanded">
+		<p class="exampleHeading toggleButton">▾ <span class="text">Example</span></p>
+		
+		
+		
+			<p>Code:</p>
+			<pre class="code">
+res, err := http.Get(&#34;http://www.google.com/robots.txt&#34;)
+if err != nil {
+    log.Fatal(err)
+}
+robots, err := ioutil.ReadAll(res.Body)
+res.Body.Close()
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf(&#34;%s&#34;, robots)
+</pre>
+			
+		
+	</div>
+</div>
+
+				
+			
+				
+				<h3 id="Head">func <a href="../../../src/net/http/client.go%3Fs=24955:25004.html#L756">Head</a>
+					<a class="permalink" href="index.html#Head">&#xb6;</a>
+				</h3>
+				<pre>func Head(url <a href="../../builtin/index.html#string">string</a>) (resp *<a href="index.html#Response">Response</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Head issues a HEAD to the specified URL. If the response is one of
+the following redirect codes, Head follows the redirect, up to a
+maximum of 10 redirects:
+</p>
+<pre>301 (Moved Permanently)
+302 (Found)
+303 (See Other)
+307 (Temporary Redirect)
+308 (Permanent Redirect)
+</pre>
+<p>
+Head is a wrapper around DefaultClient.Head
+</p>
+
+				
+				
+			
+				
+				<h3 id="Post">func <a href="../../../src/net/http/client.go%3Fs=22596:22681.html#L689">Post</a>
+					<a class="permalink" href="index.html#Post">&#xb6;</a>
+				</h3>
+				<pre>func Post(url <a href="../../builtin/index.html#string">string</a>, contentType <a href="../../builtin/index.html#string">string</a>, body <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Reader">Reader</a>) (resp *<a href="index.html#Response">Response</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Post issues a POST to the specified URL.
+</p>
+<p>
+Caller should close resp.Body when done reading from it.
+</p>
+<p>
+If the provided body is an io.Closer, it is closed after the
+request.
+</p>
+<p>
+Post is a wrapper around DefaultClient.Post.
+</p>
+<p>
+To set custom headers, use NewRequest and DefaultClient.Do.
+</p>
+<p>
+See the Client.Do method documentation for details on how redirects
+are handled.
+</p>
+
+				
+				
+			
+				
+				<h3 id="PostForm">func <a href="../../../src/net/http/client.go%3Fs=23843:23913.html#L726">PostForm</a>
+					<a class="permalink" href="index.html#PostForm">&#xb6;</a>
+				</h3>
+				<pre>func PostForm(url <a href="../../builtin/index.html#string">string</a>, data <a href="../url/index.html">url</a>.<a href="../url/index.html#Values">Values</a>) (resp *<a href="index.html#Response">Response</a>, err <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+PostForm issues a POST to the specified URL, with data&#39;s keys and
+values URL-encoded as the request body.
+</p>
+<p>
+The Content-Type header is set to application/x-www-form-urlencoded.
+To set other headers, use NewRequest and DefaultClient.Do.
+</p>
+<p>
+When err is nil, resp always contains a non-nil resp.Body.
+Caller should close resp.Body when done reading from it.
+</p>
+<p>
+PostForm is a wrapper around DefaultClient.PostForm.
+</p>
+<p>
+See the Client.Do method documentation for details on how redirects
+are handled.
+</p>
+
+				
+				
+			
+				
+				<h3 id="ReadResponse">func <a href="../../../src/net/http/response.go%3Fs=4845:4912.html#L131">ReadResponse</a>
+					<a class="permalink" href="index.html#ReadResponse">&#xb6;</a>
+				</h3>
+				<pre>func ReadResponse(r *<a href="../../bufio/index.html">bufio</a>.<a href="../../bufio/index.html#Reader">Reader</a>, req *<a href="index.html#Request">Request</a>) (*<a href="index.html#Response">Response</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+ReadResponse reads and returns an HTTP response from r.
+The req parameter optionally specifies the Request that corresponds
+to this Response. If nil, a GET request is assumed.
+Clients must call resp.Body.Close when finished reading resp.Body.
+After that call, clients can inspect resp.Trailer to find key/value
+pairs included in the response trailer.
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Response.Cookies">func (*Response) <a href="../../../src/net/http/response.go%3Fs=3779:3817.html#L102">Cookies</a>
+					<a class="permalink" href="index.html#Response.Cookies">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Response">Response</a>) Cookies() []*<a href="index.html#Cookie">Cookie</a></pre>
+				<p>
+Cookies parses and returns the cookies set in the Set-Cookie headers.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Response.Location">func (*Response) <a href="../../../src/net/http/response.go%3Fs=4240:4287.html#L114">Location</a>
+					<a class="permalink" href="index.html#Response.Location">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Response">Response</a>) Location() (*<a href="../url/index.html">url</a>.<a href="../url/index.html#URL">URL</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+Location returns the URL of the response&#39;s &#34;Location&#34; header,
+if present. Relative redirects are resolved relative to
+the Response&#39;s Request. ErrNoLocation is returned if no
+Location header is present.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Response.ProtoAtLeast">func (*Response) <a href="../../../src/net/http/response.go%3Fs=6536:6590.html#L201">ProtoAtLeast</a>
+					<a class="permalink" href="index.html#Response.ProtoAtLeast">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Response">Response</a>) ProtoAtLeast(major, minor <a href="../../builtin/index.html#int">int</a>) <a href="../../builtin/index.html#bool">bool</a></pre>
+				<p>
+ProtoAtLeast reports whether the HTTP protocol used
+in the response is at least major.minor.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Response.Write">func (*Response) <a href="../../../src/net/http/response.go%3Fs=7128:7171.html#L222">Write</a>
+					<a class="permalink" href="index.html#Response.Write">&#xb6;</a>
+				</h3>
+				<pre>func (r *<a href="index.html#Response">Response</a>) Write(w <a href="../../io/index.html">io</a>.<a href="../../io/index.html#Writer">Writer</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+Write writes r to w in the HTTP/1.x server response format,
+including the status line, headers, body, and optional trailer.
+</p>
+<p>
+This method consults the following fields of the response r:
+</p>
+<pre>StatusCode
+ProtoMajor
+ProtoMinor
+Request.Method
+TransferEncoding
+Trailer
+Body
+ContentLength
+Header, values for non-canonical keys will have unpredictable behavior
+</pre>
+<p>
+The Response Body is closed after it is sent.
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="ResponseWriter">type <a href="../../../src/net/http/server.go%3Fs=2779:5139.html#L80">ResponseWriter</a>
+				<a class="permalink" href="index.html#ResponseWriter">&#xb6;</a>
+			</h2>
+			<p>
+A ResponseWriter interface is used by an HTTP handler to
+construct an HTTP response.
+</p>
+<p>
+A ResponseWriter may not be used after the Handler.ServeHTTP method
+has returned.
+</p>
+
+			<pre>type ResponseWriter interface {
+    <span class="comment">// Header returns the header map that will be sent by</span>
+    <span class="comment">// WriteHeader. The Header map also is the mechanism with which</span>
+    <span class="comment">// Handlers can set HTTP trailers.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Changing the header map after a call to WriteHeader (or</span>
+    <span class="comment">// Write) has no effect unless the modified headers are</span>
+    <span class="comment">// trailers.</span>
+    <span class="comment">//</span>
+    <span class="comment">// There are two ways to set Trailers. The preferred way is to</span>
+    <span class="comment">// predeclare in the headers which trailers you will later</span>
+    <span class="comment">// send by setting the &#34;Trailer&#34; header to the names of the</span>
+    <span class="comment">// trailer keys which will come later. In this case, those</span>
+    <span class="comment">// keys of the Header map are treated as if they were</span>
+    <span class="comment">// trailers. See the example. The second way, for trailer</span>
+    <span class="comment">// keys not known to the Handler until after the first Write,</span>
+    <span class="comment">// is to prefix the Header map keys with the TrailerPrefix</span>
+    <span class="comment">// constant value. See TrailerPrefix.</span>
+    <span class="comment">//</span>
+    <span class="comment">// To suppress implicit response headers (such as &#34;Date&#34;), set</span>
+    <span class="comment">// their value to nil.</span>
+    Header() <a href="index.html#Header">Header</a>
+
+    <span class="comment">// Write writes the data to the connection as part of an HTTP reply.</span>
+    <span class="comment">//</span>
+    <span class="comment">// If WriteHeader has not yet been called, Write calls</span>
+    <span class="comment">// WriteHeader(http.StatusOK) before writing the data. If the Header</span>
+    <span class="comment">// does not contain a Content-Type line, Write adds a Content-Type set</span>
+    <span class="comment">// to the result of passing the initial 512 bytes of written data to</span>
+    <span class="comment">// DetectContentType.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Depending on the HTTP protocol version and the client, calling</span>
+    <span class="comment">// Write or WriteHeader may prevent future reads on the</span>
+    <span class="comment">// Request.Body. For HTTP/1.x requests, handlers should read any</span>
+    <span class="comment">// needed request body data before writing the response. Once the</span>
+    <span class="comment">// headers have been flushed (due to either an explicit Flusher.Flush</span>
+    <span class="comment">// call or writing enough data to trigger a flush), the request body</span>
+    <span class="comment">// may be unavailable. For HTTP/2 requests, the Go HTTP server permits</span>
+    <span class="comment">// handlers to continue to read the request body while concurrently</span>
+    <span class="comment">// writing the response. However, such behavior may not be supported</span>
+    <span class="comment">// by all HTTP/2 clients. Handlers should read before writing if</span>
+    <span class="comment">// possible to maximize compatibility.</span>
+    Write([]<a href="../../builtin/index.html#byte">byte</a>) (<a href="../../builtin/index.html#int">int</a>, <a href="../../builtin/index.html#error">error</a>)
+
+    <span class="comment">// WriteHeader sends an HTTP response header with status code.</span>
+    <span class="comment">// If WriteHeader is not called explicitly, the first call to Write</span>
+    <span class="comment">// will trigger an implicit WriteHeader(http.StatusOK).</span>
+    <span class="comment">// Thus explicit calls to WriteHeader are mainly used to</span>
+    <span class="comment">// send error codes.</span>
+    WriteHeader(<a href="../../builtin/index.html#int">int</a>)
+}</pre>
+
+			
+
+			
+
+			<div id="example_ResponseWriter_trailers" class="toggle">
+	<div class="collapsed">
+		<p class="exampleHeading toggleButton">▹ <span class="text">Example (Trailers)</span></p>
+	</div>
+	<div class="expanded">
+		<p class="exampleHeading toggleButton">▾ <span class="text">Example (Trailers)</span></p>
+		<p>HTTP Trailers are a set of key/value pairs like headers that come
+after the HTTP response, instead of before.
+</p>
+		
+		
+			<p>Code:</p>
+			<pre class="code">
+mux := http.NewServeMux()
+mux.HandleFunc(&#34;/sendstrailers&#34;, func(w http.ResponseWriter, req *http.Request) {
+    <span class="comment">// Before any call to WriteHeader or Write, declare</span>
+    <span class="comment">// the trailers you will set during the HTTP</span>
+    <span class="comment">// response. These three headers are actually sent in</span>
+    <span class="comment">// the trailer.</span>
+    w.Header().Set(&#34;Trailer&#34;, &#34;AtEnd1, AtEnd2&#34;)
+    w.Header().Add(&#34;Trailer&#34;, &#34;AtEnd3&#34;)
+
+    w.Header().Set(&#34;Content-Type&#34;, &#34;text/plain; charset=utf-8&#34;) <span class="comment">// normal header</span>
+    w.WriteHeader(http.StatusOK)
+
+    w.Header().Set(&#34;AtEnd1&#34;, &#34;value 1&#34;)
+    io.WriteString(w, &#34;This HTTP response has both headers before this text and trailers at the end.\n&#34;)
+    w.Header().Set(&#34;AtEnd2&#34;, &#34;value 2&#34;)
+    w.Header().Set(&#34;AtEnd3&#34;, &#34;value 3&#34;) <span class="comment">// These will appear as trailers.</span>
+})
+</pre>
+			
+		
+	</div>
+</div>
+
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="RoundTripper">type <a href="../../../src/net/http/client.go%3Fs=4385:5446.html#L107">RoundTripper</a>
+				<a class="permalink" href="index.html#RoundTripper">&#xb6;</a>
+			</h2>
+			<p>
+RoundTripper is an interface representing the ability to execute a
+single HTTP transaction, obtaining the Response for a given Request.
+</p>
+<p>
+A RoundTripper must be safe for concurrent use by multiple
+goroutines.
+</p>
+
+			<pre>type RoundTripper interface {
+    <span class="comment">// RoundTrip executes a single HTTP transaction, returning</span>
+    <span class="comment">// a Response for the provided Request.</span>
+    <span class="comment">//</span>
+    <span class="comment">// RoundTrip should not attempt to interpret the response. In</span>
+    <span class="comment">// particular, RoundTrip must return err == nil if it obtained</span>
+    <span class="comment">// a response, regardless of the response&#39;s HTTP status code.</span>
+    <span class="comment">// A non-nil err should be reserved for failure to obtain a</span>
+    <span class="comment">// response. Similarly, RoundTrip should not attempt to</span>
+    <span class="comment">// handle higher-level protocol details such as redirects,</span>
+    <span class="comment">// authentication, or cookies.</span>
+    <span class="comment">//</span>
+    <span class="comment">// RoundTrip should not modify the request, except for</span>
+    <span class="comment">// consuming and closing the Request&#39;s Body.</span>
+    <span class="comment">//</span>
+    <span class="comment">// RoundTrip must always close the body, including on errors,</span>
+    <span class="comment">// but depending on the implementation may do so in a separate</span>
+    <span class="comment">// goroutine even after RoundTrip returns. This means that</span>
+    <span class="comment">// callers wanting to reuse the body for subsequent requests</span>
+    <span class="comment">// must arrange to wait for the Close call before doing so.</span>
+    <span class="comment">//</span>
+    <span class="comment">// The Request&#39;s URL and Header fields must be initialized.</span>
+    RoundTrip(*<a href="index.html#Request">Request</a>) (*<a href="index.html#Response">Response</a>, <a href="../../builtin/index.html#error">error</a>)
+}</pre>
+
+			
+
+			
+				<p>
+DefaultTransport is the default implementation of Transport and is
+used by DefaultClient. It establishes network connections as needed
+and caches them for reuse by subsequent calls. It uses HTTP proxies
+as directed by the $HTTP_PROXY and $NO_PROXY (or $http_proxy and
+$no_proxy) environment variables.
+</p>
+
+				<pre>var <span id="DefaultTransport">DefaultTransport</span> <a href="index.html#RoundTripper">RoundTripper</a> = &amp;<a href="index.html#Transport">Transport</a>{
+    <a href="index.html#Proxy">Proxy</a>: <a href="index.html#ProxyFromEnvironment">ProxyFromEnvironment</a>,
+    <a href="index.html#DialContext">DialContext</a>: (&amp;<a href="../index.html">net</a>.<a href="../index.html#Dialer">Dialer</a>{
+        <a href="index.html#Timeout">Timeout</a>:   30 * <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Second">Second</a>,
+        <a href="index.html#KeepAlive">KeepAlive</a>: 30 * <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Second">Second</a>,
+        <a href="index.html#DualStack">DualStack</a>: <a href="../../builtin/index.html#true">true</a>,
+    }).<a href="index.html#DialContext">DialContext</a>,
+    <a href="index.html#MaxIdleConns">MaxIdleConns</a>:          100,
+    <a href="index.html#IdleConnTimeout">IdleConnTimeout</a>:       90 * <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Second">Second</a>,
+    <a href="index.html#TLSHandshakeTimeout">TLSHandshakeTimeout</a>:   10 * <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Second">Second</a>,
+    <a href="index.html#ExpectContinueTimeout">ExpectContinueTimeout</a>: 1 * <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Second">Second</a>,
+}</pre>
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewFileTransport">func <a href="../../../src/net/http/filetransport.go%3Fs=827:876.html#L20">NewFileTransport</a>
+					<a class="permalink" href="index.html#NewFileTransport">&#xb6;</a>
+				</h3>
+				<pre>func NewFileTransport(fs <a href="index.html#FileSystem">FileSystem</a>) <a href="index.html#RoundTripper">RoundTripper</a></pre>
+				<p>
+NewFileTransport returns a new RoundTripper, serving the provided
+FileSystem. The returned RoundTripper ignores the URL host in its
+incoming requests, as well as most other properties of the
+request.
+</p>
+<p>
+The typical use case for NewFileTransport is to register the &#34;file&#34;
+protocol with a Transport, as in:
+</p>
+<pre>t := &amp;http.Transport{}
+t.RegisterProtocol(&#34;file&#34;, http.NewFileTransport(http.Dir(&#34;/&#34;)))
+c := &amp;http.Client{Transport: t}
+res, err := c.Get(&#34;file:///etc/passwd&#34;)
+...
+</pre>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="ServeMux">type <a href="../../../src/net/http/server.go%3Fs=63512:63637.html#L2106">ServeMux</a>
+				<a class="permalink" href="index.html#ServeMux">&#xb6;</a>
+			</h2>
+			<p>
+ServeMux is an HTTP request multiplexer.
+It matches the URL of each incoming request against a list of registered
+patterns and calls the handler for the pattern that
+most closely matches the URL.
+</p>
+<p>
+Patterns name fixed, rooted paths, like &#34;/favicon.ico&#34;,
+or rooted subtrees, like &#34;/images/&#34; (note the trailing slash).
+Longer patterns take precedence over shorter ones, so that
+if there are handlers registered for both &#34;/images/&#34;
+and &#34;/images/thumbnails/&#34;, the latter handler will be
+called for paths beginning &#34;/images/thumbnails/&#34; and the
+former will receive requests for any other paths in the
+&#34;/images/&#34; subtree.
+</p>
+<p>
+Note that since a pattern ending in a slash names a rooted subtree,
+the pattern &#34;/&#34; matches all paths not matched by other registered
+patterns, not just the URL with Path == &#34;/&#34;.
+</p>
+<p>
+If a subtree has been registered and a request is received naming the
+subtree root without its trailing slash, ServeMux redirects that
+request to the subtree root (adding the trailing slash). This behavior can
+be overridden with a separate registration for the path without
+the trailing slash. For example, registering &#34;/images/&#34; causes ServeMux
+to redirect a request for &#34;/images&#34; to &#34;/images/&#34;, unless &#34;/images&#34; has
+been registered separately.
+</p>
+<p>
+Patterns may optionally begin with a host name, restricting matches to
+URLs on that host only. Host-specific patterns take precedence over
+general patterns, so that a handler might register for the two patterns
+&#34;/codesearch&#34; and &#34;codesearch.google.com/&#34; without also taking over
+requests for &#34;<a href="http://www.google.com/">http://www.google.com/</a>&#34;.
+</p>
+<p>
+ServeMux also takes care of sanitizing the URL request path,
+redirecting any request containing . or .. elements or repeated slashes
+to an equivalent, cleaner URL.
+</p>
+
+			<pre>type ServeMux struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewServeMux">func <a href="../../../src/net/http/server.go%3Fs=63768:63796.html#L2119">NewServeMux</a>
+					<a class="permalink" href="index.html#NewServeMux">&#xb6;</a>
+				</h3>
+				<pre>func NewServeMux() *<a href="index.html#ServeMux">ServeMux</a></pre>
+				<p>
+NewServeMux allocates and returns a new ServeMux.
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="ServeMux.Handle">func (*ServeMux) <a href="../../../src/net/http/server.go%3Fs=66820:66880.html#L2233">Handle</a>
+					<a class="permalink" href="index.html#ServeMux.Handle">&#xb6;</a>
+				</h3>
+				<pre>func (mux *<a href="index.html#ServeMux">ServeMux</a>) Handle(pattern <a href="../../builtin/index.html#string">string</a>, handler <a href="index.html#Handler">Handler</a>)</pre>
+				<p>
+Handle registers the handler for the given pattern.
+If a handler already exists for pattern, Handle panics.
+</p>
+
+				
+				<div id="example_ServeMux_Handle" class="toggle">
+	<div class="collapsed">
+		<p class="exampleHeading toggleButton">▹ <span class="text">Example</span></p>
+	</div>
+	<div class="expanded">
+		<p class="exampleHeading toggleButton">▾ <span class="text">Example</span></p>
+		
+		
+		
+			<p>Code:</p>
+			<pre class="code">
+mux := http.NewServeMux()
+mux.Handle(&#34;/api/&#34;, apiHandler{})
+mux.HandleFunc(&#34;/&#34;, func(w http.ResponseWriter, req *http.Request) {
+    <span class="comment">// The &#34;/&#34; pattern matches everything, so we need to check</span>
+    <span class="comment">// that we&#39;re at the root here.</span>
+    if req.URL.Path != &#34;/&#34; {
+        http.NotFound(w, req)
+        return
+    }
+    fmt.Fprintf(w, &#34;Welcome to the home page!&#34;)
+})
+</pre>
+			
+		
+	</div>
+</div>
+
+				
+			
+				
+				<h3 id="ServeMux.HandleFunc">func (*ServeMux) <a href="../../../src/net/http/server.go%3Fs=68041:68128.html#L2275">HandleFunc</a>
+					<a class="permalink" href="index.html#ServeMux.HandleFunc">&#xb6;</a>
+				</h3>
+				<pre>func (mux *<a href="index.html#ServeMux">ServeMux</a>) HandleFunc(pattern <a href="../../builtin/index.html#string">string</a>, handler func(<a href="index.html#ResponseWriter">ResponseWriter</a>, *<a href="index.html#Request">Request</a>))</pre>
+				<p>
+HandleFunc registers the handler function for the given pattern.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ServeMux.Handler">func (*ServeMux) <a href="../../../src/net/http/server.go%3Fs=65524:65592.html#L2185">Handler</a>
+					<a class="permalink" href="index.html#ServeMux.Handler">&#xb6;</a>
+				</h3>
+				<pre>func (mux *<a href="index.html#ServeMux">ServeMux</a>) Handler(r *<a href="index.html#Request">Request</a>) (h <a href="index.html#Handler">Handler</a>, pattern <a href="../../builtin/index.html#string">string</a>)</pre>
+				<p>
+Handler returns the handler to use for the given request,
+consulting r.Method, r.Host, and r.URL.Path. It always returns
+a non-nil handler. If the path is not in its canonical form, the
+handler will be an internally-generated handler that redirects
+to the canonical path.
+</p>
+<p>
+Handler also returns the registered pattern that matches the
+request or, in the case of internally-generated redirects,
+the pattern that will match after following the redirect.
+</p>
+<p>
+If there is no registered handler that applies to the request,
+Handler returns a &ldquo;page not found&rdquo; handler and an empty pattern.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ServeMux.ServeHTTP">func (*ServeMux) <a href="../../../src/net/http/server.go%3Fs=66452:66512.html#L2219">ServeHTTP</a>
+					<a class="permalink" href="index.html#ServeMux.ServeHTTP">&#xb6;</a>
+				</h3>
+				<pre>func (mux *<a href="index.html#ServeMux">ServeMux</a>) ServeHTTP(w <a href="index.html#ResponseWriter">ResponseWriter</a>, r *<a href="index.html#Request">Request</a>)</pre>
+				<p>
+ServeHTTP dispatches the request to the handler whose
+pattern most closely matches the request URL.
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Server">type <a href="../../../src/net/http/server.go%3Fs=69188:72198.html#L2302">Server</a>
+				<a class="permalink" href="index.html#Server">&#xb6;</a>
+			</h2>
+			<p>
+A Server defines parameters for running an HTTP server.
+The zero value for Server is a valid configuration.
+</p>
+
+			<pre>type Server struct {
+<span id="Server.Addr"></span>    Addr      <a href="../../builtin/index.html#string">string</a>      <span class="comment">// TCP address to listen on, &#34;:http&#34; if empty</span>
+<span id="Server.Handler"></span>    Handler   <a href="index.html#Handler">Handler</a>     <span class="comment">// handler to invoke, http.DefaultServeMux if nil</span>
+<span id="Server.TLSConfig"></span>    TLSConfig *<a href="../../crypto/tls/index.html">tls</a>.<a href="../../crypto/tls/index.html#Config">Config</a> <span class="comment">// optional TLS config, used by ListenAndServeTLS</span>
+
+<span id="Server.ReadTimeout"></span>    <span class="comment">// ReadTimeout is the maximum duration for reading the entire</span>
+    <span class="comment">// request, including the body.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Because ReadTimeout does not let Handlers make per-request</span>
+    <span class="comment">// decisions on each request body&#39;s acceptable deadline or</span>
+    <span class="comment">// upload rate, most users will prefer to use</span>
+<span id="Server.ReadHeaderTimeout"></span>    <span class="comment">// ReadHeaderTimeout. It is valid to use them both.</span>
+    ReadTimeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+
+    <span class="comment">// ReadHeaderTimeout is the amount of time allowed to read</span>
+    <span class="comment">// request headers. The connection&#39;s read deadline is reset</span>
+    <span class="comment">// after reading the headers and the Handler can decide what</span>
+    <span class="comment">// is considered too slow for the body.</span>
+    ReadHeaderTimeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+
+<span id="Server.WriteTimeout"></span>    <span class="comment">// WriteTimeout is the maximum duration before timing out</span>
+    <span class="comment">// writes of the response. It is reset whenever a new</span>
+    <span class="comment">// request&#39;s header is read. Like ReadTimeout, it does not</span>
+    <span class="comment">// let Handlers make decisions on a per-request basis.</span>
+    WriteTimeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+
+<span id="Server.IdleTimeout"></span>    <span class="comment">// IdleTimeout is the maximum amount of time to wait for the</span>
+    <span class="comment">// next request when keep-alives are enabled. If IdleTimeout</span>
+    <span class="comment">// is zero, the value of ReadTimeout is used. If both are</span>
+    <span class="comment">// zero, there is no timeout.</span>
+    IdleTimeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+
+<span id="Server.MaxHeaderBytes"></span>    <span class="comment">// MaxHeaderBytes controls the maximum number of bytes the</span>
+    <span class="comment">// server will read parsing the request header&#39;s keys and</span>
+    <span class="comment">// values, including the request line. It does not limit the</span>
+    <span class="comment">// size of the request body.</span>
+    <span class="comment">// If zero, DefaultMaxHeaderBytes is used.</span>
+    MaxHeaderBytes <a href="../../builtin/index.html#int">int</a>
+
+<span id="Server.TLSNextProto"></span>    <span class="comment">// TLSNextProto optionally specifies a function to take over</span>
+    <span class="comment">// ownership of the provided TLS connection when an NPN/ALPN</span>
+    <span class="comment">// protocol upgrade has occurred. The map key is the protocol</span>
+    <span class="comment">// name negotiated. The Handler argument should be used to</span>
+    <span class="comment">// handle HTTP requests and will initialize the Request&#39;s TLS</span>
+    <span class="comment">// and RemoteAddr if not already set. The connection is</span>
+    <span class="comment">// automatically closed when the function returns.</span>
+    <span class="comment">// If TLSNextProto is not nil, HTTP/2 support is not enabled</span>
+    <span class="comment">// automatically.</span>
+    TLSNextProto map[<a href="../../builtin/index.html#string">string</a>]func(*<a href="index.html#Server">Server</a>, *<a href="../../crypto/tls/index.html">tls</a>.<a href="../../crypto/tls/index.html#Conn">Conn</a>, <a href="index.html#Handler">Handler</a>)
+
+<span id="Server.ConnState"></span>    <span class="comment">// ConnState specifies an optional callback function that is</span>
+    <span class="comment">// called when a client connection changes state. See the</span>
+    <span class="comment">// ConnState type and associated constants for details.</span>
+    ConnState func(<a href="../index.html">net</a>.<a href="../index.html#Conn">Conn</a>, <a href="index.html#ConnState">ConnState</a>)
+
+<span id="Server.ErrorLog"></span>    <span class="comment">// ErrorLog specifies an optional logger for errors accepting</span>
+    <span class="comment">// connections and unexpected behavior from handlers.</span>
+    <span class="comment">// If nil, logging goes to os.Stderr via the log package&#39;s</span>
+    <span class="comment">// standard logger.</span>
+    ErrorLog *<a href="../../log/index.html">log</a>.<a href="../../log/index.html#Logger">Logger</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Server.Close">func (*Server) <a href="../../../src/net/http/server.go%3Fs=73057:73089.html#L2408">Close</a>
+					<a class="permalink" href="index.html#Server.Close">&#xb6;</a>
+				</h3>
+				<pre>func (srv *<a href="index.html#Server">Server</a>) Close() <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+Close immediately closes all active net.Listeners and any
+connections in state StateNew, StateActive, or StateIdle. For a
+graceful shutdown, use Shutdown.
+</p>
+<p>
+Close does not attempt to close (and does not even know about)
+any hijacked connections, such as WebSockets.
+</p>
+<p>
+Close returns any error returned from closing the Server&#39;s
+underlying Listener(s).
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Server.ListenAndServe">func (*Server) <a href="../../../src/net/http/server.go%3Fs=77847:77888.html#L2566">ListenAndServe</a>
+					<a class="permalink" href="index.html#Server.ListenAndServe">&#xb6;</a>
+				</h3>
+				<pre>func (srv *<a href="index.html#Server">Server</a>) ListenAndServe() <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+ListenAndServe listens on the TCP network address srv.Addr and then
+calls Serve to handle requests on incoming connections.
+Accepted connections are configured to enable TCP keep-alives.
+If srv.Addr is blank, &#34;:http&#34; is used.
+ListenAndServe always returns a non-nil error.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Server.ListenAndServeTLS">func (*Server) <a href="../../../src/net/http/server.go%3Fs=85702:85770.html#L2827">ListenAndServeTLS</a>
+					<a class="permalink" href="index.html#Server.ListenAndServeTLS">&#xb6;</a>
+				</h3>
+				<pre>func (srv *<a href="index.html#Server">Server</a>) ListenAndServeTLS(certFile, keyFile <a href="../../builtin/index.html#string">string</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+ListenAndServeTLS listens on the TCP network address srv.Addr and
+then calls Serve to handle requests on incoming TLS connections.
+Accepted connections are configured to enable TCP keep-alives.
+</p>
+<p>
+Filenames containing a certificate and matching private key for the
+server must be provided if neither the Server&#39;s TLSConfig.Certificates
+nor TLSConfig.GetCertificate are populated. If the certificate is
+signed by a certificate authority, the certFile should be the
+concatenation of the server&#39;s certificate, any intermediates, and
+the CA&#39;s certificate.
+</p>
+<p>
+If srv.Addr is blank, &#34;:https&#34; is used.
+</p>
+<p>
+ListenAndServeTLS always returns a non-nil error.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Server.Serve">func (*Server) <a href="../../../src/net/http/server.go%3Fs=79791:79837.html#L2615">Serve</a>
+					<a class="permalink" href="index.html#Server.Serve">&#xb6;</a>
+				</h3>
+				<pre>func (srv *<a href="index.html#Server">Server</a>) Serve(l <a href="../index.html">net</a>.<a href="../index.html#Listener">Listener</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+Serve accepts incoming connections on the Listener l, creating a
+new service goroutine for each. The service goroutines read requests and
+then call srv.Handler to reply to them.
+</p>
+<p>
+For HTTP/2 support, srv.TLSConfig should be initialized to the
+provided listener&#39;s TLS Config before calling Serve. If
+srv.TLSConfig is non-nil and doesn&#39;t include the string &#34;h2&#34; in
+Config.NextProtos, HTTP/2 support is not enabled.
+</p>
+<p>
+Serve always returns a non-nil error. After Shutdown or Close, the
+returned error is ErrServerClosed.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Server.SetKeepAlivesEnabled">func (*Server) <a href="../../../src/net/http/server.go%3Fs=82285:82332.html#L2719">SetKeepAlivesEnabled</a>
+					<a class="permalink" href="index.html#Server.SetKeepAlivesEnabled">&#xb6;</a>
+				</h3>
+				<pre>func (srv *<a href="index.html#Server">Server</a>) SetKeepAlivesEnabled(v <a href="../../builtin/index.html#bool">bool</a>)</pre>
+				<p>
+SetKeepAlivesEnabled controls whether HTTP keep-alives are enabled.
+By default, keep-alives are always enabled. Only very
+resource-constrained environments or servers in the process of
+shutting down should disable them.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Server.Shutdown">func (*Server) <a href="../../../src/net/http/server.go%3Fs=74304:74358.html#L2440">Shutdown</a>
+					<a class="permalink" href="index.html#Server.Shutdown">&#xb6;</a>
+				</h3>
+				<pre>func (srv *<a href="index.html#Server">Server</a>) Shutdown(ctx <a href="../../context/index.html">context</a>.<a href="../../context/index.html#Context">Context</a>) <a href="../../builtin/index.html#error">error</a></pre>
+				<p>
+Shutdown gracefully shuts down the server without interrupting any
+active connections. Shutdown works by first closing all open
+listeners, then closing all idle connections, and then waiting
+indefinitely for connections to return to idle and then shut down.
+If the provided context expires before the shutdown is complete,
+then the context&#39;s error is returned.
+</p>
+<p>
+Shutdown does not attempt to close nor wait for hijacked
+connections such as WebSockets. The caller of Shutdown should
+separately notify such long-lived connections of shutdown and wait
+for them to close, if desired.
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Transport">type <a href="../../../src/net/http/transport.go%3Fs=2438:7678.html#L65">Transport</a>
+				<a class="permalink" href="index.html#Transport">&#xb6;</a>
+			</h2>
+			<p>
+Transport is an implementation of RoundTripper that supports HTTP,
+HTTPS, and HTTP proxies (for either HTTP or HTTPS with CONNECT).
+</p>
+<p>
+By default, Transport caches connections for future re-use.
+This may leave many open connections when accessing many hosts.
+This behavior can be managed using Transport&#39;s CloseIdleConnections method
+and the MaxIdleConnsPerHost and DisableKeepAlives fields.
+</p>
+<p>
+Transports should be reused instead of created as needed.
+Transports are safe for concurrent use by multiple goroutines.
+</p>
+<p>
+A Transport is a low-level primitive for making HTTP and HTTPS requests.
+For high-level functionality, such as cookies and redirects, see Client.
+</p>
+<p>
+Transport uses HTTP/1.1 for HTTP URLs and either HTTP/1.1 or HTTP/2
+for HTTPS URLs, depending on whether the server supports HTTP/2,
+and how the Transport is configured. The DefaultTransport supports HTTP/2.
+To explicitly enable HTTP/2 on a transport, use golang.org/x/net/http2
+and call ConfigureTransport. See the package docs for more about HTTP/2.
+</p>
+
+			<pre>type Transport struct {
+
+<span id="Transport.Proxy"></span>    <span class="comment">// Proxy specifies a function to return a proxy for a given</span>
+    <span class="comment">// Request. If the function returns a non-nil error, the</span>
+    <span class="comment">// request is aborted with the provided error.</span>
+    <span class="comment">// If Proxy is nil or returns a nil *URL, no proxy is used.</span>
+    Proxy func(*<a href="index.html#Request">Request</a>) (*<a href="../url/index.html">url</a>.<a href="../url/index.html#URL">URL</a>, <a href="../../builtin/index.html#error">error</a>)
+
+<span id="Transport.DialContext"></span>    <span class="comment">// DialContext specifies the dial function for creating unencrypted TCP connections.</span>
+    <span class="comment">// If DialContext is nil (and the deprecated Dial below is also nil),</span>
+    <span class="comment">// then the transport dials using package net.</span>
+    DialContext func(ctx <a href="../../context/index.html">context</a>.<a href="../../context/index.html#Context">Context</a>, network, addr <a href="../../builtin/index.html#string">string</a>) (<a href="../index.html">net</a>.<a href="../index.html#Conn">Conn</a>, <a href="../../builtin/index.html#error">error</a>)
+
+<span id="Transport.Dial"></span>    <span class="comment">// Dial specifies the dial function for creating unencrypted TCP connections.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Deprecated: Use DialContext instead, which allows the transport</span>
+    <span class="comment">// to cancel dials as soon as they are no longer needed.</span>
+    <span class="comment">// If both are set, DialContext takes priority.</span>
+    Dial func(network, addr <a href="../../builtin/index.html#string">string</a>) (<a href="../index.html">net</a>.<a href="../index.html#Conn">Conn</a>, <a href="../../builtin/index.html#error">error</a>)
+
+<span id="Transport.DialTLS"></span>    <span class="comment">// DialTLS specifies an optional dial function for creating</span>
+    <span class="comment">// TLS connections for non-proxied HTTPS requests.</span>
+    <span class="comment">//</span>
+    <span class="comment">// If DialTLS is nil, Dial and TLSClientConfig are used.</span>
+    <span class="comment">//</span>
+    <span class="comment">// If DialTLS is set, the Dial hook is not used for HTTPS</span>
+    <span class="comment">// requests and the TLSClientConfig and TLSHandshakeTimeout</span>
+    <span class="comment">// are ignored. The returned net.Conn is assumed to already be</span>
+    <span class="comment">// past the TLS handshake.</span>
+    DialTLS func(network, addr <a href="../../builtin/index.html#string">string</a>) (<a href="../index.html">net</a>.<a href="../index.html#Conn">Conn</a>, <a href="../../builtin/index.html#error">error</a>)
+
+<span id="Transport.TLSClientConfig"></span>    <span class="comment">// TLSClientConfig specifies the TLS configuration to use with</span>
+    <span class="comment">// tls.Client.</span>
+    <span class="comment">// If nil, the default configuration is used.</span>
+    <span class="comment">// If non-nil, HTTP/2 support may not be enabled by default.</span>
+    TLSClientConfig *<a href="../../crypto/tls/index.html">tls</a>.<a href="../../crypto/tls/index.html#Config">Config</a>
+
+<span id="Transport.TLSHandshakeTimeout"></span>    <span class="comment">// TLSHandshakeTimeout specifies the maximum amount of time waiting to</span>
+    <span class="comment">// wait for a TLS handshake. Zero means no timeout.</span>
+    TLSHandshakeTimeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+
+<span id="Transport.DisableKeepAlives"></span>    <span class="comment">// DisableKeepAlives, if true, prevents re-use of TCP connections</span>
+    <span class="comment">// between different HTTP requests.</span>
+    DisableKeepAlives <a href="../../builtin/index.html#bool">bool</a>
+
+<span id="Transport.DisableCompression"></span>    <span class="comment">// DisableCompression, if true, prevents the Transport from</span>
+    <span class="comment">// requesting compression with an &#34;Accept-Encoding: gzip&#34;</span>
+    <span class="comment">// request header when the Request contains no existing</span>
+    <span class="comment">// Accept-Encoding value. If the Transport requests gzip on</span>
+    <span class="comment">// its own and gets a gzipped response, it&#39;s transparently</span>
+    <span class="comment">// decoded in the Response.Body. However, if the user</span>
+    <span class="comment">// explicitly requested gzip it is not automatically</span>
+    <span class="comment">// uncompressed.</span>
+    DisableCompression <a href="../../builtin/index.html#bool">bool</a>
+
+<span id="Transport.MaxIdleConns"></span>    <span class="comment">// MaxIdleConns controls the maximum number of idle (keep-alive)</span>
+    <span class="comment">// connections across all hosts. Zero means no limit.</span>
+    MaxIdleConns <a href="../../builtin/index.html#int">int</a>
+
+<span id="Transport.MaxIdleConnsPerHost"></span>    <span class="comment">// MaxIdleConnsPerHost, if non-zero, controls the maximum idle</span>
+    <span class="comment">// (keep-alive) connections to keep per-host. If zero,</span>
+    <span class="comment">// DefaultMaxIdleConnsPerHost is used.</span>
+    MaxIdleConnsPerHost <a href="../../builtin/index.html#int">int</a>
+
+<span id="Transport.IdleConnTimeout"></span>    <span class="comment">// IdleConnTimeout is the maximum amount of time an idle</span>
+    <span class="comment">// (keep-alive) connection will remain idle before closing</span>
+    <span class="comment">// itself.</span>
+    <span class="comment">// Zero means no limit.</span>
+    IdleConnTimeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+
+<span id="Transport.ResponseHeaderTimeout"></span>    <span class="comment">// ResponseHeaderTimeout, if non-zero, specifies the amount of</span>
+    <span class="comment">// time to wait for a server&#39;s response headers after fully</span>
+    <span class="comment">// writing the request (including its body, if any). This</span>
+    <span class="comment">// time does not include the time to read the response body.</span>
+    ResponseHeaderTimeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+
+<span id="Transport.ExpectContinueTimeout"></span>    <span class="comment">// ExpectContinueTimeout, if non-zero, specifies the amount of</span>
+    <span class="comment">// time to wait for a server&#39;s first response headers after fully</span>
+    <span class="comment">// writing the request headers if the request has an</span>
+    <span class="comment">// &#34;Expect: 100-continue&#34; header. Zero means no timeout and</span>
+    <span class="comment">// causes the body to be sent immediately, without</span>
+    <span class="comment">// waiting for the server to approve.</span>
+    <span class="comment">// This time does not include the time to send the request header.</span>
+    ExpectContinueTimeout <a href="../../time/index.html">time</a>.<a href="../../time/index.html#Duration">Duration</a>
+
+<span id="Transport.TLSNextProto"></span>    <span class="comment">// TLSNextProto specifies how the Transport switches to an</span>
+    <span class="comment">// alternate protocol (such as HTTP/2) after a TLS NPN/ALPN</span>
+    <span class="comment">// protocol negotiation. If Transport dials an TLS connection</span>
+    <span class="comment">// with a non-empty protocol name and TLSNextProto contains a</span>
+    <span class="comment">// map entry for that key (such as &#34;h2&#34;), then the func is</span>
+    <span class="comment">// called with the request&#39;s authority (such as &#34;example.com&#34;</span>
+    <span class="comment">// or &#34;example.com:1234&#34;) and the TLS connection. The function</span>
+    <span class="comment">// must return a RoundTripper that then handles the request.</span>
+    <span class="comment">// If TLSNextProto is not nil, HTTP/2 support is not enabled</span>
+    <span class="comment">// automatically.</span>
+    TLSNextProto map[<a href="../../builtin/index.html#string">string</a>]func(authority <a href="../../builtin/index.html#string">string</a>, c *<a href="../../crypto/tls/index.html">tls</a>.<a href="../../crypto/tls/index.html#Conn">Conn</a>) <a href="index.html#RoundTripper">RoundTripper</a>
+
+<span id="Transport.ProxyConnectHeader"></span>    <span class="comment">// ProxyConnectHeader optionally specifies headers to send to</span>
+    <span class="comment">// proxies during CONNECT requests.</span>
+    ProxyConnectHeader <a href="index.html#Header">Header</a>
+
+<span id="Transport.MaxResponseHeaderBytes"></span>    <span class="comment">// MaxResponseHeaderBytes specifies a limit on how many</span>
+    <span class="comment">// response bytes are allowed in the server&#39;s response</span>
+    <span class="comment">// header.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Zero means to use a default limit.</span>
+    MaxResponseHeaderBytes <a href="../../builtin/index.html#int64">int64</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Transport.CancelRequest">func (*Transport) <a href="../../../src/net/http/transport.go%3Fs=17608:17655.html#L504">CancelRequest</a>
+					<a class="permalink" href="index.html#Transport.CancelRequest">&#xb6;</a>
+				</h3>
+				<pre>func (t *<a href="index.html#Transport">Transport</a>) CancelRequest(req *<a href="index.html#Request">Request</a>)</pre>
+				<p>
+CancelRequest cancels an in-flight request by closing its connection.
+CancelRequest should only be called after RoundTrip has returned.
+</p>
+<p>
+Deprecated: Use Request.WithContext to create a request with a
+cancelable context instead. CancelRequest cannot cancel HTTP/2
+requests.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Transport.CloseIdleConnections">func (*Transport) <a href="../../../src/net/http/transport.go%3Fs=16921:16963.html#L479">CloseIdleConnections</a>
+					<a class="permalink" href="index.html#Transport.CloseIdleConnections">&#xb6;</a>
+				</h3>
+				<pre>func (t *<a href="index.html#Transport">Transport</a>) CloseIdleConnections()</pre>
+				<p>
+CloseIdleConnections closes any connections which were previously
+connected from previous requests but are now sitting idle in
+a &#34;keep-alive&#34; state. It does not interrupt any connections currently
+in use.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Transport.RegisterProtocol">func (*Transport) <a href="../../../src/net/http/transport.go%3Fs=16298:16366.html#L460">RegisterProtocol</a>
+					<a class="permalink" href="index.html#Transport.RegisterProtocol">&#xb6;</a>
+				</h3>
+				<pre>func (t *<a href="index.html#Transport">Transport</a>) RegisterProtocol(scheme <a href="../../builtin/index.html#string">string</a>, rt <a href="index.html#RoundTripper">RoundTripper</a>)</pre>
+				<p>
+RegisterProtocol registers a new protocol with scheme.
+The Transport will pass requests using the given scheme to rt.
+It is rt&#39;s responsibility to simulate HTTP request semantics.
+</p>
+<p>
+RegisterProtocol can be used by other packages to provide
+implementations of protocol schemes like &#34;ftp&#34; or &#34;file&#34;.
+</p>
+<p>
+If rt.RoundTrip returns ErrSkipAltProtocol, the Transport will
+handle the RoundTrip itself for that one request, as if the
+protocol were not registered.
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Transport.RoundTrip">func (*Transport) <a href="../../../src/net/http/transport.go%3Fs=11576:11638.html#L309">RoundTrip</a>
+					<a class="permalink" href="index.html#Transport.RoundTrip">&#xb6;</a>
+				</h3>
+				<pre>func (t *<a href="index.html#Transport">Transport</a>) RoundTrip(req *<a href="index.html#Request">Request</a>) (*<a href="index.html#Response">Response</a>, <a href="../../builtin/index.html#error">error</a>)</pre>
+				<p>
+RoundTrip implements the RoundTripper interface.
+</p>
+<p>
+For higher-level HTTP client support (such as handling of cookies
+and redirects), see Get, Post, and the Client type.
+</p>
+
+				
+				
+				
+			
+		
+	
+
+	
+
+
+
+
+
+	
+	
+		<h2 id="pkg-subdirectories">Subdirectories</h2>
+	
+	
+
+
+	<div class="pkg-dir">
+		<table>
+			<tr>
+				<th class="pkg-name">Name</th>
+				<th class="pkg-synopsis">Synopsis</th>
+			</tr>
+
+			
+			<tr>
+				<td colspan="2"><a href="../index.html">..</a></td>
+			</tr>
+			
+
+			
+				
+					<tr>
+						<td class="pkg-name" style="padding-left: 0px;">
+							<a href="cgi/index.html">cgi</a>
+						</td>
+						<td class="pkg-synopsis">
+							Package cgi implements CGI (Common Gateway Interface) as specified in RFC 3875.
+						</td>
+					</tr>
+				
+			
+				
+					<tr>
+						<td class="pkg-name" style="padding-left: 0px;">
+							<a href="cookiejar/index.html">cookiejar</a>
+						</td>
+						<td class="pkg-synopsis">
+							Package cookiejar implements an in-memory RFC 6265-compliant http.CookieJar.
+						</td>
+					</tr>
+				
+			
+				
+					<tr>
+						<td class="pkg-name" style="padding-left: 0px;">
+							<a href="fcgi/index.html">fcgi</a>
+						</td>
+						<td class="pkg-synopsis">
+							Package fcgi implements the FastCGI protocol.
+						</td>
+					</tr>
+				
+			
+				
+					<tr>
+						<td class="pkg-name" style="padding-left: 0px;">
+							<a href="httptest/index.html">httptest</a>
+						</td>
+						<td class="pkg-synopsis">
+							Package httptest provides utilities for HTTP testing.
+						</td>
+					</tr>
+				
+			
+				
+					<tr>
+						<td class="pkg-name" style="padding-left: 0px;">
+							<a href="httptrace/index.html">httptrace</a>
+						</td>
+						<td class="pkg-synopsis">
+							Package httptrace provides mechanisms to trace the events within HTTP client requests.
+						</td>
+					</tr>
+				
+			
+				
+					<tr>
+						<td class="pkg-name" style="padding-left: 0px;">
+							<a href="httputil/index.html">httputil</a>
+						</td>
+						<td class="pkg-synopsis">
+							Package httputil provides HTTP utility functions, complementing the more common ones in the net/http package.
+						</td>
+					</tr>
+				
+			
+				
+					<tr>
+						<td class="pkg-name" style="padding-left: 0px;">
+							<a href="pprof/index.html">pprof</a>
+						</td>
+						<td class="pkg-synopsis">
+							Package pprof serves via its HTTP server runtime profiling data in the format expected by the pprof visualization tool.
+						</td>
+					</tr>
+				
+			
+		</table>
+	</div>
+
+
+	
+
+
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

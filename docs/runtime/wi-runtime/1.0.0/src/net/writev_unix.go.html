@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/writev_unix.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="writev_unix.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/net/writev_unix.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2016 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// +build darwin dragonfly freebsd linux netbsd openbsd</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package net
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;io&#34;
+<span id="L11" class="ln">    11	</span>	&#34;os&#34;
+<span id="L12" class="ln">    12	</span>	&#34;syscall&#34;
+<span id="L13" class="ln">    13	</span>	&#34;unsafe&#34;
+<span id="L14" class="ln">    14	</span>)
+<span id="L15" class="ln">    15	</span>
+<span id="L16" class="ln">    16	</span>func (c *conn) writeBuffers(v *Buffers) (int64, error) {
+<span id="L17" class="ln">    17	</span>	if !c.ok() {
+<span id="L18" class="ln">    18	</span>		return 0, syscall.EINVAL
+<span id="L19" class="ln">    19	</span>	}
+<span id="L20" class="ln">    20	</span>	n, err := c.fd.writeBuffers(v)
+<span id="L21" class="ln">    21	</span>	if err != nil {
+<span id="L22" class="ln">    22	</span>		return n, &amp;OpError{Op: &#34;writev&#34;, Net: c.fd.net, Source: c.fd.laddr, Addr: c.fd.raddr, Err: err}
+<span id="L23" class="ln">    23	</span>	}
+<span id="L24" class="ln">    24	</span>	return n, nil
+<span id="L25" class="ln">    25	</span>}
+<span id="L26" class="ln">    26	</span>
+<span id="L27" class="ln">    27	</span>func (fd *netFD) writeBuffers(v *Buffers) (n int64, err error) {
+<span id="L28" class="ln">    28	</span>	if err := fd.writeLock(); err != nil {
+<span id="L29" class="ln">    29	</span>		return 0, err
+<span id="L30" class="ln">    30	</span>	}
+<span id="L31" class="ln">    31	</span>	defer fd.writeUnlock()
+<span id="L32" class="ln">    32	</span>	if err := fd.pd.prepareWrite(); err != nil {
+<span id="L33" class="ln">    33	</span>		return 0, err
+<span id="L34" class="ln">    34	</span>	}
+<span id="L35" class="ln">    35	</span>
+<span id="L36" class="ln">    36	</span>	var iovecs []syscall.Iovec
+<span id="L37" class="ln">    37	</span>	if fd.iovecs != nil {
+<span id="L38" class="ln">    38	</span>		iovecs = *fd.iovecs
+<span id="L39" class="ln">    39	</span>	}
+<span id="L40" class="ln">    40	</span>	<span class="comment">// TODO: read from sysconf(_SC_IOV_MAX)? The Linux default is</span>
+<span id="L41" class="ln">    41	</span>	<span class="comment">// 1024 and this seems conservative enough for now. Darwin&#39;s</span>
+<span id="L42" class="ln">    42	</span>	<span class="comment">// UIO_MAXIOV also seems to be 1024.</span>
+<span id="L43" class="ln">    43	</span>	maxVec := 1024
+<span id="L44" class="ln">    44	</span>
+<span id="L45" class="ln">    45	</span>	for len(*v) &gt; 0 {
+<span id="L46" class="ln">    46	</span>		iovecs = iovecs[:0]
+<span id="L47" class="ln">    47	</span>		for _, chunk := range *v {
+<span id="L48" class="ln">    48	</span>			if len(chunk) == 0 {
+<span id="L49" class="ln">    49	</span>				continue
+<span id="L50" class="ln">    50	</span>			}
+<span id="L51" class="ln">    51	</span>			iovecs = append(iovecs, syscall.Iovec{Base: &amp;chunk[0]})
+<span id="L52" class="ln">    52	</span>			if fd.isStream &amp;&amp; len(chunk) &gt; 1&lt;&lt;30 {
+<span id="L53" class="ln">    53	</span>				iovecs[len(iovecs)-1].SetLen(1 &lt;&lt; 30)
+<span id="L54" class="ln">    54	</span>				break <span class="comment">// continue chunk on next writev</span>
+<span id="L55" class="ln">    55	</span>			}
+<span id="L56" class="ln">    56	</span>			iovecs[len(iovecs)-1].SetLen(len(chunk))
+<span id="L57" class="ln">    57	</span>			if len(iovecs) == maxVec {
+<span id="L58" class="ln">    58	</span>				break
+<span id="L59" class="ln">    59	</span>			}
+<span id="L60" class="ln">    60	</span>		}
+<span id="L61" class="ln">    61	</span>		if len(iovecs) == 0 {
+<span id="L62" class="ln">    62	</span>			break
+<span id="L63" class="ln">    63	</span>		}
+<span id="L64" class="ln">    64	</span>		fd.iovecs = &amp;iovecs <span class="comment">// cache</span>
+<span id="L65" class="ln">    65	</span>
+<span id="L66" class="ln">    66	</span>		wrote, _, e0 := syscall.Syscall(syscall.SYS_WRITEV,
+<span id="L67" class="ln">    67	</span>			uintptr(fd.sysfd),
+<span id="L68" class="ln">    68	</span>			uintptr(unsafe.Pointer(&amp;iovecs[0])),
+<span id="L69" class="ln">    69	</span>			uintptr(len(iovecs)))
+<span id="L70" class="ln">    70	</span>		if wrote == ^uintptr(0) {
+<span id="L71" class="ln">    71	</span>			wrote = 0
+<span id="L72" class="ln">    72	</span>		}
+<span id="L73" class="ln">    73	</span>		testHookDidWritev(int(wrote))
+<span id="L74" class="ln">    74	</span>		n += int64(wrote)
+<span id="L75" class="ln">    75	</span>		v.consume(int64(wrote))
+<span id="L76" class="ln">    76	</span>		if e0 == syscall.EAGAIN {
+<span id="L77" class="ln">    77	</span>			if err = fd.pd.waitWrite(); err == nil {
+<span id="L78" class="ln">    78	</span>				continue
+<span id="L79" class="ln">    79	</span>			}
+<span id="L80" class="ln">    80	</span>		} else if e0 != 0 {
+<span id="L81" class="ln">    81	</span>			err = syscall.Errno(e0)
+<span id="L82" class="ln">    82	</span>		}
+<span id="L83" class="ln">    83	</span>		if err != nil {
+<span id="L84" class="ln">    84	</span>			break
+<span id="L85" class="ln">    85	</span>		}
+<span id="L86" class="ln">    86	</span>		if n == 0 {
+<span id="L87" class="ln">    87	</span>			err = io.ErrUnexpectedEOF
+<span id="L88" class="ln">    88	</span>			break
+<span id="L89" class="ln">    89	</span>		}
+<span id="L90" class="ln">    90	</span>	}
+<span id="L91" class="ln">    91	</span>	if _, ok := err.(syscall.Errno); ok {
+<span id="L92" class="ln">    92	</span>		err = os.NewSyscallError(&#34;writev&#34;, err)
+<span id="L93" class="ln">    93	</span>	}
+<span id="L94" class="ln">    94	</span>	return n, err
+<span id="L95" class="ln">    95	</span>}
+<span id="L96" class="ln">    96	</span>
+</pre><p><a href="writev_unix.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

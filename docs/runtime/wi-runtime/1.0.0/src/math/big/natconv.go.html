@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/natconv.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="natconv.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/math/big/natconv.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2015 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// This file implements nat-to-string conversion functions.</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package big
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;errors&#34;
+<span id="L11" class="ln">    11	</span>	&#34;fmt&#34;
+<span id="L12" class="ln">    12	</span>	&#34;io&#34;
+<span id="L13" class="ln">    13	</span>	&#34;math&#34;
+<span id="L14" class="ln">    14	</span>	&#34;sync&#34;
+<span id="L15" class="ln">    15	</span>)
+<span id="L16" class="ln">    16	</span>
+<span id="L17" class="ln">    17	</span>const digits = &#34;0123456789abcdefghijklmnopqrstuvwxyz&#34;
+<span id="L18" class="ln">    18	</span>
+<span id="L19" class="ln">    19	</span><span class="comment">// Note: MaxBase = len(digits), but it must remain a rune constant</span>
+<span id="L20" class="ln">    20	</span><span class="comment">//       for API compatibility.</span>
+<span id="L21" class="ln">    21	</span>
+<span id="L22" class="ln">    22	</span><span class="comment">// MaxBase is the largest number base accepted for string conversions.</span>
+<span id="L23" class="ln">    23	</span>const MaxBase = &#39;z&#39; - &#39;a&#39; + 10 + 1
+<span id="L24" class="ln">    24	</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// maxPow returns (b**n, n) such that b**n is the largest power b**n &lt;= _M.</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// For instance maxPow(10) == (1e19, 19) for 19 decimal digits in a 64bit Word.</span>
+<span id="L27" class="ln">    27	</span><span class="comment">// In other words, at most n digits in base b fit into a Word.</span>
+<span id="L28" class="ln">    28	</span><span class="comment">// TODO(gri) replace this with a table, generated at build time.</span>
+<span id="L29" class="ln">    29	</span>func maxPow(b Word) (p Word, n int) {
+<span id="L30" class="ln">    30	</span>	p, n = b, 1 <span class="comment">// assuming b &lt;= _M</span>
+<span id="L31" class="ln">    31	</span>	for max := _M / b; p &lt;= max; {
+<span id="L32" class="ln">    32	</span>		<span class="comment">// p == b**n &amp;&amp; p &lt;= max</span>
+<span id="L33" class="ln">    33	</span>		p *= b
+<span id="L34" class="ln">    34	</span>		n++
+<span id="L35" class="ln">    35	</span>	}
+<span id="L36" class="ln">    36	</span>	<span class="comment">// p == b**n &amp;&amp; p &lt;= _M</span>
+<span id="L37" class="ln">    37	</span>	return
+<span id="L38" class="ln">    38	</span>}
+<span id="L39" class="ln">    39	</span>
+<span id="L40" class="ln">    40	</span><span class="comment">// pow returns x**n for n &gt; 0, and 1 otherwise.</span>
+<span id="L41" class="ln">    41	</span>func pow(x Word, n int) (p Word) {
+<span id="L42" class="ln">    42	</span>	<span class="comment">// n == sum of bi * 2**i, for 0 &lt;= i &lt; imax, and bi is 0 or 1</span>
+<span id="L43" class="ln">    43	</span>	<span class="comment">// thus x**n == product of x**(2**i) for all i where bi == 1</span>
+<span id="L44" class="ln">    44	</span>	<span class="comment">// (Russian Peasant Method for exponentiation)</span>
+<span id="L45" class="ln">    45	</span>	p = 1
+<span id="L46" class="ln">    46	</span>	for n &gt; 0 {
+<span id="L47" class="ln">    47	</span>		if n&amp;1 != 0 {
+<span id="L48" class="ln">    48	</span>			p *= x
+<span id="L49" class="ln">    49	</span>		}
+<span id="L50" class="ln">    50	</span>		x *= x
+<span id="L51" class="ln">    51	</span>		n &gt;&gt;= 1
+<span id="L52" class="ln">    52	</span>	}
+<span id="L53" class="ln">    53	</span>	return
+<span id="L54" class="ln">    54	</span>}
+<span id="L55" class="ln">    55	</span>
+<span id="L56" class="ln">    56	</span><span class="comment">// scan scans the number corresponding to the longest possible prefix</span>
+<span id="L57" class="ln">    57	</span><span class="comment">// from r representing an unsigned number in a given conversion base.</span>
+<span id="L58" class="ln">    58	</span><span class="comment">// It returns the corresponding natural number res, the actual base b,</span>
+<span id="L59" class="ln">    59	</span><span class="comment">// a digit count, and a read or syntax error err, if any.</span>
+<span id="L60" class="ln">    60	</span><span class="comment">//</span>
+<span id="L61" class="ln">    61	</span><span class="comment">//	number   = [ prefix ] mantissa .</span>
+<span id="L62" class="ln">    62	</span><span class="comment">//	prefix   = &#34;0&#34; [ &#34;x&#34; | &#34;X&#34; | &#34;b&#34; | &#34;B&#34; ] .</span>
+<span id="L63" class="ln">    63	</span><span class="comment">//      mantissa = digits | digits &#34;.&#34; [ digits ] | &#34;.&#34; digits .</span>
+<span id="L64" class="ln">    64	</span><span class="comment">//	digits   = digit { digit } .</span>
+<span id="L65" class="ln">    65	</span><span class="comment">//	digit    = &#34;0&#34; ... &#34;9&#34; | &#34;a&#34; ... &#34;z&#34; | &#34;A&#34; ... &#34;Z&#34; .</span>
+<span id="L66" class="ln">    66	</span><span class="comment">//</span>
+<span id="L67" class="ln">    67	</span><span class="comment">// Unless fracOk is set, the base argument must be 0 or a value between</span>
+<span id="L68" class="ln">    68	</span><span class="comment">// 2 and MaxBase. If fracOk is set, the base argument must be one of</span>
+<span id="L69" class="ln">    69	</span><span class="comment">// 0, 2, 10, or 16. Providing an invalid base argument leads to a run-</span>
+<span id="L70" class="ln">    70	</span><span class="comment">// time panic.</span>
+<span id="L71" class="ln">    71	</span><span class="comment">//</span>
+<span id="L72" class="ln">    72	</span><span class="comment">// For base 0, the number prefix determines the actual base: A prefix of</span>
+<span id="L73" class="ln">    73	</span><span class="comment">// ``0x&#39;&#39; or ``0X&#39;&#39; selects base 16; if fracOk is not set, the ``0&#39;&#39; prefix</span>
+<span id="L74" class="ln">    74	</span><span class="comment">// selects base 8, and a ``0b&#39;&#39; or ``0B&#39;&#39; prefix selects base 2. Otherwise</span>
+<span id="L75" class="ln">    75	</span><span class="comment">// the selected base is 10 and no prefix is accepted.</span>
+<span id="L76" class="ln">    76	</span><span class="comment">//</span>
+<span id="L77" class="ln">    77	</span><span class="comment">// If fracOk is set, an octal prefix is ignored (a leading ``0&#39;&#39; simply</span>
+<span id="L78" class="ln">    78	</span><span class="comment">// stands for a zero digit), and a period followed by a fractional part</span>
+<span id="L79" class="ln">    79	</span><span class="comment">// is permitted. The result value is computed as if there were no period</span>
+<span id="L80" class="ln">    80	</span><span class="comment">// present; and the count value is used to determine the fractional part.</span>
+<span id="L81" class="ln">    81	</span><span class="comment">//</span>
+<span id="L82" class="ln">    82	</span><span class="comment">// A result digit count &gt; 0 corresponds to the number of (non-prefix) digits</span>
+<span id="L83" class="ln">    83	</span><span class="comment">// parsed. A digit count &lt;= 0 indicates the presence of a period (if fracOk</span>
+<span id="L84" class="ln">    84	</span><span class="comment">// is set, only), and -count is the number of fractional digits found.</span>
+<span id="L85" class="ln">    85	</span><span class="comment">// In this case, the actual value of the scanned number is res * b**count.</span>
+<span id="L86" class="ln">    86	</span><span class="comment">//</span>
+<span id="L87" class="ln">    87	</span>func (z nat) scan(r io.ByteScanner, base int, fracOk bool) (res nat, b, count int, err error) {
+<span id="L88" class="ln">    88	</span>	<span class="comment">// reject illegal bases</span>
+<span id="L89" class="ln">    89	</span>	baseOk := base == 0 ||
+<span id="L90" class="ln">    90	</span>		!fracOk &amp;&amp; 2 &lt;= base &amp;&amp; base &lt;= MaxBase ||
+<span id="L91" class="ln">    91	</span>		fracOk &amp;&amp; (base == 2 || base == 10 || base == 16)
+<span id="L92" class="ln">    92	</span>	if !baseOk {
+<span id="L93" class="ln">    93	</span>		panic(fmt.Sprintf(&#34;illegal number base %d&#34;, base))
+<span id="L94" class="ln">    94	</span>	}
+<span id="L95" class="ln">    95	</span>
+<span id="L96" class="ln">    96	</span>	<span class="comment">// one char look-ahead</span>
+<span id="L97" class="ln">    97	</span>	ch, err := r.ReadByte()
+<span id="L98" class="ln">    98	</span>	if err != nil {
+<span id="L99" class="ln">    99	</span>		return
+<span id="L100" class="ln">   100	</span>	}
+<span id="L101" class="ln">   101	</span>
+<span id="L102" class="ln">   102	</span>	<span class="comment">// determine actual base</span>
+<span id="L103" class="ln">   103	</span>	b = base
+<span id="L104" class="ln">   104	</span>	if base == 0 {
+<span id="L105" class="ln">   105	</span>		<span class="comment">// actual base is 10 unless there&#39;s a base prefix</span>
+<span id="L106" class="ln">   106	</span>		b = 10
+<span id="L107" class="ln">   107	</span>		if ch == &#39;0&#39; {
+<span id="L108" class="ln">   108	</span>			count = 1
+<span id="L109" class="ln">   109	</span>			switch ch, err = r.ReadByte(); err {
+<span id="L110" class="ln">   110	</span>			case nil:
+<span id="L111" class="ln">   111	</span>				<span class="comment">// possibly one of 0x, 0X, 0b, 0B</span>
+<span id="L112" class="ln">   112	</span>				if !fracOk {
+<span id="L113" class="ln">   113	</span>					b = 8
+<span id="L114" class="ln">   114	</span>				}
+<span id="L115" class="ln">   115	</span>				switch ch {
+<span id="L116" class="ln">   116	</span>				case &#39;x&#39;, &#39;X&#39;:
+<span id="L117" class="ln">   117	</span>					b = 16
+<span id="L118" class="ln">   118	</span>				case &#39;b&#39;, &#39;B&#39;:
+<span id="L119" class="ln">   119	</span>					b = 2
+<span id="L120" class="ln">   120	</span>				}
+<span id="L121" class="ln">   121	</span>				switch b {
+<span id="L122" class="ln">   122	</span>				case 16, 2:
+<span id="L123" class="ln">   123	</span>					count = 0 <span class="comment">// prefix is not counted</span>
+<span id="L124" class="ln">   124	</span>					if ch, err = r.ReadByte(); err != nil {
+<span id="L125" class="ln">   125	</span>						<span class="comment">// io.EOF is also an error in this case</span>
+<span id="L126" class="ln">   126	</span>						return
+<span id="L127" class="ln">   127	</span>					}
+<span id="L128" class="ln">   128	</span>				case 8:
+<span id="L129" class="ln">   129	</span>					count = 0 <span class="comment">// prefix is not counted</span>
+<span id="L130" class="ln">   130	</span>				}
+<span id="L131" class="ln">   131	</span>			case io.EOF:
+<span id="L132" class="ln">   132	</span>				<span class="comment">// input is &#34;0&#34;</span>
+<span id="L133" class="ln">   133	</span>				res = z[:0]
+<span id="L134" class="ln">   134	</span>				err = nil
+<span id="L135" class="ln">   135	</span>				return
+<span id="L136" class="ln">   136	</span>			default:
+<span id="L137" class="ln">   137	</span>				<span class="comment">// read error</span>
+<span id="L138" class="ln">   138	</span>				return
+<span id="L139" class="ln">   139	</span>			}
+<span id="L140" class="ln">   140	</span>		}
+<span id="L141" class="ln">   141	</span>	}
+<span id="L142" class="ln">   142	</span>
+<span id="L143" class="ln">   143	</span>	<span class="comment">// convert string</span>
+<span id="L144" class="ln">   144	</span>	<span class="comment">// Algorithm: Collect digits in groups of at most n digits in di</span>
+<span id="L145" class="ln">   145	</span>	<span class="comment">// and then use mulAddWW for every such group to add them to the</span>
+<span id="L146" class="ln">   146	</span>	<span class="comment">// result.</span>
+<span id="L147" class="ln">   147	</span>	z = z[:0]
+<span id="L148" class="ln">   148	</span>	b1 := Word(b)
+<span id="L149" class="ln">   149	</span>	bn, n := maxPow(b1) <span class="comment">// at most n digits in base b1 fit into Word</span>
+<span id="L150" class="ln">   150	</span>	di := Word(0)       <span class="comment">// 0 &lt;= di &lt; b1**i &lt; bn</span>
+<span id="L151" class="ln">   151	</span>	i := 0              <span class="comment">// 0 &lt;= i &lt; n</span>
+<span id="L152" class="ln">   152	</span>	dp := -1            <span class="comment">// position of decimal point</span>
+<span id="L153" class="ln">   153	</span>	for {
+<span id="L154" class="ln">   154	</span>		if fracOk &amp;&amp; ch == &#39;.&#39; {
+<span id="L155" class="ln">   155	</span>			fracOk = false
+<span id="L156" class="ln">   156	</span>			dp = count
+<span id="L157" class="ln">   157	</span>			<span class="comment">// advance</span>
+<span id="L158" class="ln">   158	</span>			if ch, err = r.ReadByte(); err != nil {
+<span id="L159" class="ln">   159	</span>				if err == io.EOF {
+<span id="L160" class="ln">   160	</span>					err = nil
+<span id="L161" class="ln">   161	</span>					break
+<span id="L162" class="ln">   162	</span>				}
+<span id="L163" class="ln">   163	</span>				return
+<span id="L164" class="ln">   164	</span>			}
+<span id="L165" class="ln">   165	</span>		}
+<span id="L166" class="ln">   166	</span>
+<span id="L167" class="ln">   167	</span>		<span class="comment">// convert rune into digit value d1</span>
+<span id="L168" class="ln">   168	</span>		var d1 Word
+<span id="L169" class="ln">   169	</span>		switch {
+<span id="L170" class="ln">   170	</span>		case &#39;0&#39; &lt;= ch &amp;&amp; ch &lt;= &#39;9&#39;:
+<span id="L171" class="ln">   171	</span>			d1 = Word(ch - &#39;0&#39;)
+<span id="L172" class="ln">   172	</span>		case &#39;a&#39; &lt;= ch &amp;&amp; ch &lt;= &#39;z&#39;:
+<span id="L173" class="ln">   173	</span>			d1 = Word(ch - &#39;a&#39; + 10)
+<span id="L174" class="ln">   174	</span>		case &#39;A&#39; &lt;= ch &amp;&amp; ch &lt;= &#39;Z&#39;:
+<span id="L175" class="ln">   175	</span>			d1 = Word(ch - &#39;A&#39; + 10)
+<span id="L176" class="ln">   176	</span>		default:
+<span id="L177" class="ln">   177	</span>			d1 = MaxBase + 1
+<span id="L178" class="ln">   178	</span>		}
+<span id="L179" class="ln">   179	</span>		if d1 &gt;= b1 {
+<span id="L180" class="ln">   180	</span>			r.UnreadByte() <span class="comment">// ch does not belong to number anymore</span>
+<span id="L181" class="ln">   181	</span>			break
+<span id="L182" class="ln">   182	</span>		}
+<span id="L183" class="ln">   183	</span>		count++
+<span id="L184" class="ln">   184	</span>
+<span id="L185" class="ln">   185	</span>		<span class="comment">// collect d1 in di</span>
+<span id="L186" class="ln">   186	</span>		di = di*b1 + d1
+<span id="L187" class="ln">   187	</span>		i++
+<span id="L188" class="ln">   188	</span>
+<span id="L189" class="ln">   189	</span>		<span class="comment">// if di is &#34;full&#34;, add it to the result</span>
+<span id="L190" class="ln">   190	</span>		if i == n {
+<span id="L191" class="ln">   191	</span>			z = z.mulAddWW(z, bn, di)
+<span id="L192" class="ln">   192	</span>			di = 0
+<span id="L193" class="ln">   193	</span>			i = 0
+<span id="L194" class="ln">   194	</span>		}
+<span id="L195" class="ln">   195	</span>
+<span id="L196" class="ln">   196	</span>		<span class="comment">// advance</span>
+<span id="L197" class="ln">   197	</span>		if ch, err = r.ReadByte(); err != nil {
+<span id="L198" class="ln">   198	</span>			if err == io.EOF {
+<span id="L199" class="ln">   199	</span>				err = nil
+<span id="L200" class="ln">   200	</span>				break
+<span id="L201" class="ln">   201	</span>			}
+<span id="L202" class="ln">   202	</span>			return
+<span id="L203" class="ln">   203	</span>		}
+<span id="L204" class="ln">   204	</span>	}
+<span id="L205" class="ln">   205	</span>
+<span id="L206" class="ln">   206	</span>	if count == 0 {
+<span id="L207" class="ln">   207	</span>		<span class="comment">// no digits found</span>
+<span id="L208" class="ln">   208	</span>		switch {
+<span id="L209" class="ln">   209	</span>		case base == 0 &amp;&amp; b == 8:
+<span id="L210" class="ln">   210	</span>			<span class="comment">// there was only the octal prefix 0 (possibly followed by digits &gt; 7);</span>
+<span id="L211" class="ln">   211	</span>			<span class="comment">// count as one digit and return base 10, not 8</span>
+<span id="L212" class="ln">   212	</span>			count = 1
+<span id="L213" class="ln">   213	</span>			b = 10
+<span id="L214" class="ln">   214	</span>		case base != 0 || b != 8:
+<span id="L215" class="ln">   215	</span>			<span class="comment">// there was neither a mantissa digit nor the octal prefix 0</span>
+<span id="L216" class="ln">   216	</span>			err = errors.New(&#34;syntax error scanning number&#34;)
+<span id="L217" class="ln">   217	</span>		}
+<span id="L218" class="ln">   218	</span>		return
+<span id="L219" class="ln">   219	</span>	}
+<span id="L220" class="ln">   220	</span>	<span class="comment">// count &gt; 0</span>
+<span id="L221" class="ln">   221	</span>
+<span id="L222" class="ln">   222	</span>	<span class="comment">// add remaining digits to result</span>
+<span id="L223" class="ln">   223	</span>	if i &gt; 0 {
+<span id="L224" class="ln">   224	</span>		z = z.mulAddWW(z, pow(b1, i), di)
+<span id="L225" class="ln">   225	</span>	}
+<span id="L226" class="ln">   226	</span>	res = z.norm()
+<span id="L227" class="ln">   227	</span>
+<span id="L228" class="ln">   228	</span>	<span class="comment">// adjust for fraction, if any</span>
+<span id="L229" class="ln">   229	</span>	if dp &gt;= 0 {
+<span id="L230" class="ln">   230	</span>		<span class="comment">// 0 &lt;= dp &lt;= count &gt; 0</span>
+<span id="L231" class="ln">   231	</span>		count = dp - count
+<span id="L232" class="ln">   232	</span>	}
+<span id="L233" class="ln">   233	</span>
+<span id="L234" class="ln">   234	</span>	return
+<span id="L235" class="ln">   235	</span>}
+<span id="L236" class="ln">   236	</span>
+<span id="L237" class="ln">   237	</span><span class="comment">// utoa converts x to an ASCII representation in the given base;</span>
+<span id="L238" class="ln">   238	</span><span class="comment">// base must be between 2 and MaxBase, inclusive.</span>
+<span id="L239" class="ln">   239	</span>func (x nat) utoa(base int) []byte {
+<span id="L240" class="ln">   240	</span>	return x.itoa(false, base)
+<span id="L241" class="ln">   241	</span>}
+<span id="L242" class="ln">   242	</span>
+<span id="L243" class="ln">   243	</span><span class="comment">// itoa is like utoa but it prepends a &#39;-&#39; if neg &amp;&amp; x != 0.</span>
+<span id="L244" class="ln">   244	</span>func (x nat) itoa(neg bool, base int) []byte {
+<span id="L245" class="ln">   245	</span>	if base &lt; 2 || base &gt; MaxBase {
+<span id="L246" class="ln">   246	</span>		panic(&#34;invalid base&#34;)
+<span id="L247" class="ln">   247	</span>	}
+<span id="L248" class="ln">   248	</span>
+<span id="L249" class="ln">   249	</span>	<span class="comment">// x == 0</span>
+<span id="L250" class="ln">   250	</span>	if len(x) == 0 {
+<span id="L251" class="ln">   251	</span>		return []byte(&#34;0&#34;)
+<span id="L252" class="ln">   252	</span>	}
+<span id="L253" class="ln">   253	</span>	<span class="comment">// len(x) &gt; 0</span>
+<span id="L254" class="ln">   254	</span>
+<span id="L255" class="ln">   255	</span>	<span class="comment">// allocate buffer for conversion</span>
+<span id="L256" class="ln">   256	</span>	i := int(float64(x.bitLen())/math.Log2(float64(base))) + 1 <span class="comment">// off by 1 at most</span>
+<span id="L257" class="ln">   257	</span>	if neg {
+<span id="L258" class="ln">   258	</span>		i++
+<span id="L259" class="ln">   259	</span>	}
+<span id="L260" class="ln">   260	</span>	s := make([]byte, i)
+<span id="L261" class="ln">   261	</span>
+<span id="L262" class="ln">   262	</span>	<span class="comment">// convert power of two and non power of two bases separately</span>
+<span id="L263" class="ln">   263	</span>	if b := Word(base); b == b&amp;-b {
+<span id="L264" class="ln">   264	</span>		<span class="comment">// shift is base b digit size in bits</span>
+<span id="L265" class="ln">   265	</span>		shift := trailingZeroBits(b) <span class="comment">// shift &gt; 0 because b &gt;= 2</span>
+<span id="L266" class="ln">   266	</span>		mask := Word(1&lt;&lt;shift - 1)
+<span id="L267" class="ln">   267	</span>		w := x[0]         <span class="comment">// current word</span>
+<span id="L268" class="ln">   268	</span>		nbits := uint(_W) <span class="comment">// number of unprocessed bits in w</span>
+<span id="L269" class="ln">   269	</span>
+<span id="L270" class="ln">   270	</span>		<span class="comment">// convert less-significant words (include leading zeros)</span>
+<span id="L271" class="ln">   271	</span>		for k := 1; k &lt; len(x); k++ {
+<span id="L272" class="ln">   272	</span>			<span class="comment">// convert full digits</span>
+<span id="L273" class="ln">   273	</span>			for nbits &gt;= shift {
+<span id="L274" class="ln">   274	</span>				i--
+<span id="L275" class="ln">   275	</span>				s[i] = digits[w&amp;mask]
+<span id="L276" class="ln">   276	</span>				w &gt;&gt;= shift
+<span id="L277" class="ln">   277	</span>				nbits -= shift
+<span id="L278" class="ln">   278	</span>			}
+<span id="L279" class="ln">   279	</span>
+<span id="L280" class="ln">   280	</span>			<span class="comment">// convert any partial leading digit and advance to next word</span>
+<span id="L281" class="ln">   281	</span>			if nbits == 0 {
+<span id="L282" class="ln">   282	</span>				<span class="comment">// no partial digit remaining, just advance</span>
+<span id="L283" class="ln">   283	</span>				w = x[k]
+<span id="L284" class="ln">   284	</span>				nbits = _W
+<span id="L285" class="ln">   285	</span>			} else {
+<span id="L286" class="ln">   286	</span>				<span class="comment">// partial digit in current word w (== x[k-1]) and next word x[k]</span>
+<span id="L287" class="ln">   287	</span>				w |= x[k] &lt;&lt; nbits
+<span id="L288" class="ln">   288	</span>				i--
+<span id="L289" class="ln">   289	</span>				s[i] = digits[w&amp;mask]
+<span id="L290" class="ln">   290	</span>
+<span id="L291" class="ln">   291	</span>				<span class="comment">// advance</span>
+<span id="L292" class="ln">   292	</span>				w = x[k] &gt;&gt; (shift - nbits)
+<span id="L293" class="ln">   293	</span>				nbits = _W - (shift - nbits)
+<span id="L294" class="ln">   294	</span>			}
+<span id="L295" class="ln">   295	</span>		}
+<span id="L296" class="ln">   296	</span>
+<span id="L297" class="ln">   297	</span>		<span class="comment">// convert digits of most-significant word w (omit leading zeros)</span>
+<span id="L298" class="ln">   298	</span>		for w != 0 {
+<span id="L299" class="ln">   299	</span>			i--
+<span id="L300" class="ln">   300	</span>			s[i] = digits[w&amp;mask]
+<span id="L301" class="ln">   301	</span>			w &gt;&gt;= shift
+<span id="L302" class="ln">   302	</span>		}
+<span id="L303" class="ln">   303	</span>
+<span id="L304" class="ln">   304	</span>	} else {
+<span id="L305" class="ln">   305	</span>		bb, ndigits := maxPow(b)
+<span id="L306" class="ln">   306	</span>
+<span id="L307" class="ln">   307	</span>		<span class="comment">// construct table of successive squares of bb*leafSize to use in subdivisions</span>
+<span id="L308" class="ln">   308	</span>		<span class="comment">// result (table != nil) &lt;=&gt; (len(x) &gt; leafSize &gt; 0)</span>
+<span id="L309" class="ln">   309	</span>		table := divisors(len(x), b, ndigits, bb)
+<span id="L310" class="ln">   310	</span>
+<span id="L311" class="ln">   311	</span>		<span class="comment">// preserve x, create local copy for use by convertWords</span>
+<span id="L312" class="ln">   312	</span>		q := nat(nil).set(x)
+<span id="L313" class="ln">   313	</span>
+<span id="L314" class="ln">   314	</span>		<span class="comment">// convert q to string s in base b</span>
+<span id="L315" class="ln">   315	</span>		q.convertWords(s, b, ndigits, bb, table)
+<span id="L316" class="ln">   316	</span>
+<span id="L317" class="ln">   317	</span>		<span class="comment">// strip leading zeros</span>
+<span id="L318" class="ln">   318	</span>		<span class="comment">// (x != 0; thus s must contain at least one non-zero digit</span>
+<span id="L319" class="ln">   319	</span>		<span class="comment">// and the loop will terminate)</span>
+<span id="L320" class="ln">   320	</span>		i = 0
+<span id="L321" class="ln">   321	</span>		for s[i] == &#39;0&#39; {
+<span id="L322" class="ln">   322	</span>			i++
+<span id="L323" class="ln">   323	</span>		}
+<span id="L324" class="ln">   324	</span>	}
+<span id="L325" class="ln">   325	</span>
+<span id="L326" class="ln">   326	</span>	if neg {
+<span id="L327" class="ln">   327	</span>		i--
+<span id="L328" class="ln">   328	</span>		s[i] = &#39;-&#39;
+<span id="L329" class="ln">   329	</span>	}
+<span id="L330" class="ln">   330	</span>
+<span id="L331" class="ln">   331	</span>	return s[i:]
+<span id="L332" class="ln">   332	</span>}
+<span id="L333" class="ln">   333	</span>
+<span id="L334" class="ln">   334	</span><span class="comment">// Convert words of q to base b digits in s. If q is large, it is recursively &#34;split in half&#34;</span>
+<span id="L335" class="ln">   335	</span><span class="comment">// by nat/nat division using tabulated divisors. Otherwise, it is converted iteratively using</span>
+<span id="L336" class="ln">   336	</span><span class="comment">// repeated nat/Word division.</span>
+<span id="L337" class="ln">   337	</span><span class="comment">//</span>
+<span id="L338" class="ln">   338	</span><span class="comment">// The iterative method processes n Words by n divW() calls, each of which visits every Word in the</span>
+<span id="L339" class="ln">   339	</span><span class="comment">// incrementally shortened q for a total of n + (n-1) + (n-2) ... + 2 + 1, or n(n+1)/2 divW()&#39;s.</span>
+<span id="L340" class="ln">   340	</span><span class="comment">// Recursive conversion divides q by its approximate square root, yielding two parts, each half</span>
+<span id="L341" class="ln">   341	</span><span class="comment">// the size of q. Using the iterative method on both halves means 2 * (n/2)(n/2 + 1)/2 divW()&#39;s</span>
+<span id="L342" class="ln">   342	</span><span class="comment">// plus the expensive long div(). Asymptotically, the ratio is favorable at 1/2 the divW()&#39;s, and</span>
+<span id="L343" class="ln">   343	</span><span class="comment">// is made better by splitting the subblocks recursively. Best is to split blocks until one more</span>
+<span id="L344" class="ln">   344	</span><span class="comment">// split would take longer (because of the nat/nat div()) than the twice as many divW()&#39;s of the</span>
+<span id="L345" class="ln">   345	</span><span class="comment">// iterative approach. This threshold is represented by leafSize. Benchmarking of leafSize in the</span>
+<span id="L346" class="ln">   346	</span><span class="comment">// range 2..64 shows that values of 8 and 16 work well, with a 4x speedup at medium lengths and</span>
+<span id="L347" class="ln">   347	</span><span class="comment">// ~30x for 20000 digits. Use nat_test.go&#39;s BenchmarkLeafSize tests to optimize leafSize for</span>
+<span id="L348" class="ln">   348	</span><span class="comment">// specific hardware.</span>
+<span id="L349" class="ln">   349	</span><span class="comment">//</span>
+<span id="L350" class="ln">   350	</span>func (q nat) convertWords(s []byte, b Word, ndigits int, bb Word, table []divisor) {
+<span id="L351" class="ln">   351	</span>	<span class="comment">// split larger blocks recursively</span>
+<span id="L352" class="ln">   352	</span>	if table != nil {
+<span id="L353" class="ln">   353	</span>		<span class="comment">// len(q) &gt; leafSize &gt; 0</span>
+<span id="L354" class="ln">   354	</span>		var r nat
+<span id="L355" class="ln">   355	</span>		index := len(table) - 1
+<span id="L356" class="ln">   356	</span>		for len(q) &gt; leafSize {
+<span id="L357" class="ln">   357	</span>			<span class="comment">// find divisor close to sqrt(q) if possible, but in any case &lt; q</span>
+<span id="L358" class="ln">   358	</span>			maxLength := q.bitLen()     <span class="comment">// ~= log2 q, or at of least largest possible q of this bit length</span>
+<span id="L359" class="ln">   359	</span>			minLength := maxLength &gt;&gt; 1 <span class="comment">// ~= log2 sqrt(q)</span>
+<span id="L360" class="ln">   360	</span>			for index &gt; 0 &amp;&amp; table[index-1].nbits &gt; minLength {
+<span id="L361" class="ln">   361	</span>				index-- <span class="comment">// desired</span>
+<span id="L362" class="ln">   362	</span>			}
+<span id="L363" class="ln">   363	</span>			if table[index].nbits &gt;= maxLength &amp;&amp; table[index].bbb.cmp(q) &gt;= 0 {
+<span id="L364" class="ln">   364	</span>				index--
+<span id="L365" class="ln">   365	</span>				if index &lt; 0 {
+<span id="L366" class="ln">   366	</span>					panic(&#34;internal inconsistency&#34;)
+<span id="L367" class="ln">   367	</span>				}
+<span id="L368" class="ln">   368	</span>			}
+<span id="L369" class="ln">   369	</span>
+<span id="L370" class="ln">   370	</span>			<span class="comment">// split q into the two digit number (q&#39;*bbb + r) to form independent subblocks</span>
+<span id="L371" class="ln">   371	</span>			q, r = q.div(r, q, table[index].bbb)
+<span id="L372" class="ln">   372	</span>
+<span id="L373" class="ln">   373	</span>			<span class="comment">// convert subblocks and collect results in s[:h] and s[h:]</span>
+<span id="L374" class="ln">   374	</span>			h := len(s) - table[index].ndigits
+<span id="L375" class="ln">   375	</span>			r.convertWords(s[h:], b, ndigits, bb, table[0:index])
+<span id="L376" class="ln">   376	</span>			s = s[:h] <span class="comment">// == q.convertWords(s, b, ndigits, bb, table[0:index+1])</span>
+<span id="L377" class="ln">   377	</span>		}
+<span id="L378" class="ln">   378	</span>	}
+<span id="L379" class="ln">   379	</span>
+<span id="L380" class="ln">   380	</span>	<span class="comment">// having split any large blocks now process the remaining (small) block iteratively</span>
+<span id="L381" class="ln">   381	</span>	i := len(s)
+<span id="L382" class="ln">   382	</span>	var r Word
+<span id="L383" class="ln">   383	</span>	if b == 10 {
+<span id="L384" class="ln">   384	</span>		<span class="comment">// hard-coding for 10 here speeds this up by 1.25x (allows for / and % by constants)</span>
+<span id="L385" class="ln">   385	</span>		for len(q) &gt; 0 {
+<span id="L386" class="ln">   386	</span>			<span class="comment">// extract least significant, base bb &#34;digit&#34;</span>
+<span id="L387" class="ln">   387	</span>			q, r = q.divW(q, bb)
+<span id="L388" class="ln">   388	</span>			for j := 0; j &lt; ndigits &amp;&amp; i &gt; 0; j++ {
+<span id="L389" class="ln">   389	</span>				i--
+<span id="L390" class="ln">   390	</span>				<span class="comment">// avoid % computation since r%10 == r - int(r/10)*10;</span>
+<span id="L391" class="ln">   391	</span>				<span class="comment">// this appears to be faster for BenchmarkString10000Base10</span>
+<span id="L392" class="ln">   392	</span>				<span class="comment">// and smaller strings (but a bit slower for larger ones)</span>
+<span id="L393" class="ln">   393	</span>				t := r / 10
+<span id="L394" class="ln">   394	</span>				s[i] = &#39;0&#39; + byte(r-t*10)
+<span id="L395" class="ln">   395	</span>				r = t
+<span id="L396" class="ln">   396	</span>			}
+<span id="L397" class="ln">   397	</span>		}
+<span id="L398" class="ln">   398	</span>	} else {
+<span id="L399" class="ln">   399	</span>		for len(q) &gt; 0 {
+<span id="L400" class="ln">   400	</span>			<span class="comment">// extract least significant, base bb &#34;digit&#34;</span>
+<span id="L401" class="ln">   401	</span>			q, r = q.divW(q, bb)
+<span id="L402" class="ln">   402	</span>			for j := 0; j &lt; ndigits &amp;&amp; i &gt; 0; j++ {
+<span id="L403" class="ln">   403	</span>				i--
+<span id="L404" class="ln">   404	</span>				s[i] = digits[r%b]
+<span id="L405" class="ln">   405	</span>				r /= b
+<span id="L406" class="ln">   406	</span>			}
+<span id="L407" class="ln">   407	</span>		}
+<span id="L408" class="ln">   408	</span>	}
+<span id="L409" class="ln">   409	</span>
+<span id="L410" class="ln">   410	</span>	<span class="comment">// prepend high-order zeros</span>
+<span id="L411" class="ln">   411	</span>	for i &gt; 0 { <span class="comment">// while need more leading zeros</span>
+<span id="L412" class="ln">   412	</span>		i--
+<span id="L413" class="ln">   413	</span>		s[i] = &#39;0&#39;
+<span id="L414" class="ln">   414	</span>	}
+<span id="L415" class="ln">   415	</span>}
+<span id="L416" class="ln">   416	</span>
+<span id="L417" class="ln">   417	</span><span class="comment">// Split blocks greater than leafSize Words (or set to 0 to disable recursive conversion)</span>
+<span id="L418" class="ln">   418	</span><span class="comment">// Benchmark and configure leafSize using: go test -bench=&#34;Leaf&#34;</span>
+<span id="L419" class="ln">   419	</span><span class="comment">//   8 and 16 effective on 3.0 GHz Xeon &#34;Clovertown&#34; CPU (128 byte cache lines)</span>
+<span id="L420" class="ln">   420	</span><span class="comment">//   8 and 16 effective on 2.66 GHz Core 2 Duo &#34;Penryn&#34; CPU</span>
+<span id="L421" class="ln">   421	</span>var leafSize int = 8 <span class="comment">// number of Word-size binary values treat as a monolithic block</span>
+<span id="L422" class="ln">   422	</span>
+<span id="L423" class="ln">   423	</span>type divisor struct {
+<span id="L424" class="ln">   424	</span>	bbb     nat <span class="comment">// divisor</span>
+<span id="L425" class="ln">   425	</span>	nbits   int <span class="comment">// bit length of divisor (discounting leading zeros) ~= log2(bbb)</span>
+<span id="L426" class="ln">   426	</span>	ndigits int <span class="comment">// digit length of divisor in terms of output base digits</span>
+<span id="L427" class="ln">   427	</span>}
+<span id="L428" class="ln">   428	</span>
+<span id="L429" class="ln">   429	</span>var cacheBase10 struct {
+<span id="L430" class="ln">   430	</span>	sync.Mutex
+<span id="L431" class="ln">   431	</span>	table [64]divisor <span class="comment">// cached divisors for base 10</span>
+<span id="L432" class="ln">   432	</span>}
+<span id="L433" class="ln">   433	</span>
+<span id="L434" class="ln">   434	</span><span class="comment">// expWW computes x**y</span>
+<span id="L435" class="ln">   435	</span>func (z nat) expWW(x, y Word) nat {
+<span id="L436" class="ln">   436	</span>	return z.expNN(nat(nil).setWord(x), nat(nil).setWord(y), nil)
+<span id="L437" class="ln">   437	</span>}
+<span id="L438" class="ln">   438	</span>
+<span id="L439" class="ln">   439	</span><span class="comment">// construct table of powers of bb*leafSize to use in subdivisions</span>
+<span id="L440" class="ln">   440	</span>func divisors(m int, b Word, ndigits int, bb Word) []divisor {
+<span id="L441" class="ln">   441	</span>	<span class="comment">// only compute table when recursive conversion is enabled and x is large</span>
+<span id="L442" class="ln">   442	</span>	if leafSize == 0 || m &lt;= leafSize {
+<span id="L443" class="ln">   443	</span>		return nil
+<span id="L444" class="ln">   444	</span>	}
+<span id="L445" class="ln">   445	</span>
+<span id="L446" class="ln">   446	</span>	<span class="comment">// determine k where (bb**leafSize)**(2**k) &gt;= sqrt(x)</span>
+<span id="L447" class="ln">   447	</span>	k := 1
+<span id="L448" class="ln">   448	</span>	for words := leafSize; words &lt; m&gt;&gt;1 &amp;&amp; k &lt; len(cacheBase10.table); words &lt;&lt;= 1 {
+<span id="L449" class="ln">   449	</span>		k++
+<span id="L450" class="ln">   450	</span>	}
+<span id="L451" class="ln">   451	</span>
+<span id="L452" class="ln">   452	</span>	<span class="comment">// reuse and extend existing table of divisors or create new table as appropriate</span>
+<span id="L453" class="ln">   453	</span>	var table []divisor <span class="comment">// for b == 10, table overlaps with cacheBase10.table</span>
+<span id="L454" class="ln">   454	</span>	if b == 10 {
+<span id="L455" class="ln">   455	</span>		cacheBase10.Lock()
+<span id="L456" class="ln">   456	</span>		table = cacheBase10.table[0:k] <span class="comment">// reuse old table for this conversion</span>
+<span id="L457" class="ln">   457	</span>	} else {
+<span id="L458" class="ln">   458	</span>		table = make([]divisor, k) <span class="comment">// create new table for this conversion</span>
+<span id="L459" class="ln">   459	</span>	}
+<span id="L460" class="ln">   460	</span>
+<span id="L461" class="ln">   461	</span>	<span class="comment">// extend table</span>
+<span id="L462" class="ln">   462	</span>	if table[k-1].ndigits == 0 {
+<span id="L463" class="ln">   463	</span>		<span class="comment">// add new entries as needed</span>
+<span id="L464" class="ln">   464	</span>		var larger nat
+<span id="L465" class="ln">   465	</span>		for i := 0; i &lt; k; i++ {
+<span id="L466" class="ln">   466	</span>			if table[i].ndigits == 0 {
+<span id="L467" class="ln">   467	</span>				if i == 0 {
+<span id="L468" class="ln">   468	</span>					table[0].bbb = nat(nil).expWW(bb, Word(leafSize))
+<span id="L469" class="ln">   469	</span>					table[0].ndigits = ndigits * leafSize
+<span id="L470" class="ln">   470	</span>				} else {
+<span id="L471" class="ln">   471	</span>					table[i].bbb = nat(nil).mul(table[i-1].bbb, table[i-1].bbb)
+<span id="L472" class="ln">   472	</span>					table[i].ndigits = 2 * table[i-1].ndigits
+<span id="L473" class="ln">   473	</span>				}
+<span id="L474" class="ln">   474	</span>
+<span id="L475" class="ln">   475	</span>				<span class="comment">// optimization: exploit aggregated extra bits in macro blocks</span>
+<span id="L476" class="ln">   476	</span>				larger = nat(nil).set(table[i].bbb)
+<span id="L477" class="ln">   477	</span>				for mulAddVWW(larger, larger, b, 0) == 0 {
+<span id="L478" class="ln">   478	</span>					table[i].bbb = table[i].bbb.set(larger)
+<span id="L479" class="ln">   479	</span>					table[i].ndigits++
+<span id="L480" class="ln">   480	</span>				}
+<span id="L481" class="ln">   481	</span>
+<span id="L482" class="ln">   482	</span>				table[i].nbits = table[i].bbb.bitLen()
+<span id="L483" class="ln">   483	</span>			}
+<span id="L484" class="ln">   484	</span>		}
+<span id="L485" class="ln">   485	</span>	}
+<span id="L486" class="ln">   486	</span>
+<span id="L487" class="ln">   487	</span>	if b == 10 {
+<span id="L488" class="ln">   488	</span>		cacheBase10.Unlock()
+<span id="L489" class="ln">   489	</span>	}
+<span id="L490" class="ln">   490	</span>
+<span id="L491" class="ln">   491	</span>	return table
+<span id="L492" class="ln">   492	</span>}
+<span id="L493" class="ln">   493	</span>
+</pre><p><a href="natconv.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

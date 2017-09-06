@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/hmac/hmac.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./hmac.go%3Fs=1760:1810.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/crypto/hmac/hmac.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">/*
+<span id="L6" class="ln">     6	</span>Package hmac implements the Keyed-Hash Message Authentication Code (HMAC) as
+<span id="L7" class="ln">     7	</span>defined in U.S. Federal Information Processing Standards Publication 198.
+<span id="L8" class="ln">     8	</span>An HMAC is a cryptographic hash that uses a key to sign a message.
+<span id="L9" class="ln">     9	</span>The receiver verifies the hash by recomputing it using the same key.
+<span id="L10" class="ln">    10	</span>
+<span id="L11" class="ln">    11	</span>Receivers should be careful to use Equal to compare MACs in order to avoid
+<span id="L12" class="ln">    12	</span>timing side-channels:
+<span id="L13" class="ln">    13	</span>
+<span id="L14" class="ln">    14	</span>	// CheckMAC reports whether messageMAC is a valid HMAC tag for message.
+<span id="L15" class="ln">    15	</span>	func CheckMAC(message, messageMAC, key []byte) bool {
+<span id="L16" class="ln">    16	</span>		mac := hmac.New(sha256.New, key)
+<span id="L17" class="ln">    17	</span>		mac.Write(message)
+<span id="L18" class="ln">    18	</span>		expectedMAC := mac.Sum(nil)
+<span id="L19" class="ln">    19	</span>		return hmac.Equal(messageMAC, expectedMAC)
+<span id="L20" class="ln">    20	</span>	}
+<span id="L21" class="ln">    21	</span>*/</span>
+<span id="L22" class="ln">    22	</span>package hmac
+<span id="L23" class="ln">    23	</span>
+<span id="L24" class="ln">    24	</span>import (
+<span id="L25" class="ln">    25	</span>	&#34;crypto/subtle&#34;
+<span id="L26" class="ln">    26	</span>	&#34;hash&#34;
+<span id="L27" class="ln">    27	</span>)
+<span id="L28" class="ln">    28	</span>
+<span id="L29" class="ln">    29	</span><span class="comment">// FIPS 198-1:</span>
+<span id="L30" class="ln">    30	</span><span class="comment">// http://csrc.nist.gov/publications/fips/fips198-1/FIPS-198-1_final.pdf</span>
+<span id="L31" class="ln">    31	</span>
+<span id="L32" class="ln">    32	</span><span class="comment">// key is zero padded to the block size of the hash function</span>
+<span id="L33" class="ln">    33	</span><span class="comment">// ipad = 0x36 byte repeated for key length</span>
+<span id="L34" class="ln">    34	</span><span class="comment">// opad = 0x5c byte repeated for key length</span>
+<span id="L35" class="ln">    35	</span><span class="comment">// hmac = H([key ^ opad] H([key ^ ipad] text))</span>
+<span id="L36" class="ln">    36	</span>
+<span id="L37" class="ln">    37	</span>type hmac struct {
+<span id="L38" class="ln">    38	</span>	size         int
+<span id="L39" class="ln">    39	</span>	blocksize    int
+<span id="L40" class="ln">    40	</span>	opad, ipad   []byte
+<span id="L41" class="ln">    41	</span>	outer, inner hash.Hash
+<span id="L42" class="ln">    42	</span>}
+<span id="L43" class="ln">    43	</span>
+<span id="L44" class="ln">    44	</span>func (h *hmac) Sum(in []byte) []byte {
+<span id="L45" class="ln">    45	</span>	origLen := len(in)
+<span id="L46" class="ln">    46	</span>	in = h.inner.Sum(in)
+<span id="L47" class="ln">    47	</span>	h.outer.Reset()
+<span id="L48" class="ln">    48	</span>	h.outer.Write(h.opad)
+<span id="L49" class="ln">    49	</span>	h.outer.Write(in[origLen:])
+<span id="L50" class="ln">    50	</span>	return h.outer.Sum(in[:origLen])
+<span id="L51" class="ln">    51	</span>}
+<span id="L52" class="ln">    52	</span>
+<span id="L53" class="ln">    53	</span>func (h *hmac) Write(p []byte) (n int, err error) {
+<span id="L54" class="ln">    54	</span>	return h.inner.Write(p)
+<span id="L55" class="ln">    55	</span>}
+<span id="L56" class="ln">    56	</span>
+<span id="L57" class="ln">    57	</span>func (h *hmac) Size() int { return h.size }
+<span id="L58" class="ln">    58	</span>
+<span id="L59" class="ln">    59	</span>func (h *hmac) BlockSize() int { return h.blocksize }
+<span id="L60" class="ln">    60	</span>
+<span id="L61" class="ln">    61	</span>func (h *hmac) Reset() {
+<span id="L62" class="ln">    62	</span>	h.inner.Reset()
+<span id="L63" class="ln">    63	</span>	h.inner.Write(h.ipad)
+<span id="L64" class="ln">    64	</span>}
+<span id="L65" class="ln">    65	</span>
+<span id="L66" class="ln">    66	</span><span class="comment">// New returns a new HMAC hash using the given hash.Hash type and key.</span>
+<span id="L67" class="ln">    67	</span><span class="selection">func New(h func() hash.Hash, key []byte) hash.Hash</span> {
+<span id="L68" class="ln">    68	</span>	hm := new(hmac)
+<span id="L69" class="ln">    69	</span>	hm.outer = h()
+<span id="L70" class="ln">    70	</span>	hm.inner = h()
+<span id="L71" class="ln">    71	</span>	hm.size = hm.inner.Size()
+<span id="L72" class="ln">    72	</span>	hm.blocksize = hm.inner.BlockSize()
+<span id="L73" class="ln">    73	</span>	hm.ipad = make([]byte, hm.blocksize)
+<span id="L74" class="ln">    74	</span>	hm.opad = make([]byte, hm.blocksize)
+<span id="L75" class="ln">    75	</span>	if len(key) &gt; hm.blocksize {
+<span id="L76" class="ln">    76	</span>		<span class="comment">// If key is too big, hash it.</span>
+<span id="L77" class="ln">    77	</span>		hm.outer.Write(key)
+<span id="L78" class="ln">    78	</span>		key = hm.outer.Sum(nil)
+<span id="L79" class="ln">    79	</span>	}
+<span id="L80" class="ln">    80	</span>	copy(hm.ipad, key)
+<span id="L81" class="ln">    81	</span>	copy(hm.opad, key)
+<span id="L82" class="ln">    82	</span>	for i := range hm.ipad {
+<span id="L83" class="ln">    83	</span>		hm.ipad[i] ^= 0x36
+<span id="L84" class="ln">    84	</span>	}
+<span id="L85" class="ln">    85	</span>	for i := range hm.opad {
+<span id="L86" class="ln">    86	</span>		hm.opad[i] ^= 0x5c
+<span id="L87" class="ln">    87	</span>	}
+<span id="L88" class="ln">    88	</span>	hm.inner.Write(hm.ipad)
+<span id="L89" class="ln">    89	</span>	return hm
+<span id="L90" class="ln">    90	</span>}
+<span id="L91" class="ln">    91	</span>
+<span id="L92" class="ln">    92	</span><span class="comment">// Equal compares two MACs for equality without leaking timing information.</span>
+<span id="L93" class="ln">    93	</span>func Equal(mac1, mac2 []byte) bool {
+<span id="L94" class="ln">    94	</span>	<span class="comment">// We don&#39;t have to be constant time if the lengths of the MACs are</span>
+<span id="L95" class="ln">    95	</span>	<span class="comment">// different as that suggests that a completely different hash function</span>
+<span id="L96" class="ln">    96	</span>	<span class="comment">// was used.</span>
+<span id="L97" class="ln">    97	</span>	return subtle.ConstantTimeCompare(mac1, mac2) == 1
+<span id="L98" class="ln">    98	</span>}
+<span id="L99" class="ln">    99	</span>
+</pre><p><a href="hmac.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+
