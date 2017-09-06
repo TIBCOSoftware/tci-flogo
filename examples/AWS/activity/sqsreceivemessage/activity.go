@@ -42,7 +42,7 @@ func (a *SQSReceiveMessageActivity) Metadata() *activity.Metadata {
 	return a.metadata
 }
 func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, err error) {
-	activityLog.Info("Executing SQS Send Message activity")
+	activityLog.Info("Executing SQS Receive Message activity")
 	//Read Inputs
 	if context.GetInput(ivConnection) == nil {
 		return false, activity.NewError("SQS connection is not configured", "SQS-RECEIVEMESSAGE-4001", nil)
