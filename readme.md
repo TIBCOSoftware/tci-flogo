@@ -9,7 +9,7 @@ The [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome) repository is wh
 * Contribute new activities or projects for our Web Integrator or Business Studio.
 
 ## Contributing
-If you want to build your own activities for Web Integrator please read the Wiki page on [Creating extensions for Web Integrator](https://github.com/TIBCOSoftware/tci-webintegrator/wiki).
+If you want to build your own activities for Web Integrator please read the [docs](https://tibcosoftware.github.io/tci-webintegrator/).
 
 If you want to showcase your project, check out [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome)
 
