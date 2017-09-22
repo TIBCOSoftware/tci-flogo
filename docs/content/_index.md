@@ -10,7 +10,7 @@
 * Contribute new activities or projects for our Web Integrator or Business Studio.
 
 ## Contributing
-If you want to build your own activities for Web Integrator please read the docs in this repo.
+If you want to build your own activities for Web Integrator please read the docs here.
 
 If you want to showcase your project, check out [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome)
 
