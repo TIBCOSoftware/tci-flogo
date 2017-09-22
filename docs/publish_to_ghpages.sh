@@ -43,5 +43,6 @@ hugo
 cp -R public/ ../public/
 
 ### Push to GitHub
+cd ../public
 echo "Updating gh-pages branch"
 cd public && git add --all && git commit -m "Publishing to gh-pages"
