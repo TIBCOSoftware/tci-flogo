@@ -12,8 +12,8 @@ This CLI is aimed to provide the easy way to set up the environment and to provi
 
 ## Installing wi-cli
 
-* Once the wi-cli project is built copy the dist to the desired location where you want to generate your contribution boilerplate code
-* Run `npm install -g file:./dist` -- Requires admin privileges to install based on your operating system
+* Once the wi-cli project is built copy the wi-cli.tar.gz to the desired location where you want to generate your contribution boilerplate code and extract to wi-cli folder
+* Run `npm install -g file:./wi-cli` -- Requires admin privileges to install based on your operating system
 * Once above step is done you should be able to run wi-cli in your command prompt to see the welcome message from wi-cli. Now you are all set to use wi-cli to generate the contribution.
 
 ## Commands
