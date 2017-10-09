@@ -61,15 +61,15 @@ First download the [GO language SDK](https://golang.org/dl/) and follow the inst
 ### Setup the Environment Variables <a name="environment"></a>
    * PATH - Should contain the folder where go lang compiler is installed , usually in Unix bases systems it is the */usr/local/go/bin*
    * GOROOT - This variable is set to point to the folder where GO language SDK is installed , which is same as above in */usr/local/go*
-   * GOPATH - This is set to the workspace directory where the GO compiler finds its [projects based on project namespace](https://golang.org/doc/code.html). We will refer this folder as **workspace** as it involves hosting typescript files also in addition to GO language files in its subfolders. 
+   * GOPATH - This is set to the workspace directory where the GO compiler finds its [projects based on project namespace](https://golang.org/doc/code.html). We will refer this folder as **&lt;workspace-folder&gt;** as it involves hosting typescript files also in addition to GO language files in its subfolders. 
 
 ```
     export GOROOT=/usr/local/go
     export PATH=$PATH:$GOROOT/bin
-    export GOPATH=$HOME/<your workspace folder path>
+    export GOPATH=$HOME/.../<workspace folder>
 ```
 ### Folder Structure <a name="source-folder"></a>
-A sample Web-Integrator GO Lang project workspace folder will look like this
+A sample Web-Integrator GO Lang project &lt;workspace-folder&gt; will look like this
 
 ```
 bin/
@@ -82,35 +82,34 @@ pkg/
 src/
     github.com/
         golang/
-            example/
+            <workspace folder>/               # Your workspace folder
                 .git/                         # Git repository metadata
+                package.json
+                tsconfig.json
+                tslint.json
         <extension category name>/            # namespace category stored in github.com
                                               # Visual Studio/WebStorm Project folder
-            .git/                             # Git repository metadata
-            package.json
-            tsconfig.json
-            tslint.json
-            activity/                          # Type of extension i.e. activity or connector
-                <activity-name>/               # Extension Activity Named folder
-                    <activity-name>.go         # Extension Activity source
-                    <activity-name>_test.go    # Extension Activity Go Test source
-                    <activity-name>.module.ts  # ExtensionActivity UI module source
-                    <activity-name>.ts         # Extension Activity UI source.
-                    activity.json              # Extension Activity Model JSON
-                    icons/
-                        <activity-name>.png       # Activity PNG icon size 16x16 pixels
-                        <acitivity-name>.svg      # Activity SVG icon size 16x16 pixels
-                        <activity-name>@2x.png    # Activity PNG icon size 32x32 pixels
-            connector/
-                <connector-name>/
-                    connector.json
-                    <connector-name>.module.ts
-                    <connector-name>.ts
-                    <connector-name>*.go
-                    icons/
-                        <connector-name>.png     # Activity PNG icon size 16x16 pixels
-                        <connector-name>.svg     # Activity SVG icon size 16x16 pixels
-                        <connector-name>@2x.png  # Activity PNG icon size 32x32 pixels
+                       
+            <activity-name>/               # Extension Activity Named folder
+                <activity-name>.go         # Extension Activity source
+                <activity-name>_test.go    # Extension Activity Go Test source
+                <activity-name>.module.ts  # ExtensionActivity UI module source
+                <activity-name>.ts         # Extension Activity UI source.
+                activity.json              # Extension Activity Model JSON
+                icons/
+                    <activity-name>.png       # Activity PNG icon size 16x16 pixels
+                    <acitivity-name>.svg      # Activity SVG icon size 16x16 pixels
+                    <activity-name>@2x.png    # Activity PNG icon size 32x32 pixels
+
+            <connector-name>/
+                connector.json
+                <connector-name>.module.ts
+                <connector-name>.ts
+                <connector-name>*.go
+                icons/
+                    <connector-name>.png     # Activity PNG icon size 16x16 pixels
+                    <connector-name>.svg     # Activity SVG icon size 16x16 pixels
+                    <connector-name>@2x.png  # Activity PNG icon size 32x32 pixels
 
 	github.com/TIBCOSoftware/flogo-lib/
 	    # Files from the flogo-lib library
@@ -152,7 +151,7 @@ src/
    * Set GOROOT - This should point to the folder set in the [GOROOT envrionment variable](#environment) above and select the GO SDK folder.
 
         ![Intellij GOROOT settings](./images/intellij-goroot.png)
-   * Set GOPATH - This should point to the workspace folder set in the [GOROOT envrionment variable](#environment) above.
+   * Set GOPATH - This should point to the &lt;workspace-folder&gt; set in the [GOROOT envrionment variable](#environment) above.
 
         ![Intellij GOPATH settings](./images/intellij-gopath.png)
 
@@ -179,7 +178,7 @@ go get github.com/Sirupsen/logrus
 ```
 Now the GOPATH env ready to develop, the Go code can be compiled and tested locally from the command line as follows
 ```bash
-cd $GOPATH/<workspace folder>/src/<MyExtension folder>
+cd $GOPATH/<workspace-folder>/src/<MyExtension folder>
 go build ./activity/... ./connector/...
 go test ./activity/... ./connector/...
 ```		
@@ -208,14 +207,14 @@ as wi-studio.tar.gz file and installed using npm installer after the
 package.json is creates as explained in the [Contribution Dependencies step](#package-json) :-
 
 ```
-cd <workspace folder>           # change to your workspace folder
+cd <workspace-folder>           # change to your workspace folder
 ```
 
-[**Download the wi-studio SDK wi-studio.tar.gz from here to your workspace folder**](https://github.com/TIBCOSoftware/tci-webintegrator/releases/download/1.0.0/wi-studio.tar.gz)
+[**Download the wi-studio SDK wi-studio.tar.gz from here to your &lt;workspace-folder&gt;**](https://github.com/TIBCOSoftware/tci-webintegrator/releases/download/1.0.0/wi-studio.tar.gz)
 
 **OR**
 
-Download the wi-studio.tar.gz file inside your workspace folder using wget command as shown below
+Download the wi-studio.tar.gz file inside your &lt;workspace-folder&gt; using wget command as shown below
 
 ```
 wget --no-check-certificate https://github.com/TIBCOSoftware/tci-webintegrator/releases/download/1.0.0/wi-studio.tar.gz
@@ -246,7 +245,7 @@ npm install
 ### Contribution Dependencies (package.json)<a name="package-json"></a>
 The contribution design time dependencies match the wi-studio web server application dependencies as they need to run and execute in the same environment. 
 
-You can copy the boilerplate package.json contents shown below to your workspace folder to install all the Typescript compile dependencies.
+You can copy the boilerplate package.json contents shown below to your &lt;workspace-folder&gt; to install all the Typescript compile dependencies.
 
 **PLEASE NOTE** that the package *wi-studio*  points to the local sub folder **wi-studio** using the *file:wi-studio* URI path. You may need to adjust this path if you have downloaded and unzipped the wi-studio SDK to another folder.
 
@@ -423,7 +422,7 @@ The initial tsconfig.json can be created using the tsc command which Initializes
 ```
 tsc --init
 ```
-You can use the boilerplate tsconfig.json content shown below to your workspace folder.
+You can use the boilerplate tsconfig.json content shown below to your &lt;workspace-folder&gt;.
 
 ~~~javascript
 {
@@ -471,7 +470,7 @@ You can use the boilerplate tsconfig.json content shown below to your workspace 
 ~~~
 
 ### Typescript coding style and standard<a name="tslint-json"></a>
-The coding styles are enforced by the *tslint.json* configuration. You can copy the boilerplate tslint.json contents shown below to your workspace folder.
+The coding styles are enforced by the *tslint.json* configuration. You can copy the boilerplate tslint.json contents shown below to your &lt;workspace-folder&gt;.
 
 ~~~javascript
 {
