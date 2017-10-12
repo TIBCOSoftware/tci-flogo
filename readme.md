@@ -30,4 +30,4 @@ You might also want to visit our other repos
 * [Command Line Interface for Node.js](https://github.com/TIBCOSoftware/tibcli-node)
 
 ## License
-This project is licensed under a BSD-type license. See license.txt.
+This project is licensed under a BSD-type license. See [license.txt](license.txt).
