@@ -2,10 +2,11 @@
 # This script has at most 2 dependencies 
 #       jq and curl   OR   jq and wget
 # This script is meant for quick & easy install via:
-#   'curl -sSL https://github.com/TIBCOSoftware/flogo/releases/download/${GITHUB_TAG}/start-flogo.txt | sh'
+#   'curl -sSL https://github.com/TIBCOSoftware/tci-webintegrator/releases/download/${GITHUB_TAG}/wi-studio.tar.gz | sh'
+#   'curl -sSL https://github.com/TIBCOSoftware/tci-webintegrator/releases/download/${GITHUB_TAG}/wi-runtime.tar.gz | sh'
 # or:
-#   'wget -qO- https://github.com/TIBCOSoftware/flogo/releases/download/${GITHUB_TAG}/start-flogo.txt | sh'
-#
+#   'wget -qO- https://github.com/TIBCOSoftware/tci-webintegrator/releases/download/${GITHUB_TAG}/wi-studio.tar.gz | sh'
+#   'wget -qO- https://github.com/TIBCOSoftware/tci-webintegrator/releases/download/${GITHUB_TAG}/wi-runtime.tar.gz | sh'
 
 script_root=$(dirname "${BASH_SOURCE}")
 command_exists() {
@@ -202,7 +203,7 @@ getLatestRelease() {
     fi
     if [[ -z "${tag_name}" || "${tag_name}" == "null" ]]; then 
         cat >&2 <<-'EOF'
-        Error: "Latest" release not found at https://github.com/TIBCOSoftware/flogo/releases
+        Error: "Latest" release not found at https://github.com/TIBCOSoftware/tci-webintegrator/releases
 EOF
         exit 1
     fi

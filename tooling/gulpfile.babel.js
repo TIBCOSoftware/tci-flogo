@@ -4,9 +4,11 @@ var tsProject = ts.createProject("tsconfig.json");
 import jeditor from "gulp-json-editor";
 import runSequence from "run-sequence";
 import del from "del";
+const tar = require('gulp-tar');
+const gzip = require('gulp-gzip');
 
 gulp.task("copy-package", callback => {
-    gulp.src("./package.json")
+    return gulp.src("./package.json")
         .pipe(jeditor((pkgjson) => {
             delete pkgjson.scripts.sdk;
             return pkgjson;
@@ -36,12 +38,21 @@ gulp.task("clean", callback => {
     }, callback);
 });
 
+gulp.task("gzip", callback => {
+    return gulp.src("dist/*")
+        .pipe(tar("wi-cli.tar"))
+        .pipe(gzip())
+        .pipe(gulp.dest("./"));
+});
+
+
 gulp.task("default", callback => {
 
-    runSequence(
+    return runSequence(
         "clean",
         "copy-studio-sdk",
         "copy-runtime-sdk",
         "compile",
-        "copy-package", callback);
+        "copy-package",
+        "gzip", callback);
 });
