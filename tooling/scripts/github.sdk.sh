@@ -1,5 +1,4 @@
 #!/bin/sh
-set -x
 # This script has at most 2 dependencies 
 #       jq and curl   OR   jq and wget
 # This script is meant for quick & easy install via:
