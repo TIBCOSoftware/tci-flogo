@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 if [ -f "$HOME/.wicli" ]; then
     source "$HOME/.wicli"
     mkdir -p wi-studio &&
