@@ -7,8 +7,9 @@ import * as path from "path";
 import * as ProgressBar from "progress";
 import {ServiceTemplate, ValueTemplate, ValidationTemplate, ActionTemplate} from "wi-studio/app/cli"
 import {CLIUtils} from "../utils/cli-utils";
+import { IContribServiceProgressGenerator } from "../generator";
 
-export class ContribProviderGenerator implements IContribProviderGenerator {
+export class ContribProviderGenerator implements IContribServiceProgressGenerator<IContribProviderMetadata> {
 
     providersList: any;
     constructor(private outputFolder: string, private progressBar: ProgressBar) {

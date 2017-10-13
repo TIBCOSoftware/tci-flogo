@@ -24,8 +24,12 @@ import { IContribGenerator,
         TSCONFIG_JSON,
         TSLINT_JSON,
         IContribCategoryMetaData,
-        WI_CLI_JSON} from "wi-studio/app/cli/template";
+        WI_CLI_JSON,
+        IContribServiceGenerator} from "wi-studio/app/cli/template";
 
+export interface IContribServiceProgressGenerator<T> extends IContribServiceGenerator<T>{
+    getProgressBar(): ProgressBar
+}
 export class ContribCodeGenerator implements IContribGenerator<IContribModuleMetaData> {
 
     constructor(private outputfolder: string, private progressBar: ProgressBar) {

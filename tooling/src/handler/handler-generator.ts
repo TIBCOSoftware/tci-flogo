@@ -4,8 +4,9 @@ import {Template, IContribHandlerGenerator, IContribHandlerMetaData, TEMPLATE_TY
 import * as path from "path";
 import * as fs from "fs";
 import {CLIUtils} from "../utils/cli-utils";
+import { IContribServiceProgressGenerator } from "../generator";
 
-export class ContribHandlerGenerator implements IContribHandlerGenerator {
+export class ContribHandlerGenerator implements IContribServiceProgressGenerator<IContribHandlerMetaData> {
     constructor(private outputFolder: string, private progressBar: ProgressBar) {
     }
 
