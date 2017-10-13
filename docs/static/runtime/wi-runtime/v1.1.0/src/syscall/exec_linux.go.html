@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/syscall/exec_linux.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="exec_linux.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/syscall/exec_linux.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// +build linux</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package syscall
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;runtime&#34;
+<span id="L11" class="ln">    11	</span>	&#34;unsafe&#34;
+<span id="L12" class="ln">    12	</span>)
+<span id="L13" class="ln">    13	</span>
+<span id="L14" class="ln">    14	</span><span class="comment">// SysProcIDMap holds Container ID to Host ID mappings used for User Namespaces in Linux.</span>
+<span id="L15" class="ln">    15	</span><span class="comment">// See user_namespaces(7).</span>
+<span id="L16" class="ln">    16	</span>type SysProcIDMap struct {
+<span id="L17" class="ln">    17	</span>	ContainerID int <span class="comment">// Container ID.</span>
+<span id="L18" class="ln">    18	</span>	HostID      int <span class="comment">// Host ID.</span>
+<span id="L19" class="ln">    19	</span>	Size        int <span class="comment">// Size.</span>
+<span id="L20" class="ln">    20	</span>}
+<span id="L21" class="ln">    21	</span>
+<span id="L22" class="ln">    22	</span>type SysProcAttr struct {
+<span id="L23" class="ln">    23	</span>	Chroot       string         <span class="comment">// Chroot.</span>
+<span id="L24" class="ln">    24	</span>	Credential   *Credential    <span class="comment">// Credential.</span>
+<span id="L25" class="ln">    25	</span>	Ptrace       bool           <span class="comment">// Enable tracing.</span>
+<span id="L26" class="ln">    26	</span>	Setsid       bool           <span class="comment">// Create session.</span>
+<span id="L27" class="ln">    27	</span>	Setpgid      bool           <span class="comment">// Set process group ID to Pgid, or, if Pgid == 0, to new pid.</span>
+<span id="L28" class="ln">    28	</span>	Setctty      bool           <span class="comment">// Set controlling terminal to fd Ctty (only meaningful if Setsid is set)</span>
+<span id="L29" class="ln">    29	</span>	Noctty       bool           <span class="comment">// Detach fd 0 from controlling terminal</span>
+<span id="L30" class="ln">    30	</span>	Ctty         int            <span class="comment">// Controlling TTY fd</span>
+<span id="L31" class="ln">    31	</span>	Foreground   bool           <span class="comment">// Place child&#39;s process group in foreground. (Implies Setpgid. Uses Ctty as fd of controlling TTY)</span>
+<span id="L32" class="ln">    32	</span>	Pgid         int            <span class="comment">// Child&#39;s process group ID if Setpgid.</span>
+<span id="L33" class="ln">    33	</span>	Pdeathsig    Signal         <span class="comment">// Signal that the process will get when its parent dies (Linux only)</span>
+<span id="L34" class="ln">    34	</span>	Cloneflags   uintptr        <span class="comment">// Flags for clone calls (Linux only)</span>
+<span id="L35" class="ln">    35	</span>	Unshareflags uintptr        <span class="comment">// Flags for unshare calls (Linux only)</span>
+<span id="L36" class="ln">    36	</span>	UidMappings  []SysProcIDMap <span class="comment">// User ID mappings for user namespaces.</span>
+<span id="L37" class="ln">    37	</span>	GidMappings  []SysProcIDMap <span class="comment">// Group ID mappings for user namespaces.</span>
+<span id="L38" class="ln">    38	</span>	<span class="comment">// GidMappingsEnableSetgroups enabling setgroups syscall.</span>
+<span id="L39" class="ln">    39	</span>	<span class="comment">// If false, then setgroups syscall will be disabled for the child process.</span>
+<span id="L40" class="ln">    40	</span>	<span class="comment">// This parameter is no-op if GidMappings == nil. Otherwise for unprivileged</span>
+<span id="L41" class="ln">    41	</span>	<span class="comment">// users this should be set to false for mappings work.</span>
+<span id="L42" class="ln">    42	</span>	GidMappingsEnableSetgroups bool
+<span id="L43" class="ln">    43	</span>}
+<span id="L44" class="ln">    44	</span>
+<span id="L45" class="ln">    45	</span><span class="comment">// Implemented in runtime package.</span>
+<span id="L46" class="ln">    46	</span>func runtime_BeforeFork()
+<span id="L47" class="ln">    47	</span>func runtime_AfterFork()
+<span id="L48" class="ln">    48	</span>
+<span id="L49" class="ln">    49	</span><span class="comment">// Fork, dup fd onto 0..len(fd), and exec(argv0, argvv, envv) in child.</span>
+<span id="L50" class="ln">    50	</span><span class="comment">// If a dup or exec fails, write the errno error to pipe.</span>
+<span id="L51" class="ln">    51	</span><span class="comment">// (Pipe is close-on-exec so if exec succeeds, it will be closed.)</span>
+<span id="L52" class="ln">    52	</span><span class="comment">// In the child, this function must not acquire any locks, because</span>
+<span id="L53" class="ln">    53	</span><span class="comment">// they might have been locked at the time of the fork. This means</span>
+<span id="L54" class="ln">    54	</span><span class="comment">// no rescheduling, no malloc calls, and no new stack segments.</span>
+<span id="L55" class="ln">    55	</span><span class="comment">// For the same reason compiler does not race instrument it.</span>
+<span id="L56" class="ln">    56	</span><span class="comment">// The calls to RawSyscall are okay because they are assembly</span>
+<span id="L57" class="ln">    57	</span><span class="comment">// functions that do not grow the stack.</span>
+<span id="L58" class="ln">    58	</span><span class="comment">//go:norace</span>
+<span id="L59" class="ln">    59	</span>func forkAndExecInChild(argv0 *byte, argv, envv []*byte, chroot, dir *byte, attr *ProcAttr, sys *SysProcAttr, pipe int) (pid int, err Errno) {
+<span id="L60" class="ln">    60	</span>	<span class="comment">// Declare all variables at top in case any</span>
+<span id="L61" class="ln">    61	</span>	<span class="comment">// declarations require heap allocation (e.g., err1).</span>
+<span id="L62" class="ln">    62	</span>	var (
+<span id="L63" class="ln">    63	</span>		r1     uintptr
+<span id="L64" class="ln">    64	</span>		err1   Errno
+<span id="L65" class="ln">    65	</span>		err2   Errno
+<span id="L66" class="ln">    66	</span>		nextfd int
+<span id="L67" class="ln">    67	</span>		i      int
+<span id="L68" class="ln">    68	</span>		p      [2]int
+<span id="L69" class="ln">    69	</span>	)
+<span id="L70" class="ln">    70	</span>
+<span id="L71" class="ln">    71	</span>	<span class="comment">// Record parent PID so child can test if it has died.</span>
+<span id="L72" class="ln">    72	</span>	ppid, _, _ := RawSyscall(SYS_GETPID, 0, 0, 0)
+<span id="L73" class="ln">    73	</span>
+<span id="L74" class="ln">    74	</span>	<span class="comment">// Guard against side effects of shuffling fds below.</span>
+<span id="L75" class="ln">    75	</span>	<span class="comment">// Make sure that nextfd is beyond any currently open files so</span>
+<span id="L76" class="ln">    76	</span>	<span class="comment">// that we can&#39;t run the risk of overwriting any of them.</span>
+<span id="L77" class="ln">    77	</span>	fd := make([]int, len(attr.Files))
+<span id="L78" class="ln">    78	</span>	nextfd = len(attr.Files)
+<span id="L79" class="ln">    79	</span>	for i, ufd := range attr.Files {
+<span id="L80" class="ln">    80	</span>		if nextfd &lt; int(ufd) {
+<span id="L81" class="ln">    81	</span>			nextfd = int(ufd)
+<span id="L82" class="ln">    82	</span>		}
+<span id="L83" class="ln">    83	</span>		fd[i] = int(ufd)
+<span id="L84" class="ln">    84	</span>	}
+<span id="L85" class="ln">    85	</span>	nextfd++
+<span id="L86" class="ln">    86	</span>
+<span id="L87" class="ln">    87	</span>	<span class="comment">// Allocate another pipe for parent to child communication for</span>
+<span id="L88" class="ln">    88	</span>	<span class="comment">// synchronizing writing of User ID/Group ID mappings.</span>
+<span id="L89" class="ln">    89	</span>	if sys.UidMappings != nil || sys.GidMappings != nil {
+<span id="L90" class="ln">    90	</span>		if err := forkExecPipe(p[:]); err != nil {
+<span id="L91" class="ln">    91	</span>			return 0, err.(Errno)
+<span id="L92" class="ln">    92	</span>		}
+<span id="L93" class="ln">    93	</span>	}
+<span id="L94" class="ln">    94	</span>
+<span id="L95" class="ln">    95	</span>	<span class="comment">// About to call fork.</span>
+<span id="L96" class="ln">    96	</span>	<span class="comment">// No more allocation or calls of non-assembly functions.</span>
+<span id="L97" class="ln">    97	</span>	runtime_BeforeFork()
+<span id="L98" class="ln">    98	</span>	if runtime.GOARCH == &#34;s390x&#34; {
+<span id="L99" class="ln">    99	</span>		r1, _, err1 = RawSyscall6(SYS_CLONE, 0, uintptr(SIGCHLD)|sys.Cloneflags, 0, 0, 0, 0)
+<span id="L100" class="ln">   100	</span>	} else {
+<span id="L101" class="ln">   101	</span>		r1, _, err1 = RawSyscall6(SYS_CLONE, uintptr(SIGCHLD)|sys.Cloneflags, 0, 0, 0, 0, 0)
+<span id="L102" class="ln">   102	</span>	}
+<span id="L103" class="ln">   103	</span>	if err1 != 0 {
+<span id="L104" class="ln">   104	</span>		runtime_AfterFork()
+<span id="L105" class="ln">   105	</span>		return 0, err1
+<span id="L106" class="ln">   106	</span>	}
+<span id="L107" class="ln">   107	</span>
+<span id="L108" class="ln">   108	</span>	if r1 != 0 {
+<span id="L109" class="ln">   109	</span>		<span class="comment">// parent; return PID</span>
+<span id="L110" class="ln">   110	</span>		runtime_AfterFork()
+<span id="L111" class="ln">   111	</span>		pid = int(r1)
+<span id="L112" class="ln">   112	</span>
+<span id="L113" class="ln">   113	</span>		if sys.UidMappings != nil || sys.GidMappings != nil {
+<span id="L114" class="ln">   114	</span>			Close(p[0])
+<span id="L115" class="ln">   115	</span>			err := writeUidGidMappings(pid, sys)
+<span id="L116" class="ln">   116	</span>			if err != nil {
+<span id="L117" class="ln">   117	</span>				err2 = err.(Errno)
+<span id="L118" class="ln">   118	</span>			}
+<span id="L119" class="ln">   119	</span>			RawSyscall(SYS_WRITE, uintptr(p[1]), uintptr(unsafe.Pointer(&amp;err2)), unsafe.Sizeof(err2))
+<span id="L120" class="ln">   120	</span>			Close(p[1])
+<span id="L121" class="ln">   121	</span>		}
+<span id="L122" class="ln">   122	</span>
+<span id="L123" class="ln">   123	</span>		return pid, 0
+<span id="L124" class="ln">   124	</span>	}
+<span id="L125" class="ln">   125	</span>
+<span id="L126" class="ln">   126	</span>	<span class="comment">// Fork succeeded, now in child.</span>
+<span id="L127" class="ln">   127	</span>
+<span id="L128" class="ln">   128	</span>	<span class="comment">// Wait for User ID/Group ID mappings to be written.</span>
+<span id="L129" class="ln">   129	</span>	if sys.UidMappings != nil || sys.GidMappings != nil {
+<span id="L130" class="ln">   130	</span>		if _, _, err1 = RawSyscall(SYS_CLOSE, uintptr(p[1]), 0, 0); err1 != 0 {
+<span id="L131" class="ln">   131	</span>			goto childerror
+<span id="L132" class="ln">   132	</span>		}
+<span id="L133" class="ln">   133	</span>		r1, _, err1 = RawSyscall(SYS_READ, uintptr(p[0]), uintptr(unsafe.Pointer(&amp;err2)), unsafe.Sizeof(err2))
+<span id="L134" class="ln">   134	</span>		if err1 != 0 {
+<span id="L135" class="ln">   135	</span>			goto childerror
+<span id="L136" class="ln">   136	</span>		}
+<span id="L137" class="ln">   137	</span>		if r1 != unsafe.Sizeof(err2) {
+<span id="L138" class="ln">   138	</span>			err1 = EINVAL
+<span id="L139" class="ln">   139	</span>			goto childerror
+<span id="L140" class="ln">   140	</span>		}
+<span id="L141" class="ln">   141	</span>		if err2 != 0 {
+<span id="L142" class="ln">   142	</span>			err1 = err2
+<span id="L143" class="ln">   143	</span>			goto childerror
+<span id="L144" class="ln">   144	</span>		}
+<span id="L145" class="ln">   145	</span>	}
+<span id="L146" class="ln">   146	</span>
+<span id="L147" class="ln">   147	</span>	<span class="comment">// Enable tracing if requested.</span>
+<span id="L148" class="ln">   148	</span>	if sys.Ptrace {
+<span id="L149" class="ln">   149	</span>		_, _, err1 = RawSyscall(SYS_PTRACE, uintptr(PTRACE_TRACEME), 0, 0)
+<span id="L150" class="ln">   150	</span>		if err1 != 0 {
+<span id="L151" class="ln">   151	</span>			goto childerror
+<span id="L152" class="ln">   152	</span>		}
+<span id="L153" class="ln">   153	</span>	}
+<span id="L154" class="ln">   154	</span>
+<span id="L155" class="ln">   155	</span>	<span class="comment">// Session ID</span>
+<span id="L156" class="ln">   156	</span>	if sys.Setsid {
+<span id="L157" class="ln">   157	</span>		_, _, err1 = RawSyscall(SYS_SETSID, 0, 0, 0)
+<span id="L158" class="ln">   158	</span>		if err1 != 0 {
+<span id="L159" class="ln">   159	</span>			goto childerror
+<span id="L160" class="ln">   160	</span>		}
+<span id="L161" class="ln">   161	</span>	}
+<span id="L162" class="ln">   162	</span>
+<span id="L163" class="ln">   163	</span>	<span class="comment">// Set process group</span>
+<span id="L164" class="ln">   164	</span>	if sys.Setpgid || sys.Foreground {
+<span id="L165" class="ln">   165	</span>		<span class="comment">// Place child in process group.</span>
+<span id="L166" class="ln">   166	</span>		_, _, err1 = RawSyscall(SYS_SETPGID, 0, uintptr(sys.Pgid), 0)
+<span id="L167" class="ln">   167	</span>		if err1 != 0 {
+<span id="L168" class="ln">   168	</span>			goto childerror
+<span id="L169" class="ln">   169	</span>		}
+<span id="L170" class="ln">   170	</span>	}
+<span id="L171" class="ln">   171	</span>
+<span id="L172" class="ln">   172	</span>	if sys.Foreground {
+<span id="L173" class="ln">   173	</span>		pgrp := int32(sys.Pgid)
+<span id="L174" class="ln">   174	</span>		if pgrp == 0 {
+<span id="L175" class="ln">   175	</span>			r1, _, err1 = RawSyscall(SYS_GETPID, 0, 0, 0)
+<span id="L176" class="ln">   176	</span>			if err1 != 0 {
+<span id="L177" class="ln">   177	</span>				goto childerror
+<span id="L178" class="ln">   178	</span>			}
+<span id="L179" class="ln">   179	</span>
+<span id="L180" class="ln">   180	</span>			pgrp = int32(r1)
+<span id="L181" class="ln">   181	</span>		}
+<span id="L182" class="ln">   182	</span>
+<span id="L183" class="ln">   183	</span>		<span class="comment">// Place process group in foreground.</span>
+<span id="L184" class="ln">   184	</span>		_, _, err1 = RawSyscall(SYS_IOCTL, uintptr(sys.Ctty), uintptr(TIOCSPGRP), uintptr(unsafe.Pointer(&amp;pgrp)))
+<span id="L185" class="ln">   185	</span>		if err1 != 0 {
+<span id="L186" class="ln">   186	</span>			goto childerror
+<span id="L187" class="ln">   187	</span>		}
+<span id="L188" class="ln">   188	</span>	}
+<span id="L189" class="ln">   189	</span>
+<span id="L190" class="ln">   190	</span>	<span class="comment">// Chroot</span>
+<span id="L191" class="ln">   191	</span>	if chroot != nil {
+<span id="L192" class="ln">   192	</span>		_, _, err1 = RawSyscall(SYS_CHROOT, uintptr(unsafe.Pointer(chroot)), 0, 0)
+<span id="L193" class="ln">   193	</span>		if err1 != 0 {
+<span id="L194" class="ln">   194	</span>			goto childerror
+<span id="L195" class="ln">   195	</span>		}
+<span id="L196" class="ln">   196	</span>	}
+<span id="L197" class="ln">   197	</span>
+<span id="L198" class="ln">   198	</span>	<span class="comment">// Unshare</span>
+<span id="L199" class="ln">   199	</span>	if sys.Unshareflags != 0 {
+<span id="L200" class="ln">   200	</span>		_, _, err1 = RawSyscall(SYS_UNSHARE, sys.Unshareflags, 0, 0)
+<span id="L201" class="ln">   201	</span>		if err1 != 0 {
+<span id="L202" class="ln">   202	</span>			goto childerror
+<span id="L203" class="ln">   203	</span>		}
+<span id="L204" class="ln">   204	</span>	}
+<span id="L205" class="ln">   205	</span>
+<span id="L206" class="ln">   206	</span>	<span class="comment">// User and groups</span>
+<span id="L207" class="ln">   207	</span>	if cred := sys.Credential; cred != nil {
+<span id="L208" class="ln">   208	</span>		ngroups := uintptr(len(cred.Groups))
+<span id="L209" class="ln">   209	</span>		groups := uintptr(0)
+<span id="L210" class="ln">   210	</span>		if ngroups &gt; 0 {
+<span id="L211" class="ln">   211	</span>			groups = uintptr(unsafe.Pointer(&amp;cred.Groups[0]))
+<span id="L212" class="ln">   212	</span>		}
+<span id="L213" class="ln">   213	</span>		<span class="comment">// Don&#39;t call setgroups in case of user namespace, gid mappings</span>
+<span id="L214" class="ln">   214	</span>		<span class="comment">// and disabled setgroups, because otherwise unprivileged user namespace</span>
+<span id="L215" class="ln">   215	</span>		<span class="comment">// will fail with any non-empty SysProcAttr.Credential.</span>
+<span id="L216" class="ln">   216	</span>		if !(sys.GidMappings != nil &amp;&amp; !sys.GidMappingsEnableSetgroups &amp;&amp; ngroups == 0) {
+<span id="L217" class="ln">   217	</span>			_, _, err1 = RawSyscall(_SYS_setgroups, ngroups, groups, 0)
+<span id="L218" class="ln">   218	</span>			if err1 != 0 {
+<span id="L219" class="ln">   219	</span>				goto childerror
+<span id="L220" class="ln">   220	</span>			}
+<span id="L221" class="ln">   221	</span>		}
+<span id="L222" class="ln">   222	</span>		_, _, err1 = RawSyscall(sys_SETGID, uintptr(cred.Gid), 0, 0)
+<span id="L223" class="ln">   223	</span>		if err1 != 0 {
+<span id="L224" class="ln">   224	</span>			goto childerror
+<span id="L225" class="ln">   225	</span>		}
+<span id="L226" class="ln">   226	</span>		_, _, err1 = RawSyscall(sys_SETUID, uintptr(cred.Uid), 0, 0)
+<span id="L227" class="ln">   227	</span>		if err1 != 0 {
+<span id="L228" class="ln">   228	</span>			goto childerror
+<span id="L229" class="ln">   229	</span>		}
+<span id="L230" class="ln">   230	</span>	}
+<span id="L231" class="ln">   231	</span>
+<span id="L232" class="ln">   232	</span>	<span class="comment">// Chdir</span>
+<span id="L233" class="ln">   233	</span>	if dir != nil {
+<span id="L234" class="ln">   234	</span>		_, _, err1 = RawSyscall(SYS_CHDIR, uintptr(unsafe.Pointer(dir)), 0, 0)
+<span id="L235" class="ln">   235	</span>		if err1 != 0 {
+<span id="L236" class="ln">   236	</span>			goto childerror
+<span id="L237" class="ln">   237	</span>		}
+<span id="L238" class="ln">   238	</span>	}
+<span id="L239" class="ln">   239	</span>
+<span id="L240" class="ln">   240	</span>	<span class="comment">// Parent death signal</span>
+<span id="L241" class="ln">   241	</span>	if sys.Pdeathsig != 0 {
+<span id="L242" class="ln">   242	</span>		_, _, err1 = RawSyscall6(SYS_PRCTL, PR_SET_PDEATHSIG, uintptr(sys.Pdeathsig), 0, 0, 0, 0)
+<span id="L243" class="ln">   243	</span>		if err1 != 0 {
+<span id="L244" class="ln">   244	</span>			goto childerror
+<span id="L245" class="ln">   245	</span>		}
+<span id="L246" class="ln">   246	</span>
+<span id="L247" class="ln">   247	</span>		<span class="comment">// Signal self if parent is already dead. This might cause a</span>
+<span id="L248" class="ln">   248	</span>		<span class="comment">// duplicate signal in rare cases, but it won&#39;t matter when</span>
+<span id="L249" class="ln">   249	</span>		<span class="comment">// using SIGKILL.</span>
+<span id="L250" class="ln">   250	</span>		r1, _, _ = RawSyscall(SYS_GETPPID, 0, 0, 0)
+<span id="L251" class="ln">   251	</span>		if r1 != ppid {
+<span id="L252" class="ln">   252	</span>			pid, _, _ := RawSyscall(SYS_GETPID, 0, 0, 0)
+<span id="L253" class="ln">   253	</span>			_, _, err1 := RawSyscall(SYS_KILL, pid, uintptr(sys.Pdeathsig), 0)
+<span id="L254" class="ln">   254	</span>			if err1 != 0 {
+<span id="L255" class="ln">   255	</span>				goto childerror
+<span id="L256" class="ln">   256	</span>			}
+<span id="L257" class="ln">   257	</span>		}
+<span id="L258" class="ln">   258	</span>	}
+<span id="L259" class="ln">   259	</span>
+<span id="L260" class="ln">   260	</span>	<span class="comment">// Pass 1: look for fd[i] &lt; i and move those up above len(fd)</span>
+<span id="L261" class="ln">   261	</span>	<span class="comment">// so that pass 2 won&#39;t stomp on an fd it needs later.</span>
+<span id="L262" class="ln">   262	</span>	if pipe &lt; nextfd {
+<span id="L263" class="ln">   263	</span>		_, _, err1 = RawSyscall(_SYS_dup, uintptr(pipe), uintptr(nextfd), 0)
+<span id="L264" class="ln">   264	</span>		if err1 != 0 {
+<span id="L265" class="ln">   265	</span>			goto childerror
+<span id="L266" class="ln">   266	</span>		}
+<span id="L267" class="ln">   267	</span>		RawSyscall(SYS_FCNTL, uintptr(nextfd), F_SETFD, FD_CLOEXEC)
+<span id="L268" class="ln">   268	</span>		pipe = nextfd
+<span id="L269" class="ln">   269	</span>		nextfd++
+<span id="L270" class="ln">   270	</span>	}
+<span id="L271" class="ln">   271	</span>	for i = 0; i &lt; len(fd); i++ {
+<span id="L272" class="ln">   272	</span>		if fd[i] &gt;= 0 &amp;&amp; fd[i] &lt; int(i) {
+<span id="L273" class="ln">   273	</span>			if nextfd == pipe { <span class="comment">// don&#39;t stomp on pipe</span>
+<span id="L274" class="ln">   274	</span>				nextfd++
+<span id="L275" class="ln">   275	</span>			}
+<span id="L276" class="ln">   276	</span>			_, _, err1 = RawSyscall(_SYS_dup, uintptr(fd[i]), uintptr(nextfd), 0)
+<span id="L277" class="ln">   277	</span>			if err1 != 0 {
+<span id="L278" class="ln">   278	</span>				goto childerror
+<span id="L279" class="ln">   279	</span>			}
+<span id="L280" class="ln">   280	</span>			RawSyscall(SYS_FCNTL, uintptr(nextfd), F_SETFD, FD_CLOEXEC)
+<span id="L281" class="ln">   281	</span>			fd[i] = nextfd
+<span id="L282" class="ln">   282	</span>			nextfd++
+<span id="L283" class="ln">   283	</span>		}
+<span id="L284" class="ln">   284	</span>	}
+<span id="L285" class="ln">   285	</span>
+<span id="L286" class="ln">   286	</span>	<span class="comment">// Pass 2: dup fd[i] down onto i.</span>
+<span id="L287" class="ln">   287	</span>	for i = 0; i &lt; len(fd); i++ {
+<span id="L288" class="ln">   288	</span>		if fd[i] == -1 {
+<span id="L289" class="ln">   289	</span>			RawSyscall(SYS_CLOSE, uintptr(i), 0, 0)
+<span id="L290" class="ln">   290	</span>			continue
+<span id="L291" class="ln">   291	</span>		}
+<span id="L292" class="ln">   292	</span>		if fd[i] == int(i) {
+<span id="L293" class="ln">   293	</span>			<span class="comment">// dup2(i, i) won&#39;t clear close-on-exec flag on Linux,</span>
+<span id="L294" class="ln">   294	</span>			<span class="comment">// probably not elsewhere either.</span>
+<span id="L295" class="ln">   295	</span>			_, _, err1 = RawSyscall(SYS_FCNTL, uintptr(fd[i]), F_SETFD, 0)
+<span id="L296" class="ln">   296	</span>			if err1 != 0 {
+<span id="L297" class="ln">   297	</span>				goto childerror
+<span id="L298" class="ln">   298	</span>			}
+<span id="L299" class="ln">   299	</span>			continue
+<span id="L300" class="ln">   300	</span>		}
+<span id="L301" class="ln">   301	</span>		<span class="comment">// The new fd is created NOT close-on-exec,</span>
+<span id="L302" class="ln">   302	</span>		<span class="comment">// which is exactly what we want.</span>
+<span id="L303" class="ln">   303	</span>		_, _, err1 = RawSyscall(_SYS_dup, uintptr(fd[i]), uintptr(i), 0)
+<span id="L304" class="ln">   304	</span>		if err1 != 0 {
+<span id="L305" class="ln">   305	</span>			goto childerror
+<span id="L306" class="ln">   306	</span>		}
+<span id="L307" class="ln">   307	</span>	}
+<span id="L308" class="ln">   308	</span>
+<span id="L309" class="ln">   309	</span>	<span class="comment">// By convention, we don&#39;t close-on-exec the fds we are</span>
+<span id="L310" class="ln">   310	</span>	<span class="comment">// started with, so if len(fd) &lt; 3, close 0, 1, 2 as needed.</span>
+<span id="L311" class="ln">   311	</span>	<span class="comment">// Programs that know they inherit fds &gt;= 3 will need</span>
+<span id="L312" class="ln">   312	</span>	<span class="comment">// to set them close-on-exec.</span>
+<span id="L313" class="ln">   313	</span>	for i = len(fd); i &lt; 3; i++ {
+<span id="L314" class="ln">   314	</span>		RawSyscall(SYS_CLOSE, uintptr(i), 0, 0)
+<span id="L315" class="ln">   315	</span>	}
+<span id="L316" class="ln">   316	</span>
+<span id="L317" class="ln">   317	</span>	<span class="comment">// Detach fd 0 from tty</span>
+<span id="L318" class="ln">   318	</span>	if sys.Noctty {
+<span id="L319" class="ln">   319	</span>		_, _, err1 = RawSyscall(SYS_IOCTL, 0, uintptr(TIOCNOTTY), 0)
+<span id="L320" class="ln">   320	</span>		if err1 != 0 {
+<span id="L321" class="ln">   321	</span>			goto childerror
+<span id="L322" class="ln">   322	</span>		}
+<span id="L323" class="ln">   323	</span>	}
+<span id="L324" class="ln">   324	</span>
+<span id="L325" class="ln">   325	</span>	<span class="comment">// Set the controlling TTY to Ctty</span>
+<span id="L326" class="ln">   326	</span>	if sys.Setctty {
+<span id="L327" class="ln">   327	</span>		_, _, err1 = RawSyscall(SYS_IOCTL, uintptr(sys.Ctty), uintptr(TIOCSCTTY), 0)
+<span id="L328" class="ln">   328	</span>		if err1 != 0 {
+<span id="L329" class="ln">   329	</span>			goto childerror
+<span id="L330" class="ln">   330	</span>		}
+<span id="L331" class="ln">   331	</span>	}
+<span id="L332" class="ln">   332	</span>
+<span id="L333" class="ln">   333	</span>	<span class="comment">// Time to exec.</span>
+<span id="L334" class="ln">   334	</span>	_, _, err1 = RawSyscall(SYS_EXECVE,
+<span id="L335" class="ln">   335	</span>		uintptr(unsafe.Pointer(argv0)),
+<span id="L336" class="ln">   336	</span>		uintptr(unsafe.Pointer(&amp;argv[0])),
+<span id="L337" class="ln">   337	</span>		uintptr(unsafe.Pointer(&amp;envv[0])))
+<span id="L338" class="ln">   338	</span>
+<span id="L339" class="ln">   339	</span>childerror:
+<span id="L340" class="ln">   340	</span>	<span class="comment">// send error code on pipe</span>
+<span id="L341" class="ln">   341	</span>	RawSyscall(SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&amp;err1)), unsafe.Sizeof(err1))
+<span id="L342" class="ln">   342	</span>	for {
+<span id="L343" class="ln">   343	</span>		RawSyscall(SYS_EXIT, 253, 0, 0)
+<span id="L344" class="ln">   344	</span>	}
+<span id="L345" class="ln">   345	</span>}
+<span id="L346" class="ln">   346	</span>
+<span id="L347" class="ln">   347	</span><span class="comment">// Try to open a pipe with O_CLOEXEC set on both file descriptors.</span>
+<span id="L348" class="ln">   348	</span>func forkExecPipe(p []int) (err error) {
+<span id="L349" class="ln">   349	</span>	err = Pipe2(p, O_CLOEXEC)
+<span id="L350" class="ln">   350	</span>	<span class="comment">// pipe2 was added in 2.6.27 and our minimum requirement is 2.6.23, so it</span>
+<span id="L351" class="ln">   351	</span>	<span class="comment">// might not be implemented.</span>
+<span id="L352" class="ln">   352	</span>	if err == ENOSYS {
+<span id="L353" class="ln">   353	</span>		if err = Pipe(p); err != nil {
+<span id="L354" class="ln">   354	</span>			return
+<span id="L355" class="ln">   355	</span>		}
+<span id="L356" class="ln">   356	</span>		if _, err = fcntl(p[0], F_SETFD, FD_CLOEXEC); err != nil {
+<span id="L357" class="ln">   357	</span>			return
+<span id="L358" class="ln">   358	</span>		}
+<span id="L359" class="ln">   359	</span>		_, err = fcntl(p[1], F_SETFD, FD_CLOEXEC)
+<span id="L360" class="ln">   360	</span>	}
+<span id="L361" class="ln">   361	</span>	return
+<span id="L362" class="ln">   362	</span>}
+<span id="L363" class="ln">   363	</span>
+<span id="L364" class="ln">   364	</span><span class="comment">// writeIDMappings writes the user namespace User ID or Group ID mappings to the specified path.</span>
+<span id="L365" class="ln">   365	</span>func writeIDMappings(path string, idMap []SysProcIDMap) error {
+<span id="L366" class="ln">   366	</span>	fd, err := Open(path, O_RDWR, 0)
+<span id="L367" class="ln">   367	</span>	if err != nil {
+<span id="L368" class="ln">   368	</span>		return err
+<span id="L369" class="ln">   369	</span>	}
+<span id="L370" class="ln">   370	</span>
+<span id="L371" class="ln">   371	</span>	data := &#34;&#34;
+<span id="L372" class="ln">   372	</span>	for _, im := range idMap {
+<span id="L373" class="ln">   373	</span>		data = data + itoa(im.ContainerID) + &#34; &#34; + itoa(im.HostID) + &#34; &#34; + itoa(im.Size) + &#34;\n&#34;
+<span id="L374" class="ln">   374	</span>	}
+<span id="L375" class="ln">   375	</span>
+<span id="L376" class="ln">   376	</span>	bytes, err := ByteSliceFromString(data)
+<span id="L377" class="ln">   377	</span>	if err != nil {
+<span id="L378" class="ln">   378	</span>		Close(fd)
+<span id="L379" class="ln">   379	</span>		return err
+<span id="L380" class="ln">   380	</span>	}
+<span id="L381" class="ln">   381	</span>
+<span id="L382" class="ln">   382	</span>	if _, err := Write(fd, bytes); err != nil {
+<span id="L383" class="ln">   383	</span>		Close(fd)
+<span id="L384" class="ln">   384	</span>		return err
+<span id="L385" class="ln">   385	</span>	}
+<span id="L386" class="ln">   386	</span>
+<span id="L387" class="ln">   387	</span>	if err := Close(fd); err != nil {
+<span id="L388" class="ln">   388	</span>		return err
+<span id="L389" class="ln">   389	</span>	}
+<span id="L390" class="ln">   390	</span>
+<span id="L391" class="ln">   391	</span>	return nil
+<span id="L392" class="ln">   392	</span>}
+<span id="L393" class="ln">   393	</span>
+<span id="L394" class="ln">   394	</span><span class="comment">// writeSetgroups writes to /proc/PID/setgroups &#34;deny&#34; if enable is false</span>
+<span id="L395" class="ln">   395	</span><span class="comment">// and &#34;allow&#34; if enable is true.</span>
+<span id="L396" class="ln">   396	</span><span class="comment">// This is needed since kernel 3.19, because you can&#39;t write gid_map without</span>
+<span id="L397" class="ln">   397	</span><span class="comment">// disabling setgroups() system call.</span>
+<span id="L398" class="ln">   398	</span>func writeSetgroups(pid int, enable bool) error {
+<span id="L399" class="ln">   399	</span>	sgf := &#34;/proc/&#34; + itoa(pid) + &#34;/setgroups&#34;
+<span id="L400" class="ln">   400	</span>	fd, err := Open(sgf, O_RDWR, 0)
+<span id="L401" class="ln">   401	</span>	if err != nil {
+<span id="L402" class="ln">   402	</span>		return err
+<span id="L403" class="ln">   403	</span>	}
+<span id="L404" class="ln">   404	</span>
+<span id="L405" class="ln">   405	</span>	var data []byte
+<span id="L406" class="ln">   406	</span>	if enable {
+<span id="L407" class="ln">   407	</span>		data = []byte(&#34;allow&#34;)
+<span id="L408" class="ln">   408	</span>	} else {
+<span id="L409" class="ln">   409	</span>		data = []byte(&#34;deny&#34;)
+<span id="L410" class="ln">   410	</span>	}
+<span id="L411" class="ln">   411	</span>
+<span id="L412" class="ln">   412	</span>	if _, err := Write(fd, data); err != nil {
+<span id="L413" class="ln">   413	</span>		Close(fd)
+<span id="L414" class="ln">   414	</span>		return err
+<span id="L415" class="ln">   415	</span>	}
+<span id="L416" class="ln">   416	</span>
+<span id="L417" class="ln">   417	</span>	return Close(fd)
+<span id="L418" class="ln">   418	</span>}
+<span id="L419" class="ln">   419	</span>
+<span id="L420" class="ln">   420	</span><span class="comment">// writeUidGidMappings writes User ID and Group ID mappings for user namespaces</span>
+<span id="L421" class="ln">   421	</span><span class="comment">// for a process and it is called from the parent process.</span>
+<span id="L422" class="ln">   422	</span>func writeUidGidMappings(pid int, sys *SysProcAttr) error {
+<span id="L423" class="ln">   423	</span>	if sys.UidMappings != nil {
+<span id="L424" class="ln">   424	</span>		uidf := &#34;/proc/&#34; + itoa(pid) + &#34;/uid_map&#34;
+<span id="L425" class="ln">   425	</span>		if err := writeIDMappings(uidf, sys.UidMappings); err != nil {
+<span id="L426" class="ln">   426	</span>			return err
+<span id="L427" class="ln">   427	</span>		}
+<span id="L428" class="ln">   428	</span>	}
+<span id="L429" class="ln">   429	</span>
+<span id="L430" class="ln">   430	</span>	if sys.GidMappings != nil {
+<span id="L431" class="ln">   431	</span>		<span class="comment">// If the kernel is too old to support /proc/PID/setgroups, writeSetGroups will return ENOENT; this is OK.</span>
+<span id="L432" class="ln">   432	</span>		if err := writeSetgroups(pid, sys.GidMappingsEnableSetgroups); err != nil &amp;&amp; err != ENOENT {
+<span id="L433" class="ln">   433	</span>			return err
+<span id="L434" class="ln">   434	</span>		}
+<span id="L435" class="ln">   435	</span>		gidf := &#34;/proc/&#34; + itoa(pid) + &#34;/gid_map&#34;
+<span id="L436" class="ln">   436	</span>		if err := writeIDMappings(gidf, sys.GidMappings); err != nil {
+<span id="L437" class="ln">   437	</span>			return err
+<span id="L438" class="ln">   438	</span>		}
+<span id="L439" class="ln">   439	</span>	}
+<span id="L440" class="ln">   440	</span>
+<span id="L441" class="ln">   441	</span>	return nil
+<span id="L442" class="ln">   442	</span>}
+<span id="L443" class="ln">   443	</span>
+</pre><p><a href="exec_linux.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

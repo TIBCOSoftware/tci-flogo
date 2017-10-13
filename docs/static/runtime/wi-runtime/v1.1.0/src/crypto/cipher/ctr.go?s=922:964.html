@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/cipher/ctr.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./ctr.go%3Fs=922:964.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/crypto/cipher/ctr.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// Counter (CTR) mode.</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span><span class="comment">// CTR converts a block cipher into a stream cipher by</span>
+<span id="L8" class="ln">     8	</span><span class="comment">// repeatedly encrypting an incrementing counter and</span>
+<span id="L9" class="ln">     9	</span><span class="comment">// xoring the resulting stream of data with the input.</span>
+<span id="L10" class="ln">    10	</span>
+<span id="L11" class="ln">    11	</span><span class="comment">// See NIST SP 800-38A, pp 13-15</span>
+<span id="L12" class="ln">    12	</span>
+<span id="L13" class="ln">    13	</span>package cipher
+<span id="L14" class="ln">    14	</span>
+<span id="L15" class="ln">    15	</span>type ctr struct {
+<span id="L16" class="ln">    16	</span>	b       Block
+<span id="L17" class="ln">    17	</span>	ctr     []byte
+<span id="L18" class="ln">    18	</span>	out     []byte
+<span id="L19" class="ln">    19	</span>	outUsed int
+<span id="L20" class="ln">    20	</span>}
+<span id="L21" class="ln">    21	</span>
+<span id="L22" class="ln">    22	</span>const streamBufferSize = 512
+<span id="L23" class="ln">    23	</span>
+<span id="L24" class="ln">    24	</span><span class="comment">// ctrAble is an interface implemented by ciphers that have a specific optimized</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// implementation of CTR, like crypto/aes. NewCTR will check for this interface</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// and return the specific Stream if found.</span>
+<span id="L27" class="ln">    27	</span>type ctrAble interface {
+<span id="L28" class="ln">    28	</span>	NewCTR(iv []byte) Stream
+<span id="L29" class="ln">    29	</span>}
+<span id="L30" class="ln">    30	</span>
+<span id="L31" class="ln">    31	</span><span class="comment">// NewCTR returns a Stream which encrypts/decrypts using the given Block in</span>
+<span id="L32" class="ln">    32	</span><span class="comment">// counter mode. The length of iv must be the same as the Block&#39;s block size.</span>
+<span id="L33" class="ln">    33	</span><span class="selection">func NewCTR(block Block, iv []byte) Stream</span> {
+<span id="L34" class="ln">    34	</span>	if ctr, ok := block.(ctrAble); ok {
+<span id="L35" class="ln">    35	</span>		return ctr.NewCTR(iv)
+<span id="L36" class="ln">    36	</span>	}
+<span id="L37" class="ln">    37	</span>	if len(iv) != block.BlockSize() {
+<span id="L38" class="ln">    38	</span>		panic(&#34;cipher.NewCTR: IV length must equal block size&#34;)
+<span id="L39" class="ln">    39	</span>	}
+<span id="L40" class="ln">    40	</span>	bufSize := streamBufferSize
+<span id="L41" class="ln">    41	</span>	if bufSize &lt; block.BlockSize() {
+<span id="L42" class="ln">    42	</span>		bufSize = block.BlockSize()
+<span id="L43" class="ln">    43	</span>	}
+<span id="L44" class="ln">    44	</span>	return &amp;ctr{
+<span id="L45" class="ln">    45	</span>		b:       block,
+<span id="L46" class="ln">    46	</span>		ctr:     dup(iv),
+<span id="L47" class="ln">    47	</span>		out:     make([]byte, 0, bufSize),
+<span id="L48" class="ln">    48	</span>		outUsed: 0,
+<span id="L49" class="ln">    49	</span>	}
+<span id="L50" class="ln">    50	</span>}
+<span id="L51" class="ln">    51	</span>
+<span id="L52" class="ln">    52	</span>func (x *ctr) refill() {
+<span id="L53" class="ln">    53	</span>	remain := len(x.out) - x.outUsed
+<span id="L54" class="ln">    54	</span>	copy(x.out, x.out[x.outUsed:])
+<span id="L55" class="ln">    55	</span>	x.out = x.out[:cap(x.out)]
+<span id="L56" class="ln">    56	</span>	bs := x.b.BlockSize()
+<span id="L57" class="ln">    57	</span>	for remain &lt;= len(x.out)-bs {
+<span id="L58" class="ln">    58	</span>		x.b.Encrypt(x.out[remain:], x.ctr)
+<span id="L59" class="ln">    59	</span>		remain += bs
+<span id="L60" class="ln">    60	</span>
+<span id="L61" class="ln">    61	</span>		<span class="comment">// Increment counter</span>
+<span id="L62" class="ln">    62	</span>		for i := len(x.ctr) - 1; i &gt;= 0; i-- {
+<span id="L63" class="ln">    63	</span>			x.ctr[i]++
+<span id="L64" class="ln">    64	</span>			if x.ctr[i] != 0 {
+<span id="L65" class="ln">    65	</span>				break
+<span id="L66" class="ln">    66	</span>			}
+<span id="L67" class="ln">    67	</span>		}
+<span id="L68" class="ln">    68	</span>	}
+<span id="L69" class="ln">    69	</span>	x.out = x.out[:remain]
+<span id="L70" class="ln">    70	</span>	x.outUsed = 0
+<span id="L71" class="ln">    71	</span>}
+<span id="L72" class="ln">    72	</span>
+<span id="L73" class="ln">    73	</span>func (x *ctr) XORKeyStream(dst, src []byte) {
+<span id="L74" class="ln">    74	</span>	for len(src) &gt; 0 {
+<span id="L75" class="ln">    75	</span>		if x.outUsed &gt;= len(x.out)-x.b.BlockSize() {
+<span id="L76" class="ln">    76	</span>			x.refill()
+<span id="L77" class="ln">    77	</span>		}
+<span id="L78" class="ln">    78	</span>		n := xorBytes(dst, src, x.out[x.outUsed:])
+<span id="L79" class="ln">    79	</span>		dst = dst[n:]
+<span id="L80" class="ln">    80	</span>		src = src[n:]
+<span id="L81" class="ln">    81	</span>		x.outUsed += n
+<span id="L82" class="ln">    82	</span>	}
+<span id="L83" class="ln">    83	</span>}
+<span id="L84" class="ln">    84	</span>
+</pre><p><a href="ctr.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

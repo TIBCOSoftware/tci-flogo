@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/http/request.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./request.go%3Fs=29113:29164.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/net/http/request.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// HTTP Request reading and parsing.</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package http
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;bufio&#34;
+<span id="L11" class="ln">    11	</span>	&#34;bytes&#34;
+<span id="L12" class="ln">    12	</span>	&#34;context&#34;
+<span id="L13" class="ln">    13	</span>	&#34;crypto/tls&#34;
+<span id="L14" class="ln">    14	</span>	&#34;encoding/base64&#34;
+<span id="L15" class="ln">    15	</span>	&#34;errors&#34;
+<span id="L16" class="ln">    16	</span>	&#34;fmt&#34;
+<span id="L17" class="ln">    17	</span>	&#34;io&#34;
+<span id="L18" class="ln">    18	</span>	&#34;io/ioutil&#34;
+<span id="L19" class="ln">    19	</span>	&#34;mime&#34;
+<span id="L20" class="ln">    20	</span>	&#34;mime/multipart&#34;
+<span id="L21" class="ln">    21	</span>	&#34;net&#34;
+<span id="L22" class="ln">    22	</span>	&#34;net/http/httptrace&#34;
+<span id="L23" class="ln">    23	</span>	&#34;net/textproto&#34;
+<span id="L24" class="ln">    24	</span>	&#34;net/url&#34;
+<span id="L25" class="ln">    25	</span>	&#34;strconv&#34;
+<span id="L26" class="ln">    26	</span>	&#34;strings&#34;
+<span id="L27" class="ln">    27	</span>	&#34;sync&#34;
+<span id="L28" class="ln">    28	</span>
+<span id="L29" class="ln">    29	</span>	&#34;golang_org/x/net/idna&#34;
+<span id="L30" class="ln">    30	</span>	&#34;golang_org/x/text/unicode/norm&#34;
+<span id="L31" class="ln">    31	</span>	&#34;golang_org/x/text/width&#34;
+<span id="L32" class="ln">    32	</span>)
+<span id="L33" class="ln">    33	</span>
+<span id="L34" class="ln">    34	</span>const (
+<span id="L35" class="ln">    35	</span>	defaultMaxMemory = 32 &lt;&lt; 20 <span class="comment">// 32 MB</span>
+<span id="L36" class="ln">    36	</span>)
+<span id="L37" class="ln">    37	</span>
+<span id="L38" class="ln">    38	</span><span class="comment">// ErrMissingFile is returned by FormFile when the provided file field name</span>
+<span id="L39" class="ln">    39	</span><span class="comment">// is either not present in the request or not a file field.</span>
+<span id="L40" class="ln">    40	</span>var ErrMissingFile = errors.New(&#34;http: no such file&#34;)
+<span id="L41" class="ln">    41	</span>
+<span id="L42" class="ln">    42	</span><span class="comment">// ProtocolError represents an HTTP protocol error.</span>
+<span id="L43" class="ln">    43	</span><span class="comment">//</span>
+<span id="L44" class="ln">    44	</span><span class="comment">// Deprecated: Not all errors in the http package related to protocol errors</span>
+<span id="L45" class="ln">    45	</span><span class="comment">// are of type ProtocolError.</span>
+<span id="L46" class="ln">    46	</span>type ProtocolError struct {
+<span id="L47" class="ln">    47	</span>	ErrorString string
+<span id="L48" class="ln">    48	</span>}
+<span id="L49" class="ln">    49	</span>
+<span id="L50" class="ln">    50	</span>func (pe *ProtocolError) Error() string { return pe.ErrorString }
+<span id="L51" class="ln">    51	</span>
+<span id="L52" class="ln">    52	</span>var (
+<span id="L53" class="ln">    53	</span>	<span class="comment">// ErrNotSupported is returned by the Push method of Pusher</span>
+<span id="L54" class="ln">    54	</span>	<span class="comment">// implementations to indicate that HTTP/2 Push support is not</span>
+<span id="L55" class="ln">    55	</span>	<span class="comment">// available.</span>
+<span id="L56" class="ln">    56	</span>	ErrNotSupported = &amp;ProtocolError{&#34;feature not supported&#34;}
+<span id="L57" class="ln">    57	</span>
+<span id="L58" class="ln">    58	</span>	<span class="comment">// ErrUnexpectedTrailer is returned by the Transport when a server</span>
+<span id="L59" class="ln">    59	</span>	<span class="comment">// replies with a Trailer header, but without a chunked reply.</span>
+<span id="L60" class="ln">    60	</span>	ErrUnexpectedTrailer = &amp;ProtocolError{&#34;trailer header without chunked transfer encoding&#34;}
+<span id="L61" class="ln">    61	</span>
+<span id="L62" class="ln">    62	</span>	<span class="comment">// ErrMissingBoundary is returned by Request.MultipartReader when the</span>
+<span id="L63" class="ln">    63	</span>	<span class="comment">// request&#39;s Content-Type does not include a &#34;boundary&#34; parameter.</span>
+<span id="L64" class="ln">    64	</span>	ErrMissingBoundary = &amp;ProtocolError{&#34;no multipart boundary param in Content-Type&#34;}
+<span id="L65" class="ln">    65	</span>
+<span id="L66" class="ln">    66	</span>	<span class="comment">// ErrNotMultipart is returned by Request.MultipartReader when the</span>
+<span id="L67" class="ln">    67	</span>	<span class="comment">// request&#39;s Content-Type is not multipart/form-data.</span>
+<span id="L68" class="ln">    68	</span>	ErrNotMultipart = &amp;ProtocolError{&#34;request Content-Type isn&#39;t multipart/form-data&#34;}
+<span id="L69" class="ln">    69	</span>
+<span id="L70" class="ln">    70	</span>	<span class="comment">// Deprecated: ErrHeaderTooLong is not used.</span>
+<span id="L71" class="ln">    71	</span>	ErrHeaderTooLong = &amp;ProtocolError{&#34;header too long&#34;}
+<span id="L72" class="ln">    72	</span>	<span class="comment">// Deprecated: ErrShortBody is not used.</span>
+<span id="L73" class="ln">    73	</span>	ErrShortBody = &amp;ProtocolError{&#34;entity body too short&#34;}
+<span id="L74" class="ln">    74	</span>	<span class="comment">// Deprecated: ErrMissingContentLength is not used.</span>
+<span id="L75" class="ln">    75	</span>	ErrMissingContentLength = &amp;ProtocolError{&#34;missing ContentLength in HEAD response&#34;}
+<span id="L76" class="ln">    76	</span>)
+<span id="L77" class="ln">    77	</span>
+<span id="L78" class="ln">    78	</span>type badStringError struct {
+<span id="L79" class="ln">    79	</span>	what string
+<span id="L80" class="ln">    80	</span>	str  string
+<span id="L81" class="ln">    81	</span>}
+<span id="L82" class="ln">    82	</span>
+<span id="L83" class="ln">    83	</span>func (e *badStringError) Error() string { return fmt.Sprintf(&#34;%s %q&#34;, e.what, e.str) }
+<span id="L84" class="ln">    84	</span>
+<span id="L85" class="ln">    85	</span><span class="comment">// Headers that Request.Write handles itself and should be skipped.</span>
+<span id="L86" class="ln">    86	</span>var reqWriteExcludeHeader = map[string]bool{
+<span id="L87" class="ln">    87	</span>	&#34;Host&#34;:              true, <span class="comment">// not in Header map anyway</span>
+<span id="L88" class="ln">    88	</span>	&#34;User-Agent&#34;:        true,
+<span id="L89" class="ln">    89	</span>	&#34;Content-Length&#34;:    true,
+<span id="L90" class="ln">    90	</span>	&#34;Transfer-Encoding&#34;: true,
+<span id="L91" class="ln">    91	</span>	&#34;Trailer&#34;:           true,
+<span id="L92" class="ln">    92	</span>}
+<span id="L93" class="ln">    93	</span>
+<span id="L94" class="ln">    94	</span><span class="comment">// A Request represents an HTTP request received by a server</span>
+<span id="L95" class="ln">    95	</span><span class="comment">// or to be sent by a client.</span>
+<span id="L96" class="ln">    96	</span><span class="comment">//</span>
+<span id="L97" class="ln">    97	</span><span class="comment">// The field semantics differ slightly between client and server</span>
+<span id="L98" class="ln">    98	</span><span class="comment">// usage. In addition to the notes on the fields below, see the</span>
+<span id="L99" class="ln">    99	</span><span class="comment">// documentation for Request.Write and RoundTripper.</span>
+<span id="L100" class="ln">   100	</span>type Request struct {
+<span id="L101" class="ln">   101	</span>	<span class="comment">// Method specifies the HTTP method (GET, POST, PUT, etc.).</span>
+<span id="L102" class="ln">   102	</span>	<span class="comment">// For client requests an empty string means GET.</span>
+<span id="L103" class="ln">   103	</span>	Method string
+<span id="L104" class="ln">   104	</span>
+<span id="L105" class="ln">   105	</span>	<span class="comment">// URL specifies either the URI being requested (for server</span>
+<span id="L106" class="ln">   106	</span>	<span class="comment">// requests) or the URL to access (for client requests).</span>
+<span id="L107" class="ln">   107	</span>	<span class="comment">//</span>
+<span id="L108" class="ln">   108	</span>	<span class="comment">// For server requests the URL is parsed from the URI</span>
+<span id="L109" class="ln">   109	</span>	<span class="comment">// supplied on the Request-Line as stored in RequestURI.  For</span>
+<span id="L110" class="ln">   110	</span>	<span class="comment">// most requests, fields other than Path and RawQuery will be</span>
+<span id="L111" class="ln">   111	</span>	<span class="comment">// empty. (See RFC 2616, Section 5.1.2)</span>
+<span id="L112" class="ln">   112	</span>	<span class="comment">//</span>
+<span id="L113" class="ln">   113	</span>	<span class="comment">// For client requests, the URL&#39;s Host specifies the server to</span>
+<span id="L114" class="ln">   114	</span>	<span class="comment">// connect to, while the Request&#39;s Host field optionally</span>
+<span id="L115" class="ln">   115	</span>	<span class="comment">// specifies the Host header value to send in the HTTP</span>
+<span id="L116" class="ln">   116	</span>	<span class="comment">// request.</span>
+<span id="L117" class="ln">   117	</span>	URL *url.URL
+<span id="L118" class="ln">   118	</span>
+<span id="L119" class="ln">   119	</span>	<span class="comment">// The protocol version for incoming server requests.</span>
+<span id="L120" class="ln">   120	</span>	<span class="comment">//</span>
+<span id="L121" class="ln">   121	</span>	<span class="comment">// For client requests these fields are ignored. The HTTP</span>
+<span id="L122" class="ln">   122	</span>	<span class="comment">// client code always uses either HTTP/1.1 or HTTP/2.</span>
+<span id="L123" class="ln">   123	</span>	<span class="comment">// See the docs on Transport for details.</span>
+<span id="L124" class="ln">   124	</span>	Proto      string <span class="comment">// &#34;HTTP/1.0&#34;</span>
+<span id="L125" class="ln">   125	</span>	ProtoMajor int    <span class="comment">// 1</span>
+<span id="L126" class="ln">   126	</span>	ProtoMinor int    <span class="comment">// 0</span>
+<span id="L127" class="ln">   127	</span>
+<span id="L128" class="ln">   128	</span>	<span class="comment">// Header contains the request header fields either received</span>
+<span id="L129" class="ln">   129	</span>	<span class="comment">// by the server or to be sent by the client.</span>
+<span id="L130" class="ln">   130	</span>	<span class="comment">//</span>
+<span id="L131" class="ln">   131	</span>	<span class="comment">// If a server received a request with header lines,</span>
+<span id="L132" class="ln">   132	</span>	<span class="comment">//</span>
+<span id="L133" class="ln">   133	</span>	<span class="comment">//	Host: example.com</span>
+<span id="L134" class="ln">   134	</span>	<span class="comment">//	accept-encoding: gzip, deflate</span>
+<span id="L135" class="ln">   135	</span>	<span class="comment">//	Accept-Language: en-us</span>
+<span id="L136" class="ln">   136	</span>	<span class="comment">//	fOO: Bar</span>
+<span id="L137" class="ln">   137	</span>	<span class="comment">//	foo: two</span>
+<span id="L138" class="ln">   138	</span>	<span class="comment">//</span>
+<span id="L139" class="ln">   139	</span>	<span class="comment">// then</span>
+<span id="L140" class="ln">   140	</span>	<span class="comment">//</span>
+<span id="L141" class="ln">   141	</span>	<span class="comment">//	Header = map[string][]string{</span>
+<span id="L142" class="ln">   142	</span>	<span class="comment">//		&#34;Accept-Encoding&#34;: {&#34;gzip, deflate&#34;},</span>
+<span id="L143" class="ln">   143	</span>	<span class="comment">//		&#34;Accept-Language&#34;: {&#34;en-us&#34;},</span>
+<span id="L144" class="ln">   144	</span>	<span class="comment">//		&#34;Foo&#34;: {&#34;Bar&#34;, &#34;two&#34;},</span>
+<span id="L145" class="ln">   145	</span>	<span class="comment">//	}</span>
+<span id="L146" class="ln">   146	</span>	<span class="comment">//</span>
+<span id="L147" class="ln">   147	</span>	<span class="comment">// For incoming requests, the Host header is promoted to the</span>
+<span id="L148" class="ln">   148	</span>	<span class="comment">// Request.Host field and removed from the Header map.</span>
+<span id="L149" class="ln">   149	</span>	<span class="comment">//</span>
+<span id="L150" class="ln">   150	</span>	<span class="comment">// HTTP defines that header names are case-insensitive. The</span>
+<span id="L151" class="ln">   151	</span>	<span class="comment">// request parser implements this by using CanonicalHeaderKey,</span>
+<span id="L152" class="ln">   152	</span>	<span class="comment">// making the first character and any characters following a</span>
+<span id="L153" class="ln">   153	</span>	<span class="comment">// hyphen uppercase and the rest lowercase.</span>
+<span id="L154" class="ln">   154	</span>	<span class="comment">//</span>
+<span id="L155" class="ln">   155	</span>	<span class="comment">// For client requests, certain headers such as Content-Length</span>
+<span id="L156" class="ln">   156	</span>	<span class="comment">// and Connection are automatically written when needed and</span>
+<span id="L157" class="ln">   157	</span>	<span class="comment">// values in Header may be ignored. See the documentation</span>
+<span id="L158" class="ln">   158	</span>	<span class="comment">// for the Request.Write method.</span>
+<span id="L159" class="ln">   159	</span>	Header Header
+<span id="L160" class="ln">   160	</span>
+<span id="L161" class="ln">   161	</span>	<span class="comment">// Body is the request&#39;s body.</span>
+<span id="L162" class="ln">   162	</span>	<span class="comment">//</span>
+<span id="L163" class="ln">   163	</span>	<span class="comment">// For client requests a nil body means the request has no</span>
+<span id="L164" class="ln">   164	</span>	<span class="comment">// body, such as a GET request. The HTTP Client&#39;s Transport</span>
+<span id="L165" class="ln">   165	</span>	<span class="comment">// is responsible for calling the Close method.</span>
+<span id="L166" class="ln">   166	</span>	<span class="comment">//</span>
+<span id="L167" class="ln">   167	</span>	<span class="comment">// For server requests the Request Body is always non-nil</span>
+<span id="L168" class="ln">   168	</span>	<span class="comment">// but will return EOF immediately when no body is present.</span>
+<span id="L169" class="ln">   169	</span>	<span class="comment">// The Server will close the request body. The ServeHTTP</span>
+<span id="L170" class="ln">   170	</span>	<span class="comment">// Handler does not need to.</span>
+<span id="L171" class="ln">   171	</span>	Body io.ReadCloser
+<span id="L172" class="ln">   172	</span>
+<span id="L173" class="ln">   173	</span>	<span class="comment">// GetBody defines an optional func to return a new copy of</span>
+<span id="L174" class="ln">   174	</span>	<span class="comment">// Body. It is used for client requests when a redirect requires</span>
+<span id="L175" class="ln">   175	</span>	<span class="comment">// reading the body more than once. Use of GetBody still</span>
+<span id="L176" class="ln">   176	</span>	<span class="comment">// requires setting Body.</span>
+<span id="L177" class="ln">   177	</span>	<span class="comment">//</span>
+<span id="L178" class="ln">   178	</span>	<span class="comment">// For server requests it is unused.</span>
+<span id="L179" class="ln">   179	</span>	GetBody func() (io.ReadCloser, error)
+<span id="L180" class="ln">   180	</span>
+<span id="L181" class="ln">   181	</span>	<span class="comment">// ContentLength records the length of the associated content.</span>
+<span id="L182" class="ln">   182	</span>	<span class="comment">// The value -1 indicates that the length is unknown.</span>
+<span id="L183" class="ln">   183	</span>	<span class="comment">// Values &gt;= 0 indicate that the given number of bytes may</span>
+<span id="L184" class="ln">   184	</span>	<span class="comment">// be read from Body.</span>
+<span id="L185" class="ln">   185	</span>	<span class="comment">// For client requests, a value of 0 with a non-nil Body is</span>
+<span id="L186" class="ln">   186	</span>	<span class="comment">// also treated as unknown.</span>
+<span id="L187" class="ln">   187	</span>	ContentLength int64
+<span id="L188" class="ln">   188	</span>
+<span id="L189" class="ln">   189	</span>	<span class="comment">// TransferEncoding lists the transfer encodings from outermost to</span>
+<span id="L190" class="ln">   190	</span>	<span class="comment">// innermost. An empty list denotes the &#34;identity&#34; encoding.</span>
+<span id="L191" class="ln">   191	</span>	<span class="comment">// TransferEncoding can usually be ignored; chunked encoding is</span>
+<span id="L192" class="ln">   192	</span>	<span class="comment">// automatically added and removed as necessary when sending and</span>
+<span id="L193" class="ln">   193	</span>	<span class="comment">// receiving requests.</span>
+<span id="L194" class="ln">   194	</span>	TransferEncoding []string
+<span id="L195" class="ln">   195	</span>
+<span id="L196" class="ln">   196	</span>	<span class="comment">// Close indicates whether to close the connection after</span>
+<span id="L197" class="ln">   197	</span>	<span class="comment">// replying to this request (for servers) or after sending this</span>
+<span id="L198" class="ln">   198	</span>	<span class="comment">// request and reading its response (for clients).</span>
+<span id="L199" class="ln">   199	</span>	<span class="comment">//</span>
+<span id="L200" class="ln">   200	</span>	<span class="comment">// For server requests, the HTTP server handles this automatically</span>
+<span id="L201" class="ln">   201	</span>	<span class="comment">// and this field is not needed by Handlers.</span>
+<span id="L202" class="ln">   202	</span>	<span class="comment">//</span>
+<span id="L203" class="ln">   203	</span>	<span class="comment">// For client requests, setting this field prevents re-use of</span>
+<span id="L204" class="ln">   204	</span>	<span class="comment">// TCP connections between requests to the same hosts, as if</span>
+<span id="L205" class="ln">   205	</span>	<span class="comment">// Transport.DisableKeepAlives were set.</span>
+<span id="L206" class="ln">   206	</span>	Close bool
+<span id="L207" class="ln">   207	</span>
+<span id="L208" class="ln">   208	</span>	<span class="comment">// For server requests Host specifies the host on which the</span>
+<span id="L209" class="ln">   209	</span>	<span class="comment">// URL is sought. Per RFC 2616, this is either the value of</span>
+<span id="L210" class="ln">   210	</span>	<span class="comment">// the &#34;Host&#34; header or the host name given in the URL itself.</span>
+<span id="L211" class="ln">   211	</span>	<span class="comment">// It may be of the form &#34;host:port&#34;. For international domain</span>
+<span id="L212" class="ln">   212	</span>	<span class="comment">// names, Host may be in Punycode or Unicode form. Use</span>
+<span id="L213" class="ln">   213	</span>	<span class="comment">// golang.org/x/net/idna to convert it to either format if</span>
+<span id="L214" class="ln">   214	</span>	<span class="comment">// needed.</span>
+<span id="L215" class="ln">   215	</span>	<span class="comment">//</span>
+<span id="L216" class="ln">   216	</span>	<span class="comment">// For client requests Host optionally overrides the Host</span>
+<span id="L217" class="ln">   217	</span>	<span class="comment">// header to send. If empty, the Request.Write method uses</span>
+<span id="L218" class="ln">   218	</span>	<span class="comment">// the value of URL.Host. Host may contain an international</span>
+<span id="L219" class="ln">   219	</span>	<span class="comment">// domain name.</span>
+<span id="L220" class="ln">   220	</span>	Host string
+<span id="L221" class="ln">   221	</span>
+<span id="L222" class="ln">   222	</span>	<span class="comment">// Form contains the parsed form data, including both the URL</span>
+<span id="L223" class="ln">   223	</span>	<span class="comment">// field&#39;s query parameters and the POST or PUT form data.</span>
+<span id="L224" class="ln">   224	</span>	<span class="comment">// This field is only available after ParseForm is called.</span>
+<span id="L225" class="ln">   225	</span>	<span class="comment">// The HTTP client ignores Form and uses Body instead.</span>
+<span id="L226" class="ln">   226	</span>	Form url.Values
+<span id="L227" class="ln">   227	</span>
+<span id="L228" class="ln">   228	</span>	<span class="comment">// PostForm contains the parsed form data from POST, PATCH,</span>
+<span id="L229" class="ln">   229	</span>	<span class="comment">// or PUT body parameters.</span>
+<span id="L230" class="ln">   230	</span>	<span class="comment">//</span>
+<span id="L231" class="ln">   231	</span>	<span class="comment">// This field is only available after ParseForm is called.</span>
+<span id="L232" class="ln">   232	</span>	<span class="comment">// The HTTP client ignores PostForm and uses Body instead.</span>
+<span id="L233" class="ln">   233	</span>	PostForm url.Values
+<span id="L234" class="ln">   234	</span>
+<span id="L235" class="ln">   235	</span>	<span class="comment">// MultipartForm is the parsed multipart form, including file uploads.</span>
+<span id="L236" class="ln">   236	</span>	<span class="comment">// This field is only available after ParseMultipartForm is called.</span>
+<span id="L237" class="ln">   237	</span>	<span class="comment">// The HTTP client ignores MultipartForm and uses Body instead.</span>
+<span id="L238" class="ln">   238	</span>	MultipartForm *multipart.Form
+<span id="L239" class="ln">   239	</span>
+<span id="L240" class="ln">   240	</span>	<span class="comment">// Trailer specifies additional headers that are sent after the request</span>
+<span id="L241" class="ln">   241	</span>	<span class="comment">// body.</span>
+<span id="L242" class="ln">   242	</span>	<span class="comment">//</span>
+<span id="L243" class="ln">   243	</span>	<span class="comment">// For server requests the Trailer map initially contains only the</span>
+<span id="L244" class="ln">   244	</span>	<span class="comment">// trailer keys, with nil values. (The client declares which trailers it</span>
+<span id="L245" class="ln">   245	</span>	<span class="comment">// will later send.)  While the handler is reading from Body, it must</span>
+<span id="L246" class="ln">   246	</span>	<span class="comment">// not reference Trailer. After reading from Body returns EOF, Trailer</span>
+<span id="L247" class="ln">   247	</span>	<span class="comment">// can be read again and will contain non-nil values, if they were sent</span>
+<span id="L248" class="ln">   248	</span>	<span class="comment">// by the client.</span>
+<span id="L249" class="ln">   249	</span>	<span class="comment">//</span>
+<span id="L250" class="ln">   250	</span>	<span class="comment">// For client requests Trailer must be initialized to a map containing</span>
+<span id="L251" class="ln">   251	</span>	<span class="comment">// the trailer keys to later send. The values may be nil or their final</span>
+<span id="L252" class="ln">   252	</span>	<span class="comment">// values. The ContentLength must be 0 or -1, to send a chunked request.</span>
+<span id="L253" class="ln">   253	</span>	<span class="comment">// After the HTTP request is sent the map values can be updated while</span>
+<span id="L254" class="ln">   254	</span>	<span class="comment">// the request body is read. Once the body returns EOF, the caller must</span>
+<span id="L255" class="ln">   255	</span>	<span class="comment">// not mutate Trailer.</span>
+<span id="L256" class="ln">   256	</span>	<span class="comment">//</span>
+<span id="L257" class="ln">   257	</span>	<span class="comment">// Few HTTP clients, servers, or proxies support HTTP trailers.</span>
+<span id="L258" class="ln">   258	</span>	Trailer Header
+<span id="L259" class="ln">   259	</span>
+<span id="L260" class="ln">   260	</span>	<span class="comment">// RemoteAddr allows HTTP servers and other software to record</span>
+<span id="L261" class="ln">   261	</span>	<span class="comment">// the network address that sent the request, usually for</span>
+<span id="L262" class="ln">   262	</span>	<span class="comment">// logging. This field is not filled in by ReadRequest and</span>
+<span id="L263" class="ln">   263	</span>	<span class="comment">// has no defined format. The HTTP server in this package</span>
+<span id="L264" class="ln">   264	</span>	<span class="comment">// sets RemoteAddr to an &#34;IP:port&#34; address before invoking a</span>
+<span id="L265" class="ln">   265	</span>	<span class="comment">// handler.</span>
+<span id="L266" class="ln">   266	</span>	<span class="comment">// This field is ignored by the HTTP client.</span>
+<span id="L267" class="ln">   267	</span>	RemoteAddr string
+<span id="L268" class="ln">   268	</span>
+<span id="L269" class="ln">   269	</span>	<span class="comment">// RequestURI is the unmodified Request-URI of the</span>
+<span id="L270" class="ln">   270	</span>	<span class="comment">// Request-Line (RFC 2616, Section 5.1) as sent by the client</span>
+<span id="L271" class="ln">   271	</span>	<span class="comment">// to a server. Usually the URL field should be used instead.</span>
+<span id="L272" class="ln">   272	</span>	<span class="comment">// It is an error to set this field in an HTTP client request.</span>
+<span id="L273" class="ln">   273	</span>	RequestURI string
+<span id="L274" class="ln">   274	</span>
+<span id="L275" class="ln">   275	</span>	<span class="comment">// TLS allows HTTP servers and other software to record</span>
+<span id="L276" class="ln">   276	</span>	<span class="comment">// information about the TLS connection on which the request</span>
+<span id="L277" class="ln">   277	</span>	<span class="comment">// was received. This field is not filled in by ReadRequest.</span>
+<span id="L278" class="ln">   278	</span>	<span class="comment">// The HTTP server in this package sets the field for</span>
+<span id="L279" class="ln">   279	</span>	<span class="comment">// TLS-enabled connections before invoking a handler;</span>
+<span id="L280" class="ln">   280	</span>	<span class="comment">// otherwise it leaves the field nil.</span>
+<span id="L281" class="ln">   281	</span>	<span class="comment">// This field is ignored by the HTTP client.</span>
+<span id="L282" class="ln">   282	</span>	TLS *tls.ConnectionState
+<span id="L283" class="ln">   283	</span>
+<span id="L284" class="ln">   284	</span>	<span class="comment">// Cancel is an optional channel whose closure indicates that the client</span>
+<span id="L285" class="ln">   285	</span>	<span class="comment">// request should be regarded as canceled. Not all implementations of</span>
+<span id="L286" class="ln">   286	</span>	<span class="comment">// RoundTripper may support Cancel.</span>
+<span id="L287" class="ln">   287	</span>	<span class="comment">//</span>
+<span id="L288" class="ln">   288	</span>	<span class="comment">// For server requests, this field is not applicable.</span>
+<span id="L289" class="ln">   289	</span>	<span class="comment">//</span>
+<span id="L290" class="ln">   290	</span>	<span class="comment">// Deprecated: Use the Context and WithContext methods</span>
+<span id="L291" class="ln">   291	</span>	<span class="comment">// instead. If a Request&#39;s Cancel field and context are both</span>
+<span id="L292" class="ln">   292	</span>	<span class="comment">// set, it is undefined whether Cancel is respected.</span>
+<span id="L293" class="ln">   293	</span>	Cancel &lt;-chan struct{}
+<span id="L294" class="ln">   294	</span>
+<span id="L295" class="ln">   295	</span>	<span class="comment">// Response is the redirect response which caused this request</span>
+<span id="L296" class="ln">   296	</span>	<span class="comment">// to be created. This field is only populated during client</span>
+<span id="L297" class="ln">   297	</span>	<span class="comment">// redirects.</span>
+<span id="L298" class="ln">   298	</span>	Response *Response
+<span id="L299" class="ln">   299	</span>
+<span id="L300" class="ln">   300	</span>	<span class="comment">// ctx is either the client or server context. It should only</span>
+<span id="L301" class="ln">   301	</span>	<span class="comment">// be modified via copying the whole Request using WithContext.</span>
+<span id="L302" class="ln">   302	</span>	<span class="comment">// It is unexported to prevent people from using Context wrong</span>
+<span id="L303" class="ln">   303	</span>	<span class="comment">// and mutating the contexts held by callers of the same request.</span>
+<span id="L304" class="ln">   304	</span>	ctx context.Context
+<span id="L305" class="ln">   305	</span>}
+<span id="L306" class="ln">   306	</span>
+<span id="L307" class="ln">   307	</span><span class="comment">// Context returns the request&#39;s context. To change the context, use</span>
+<span id="L308" class="ln">   308	</span><span class="comment">// WithContext.</span>
+<span id="L309" class="ln">   309	</span><span class="comment">//</span>
+<span id="L310" class="ln">   310	</span><span class="comment">// The returned context is always non-nil; it defaults to the</span>
+<span id="L311" class="ln">   311	</span><span class="comment">// background context.</span>
+<span id="L312" class="ln">   312	</span><span class="comment">//</span>
+<span id="L313" class="ln">   313	</span><span class="comment">// For outgoing client requests, the context controls cancelation.</span>
+<span id="L314" class="ln">   314	</span><span class="comment">//</span>
+<span id="L315" class="ln">   315	</span><span class="comment">// For incoming server requests, the context is canceled when the</span>
+<span id="L316" class="ln">   316	</span><span class="comment">// client&#39;s connection closes, the request is canceled (with HTTP/2),</span>
+<span id="L317" class="ln">   317	</span><span class="comment">// or when the ServeHTTP method returns.</span>
+<span id="L318" class="ln">   318	</span>func (r *Request) Context() context.Context {
+<span id="L319" class="ln">   319	</span>	if r.ctx != nil {
+<span id="L320" class="ln">   320	</span>		return r.ctx
+<span id="L321" class="ln">   321	</span>	}
+<span id="L322" class="ln">   322	</span>	return context.Background()
+<span id="L323" class="ln">   323	</span>}
+<span id="L324" class="ln">   324	</span>
+<span id="L325" class="ln">   325	</span><span class="comment">// WithContext returns a shallow copy of r with its context changed</span>
+<span id="L326" class="ln">   326	</span><span class="comment">// to ctx. The provided ctx must be non-nil.</span>
+<span id="L327" class="ln">   327	</span>func (r *Request) WithContext(ctx context.Context) *Request {
+<span id="L328" class="ln">   328	</span>	if ctx == nil {
+<span id="L329" class="ln">   329	</span>		panic(&#34;nil context&#34;)
+<span id="L330" class="ln">   330	</span>	}
+<span id="L331" class="ln">   331	</span>	r2 := new(Request)
+<span id="L332" class="ln">   332	</span>	*r2 = *r
+<span id="L333" class="ln">   333	</span>	r2.ctx = ctx
+<span id="L334" class="ln">   334	</span>	return r2
+<span id="L335" class="ln">   335	</span>}
+<span id="L336" class="ln">   336	</span>
+<span id="L337" class="ln">   337	</span><span class="comment">// ProtoAtLeast reports whether the HTTP protocol used</span>
+<span id="L338" class="ln">   338	</span><span class="comment">// in the request is at least major.minor.</span>
+<span id="L339" class="ln">   339	</span>func (r *Request) ProtoAtLeast(major, minor int) bool {
+<span id="L340" class="ln">   340	</span>	return r.ProtoMajor &gt; major ||
+<span id="L341" class="ln">   341	</span>		r.ProtoMajor == major &amp;&amp; r.ProtoMinor &gt;= minor
+<span id="L342" class="ln">   342	</span>}
+<span id="L343" class="ln">   343	</span>
+<span id="L344" class="ln">   344	</span><span class="comment">// protoAtLeastOutgoing is like ProtoAtLeast, but is for outgoing</span>
+<span id="L345" class="ln">   345	</span><span class="comment">// requests (see issue 18407) where these fields aren&#39;t supposed to</span>
+<span id="L346" class="ln">   346	</span><span class="comment">// matter.  As a minor fix for Go 1.8, at least treat (0, 0) as</span>
+<span id="L347" class="ln">   347	</span><span class="comment">// matching HTTP/1.1 or HTTP/1.0.  Only HTTP/1.1 is used.</span>
+<span id="L348" class="ln">   348	</span><span class="comment">// TODO(bradfitz): ideally remove this whole method. It shouldn&#39;t be used.</span>
+<span id="L349" class="ln">   349	</span>func (r *Request) protoAtLeastOutgoing(major, minor int) bool {
+<span id="L350" class="ln">   350	</span>	if r.ProtoMajor == 0 &amp;&amp; r.ProtoMinor == 0 &amp;&amp; major == 1 &amp;&amp; minor &lt;= 1 {
+<span id="L351" class="ln">   351	</span>		return true
+<span id="L352" class="ln">   352	</span>	}
+<span id="L353" class="ln">   353	</span>	return r.ProtoAtLeast(major, minor)
+<span id="L354" class="ln">   354	</span>}
+<span id="L355" class="ln">   355	</span>
+<span id="L356" class="ln">   356	</span><span class="comment">// UserAgent returns the client&#39;s User-Agent, if sent in the request.</span>
+<span id="L357" class="ln">   357	</span>func (r *Request) UserAgent() string {
+<span id="L358" class="ln">   358	</span>	return r.Header.Get(&#34;User-Agent&#34;)
+<span id="L359" class="ln">   359	</span>}
+<span id="L360" class="ln">   360	</span>
+<span id="L361" class="ln">   361	</span><span class="comment">// Cookies parses and returns the HTTP cookies sent with the request.</span>
+<span id="L362" class="ln">   362	</span>func (r *Request) Cookies() []*Cookie {
+<span id="L363" class="ln">   363	</span>	return readCookies(r.Header, &#34;&#34;)
+<span id="L364" class="ln">   364	</span>}
+<span id="L365" class="ln">   365	</span>
+<span id="L366" class="ln">   366	</span><span class="comment">// ErrNoCookie is returned by Request&#39;s Cookie method when a cookie is not found.</span>
+<span id="L367" class="ln">   367	</span>var ErrNoCookie = errors.New(&#34;http: named cookie not present&#34;)
+<span id="L368" class="ln">   368	</span>
+<span id="L369" class="ln">   369	</span><span class="comment">// Cookie returns the named cookie provided in the request or</span>
+<span id="L370" class="ln">   370	</span><span class="comment">// ErrNoCookie if not found.</span>
+<span id="L371" class="ln">   371	</span><span class="comment">// If multiple cookies match the given name, only one cookie will</span>
+<span id="L372" class="ln">   372	</span><span class="comment">// be returned.</span>
+<span id="L373" class="ln">   373	</span>func (r *Request) Cookie(name string) (*Cookie, error) {
+<span id="L374" class="ln">   374	</span>	for _, c := range readCookies(r.Header, name) {
+<span id="L375" class="ln">   375	</span>		return c, nil
+<span id="L376" class="ln">   376	</span>	}
+<span id="L377" class="ln">   377	</span>	return nil, ErrNoCookie
+<span id="L378" class="ln">   378	</span>}
+<span id="L379" class="ln">   379	</span>
+<span id="L380" class="ln">   380	</span><span class="comment">// AddCookie adds a cookie to the request. Per RFC 6265 section 5.4,</span>
+<span id="L381" class="ln">   381	</span><span class="comment">// AddCookie does not attach more than one Cookie header field. That</span>
+<span id="L382" class="ln">   382	</span><span class="comment">// means all cookies, if any, are written into the same line,</span>
+<span id="L383" class="ln">   383	</span><span class="comment">// separated by semicolon.</span>
+<span id="L384" class="ln">   384	</span>func (r *Request) AddCookie(c *Cookie) {
+<span id="L385" class="ln">   385	</span>	s := fmt.Sprintf(&#34;%s=%s&#34;, sanitizeCookieName(c.Name), sanitizeCookieValue(c.Value))
+<span id="L386" class="ln">   386	</span>	if c := r.Header.Get(&#34;Cookie&#34;); c != &#34;&#34; {
+<span id="L387" class="ln">   387	</span>		r.Header.Set(&#34;Cookie&#34;, c+&#34;; &#34;+s)
+<span id="L388" class="ln">   388	</span>	} else {
+<span id="L389" class="ln">   389	</span>		r.Header.Set(&#34;Cookie&#34;, s)
+<span id="L390" class="ln">   390	</span>	}
+<span id="L391" class="ln">   391	</span>}
+<span id="L392" class="ln">   392	</span>
+<span id="L393" class="ln">   393	</span><span class="comment">// Referer returns the referring URL, if sent in the request.</span>
+<span id="L394" class="ln">   394	</span><span class="comment">//</span>
+<span id="L395" class="ln">   395	</span><span class="comment">// Referer is misspelled as in the request itself, a mistake from the</span>
+<span id="L396" class="ln">   396	</span><span class="comment">// earliest days of HTTP.  This value can also be fetched from the</span>
+<span id="L397" class="ln">   397	</span><span class="comment">// Header map as Header[&#34;Referer&#34;]; the benefit of making it available</span>
+<span id="L398" class="ln">   398	</span><span class="comment">// as a method is that the compiler can diagnose programs that use the</span>
+<span id="L399" class="ln">   399	</span><span class="comment">// alternate (correct English) spelling req.Referrer() but cannot</span>
+<span id="L400" class="ln">   400	</span><span class="comment">// diagnose programs that use Header[&#34;Referrer&#34;].</span>
+<span id="L401" class="ln">   401	</span>func (r *Request) Referer() string {
+<span id="L402" class="ln">   402	</span>	return r.Header.Get(&#34;Referer&#34;)
+<span id="L403" class="ln">   403	</span>}
+<span id="L404" class="ln">   404	</span>
+<span id="L405" class="ln">   405	</span><span class="comment">// multipartByReader is a sentinel value.</span>
+<span id="L406" class="ln">   406	</span><span class="comment">// Its presence in Request.MultipartForm indicates that parsing of the request</span>
+<span id="L407" class="ln">   407	</span><span class="comment">// body has been handed off to a MultipartReader instead of ParseMultipartFrom.</span>
+<span id="L408" class="ln">   408	</span>var multipartByReader = &amp;multipart.Form{
+<span id="L409" class="ln">   409	</span>	Value: make(map[string][]string),
+<span id="L410" class="ln">   410	</span>	File:  make(map[string][]*multipart.FileHeader),
+<span id="L411" class="ln">   411	</span>}
+<span id="L412" class="ln">   412	</span>
+<span id="L413" class="ln">   413	</span><span class="comment">// MultipartReader returns a MIME multipart reader if this is a</span>
+<span id="L414" class="ln">   414	</span><span class="comment">// multipart/form-data POST request, else returns nil and an error.</span>
+<span id="L415" class="ln">   415	</span><span class="comment">// Use this function instead of ParseMultipartForm to</span>
+<span id="L416" class="ln">   416	</span><span class="comment">// process the request body as a stream.</span>
+<span id="L417" class="ln">   417	</span>func (r *Request) MultipartReader() (*multipart.Reader, error) {
+<span id="L418" class="ln">   418	</span>	if r.MultipartForm == multipartByReader {
+<span id="L419" class="ln">   419	</span>		return nil, errors.New(&#34;http: MultipartReader called twice&#34;)
+<span id="L420" class="ln">   420	</span>	}
+<span id="L421" class="ln">   421	</span>	if r.MultipartForm != nil {
+<span id="L422" class="ln">   422	</span>		return nil, errors.New(&#34;http: multipart handled by ParseMultipartForm&#34;)
+<span id="L423" class="ln">   423	</span>	}
+<span id="L424" class="ln">   424	</span>	r.MultipartForm = multipartByReader
+<span id="L425" class="ln">   425	</span>	return r.multipartReader()
+<span id="L426" class="ln">   426	</span>}
+<span id="L427" class="ln">   427	</span>
+<span id="L428" class="ln">   428	</span>func (r *Request) multipartReader() (*multipart.Reader, error) {
+<span id="L429" class="ln">   429	</span>	v := r.Header.Get(&#34;Content-Type&#34;)
+<span id="L430" class="ln">   430	</span>	if v == &#34;&#34; {
+<span id="L431" class="ln">   431	</span>		return nil, ErrNotMultipart
+<span id="L432" class="ln">   432	</span>	}
+<span id="L433" class="ln">   433	</span>	d, params, err := mime.ParseMediaType(v)
+<span id="L434" class="ln">   434	</span>	if err != nil || d != &#34;multipart/form-data&#34; {
+<span id="L435" class="ln">   435	</span>		return nil, ErrNotMultipart
+<span id="L436" class="ln">   436	</span>	}
+<span id="L437" class="ln">   437	</span>	boundary, ok := params[&#34;boundary&#34;]
+<span id="L438" class="ln">   438	</span>	if !ok {
+<span id="L439" class="ln">   439	</span>		return nil, ErrMissingBoundary
+<span id="L440" class="ln">   440	</span>	}
+<span id="L441" class="ln">   441	</span>	return multipart.NewReader(r.Body, boundary), nil
+<span id="L442" class="ln">   442	</span>}
+<span id="L443" class="ln">   443	</span>
+<span id="L444" class="ln">   444	</span><span class="comment">// isH2Upgrade reports whether r represents the http2 &#34;client preface&#34;</span>
+<span id="L445" class="ln">   445	</span><span class="comment">// magic string.</span>
+<span id="L446" class="ln">   446	</span>func (r *Request) isH2Upgrade() bool {
+<span id="L447" class="ln">   447	</span>	return r.Method == &#34;PRI&#34; &amp;&amp; len(r.Header) == 0 &amp;&amp; r.URL.Path == &#34;*&#34; &amp;&amp; r.Proto == &#34;HTTP/2.0&#34;
+<span id="L448" class="ln">   448	</span>}
+<span id="L449" class="ln">   449	</span>
+<span id="L450" class="ln">   450	</span><span class="comment">// Return value if nonempty, def otherwise.</span>
+<span id="L451" class="ln">   451	</span>func valueOrDefault(value, def string) string {
+<span id="L452" class="ln">   452	</span>	if value != &#34;&#34; {
+<span id="L453" class="ln">   453	</span>		return value
+<span id="L454" class="ln">   454	</span>	}
+<span id="L455" class="ln">   455	</span>	return def
+<span id="L456" class="ln">   456	</span>}
+<span id="L457" class="ln">   457	</span>
+<span id="L458" class="ln">   458	</span><span class="comment">// NOTE: This is not intended to reflect the actual Go version being used.</span>
+<span id="L459" class="ln">   459	</span><span class="comment">// It was changed at the time of Go 1.1 release because the former User-Agent</span>
+<span id="L460" class="ln">   460	</span><span class="comment">// had ended up on a blacklist for some intrusion detection systems.</span>
+<span id="L461" class="ln">   461	</span><span class="comment">// See https://codereview.appspot.com/7532043.</span>
+<span id="L462" class="ln">   462	</span>const defaultUserAgent = &#34;Go-http-client/1.1&#34;
+<span id="L463" class="ln">   463	</span>
+<span id="L464" class="ln">   464	</span><span class="comment">// Write writes an HTTP/1.1 request, which is the header and body, in wire format.</span>
+<span id="L465" class="ln">   465	</span><span class="comment">// This method consults the following fields of the request:</span>
+<span id="L466" class="ln">   466	</span><span class="comment">//	Host</span>
+<span id="L467" class="ln">   467	</span><span class="comment">//	URL</span>
+<span id="L468" class="ln">   468	</span><span class="comment">//	Method (defaults to &#34;GET&#34;)</span>
+<span id="L469" class="ln">   469	</span><span class="comment">//	Header</span>
+<span id="L470" class="ln">   470	</span><span class="comment">//	ContentLength</span>
+<span id="L471" class="ln">   471	</span><span class="comment">//	TransferEncoding</span>
+<span id="L472" class="ln">   472	</span><span class="comment">//	Body</span>
+<span id="L473" class="ln">   473	</span><span class="comment">//</span>
+<span id="L474" class="ln">   474	</span><span class="comment">// If Body is present, Content-Length is &lt;= 0 and TransferEncoding</span>
+<span id="L475" class="ln">   475	</span><span class="comment">// hasn&#39;t been set to &#34;identity&#34;, Write adds &#34;Transfer-Encoding:</span>
+<span id="L476" class="ln">   476	</span><span class="comment">// chunked&#34; to the header. Body is closed after it is sent.</span>
+<span id="L477" class="ln">   477	</span>func (r *Request) Write(w io.Writer) error {
+<span id="L478" class="ln">   478	</span>	return r.write(w, false, nil, nil)
+<span id="L479" class="ln">   479	</span>}
+<span id="L480" class="ln">   480	</span>
+<span id="L481" class="ln">   481	</span><span class="comment">// WriteProxy is like Write but writes the request in the form</span>
+<span id="L482" class="ln">   482	</span><span class="comment">// expected by an HTTP proxy. In particular, WriteProxy writes the</span>
+<span id="L483" class="ln">   483	</span><span class="comment">// initial Request-URI line of the request with an absolute URI, per</span>
+<span id="L484" class="ln">   484	</span><span class="comment">// section 5.1.2 of RFC 2616, including the scheme and host.</span>
+<span id="L485" class="ln">   485	</span><span class="comment">// In either case, WriteProxy also writes a Host header, using</span>
+<span id="L486" class="ln">   486	</span><span class="comment">// either r.Host or r.URL.Host.</span>
+<span id="L487" class="ln">   487	</span>func (r *Request) WriteProxy(w io.Writer) error {
+<span id="L488" class="ln">   488	</span>	return r.write(w, true, nil, nil)
+<span id="L489" class="ln">   489	</span>}
+<span id="L490" class="ln">   490	</span>
+<span id="L491" class="ln">   491	</span><span class="comment">// errMissingHost is returned by Write when there is no Host or URL present in</span>
+<span id="L492" class="ln">   492	</span><span class="comment">// the Request.</span>
+<span id="L493" class="ln">   493	</span>var errMissingHost = errors.New(&#34;http: Request.Write on Request with no Host or URL set&#34;)
+<span id="L494" class="ln">   494	</span>
+<span id="L495" class="ln">   495	</span><span class="comment">// extraHeaders may be nil</span>
+<span id="L496" class="ln">   496	</span><span class="comment">// waitForContinue may be nil</span>
+<span id="L497" class="ln">   497	</span>func (req *Request) write(w io.Writer, usingProxy bool, extraHeaders Header, waitForContinue func() bool) (err error) {
+<span id="L498" class="ln">   498	</span>	trace := httptrace.ContextClientTrace(req.Context())
+<span id="L499" class="ln">   499	</span>	if trace != nil &amp;&amp; trace.WroteRequest != nil {
+<span id="L500" class="ln">   500	</span>		defer func() {
+<span id="L501" class="ln">   501	</span>			trace.WroteRequest(httptrace.WroteRequestInfo{
+<span id="L502" class="ln">   502	</span>				Err: err,
+<span id="L503" class="ln">   503	</span>			})
+<span id="L504" class="ln">   504	</span>		}()
+<span id="L505" class="ln">   505	</span>	}
+<span id="L506" class="ln">   506	</span>
+<span id="L507" class="ln">   507	</span>	<span class="comment">// Find the target host. Prefer the Host: header, but if that</span>
+<span id="L508" class="ln">   508	</span>	<span class="comment">// is not given, use the host from the request URL.</span>
+<span id="L509" class="ln">   509	</span>	<span class="comment">//</span>
+<span id="L510" class="ln">   510	</span>	<span class="comment">// Clean the host, in case it arrives with unexpected stuff in it.</span>
+<span id="L511" class="ln">   511	</span>	host := cleanHost(req.Host)
+<span id="L512" class="ln">   512	</span>	if host == &#34;&#34; {
+<span id="L513" class="ln">   513	</span>		if req.URL == nil {
+<span id="L514" class="ln">   514	</span>			return errMissingHost
+<span id="L515" class="ln">   515	</span>		}
+<span id="L516" class="ln">   516	</span>		host = cleanHost(req.URL.Host)
+<span id="L517" class="ln">   517	</span>	}
+<span id="L518" class="ln">   518	</span>
+<span id="L519" class="ln">   519	</span>	<span class="comment">// According to RFC 6874, an HTTP client, proxy, or other</span>
+<span id="L520" class="ln">   520	</span>	<span class="comment">// intermediary must remove any IPv6 zone identifier attached</span>
+<span id="L521" class="ln">   521	</span>	<span class="comment">// to an outgoing URI.</span>
+<span id="L522" class="ln">   522	</span>	host = removeZone(host)
+<span id="L523" class="ln">   523	</span>
+<span id="L524" class="ln">   524	</span>	ruri := req.URL.RequestURI()
+<span id="L525" class="ln">   525	</span>	if usingProxy &amp;&amp; req.URL.Scheme != &#34;&#34; &amp;&amp; req.URL.Opaque == &#34;&#34; {
+<span id="L526" class="ln">   526	</span>		ruri = req.URL.Scheme + &#34;://&#34; + host + ruri
+<span id="L527" class="ln">   527	</span>	} else if req.Method == &#34;CONNECT&#34; &amp;&amp; req.URL.Path == &#34;&#34; {
+<span id="L528" class="ln">   528	</span>		<span class="comment">// CONNECT requests normally give just the host and port, not a full URL.</span>
+<span id="L529" class="ln">   529	</span>		ruri = host
+<span id="L530" class="ln">   530	</span>	}
+<span id="L531" class="ln">   531	</span>	<span class="comment">// TODO(bradfitz): escape at least newlines in ruri?</span>
+<span id="L532" class="ln">   532	</span>
+<span id="L533" class="ln">   533	</span>	<span class="comment">// Wrap the writer in a bufio Writer if it&#39;s not already buffered.</span>
+<span id="L534" class="ln">   534	</span>	<span class="comment">// Don&#39;t always call NewWriter, as that forces a bytes.Buffer</span>
+<span id="L535" class="ln">   535	</span>	<span class="comment">// and other small bufio Writers to have a minimum 4k buffer</span>
+<span id="L536" class="ln">   536	</span>	<span class="comment">// size.</span>
+<span id="L537" class="ln">   537	</span>	var bw *bufio.Writer
+<span id="L538" class="ln">   538	</span>	if _, ok := w.(io.ByteWriter); !ok {
+<span id="L539" class="ln">   539	</span>		bw = bufio.NewWriter(w)
+<span id="L540" class="ln">   540	</span>		w = bw
+<span id="L541" class="ln">   541	</span>	}
+<span id="L542" class="ln">   542	</span>
+<span id="L543" class="ln">   543	</span>	_, err = fmt.Fprintf(w, &#34;%s %s HTTP/1.1\r\n&#34;, valueOrDefault(req.Method, &#34;GET&#34;), ruri)
+<span id="L544" class="ln">   544	</span>	if err != nil {
+<span id="L545" class="ln">   545	</span>		return err
+<span id="L546" class="ln">   546	</span>	}
+<span id="L547" class="ln">   547	</span>
+<span id="L548" class="ln">   548	</span>	<span class="comment">// Header lines</span>
+<span id="L549" class="ln">   549	</span>	_, err = fmt.Fprintf(w, &#34;Host: %s\r\n&#34;, host)
+<span id="L550" class="ln">   550	</span>	if err != nil {
+<span id="L551" class="ln">   551	</span>		return err
+<span id="L552" class="ln">   552	</span>	}
+<span id="L553" class="ln">   553	</span>
+<span id="L554" class="ln">   554	</span>	<span class="comment">// Use the defaultUserAgent unless the Header contains one, which</span>
+<span id="L555" class="ln">   555	</span>	<span class="comment">// may be blank to not send the header.</span>
+<span id="L556" class="ln">   556	</span>	userAgent := defaultUserAgent
+<span id="L557" class="ln">   557	</span>	if _, ok := req.Header[&#34;User-Agent&#34;]; ok {
+<span id="L558" class="ln">   558	</span>		userAgent = req.Header.Get(&#34;User-Agent&#34;)
+<span id="L559" class="ln">   559	</span>	}
+<span id="L560" class="ln">   560	</span>	if userAgent != &#34;&#34; {
+<span id="L561" class="ln">   561	</span>		_, err = fmt.Fprintf(w, &#34;User-Agent: %s\r\n&#34;, userAgent)
+<span id="L562" class="ln">   562	</span>		if err != nil {
+<span id="L563" class="ln">   563	</span>			return err
+<span id="L564" class="ln">   564	</span>		}
+<span id="L565" class="ln">   565	</span>	}
+<span id="L566" class="ln">   566	</span>
+<span id="L567" class="ln">   567	</span>	<span class="comment">// Process Body,ContentLength,Close,Trailer</span>
+<span id="L568" class="ln">   568	</span>	tw, err := newTransferWriter(req)
+<span id="L569" class="ln">   569	</span>	if err != nil {
+<span id="L570" class="ln">   570	</span>		return err
+<span id="L571" class="ln">   571	</span>	}
+<span id="L572" class="ln">   572	</span>	err = tw.WriteHeader(w)
+<span id="L573" class="ln">   573	</span>	if err != nil {
+<span id="L574" class="ln">   574	</span>		return err
+<span id="L575" class="ln">   575	</span>	}
+<span id="L576" class="ln">   576	</span>
+<span id="L577" class="ln">   577	</span>	err = req.Header.WriteSubset(w, reqWriteExcludeHeader)
+<span id="L578" class="ln">   578	</span>	if err != nil {
+<span id="L579" class="ln">   579	</span>		return err
+<span id="L580" class="ln">   580	</span>	}
+<span id="L581" class="ln">   581	</span>
+<span id="L582" class="ln">   582	</span>	if extraHeaders != nil {
+<span id="L583" class="ln">   583	</span>		err = extraHeaders.Write(w)
+<span id="L584" class="ln">   584	</span>		if err != nil {
+<span id="L585" class="ln">   585	</span>			return err
+<span id="L586" class="ln">   586	</span>		}
+<span id="L587" class="ln">   587	</span>	}
+<span id="L588" class="ln">   588	</span>
+<span id="L589" class="ln">   589	</span>	_, err = io.WriteString(w, &#34;\r\n&#34;)
+<span id="L590" class="ln">   590	</span>	if err != nil {
+<span id="L591" class="ln">   591	</span>		return err
+<span id="L592" class="ln">   592	</span>	}
+<span id="L593" class="ln">   593	</span>
+<span id="L594" class="ln">   594	</span>	if trace != nil &amp;&amp; trace.WroteHeaders != nil {
+<span id="L595" class="ln">   595	</span>		trace.WroteHeaders()
+<span id="L596" class="ln">   596	</span>	}
+<span id="L597" class="ln">   597	</span>
+<span id="L598" class="ln">   598	</span>	<span class="comment">// Flush and wait for 100-continue if expected.</span>
+<span id="L599" class="ln">   599	</span>	if waitForContinue != nil {
+<span id="L600" class="ln">   600	</span>		if bw, ok := w.(*bufio.Writer); ok {
+<span id="L601" class="ln">   601	</span>			err = bw.Flush()
+<span id="L602" class="ln">   602	</span>			if err != nil {
+<span id="L603" class="ln">   603	</span>				return err
+<span id="L604" class="ln">   604	</span>			}
+<span id="L605" class="ln">   605	</span>		}
+<span id="L606" class="ln">   606	</span>		if trace != nil &amp;&amp; trace.Wait100Continue != nil {
+<span id="L607" class="ln">   607	</span>			trace.Wait100Continue()
+<span id="L608" class="ln">   608	</span>		}
+<span id="L609" class="ln">   609	</span>		if !waitForContinue() {
+<span id="L610" class="ln">   610	</span>			req.closeBody()
+<span id="L611" class="ln">   611	</span>			return nil
+<span id="L612" class="ln">   612	</span>		}
+<span id="L613" class="ln">   613	</span>	}
+<span id="L614" class="ln">   614	</span>
+<span id="L615" class="ln">   615	</span>	if bw, ok := w.(*bufio.Writer); ok &amp;&amp; tw.FlushHeaders {
+<span id="L616" class="ln">   616	</span>		if err := bw.Flush(); err != nil {
+<span id="L617" class="ln">   617	</span>			return err
+<span id="L618" class="ln">   618	</span>		}
+<span id="L619" class="ln">   619	</span>	}
+<span id="L620" class="ln">   620	</span>
+<span id="L621" class="ln">   621	</span>	<span class="comment">// Write body and trailer</span>
+<span id="L622" class="ln">   622	</span>	err = tw.WriteBody(w)
+<span id="L623" class="ln">   623	</span>	if err != nil {
+<span id="L624" class="ln">   624	</span>		return err
+<span id="L625" class="ln">   625	</span>	}
+<span id="L626" class="ln">   626	</span>
+<span id="L627" class="ln">   627	</span>	if bw != nil {
+<span id="L628" class="ln">   628	</span>		return bw.Flush()
+<span id="L629" class="ln">   629	</span>	}
+<span id="L630" class="ln">   630	</span>	return nil
+<span id="L631" class="ln">   631	</span>}
+<span id="L632" class="ln">   632	</span>
+<span id="L633" class="ln">   633	</span>func idnaASCII(v string) (string, error) {
+<span id="L634" class="ln">   634	</span>	if isASCII(v) {
+<span id="L635" class="ln">   635	</span>		return v, nil
+<span id="L636" class="ln">   636	</span>	}
+<span id="L637" class="ln">   637	</span>	<span class="comment">// The idna package doesn&#39;t do everything from</span>
+<span id="L638" class="ln">   638	</span>	<span class="comment">// https://tools.ietf.org/html/rfc5895 so we do it here.</span>
+<span id="L639" class="ln">   639	</span>	<span class="comment">// TODO(bradfitz): should the idna package do this instead?</span>
+<span id="L640" class="ln">   640	</span>	v = strings.ToLower(v)
+<span id="L641" class="ln">   641	</span>	v = width.Fold.String(v)
+<span id="L642" class="ln">   642	</span>	v = norm.NFC.String(v)
+<span id="L643" class="ln">   643	</span>	return idna.ToASCII(v)
+<span id="L644" class="ln">   644	</span>}
+<span id="L645" class="ln">   645	</span>
+<span id="L646" class="ln">   646	</span><span class="comment">// cleanHost cleans up the host sent in request&#39;s Host header.</span>
+<span id="L647" class="ln">   647	</span><span class="comment">//</span>
+<span id="L648" class="ln">   648	</span><span class="comment">// It both strips anything after &#39;/&#39; or &#39; &#39;, and puts the value</span>
+<span id="L649" class="ln">   649	</span><span class="comment">// into Punycode form, if necessary.</span>
+<span id="L650" class="ln">   650	</span><span class="comment">//</span>
+<span id="L651" class="ln">   651	</span><span class="comment">// Ideally we&#39;d clean the Host header according to the spec:</span>
+<span id="L652" class="ln">   652	</span><span class="comment">//   https://tools.ietf.org/html/rfc7230#section-5.4 (Host = uri-host [ &#34;:&#34; port ]&#34;)</span>
+<span id="L653" class="ln">   653	</span><span class="comment">//   https://tools.ietf.org/html/rfc7230#section-2.7 (uri-host -&gt; rfc3986&#39;s host)</span>
+<span id="L654" class="ln">   654	</span><span class="comment">//   https://tools.ietf.org/html/rfc3986#section-3.2.2 (definition of host)</span>
+<span id="L655" class="ln">   655	</span><span class="comment">// But practically, what we are trying to avoid is the situation in</span>
+<span id="L656" class="ln">   656	</span><span class="comment">// issue 11206, where a malformed Host header used in the proxy context</span>
+<span id="L657" class="ln">   657	</span><span class="comment">// would create a bad request. So it is enough to just truncate at the</span>
+<span id="L658" class="ln">   658	</span><span class="comment">// first offending character.</span>
+<span id="L659" class="ln">   659	</span>func cleanHost(in string) string {
+<span id="L660" class="ln">   660	</span>	if i := strings.IndexAny(in, &#34; /&#34;); i != -1 {
+<span id="L661" class="ln">   661	</span>		in = in[:i]
+<span id="L662" class="ln">   662	</span>	}
+<span id="L663" class="ln">   663	</span>	host, port, err := net.SplitHostPort(in)
+<span id="L664" class="ln">   664	</span>	if err != nil { <span class="comment">// input was just a host</span>
+<span id="L665" class="ln">   665	</span>		a, err := idnaASCII(in)
+<span id="L666" class="ln">   666	</span>		if err != nil {
+<span id="L667" class="ln">   667	</span>			return in <span class="comment">// garbage in, garbage out</span>
+<span id="L668" class="ln">   668	</span>		}
+<span id="L669" class="ln">   669	</span>		return a
+<span id="L670" class="ln">   670	</span>	}
+<span id="L671" class="ln">   671	</span>	a, err := idnaASCII(host)
+<span id="L672" class="ln">   672	</span>	if err != nil {
+<span id="L673" class="ln">   673	</span>		return in <span class="comment">// garbage in, garbage out</span>
+<span id="L674" class="ln">   674	</span>	}
+<span id="L675" class="ln">   675	</span>	return net.JoinHostPort(a, port)
+<span id="L676" class="ln">   676	</span>}
+<span id="L677" class="ln">   677	</span>
+<span id="L678" class="ln">   678	</span><span class="comment">// removeZone removes IPv6 zone identifier from host.</span>
+<span id="L679" class="ln">   679	</span><span class="comment">// E.g., &#34;[fe80::1%en0]:8080&#34; to &#34;[fe80::1]:8080&#34;</span>
+<span id="L680" class="ln">   680	</span>func removeZone(host string) string {
+<span id="L681" class="ln">   681	</span>	if !strings.HasPrefix(host, &#34;[&#34;) {
+<span id="L682" class="ln">   682	</span>		return host
+<span id="L683" class="ln">   683	</span>	}
+<span id="L684" class="ln">   684	</span>	i := strings.LastIndex(host, &#34;]&#34;)
+<span id="L685" class="ln">   685	</span>	if i &lt; 0 {
+<span id="L686" class="ln">   686	</span>		return host
+<span id="L687" class="ln">   687	</span>	}
+<span id="L688" class="ln">   688	</span>	j := strings.LastIndex(host[:i], &#34;%&#34;)
+<span id="L689" class="ln">   689	</span>	if j &lt; 0 {
+<span id="L690" class="ln">   690	</span>		return host
+<span id="L691" class="ln">   691	</span>	}
+<span id="L692" class="ln">   692	</span>	return host[:j] + host[i:]
+<span id="L693" class="ln">   693	</span>}
+<span id="L694" class="ln">   694	</span>
+<span id="L695" class="ln">   695	</span><span class="comment">// ParseHTTPVersion parses a HTTP version string.</span>
+<span id="L696" class="ln">   696	</span><span class="comment">// &#34;HTTP/1.0&#34; returns (1, 0, true).</span>
+<span id="L697" class="ln">   697	</span>func ParseHTTPVersion(vers string) (major, minor int, ok bool) {
+<span id="L698" class="ln">   698	</span>	const Big = 1000000 <span class="comment">// arbitrary upper bound</span>
+<span id="L699" class="ln">   699	</span>	switch vers {
+<span id="L700" class="ln">   700	</span>	case &#34;HTTP/1.1&#34;:
+<span id="L701" class="ln">   701	</span>		return 1, 1, true
+<span id="L702" class="ln">   702	</span>	case &#34;HTTP/1.0&#34;:
+<span id="L703" class="ln">   703	</span>		return 1, 0, true
+<span id="L704" class="ln">   704	</span>	}
+<span id="L705" class="ln">   705	</span>	if !strings.HasPrefix(vers, &#34;HTTP/&#34;) {
+<span id="L706" class="ln">   706	</span>		return 0, 0, false
+<span id="L707" class="ln">   707	</span>	}
+<span id="L708" class="ln">   708	</span>	dot := strings.Index(vers, &#34;.&#34;)
+<span id="L709" class="ln">   709	</span>	if dot &lt; 0 {
+<span id="L710" class="ln">   710	</span>		return 0, 0, false
+<span id="L711" class="ln">   711	</span>	}
+<span id="L712" class="ln">   712	</span>	major, err := strconv.Atoi(vers[5:dot])
+<span id="L713" class="ln">   713	</span>	if err != nil || major &lt; 0 || major &gt; Big {
+<span id="L714" class="ln">   714	</span>		return 0, 0, false
+<span id="L715" class="ln">   715	</span>	}
+<span id="L716" class="ln">   716	</span>	minor, err = strconv.Atoi(vers[dot+1:])
+<span id="L717" class="ln">   717	</span>	if err != nil || minor &lt; 0 || minor &gt; Big {
+<span id="L718" class="ln">   718	</span>		return 0, 0, false
+<span id="L719" class="ln">   719	</span>	}
+<span id="L720" class="ln">   720	</span>	return major, minor, true
+<span id="L721" class="ln">   721	</span>}
+<span id="L722" class="ln">   722	</span>
+<span id="L723" class="ln">   723	</span>func validMethod(method string) bool {
+<span id="L724" class="ln">   724	</span>	<span class="comment">/*
+<span id="L725" class="ln">   725	</span>	     Method         = &#34;OPTIONS&#34;                ; Section 9.2
+<span id="L726" class="ln">   726	</span>	                    | &#34;GET&#34;                    ; Section 9.3
+<span id="L727" class="ln">   727	</span>	                    | &#34;HEAD&#34;                   ; Section 9.4
+<span id="L728" class="ln">   728	</span>	                    | &#34;POST&#34;                   ; Section 9.5
+<span id="L729" class="ln">   729	</span>	                    | &#34;PUT&#34;                    ; Section 9.6
+<span id="L730" class="ln">   730	</span>	                    | &#34;DELETE&#34;                 ; Section 9.7
+<span id="L731" class="ln">   731	</span>	                    | &#34;TRACE&#34;                  ; Section 9.8
+<span id="L732" class="ln">   732	</span>	                    | &#34;CONNECT&#34;                ; Section 9.9
+<span id="L733" class="ln">   733	</span>	                    | extension-method
+<span id="L734" class="ln">   734	</span>	   extension-method = token
+<span id="L735" class="ln">   735	</span>	     token          = 1*&lt;any CHAR except CTLs or separators&gt;
+<span id="L736" class="ln">   736	</span>	*/</span>
+<span id="L737" class="ln">   737	</span>	return len(method) &gt; 0 &amp;&amp; strings.IndexFunc(method, isNotToken) == -1
+<span id="L738" class="ln">   738	</span>}
+<span id="L739" class="ln">   739	</span>
+<span id="L740" class="ln">   740	</span><span class="comment">// NewRequest returns a new Request given a method, URL, and optional body.</span>
+<span id="L741" class="ln">   741	</span><span class="comment">//</span>
+<span id="L742" class="ln">   742	</span><span class="comment">// If the provided body is also an io.Closer, the returned</span>
+<span id="L743" class="ln">   743	</span><span class="comment">// Request.Body is set to body and will be closed by the Client</span>
+<span id="L744" class="ln">   744	</span><span class="comment">// methods Do, Post, and PostForm, and Transport.RoundTrip.</span>
+<span id="L745" class="ln">   745	</span><span class="comment">//</span>
+<span id="L746" class="ln">   746	</span><span class="comment">// NewRequest returns a Request suitable for use with Client.Do or</span>
+<span id="L747" class="ln">   747	</span><span class="comment">// Transport.RoundTrip. To create a request for use with testing a</span>
+<span id="L748" class="ln">   748	</span><span class="comment">// Server Handler, either use the NewRequest function in the</span>
+<span id="L749" class="ln">   749	</span><span class="comment">// net/http/httptest package, use ReadRequest, or manually update the</span>
+<span id="L750" class="ln">   750	</span><span class="comment">// Request fields. See the Request type&#39;s documentation for the</span>
+<span id="L751" class="ln">   751	</span><span class="comment">// difference between inbound and outbound request fields.</span>
+<span id="L752" class="ln">   752	</span><span class="comment">//</span>
+<span id="L753" class="ln">   753	</span><span class="comment">// If body is of type *bytes.Buffer, *bytes.Reader, or</span>
+<span id="L754" class="ln">   754	</span><span class="comment">// *strings.Reader, the returned request&#39;s ContentLength is set to its</span>
+<span id="L755" class="ln">   755	</span><span class="comment">// exact value (instead of -1), GetBody is populated (so 307 and 308</span>
+<span id="L756" class="ln">   756	</span><span class="comment">// redirects can replay the body), and Body is set to NoBody if the</span>
+<span id="L757" class="ln">   757	</span><span class="comment">// ContentLength is 0.</span>
+<span id="L758" class="ln">   758	</span>func NewRequest(method, urlStr string, body io.Reader) (*Request, error) {
+<span id="L759" class="ln">   759	</span>	if method == &#34;&#34; {
+<span id="L760" class="ln">   760	</span>		<span class="comment">// We document that &#34;&#34; means &#34;GET&#34; for Request.Method, and people have</span>
+<span id="L761" class="ln">   761	</span>		<span class="comment">// relied on that from NewRequest, so keep that working.</span>
+<span id="L762" class="ln">   762	</span>		<span class="comment">// We still enforce validMethod for non-empty methods.</span>
+<span id="L763" class="ln">   763	</span>		method = &#34;GET&#34;
+<span id="L764" class="ln">   764	</span>	}
+<span id="L765" class="ln">   765	</span>	if !validMethod(method) {
+<span id="L766" class="ln">   766	</span>		return nil, fmt.Errorf(&#34;net/http: invalid method %q&#34;, method)
+<span id="L767" class="ln">   767	</span>	}
+<span id="L768" class="ln">   768	</span>	u, err := url.Parse(urlStr)
+<span id="L769" class="ln">   769	</span>	if err != nil {
+<span id="L770" class="ln">   770	</span>		return nil, err
+<span id="L771" class="ln">   771	</span>	}
+<span id="L772" class="ln">   772	</span>	rc, ok := body.(io.ReadCloser)
+<span id="L773" class="ln">   773	</span>	if !ok &amp;&amp; body != nil {
+<span id="L774" class="ln">   774	</span>		rc = ioutil.NopCloser(body)
+<span id="L775" class="ln">   775	</span>	}
+<span id="L776" class="ln">   776	</span>	<span class="comment">// The host&#39;s colon:port should be normalized. See Issue 14836.</span>
+<span id="L777" class="ln">   777	</span>	u.Host = removeEmptyPort(u.Host)
+<span id="L778" class="ln">   778	</span>	req := &amp;Request{
+<span id="L779" class="ln">   779	</span>		Method:     method,
+<span id="L780" class="ln">   780	</span>		URL:        u,
+<span id="L781" class="ln">   781	</span>		Proto:      &#34;HTTP/1.1&#34;,
+<span id="L782" class="ln">   782	</span>		ProtoMajor: 1,
+<span id="L783" class="ln">   783	</span>		ProtoMinor: 1,
+<span id="L784" class="ln">   784	</span>		Header:     make(Header),
+<span id="L785" class="ln">   785	</span>		Body:       rc,
+<span id="L786" class="ln">   786	</span>		Host:       u.Host,
+<span id="L787" class="ln">   787	</span>	}
+<span id="L788" class="ln">   788	</span>	if body != nil {
+<span id="L789" class="ln">   789	</span>		switch v := body.(type) {
+<span id="L790" class="ln">   790	</span>		case *bytes.Buffer:
+<span id="L791" class="ln">   791	</span>			req.ContentLength = int64(v.Len())
+<span id="L792" class="ln">   792	</span>			buf := v.Bytes()
+<span id="L793" class="ln">   793	</span>			req.GetBody = func() (io.ReadCloser, error) {
+<span id="L794" class="ln">   794	</span>				r := bytes.NewReader(buf)
+<span id="L795" class="ln">   795	</span>				return ioutil.NopCloser(r), nil
+<span id="L796" class="ln">   796	</span>			}
+<span id="L797" class="ln">   797	</span>		case *bytes.Reader:
+<span id="L798" class="ln">   798	</span>			req.ContentLength = int64(v.Len())
+<span id="L799" class="ln">   799	</span>			snapshot := *v
+<span id="L800" class="ln">   800	</span>			req.GetBody = func() (io.ReadCloser, error) {
+<span id="L801" class="ln">   801	</span>				r := snapshot
+<span id="L802" class="ln">   802	</span>				return ioutil.NopCloser(&amp;r), nil
+<span id="L803" class="ln">   803	</span>			}
+<span id="L804" class="ln">   804	</span>		case *strings.Reader:
+<span id="L805" class="ln">   805	</span>			req.ContentLength = int64(v.Len())
+<span id="L806" class="ln">   806	</span>			snapshot := *v
+<span id="L807" class="ln">   807	</span>			req.GetBody = func() (io.ReadCloser, error) {
+<span id="L808" class="ln">   808	</span>				r := snapshot
+<span id="L809" class="ln">   809	</span>				return ioutil.NopCloser(&amp;r), nil
+<span id="L810" class="ln">   810	</span>			}
+<span id="L811" class="ln">   811	</span>		default:
+<span id="L812" class="ln">   812	</span>			<span class="comment">// This is where we&#39;d set it to -1 (at least</span>
+<span id="L813" class="ln">   813	</span>			<span class="comment">// if body != NoBody) to mean unknown, but</span>
+<span id="L814" class="ln">   814	</span>			<span class="comment">// that broke people during the Go 1.8 testing</span>
+<span id="L815" class="ln">   815	</span>			<span class="comment">// period. People depend on it being 0 I</span>
+<span id="L816" class="ln">   816	</span>			<span class="comment">// guess. Maybe retry later. See Issue 18117.</span>
+<span id="L817" class="ln">   817	</span>		}
+<span id="L818" class="ln">   818	</span>		<span class="comment">// For client requests, Request.ContentLength of 0</span>
+<span id="L819" class="ln">   819	</span>		<span class="comment">// means either actually 0, or unknown. The only way</span>
+<span id="L820" class="ln">   820	</span>		<span class="comment">// to explicitly say that the ContentLength is zero is</span>
+<span id="L821" class="ln">   821	</span>		<span class="comment">// to set the Body to nil. But turns out too much code</span>
+<span id="L822" class="ln">   822	</span>		<span class="comment">// depends on NewRequest returning a non-nil Body,</span>
+<span id="L823" class="ln">   823	</span>		<span class="comment">// so we use a well-known ReadCloser variable instead</span>
+<span id="L824" class="ln">   824	</span>		<span class="comment">// and have the http package also treat that sentinel</span>
+<span id="L825" class="ln">   825	</span>		<span class="comment">// variable to mean explicitly zero.</span>
+<span id="L826" class="ln">   826	</span>		if req.GetBody != nil &amp;&amp; req.ContentLength == 0 {
+<span id="L827" class="ln">   827	</span>			req.Body = NoBody
+<span id="L828" class="ln">   828	</span>			req.GetBody = func() (io.ReadCloser, error) { return NoBody, nil }
+<span id="L829" class="ln">   829	</span>		}
+<span id="L830" class="ln">   830	</span>	}
+<span id="L831" class="ln">   831	</span>
+<span id="L832" class="ln">   832	</span>	return req, nil
+<span id="L833" class="ln">   833	</span>}
+<span id="L834" class="ln">   834	</span>
+<span id="L835" class="ln">   835	</span><span class="comment">// BasicAuth returns the username and password provided in the request&#39;s</span>
+<span id="L836" class="ln">   836	</span><span class="comment">// Authorization header, if the request uses HTTP Basic Authentication.</span>
+<span id="L837" class="ln">   837	</span><span class="comment">// See RFC 2617, Section 2.</span>
+<span id="L838" class="ln">   838	</span>func (r *Request) BasicAuth() (username, password string, ok bool) {
+<span id="L839" class="ln">   839	</span>	auth := r.Header.Get(&#34;Authorization&#34;)
+<span id="L840" class="ln">   840	</span>	if auth == &#34;&#34; {
+<span id="L841" class="ln">   841	</span>		return
+<span id="L842" class="ln">   842	</span>	}
+<span id="L843" class="ln">   843	</span>	return parseBasicAuth(auth)
+<span id="L844" class="ln">   844	</span>}
+<span id="L845" class="ln">   845	</span>
+<span id="L846" class="ln">   846	</span><span class="comment">// parseBasicAuth parses an HTTP Basic Authentication string.</span>
+<span id="L847" class="ln">   847	</span><span class="comment">// &#34;Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==&#34; returns (&#34;Aladdin&#34;, &#34;open sesame&#34;, true).</span>
+<span id="L848" class="ln">   848	</span>func parseBasicAuth(auth string) (username, password string, ok bool) {
+<span id="L849" class="ln">   849	</span>	const prefix = &#34;Basic &#34;
+<span id="L850" class="ln">   850	</span>	if !strings.HasPrefix(auth, prefix) {
+<span id="L851" class="ln">   851	</span>		return
+<span id="L852" class="ln">   852	</span>	}
+<span id="L853" class="ln">   853	</span>	c, err := base64.StdEncoding.DecodeString(auth[len(prefix):])
+<span id="L854" class="ln">   854	</span>	if err != nil {
+<span id="L855" class="ln">   855	</span>		return
+<span id="L856" class="ln">   856	</span>	}
+<span id="L857" class="ln">   857	</span>	cs := string(c)
+<span id="L858" class="ln">   858	</span>	s := strings.IndexByte(cs, &#39;:&#39;)
+<span id="L859" class="ln">   859	</span>	if s &lt; 0 {
+<span id="L860" class="ln">   860	</span>		return
+<span id="L861" class="ln">   861	</span>	}
+<span id="L862" class="ln">   862	</span>	return cs[:s], cs[s+1:], true
+<span id="L863" class="ln">   863	</span>}
+<span id="L864" class="ln">   864	</span>
+<span id="L865" class="ln">   865	</span><span class="comment">// SetBasicAuth sets the request&#39;s Authorization header to use HTTP</span>
+<span id="L866" class="ln">   866	</span><span class="comment">// Basic Authentication with the provided username and password.</span>
+<span id="L867" class="ln">   867	</span><span class="comment">//</span>
+<span id="L868" class="ln">   868	</span><span class="comment">// With HTTP Basic Authentication the provided username and password</span>
+<span id="L869" class="ln">   869	</span><span class="comment">// are not encrypted.</span>
+<span id="L870" class="ln">   870	</span>func (r *Request) SetBasicAuth(username, password string) {
+<span id="L871" class="ln">   871	</span>	r.Header.Set(&#34;Authorization&#34;, &#34;Basic &#34;+basicAuth(username, password))
+<span id="L872" class="ln">   872	</span>}
+<span id="L873" class="ln">   873	</span>
+<span id="L874" class="ln">   874	</span><span class="comment">// parseRequestLine parses &#34;GET /foo HTTP/1.1&#34; into its three parts.</span>
+<span id="L875" class="ln">   875	</span>func parseRequestLine(line string) (method, requestURI, proto string, ok bool) {
+<span id="L876" class="ln">   876	</span>	s1 := strings.Index(line, &#34; &#34;)
+<span id="L877" class="ln">   877	</span>	s2 := strings.Index(line[s1+1:], &#34; &#34;)
+<span id="L878" class="ln">   878	</span>	if s1 &lt; 0 || s2 &lt; 0 {
+<span id="L879" class="ln">   879	</span>		return
+<span id="L880" class="ln">   880	</span>	}
+<span id="L881" class="ln">   881	</span>	s2 += s1 + 1
+<span id="L882" class="ln">   882	</span>	return line[:s1], line[s1+1 : s2], line[s2+1:], true
+<span id="L883" class="ln">   883	</span>}
+<span id="L884" class="ln">   884	</span>
+<span id="L885" class="ln">   885	</span>var textprotoReaderPool sync.Pool
+<span id="L886" class="ln">   886	</span>
+<span id="L887" class="ln">   887	</span>func newTextprotoReader(br *bufio.Reader) *textproto.Reader {
+<span id="L888" class="ln">   888	</span>	if v := textprotoReaderPool.Get(); v != nil {
+<span id="L889" class="ln">   889	</span>		tr := v.(*textproto.Reader)
+<span id="L890" class="ln">   890	</span>		tr.R = br
+<span id="L891" class="ln">   891	</span>		return tr
+<span id="L892" class="ln">   892	</span>	}
+<span id="L893" class="ln">   893	</span>	return textproto.NewReader(br)
+<span id="L894" class="ln">   894	</span>}
+<span id="L895" class="ln">   895	</span>
+<span id="L896" class="ln">   896	</span>func putTextprotoReader(r *textproto.Reader) {
+<span id="L897" class="ln">   897	</span>	r.R = nil
+<span id="L898" class="ln">   898	</span>	textprotoReaderPool.Put(r)
+<span id="L899" class="ln">   899	</span>}
+<span id="L900" class="ln">   900	</span>
+<span id="L901" class="ln">   901	</span><span class="comment">// ReadRequest reads and parses an incoming request from b.</span>
+<span id="L902" class="ln">   902	</span><span class="selection">func ReadRequest(b *bufio.Reader) (*Request, error)</span> {
+<span id="L903" class="ln">   903	</span>	return readRequest(b, deleteHostHeader)
+<span id="L904" class="ln">   904	</span>}
+<span id="L905" class="ln">   905	</span>
+<span id="L906" class="ln">   906	</span><span class="comment">// Constants for readRequest&#39;s deleteHostHeader parameter.</span>
+<span id="L907" class="ln">   907	</span>const (
+<span id="L908" class="ln">   908	</span>	deleteHostHeader = true
+<span id="L909" class="ln">   909	</span>	keepHostHeader   = false
+<span id="L910" class="ln">   910	</span>)
+<span id="L911" class="ln">   911	</span>
+<span id="L912" class="ln">   912	</span>func readRequest(b *bufio.Reader, deleteHostHeader bool) (req *Request, err error) {
+<span id="L913" class="ln">   913	</span>	tp := newTextprotoReader(b)
+<span id="L914" class="ln">   914	</span>	req = new(Request)
+<span id="L915" class="ln">   915	</span>
+<span id="L916" class="ln">   916	</span>	<span class="comment">// First line: GET /index.html HTTP/1.0</span>
+<span id="L917" class="ln">   917	</span>	var s string
+<span id="L918" class="ln">   918	</span>	if s, err = tp.ReadLine(); err != nil {
+<span id="L919" class="ln">   919	</span>		return nil, err
+<span id="L920" class="ln">   920	</span>	}
+<span id="L921" class="ln">   921	</span>	defer func() {
+<span id="L922" class="ln">   922	</span>		putTextprotoReader(tp)
+<span id="L923" class="ln">   923	</span>		if err == io.EOF {
+<span id="L924" class="ln">   924	</span>			err = io.ErrUnexpectedEOF
+<span id="L925" class="ln">   925	</span>		}
+<span id="L926" class="ln">   926	</span>	}()
+<span id="L927" class="ln">   927	</span>
+<span id="L928" class="ln">   928	</span>	var ok bool
+<span id="L929" class="ln">   929	</span>	req.Method, req.RequestURI, req.Proto, ok = parseRequestLine(s)
+<span id="L930" class="ln">   930	</span>	if !ok {
+<span id="L931" class="ln">   931	</span>		return nil, &amp;badStringError{&#34;malformed HTTP request&#34;, s}
+<span id="L932" class="ln">   932	</span>	}
+<span id="L933" class="ln">   933	</span>	rawurl := req.RequestURI
+<span id="L934" class="ln">   934	</span>	if req.ProtoMajor, req.ProtoMinor, ok = ParseHTTPVersion(req.Proto); !ok {
+<span id="L935" class="ln">   935	</span>		return nil, &amp;badStringError{&#34;malformed HTTP version&#34;, req.Proto}
+<span id="L936" class="ln">   936	</span>	}
+<span id="L937" class="ln">   937	</span>
+<span id="L938" class="ln">   938	</span>	<span class="comment">// CONNECT requests are used two different ways, and neither uses a full URL:</span>
+<span id="L939" class="ln">   939	</span>	<span class="comment">// The standard use is to tunnel HTTPS through an HTTP proxy.</span>
+<span id="L940" class="ln">   940	</span>	<span class="comment">// It looks like &#34;CONNECT www.google.com:443 HTTP/1.1&#34;, and the parameter is</span>
+<span id="L941" class="ln">   941	</span>	<span class="comment">// just the authority section of a URL. This information should go in req.URL.Host.</span>
+<span id="L942" class="ln">   942	</span>	<span class="comment">//</span>
+<span id="L943" class="ln">   943	</span>	<span class="comment">// The net/rpc package also uses CONNECT, but there the parameter is a path</span>
+<span id="L944" class="ln">   944	</span>	<span class="comment">// that starts with a slash. It can be parsed with the regular URL parser,</span>
+<span id="L945" class="ln">   945	</span>	<span class="comment">// and the path will end up in req.URL.Path, where it needs to be in order for</span>
+<span id="L946" class="ln">   946	</span>	<span class="comment">// RPC to work.</span>
+<span id="L947" class="ln">   947	</span>	justAuthority := req.Method == &#34;CONNECT&#34; &amp;&amp; !strings.HasPrefix(rawurl, &#34;/&#34;)
+<span id="L948" class="ln">   948	</span>	if justAuthority {
+<span id="L949" class="ln">   949	</span>		rawurl = &#34;http://&#34; + rawurl
+<span id="L950" class="ln">   950	</span>	}
+<span id="L951" class="ln">   951	</span>
+<span id="L952" class="ln">   952	</span>	if req.URL, err = url.ParseRequestURI(rawurl); err != nil {
+<span id="L953" class="ln">   953	</span>		return nil, err
+<span id="L954" class="ln">   954	</span>	}
+<span id="L955" class="ln">   955	</span>
+<span id="L956" class="ln">   956	</span>	if justAuthority {
+<span id="L957" class="ln">   957	</span>		<span class="comment">// Strip the bogus &#34;http://&#34; back off.</span>
+<span id="L958" class="ln">   958	</span>		req.URL.Scheme = &#34;&#34;
+<span id="L959" class="ln">   959	</span>	}
+<span id="L960" class="ln">   960	</span>
+<span id="L961" class="ln">   961	</span>	<span class="comment">// Subsequent lines: Key: value.</span>
+<span id="L962" class="ln">   962	</span>	mimeHeader, err := tp.ReadMIMEHeader()
+<span id="L963" class="ln">   963	</span>	if err != nil {
+<span id="L964" class="ln">   964	</span>		return nil, err
+<span id="L965" class="ln">   965	</span>	}
+<span id="L966" class="ln">   966	</span>	req.Header = Header(mimeHeader)
+<span id="L967" class="ln">   967	</span>
+<span id="L968" class="ln">   968	</span>	<span class="comment">// RFC 2616: Must treat</span>
+<span id="L969" class="ln">   969	</span>	<span class="comment">//	GET /index.html HTTP/1.1</span>
+<span id="L970" class="ln">   970	</span>	<span class="comment">//	Host: www.google.com</span>
+<span id="L971" class="ln">   971	</span>	<span class="comment">// and</span>
+<span id="L972" class="ln">   972	</span>	<span class="comment">//	GET http://www.google.com/index.html HTTP/1.1</span>
+<span id="L973" class="ln">   973	</span>	<span class="comment">//	Host: doesntmatter</span>
+<span id="L974" class="ln">   974	</span>	<span class="comment">// the same. In the second case, any Host line is ignored.</span>
+<span id="L975" class="ln">   975	</span>	req.Host = req.URL.Host
+<span id="L976" class="ln">   976	</span>	if req.Host == &#34;&#34; {
+<span id="L977" class="ln">   977	</span>		req.Host = req.Header.get(&#34;Host&#34;)
+<span id="L978" class="ln">   978	</span>	}
+<span id="L979" class="ln">   979	</span>	if deleteHostHeader {
+<span id="L980" class="ln">   980	</span>		delete(req.Header, &#34;Host&#34;)
+<span id="L981" class="ln">   981	</span>	}
+<span id="L982" class="ln">   982	</span>
+<span id="L983" class="ln">   983	</span>	fixPragmaCacheControl(req.Header)
+<span id="L984" class="ln">   984	</span>
+<span id="L985" class="ln">   985	</span>	req.Close = shouldClose(req.ProtoMajor, req.ProtoMinor, req.Header, false)
+<span id="L986" class="ln">   986	</span>
+<span id="L987" class="ln">   987	</span>	err = readTransfer(req, b)
+<span id="L988" class="ln">   988	</span>	if err != nil {
+<span id="L989" class="ln">   989	</span>		return nil, err
+<span id="L990" class="ln">   990	</span>	}
+<span id="L991" class="ln">   991	</span>
+<span id="L992" class="ln">   992	</span>	if req.isH2Upgrade() {
+<span id="L993" class="ln">   993	</span>		<span class="comment">// Because it&#39;s neither chunked, nor declared:</span>
+<span id="L994" class="ln">   994	</span>		req.ContentLength = -1
+<span id="L995" class="ln">   995	</span>
+<span id="L996" class="ln">   996	</span>		<span class="comment">// We want to give handlers a chance to hijack the</span>
+<span id="L997" class="ln">   997	</span>		<span class="comment">// connection, but we need to prevent the Server from</span>
+<span id="L998" class="ln">   998	</span>		<span class="comment">// dealing with the connection further if it&#39;s not</span>
+<span id="L999" class="ln">   999	</span>		<span class="comment">// hijacked. Set Close to ensure that:</span>
+<span id="L1000" class="ln">  1000	</span>		req.Close = true
+<span id="L1001" class="ln">  1001	</span>	}
+<span id="L1002" class="ln">  1002	</span>	return req, nil
+<span id="L1003" class="ln">  1003	</span>}
+<span id="L1004" class="ln">  1004	</span>
+<span id="L1005" class="ln">  1005	</span><span class="comment">// MaxBytesReader is similar to io.LimitReader but is intended for</span>
+<span id="L1006" class="ln">  1006	</span><span class="comment">// limiting the size of incoming request bodies. In contrast to</span>
+<span id="L1007" class="ln">  1007	</span><span class="comment">// io.LimitReader, MaxBytesReader&#39;s result is a ReadCloser, returns a</span>
+<span id="L1008" class="ln">  1008	</span><span class="comment">// non-EOF error for a Read beyond the limit, and closes the</span>
+<span id="L1009" class="ln">  1009	</span><span class="comment">// underlying reader when its Close method is called.</span>
+<span id="L1010" class="ln">  1010	</span><span class="comment">//</span>
+<span id="L1011" class="ln">  1011	</span><span class="comment">// MaxBytesReader prevents clients from accidentally or maliciously</span>
+<span id="L1012" class="ln">  1012	</span><span class="comment">// sending a large request and wasting server resources.</span>
+<span id="L1013" class="ln">  1013	</span>func MaxBytesReader(w ResponseWriter, r io.ReadCloser, n int64) io.ReadCloser {
+<span id="L1014" class="ln">  1014	</span>	return &amp;maxBytesReader{w: w, r: r, n: n}
+<span id="L1015" class="ln">  1015	</span>}
+<span id="L1016" class="ln">  1016	</span>
+<span id="L1017" class="ln">  1017	</span>type maxBytesReader struct {
+<span id="L1018" class="ln">  1018	</span>	w   ResponseWriter
+<span id="L1019" class="ln">  1019	</span>	r   io.ReadCloser <span class="comment">// underlying reader</span>
+<span id="L1020" class="ln">  1020	</span>	n   int64         <span class="comment">// max bytes remaining</span>
+<span id="L1021" class="ln">  1021	</span>	err error         <span class="comment">// sticky error</span>
+<span id="L1022" class="ln">  1022	</span>}
+<span id="L1023" class="ln">  1023	</span>
+<span id="L1024" class="ln">  1024	</span>func (l *maxBytesReader) tooLarge() (n int, err error) {
+<span id="L1025" class="ln">  1025	</span>	l.err = errors.New(&#34;http: request body too large&#34;)
+<span id="L1026" class="ln">  1026	</span>	return 0, l.err
+<span id="L1027" class="ln">  1027	</span>}
+<span id="L1028" class="ln">  1028	</span>
+<span id="L1029" class="ln">  1029	</span>func (l *maxBytesReader) Read(p []byte) (n int, err error) {
+<span id="L1030" class="ln">  1030	</span>	if l.err != nil {
+<span id="L1031" class="ln">  1031	</span>		return 0, l.err
+<span id="L1032" class="ln">  1032	</span>	}
+<span id="L1033" class="ln">  1033	</span>	if len(p) == 0 {
+<span id="L1034" class="ln">  1034	</span>		return 0, nil
+<span id="L1035" class="ln">  1035	</span>	}
+<span id="L1036" class="ln">  1036	</span>	<span class="comment">// If they asked for a 32KB byte read but only 5 bytes are</span>
+<span id="L1037" class="ln">  1037	</span>	<span class="comment">// remaining, no need to read 32KB. 6 bytes will answer the</span>
+<span id="L1038" class="ln">  1038	</span>	<span class="comment">// question of the whether we hit the limit or go past it.</span>
+<span id="L1039" class="ln">  1039	</span>	if int64(len(p)) &gt; l.n+1 {
+<span id="L1040" class="ln">  1040	</span>		p = p[:l.n+1]
+<span id="L1041" class="ln">  1041	</span>	}
+<span id="L1042" class="ln">  1042	</span>	n, err = l.r.Read(p)
+<span id="L1043" class="ln">  1043	</span>
+<span id="L1044" class="ln">  1044	</span>	if int64(n) &lt;= l.n {
+<span id="L1045" class="ln">  1045	</span>		l.n -= int64(n)
+<span id="L1046" class="ln">  1046	</span>		l.err = err
+<span id="L1047" class="ln">  1047	</span>		return n, err
+<span id="L1048" class="ln">  1048	</span>	}
+<span id="L1049" class="ln">  1049	</span>
+<span id="L1050" class="ln">  1050	</span>	n = int(l.n)
+<span id="L1051" class="ln">  1051	</span>	l.n = 0
+<span id="L1052" class="ln">  1052	</span>
+<span id="L1053" class="ln">  1053	</span>	<span class="comment">// The server code and client code both use</span>
+<span id="L1054" class="ln">  1054	</span>	<span class="comment">// maxBytesReader. This &#34;requestTooLarge&#34; check is</span>
+<span id="L1055" class="ln">  1055	</span>	<span class="comment">// only used by the server code. To prevent binaries</span>
+<span id="L1056" class="ln">  1056	</span>	<span class="comment">// which only using the HTTP Client code (such as</span>
+<span id="L1057" class="ln">  1057	</span>	<span class="comment">// cmd/go) from also linking in the HTTP server, don&#39;t</span>
+<span id="L1058" class="ln">  1058	</span>	<span class="comment">// use a static type assertion to the server</span>
+<span id="L1059" class="ln">  1059	</span>	<span class="comment">// &#34;*response&#34; type. Check this interface instead:</span>
+<span id="L1060" class="ln">  1060	</span>	type requestTooLarger interface {
+<span id="L1061" class="ln">  1061	</span>		requestTooLarge()
+<span id="L1062" class="ln">  1062	</span>	}
+<span id="L1063" class="ln">  1063	</span>	if res, ok := l.w.(requestTooLarger); ok {
+<span id="L1064" class="ln">  1064	</span>		res.requestTooLarge()
+<span id="L1065" class="ln">  1065	</span>	}
+<span id="L1066" class="ln">  1066	</span>	l.err = errors.New(&#34;http: request body too large&#34;)
+<span id="L1067" class="ln">  1067	</span>	return n, l.err
+<span id="L1068" class="ln">  1068	</span>}
+<span id="L1069" class="ln">  1069	</span>
+<span id="L1070" class="ln">  1070	</span>func (l *maxBytesReader) Close() error {
+<span id="L1071" class="ln">  1071	</span>	return l.r.Close()
+<span id="L1072" class="ln">  1072	</span>}
+<span id="L1073" class="ln">  1073	</span>
+<span id="L1074" class="ln">  1074	</span>func copyValues(dst, src url.Values) {
+<span id="L1075" class="ln">  1075	</span>	for k, vs := range src {
+<span id="L1076" class="ln">  1076	</span>		for _, value := range vs {
+<span id="L1077" class="ln">  1077	</span>			dst.Add(k, value)
+<span id="L1078" class="ln">  1078	</span>		}
+<span id="L1079" class="ln">  1079	</span>	}
+<span id="L1080" class="ln">  1080	</span>}
+<span id="L1081" class="ln">  1081	</span>
+<span id="L1082" class="ln">  1082	</span>func parsePostForm(r *Request) (vs url.Values, err error) {
+<span id="L1083" class="ln">  1083	</span>	if r.Body == nil {
+<span id="L1084" class="ln">  1084	</span>		err = errors.New(&#34;missing form body&#34;)
+<span id="L1085" class="ln">  1085	</span>		return
+<span id="L1086" class="ln">  1086	</span>	}
+<span id="L1087" class="ln">  1087	</span>	ct := r.Header.Get(&#34;Content-Type&#34;)
+<span id="L1088" class="ln">  1088	</span>	<span class="comment">// RFC 2616, section 7.2.1 - empty type</span>
+<span id="L1089" class="ln">  1089	</span>	<span class="comment">//   SHOULD be treated as application/octet-stream</span>
+<span id="L1090" class="ln">  1090	</span>	if ct == &#34;&#34; {
+<span id="L1091" class="ln">  1091	</span>		ct = &#34;application/octet-stream&#34;
+<span id="L1092" class="ln">  1092	</span>	}
+<span id="L1093" class="ln">  1093	</span>	ct, _, err = mime.ParseMediaType(ct)
+<span id="L1094" class="ln">  1094	</span>	switch {
+<span id="L1095" class="ln">  1095	</span>	case ct == &#34;application/x-www-form-urlencoded&#34;:
+<span id="L1096" class="ln">  1096	</span>		var reader io.Reader = r.Body
+<span id="L1097" class="ln">  1097	</span>		maxFormSize := int64(1&lt;&lt;63 - 1)
+<span id="L1098" class="ln">  1098	</span>		if _, ok := r.Body.(*maxBytesReader); !ok {
+<span id="L1099" class="ln">  1099	</span>			maxFormSize = int64(10 &lt;&lt; 20) <span class="comment">// 10 MB is a lot of text.</span>
+<span id="L1100" class="ln">  1100	</span>			reader = io.LimitReader(r.Body, maxFormSize+1)
+<span id="L1101" class="ln">  1101	</span>		}
+<span id="L1102" class="ln">  1102	</span>		b, e := ioutil.ReadAll(reader)
+<span id="L1103" class="ln">  1103	</span>		if e != nil {
+<span id="L1104" class="ln">  1104	</span>			if err == nil {
+<span id="L1105" class="ln">  1105	</span>				err = e
+<span id="L1106" class="ln">  1106	</span>			}
+<span id="L1107" class="ln">  1107	</span>			break
+<span id="L1108" class="ln">  1108	</span>		}
+<span id="L1109" class="ln">  1109	</span>		if int64(len(b)) &gt; maxFormSize {
+<span id="L1110" class="ln">  1110	</span>			err = errors.New(&#34;http: POST too large&#34;)
+<span id="L1111" class="ln">  1111	</span>			return
+<span id="L1112" class="ln">  1112	</span>		}
+<span id="L1113" class="ln">  1113	</span>		vs, e = url.ParseQuery(string(b))
+<span id="L1114" class="ln">  1114	</span>		if err == nil {
+<span id="L1115" class="ln">  1115	</span>			err = e
+<span id="L1116" class="ln">  1116	</span>		}
+<span id="L1117" class="ln">  1117	</span>	case ct == &#34;multipart/form-data&#34;:
+<span id="L1118" class="ln">  1118	</span>		<span class="comment">// handled by ParseMultipartForm (which is calling us, or should be)</span>
+<span id="L1119" class="ln">  1119	</span>		<span class="comment">// TODO(bradfitz): there are too many possible</span>
+<span id="L1120" class="ln">  1120	</span>		<span class="comment">// orders to call too many functions here.</span>
+<span id="L1121" class="ln">  1121	</span>		<span class="comment">// Clean this up and write more tests.</span>
+<span id="L1122" class="ln">  1122	</span>		<span class="comment">// request_test.go contains the start of this,</span>
+<span id="L1123" class="ln">  1123	</span>		<span class="comment">// in TestParseMultipartFormOrder and others.</span>
+<span id="L1124" class="ln">  1124	</span>	}
+<span id="L1125" class="ln">  1125	</span>	return
+<span id="L1126" class="ln">  1126	</span>}
+<span id="L1127" class="ln">  1127	</span>
+<span id="L1128" class="ln">  1128	</span><span class="comment">// ParseForm populates r.Form and r.PostForm.</span>
+<span id="L1129" class="ln">  1129	</span><span class="comment">//</span>
+<span id="L1130" class="ln">  1130	</span><span class="comment">// For all requests, ParseForm parses the raw query from the URL and updates</span>
+<span id="L1131" class="ln">  1131	</span><span class="comment">// r.Form.</span>
+<span id="L1132" class="ln">  1132	</span><span class="comment">//</span>
+<span id="L1133" class="ln">  1133	</span><span class="comment">// For POST, PUT, and PATCH requests, it also parses the request body as a form</span>
+<span id="L1134" class="ln">  1134	</span><span class="comment">// and puts the results into both r.PostForm and r.Form. Request body parameters</span>
+<span id="L1135" class="ln">  1135	</span><span class="comment">// take precedence over URL query string values in r.Form.</span>
+<span id="L1136" class="ln">  1136	</span><span class="comment">//</span>
+<span id="L1137" class="ln">  1137	</span><span class="comment">// For other HTTP methods, or when the Content-Type is not</span>
+<span id="L1138" class="ln">  1138	</span><span class="comment">// application/x-www-form-urlencoded, the request Body is not read, and</span>
+<span id="L1139" class="ln">  1139	</span><span class="comment">// r.PostForm is initialized to a non-nil, empty value.</span>
+<span id="L1140" class="ln">  1140	</span><span class="comment">//</span>
+<span id="L1141" class="ln">  1141	</span><span class="comment">// If the request Body&#39;s size has not already been limited by MaxBytesReader,</span>
+<span id="L1142" class="ln">  1142	</span><span class="comment">// the size is capped at 10MB.</span>
+<span id="L1143" class="ln">  1143	</span><span class="comment">//</span>
+<span id="L1144" class="ln">  1144	</span><span class="comment">// ParseMultipartForm calls ParseForm automatically.</span>
+<span id="L1145" class="ln">  1145	</span><span class="comment">// ParseForm is idempotent.</span>
+<span id="L1146" class="ln">  1146	</span>func (r *Request) ParseForm() error {
+<span id="L1147" class="ln">  1147	</span>	var err error
+<span id="L1148" class="ln">  1148	</span>	if r.PostForm == nil {
+<span id="L1149" class="ln">  1149	</span>		if r.Method == &#34;POST&#34; || r.Method == &#34;PUT&#34; || r.Method == &#34;PATCH&#34; {
+<span id="L1150" class="ln">  1150	</span>			r.PostForm, err = parsePostForm(r)
+<span id="L1151" class="ln">  1151	</span>		}
+<span id="L1152" class="ln">  1152	</span>		if r.PostForm == nil {
+<span id="L1153" class="ln">  1153	</span>			r.PostForm = make(url.Values)
+<span id="L1154" class="ln">  1154	</span>		}
+<span id="L1155" class="ln">  1155	</span>	}
+<span id="L1156" class="ln">  1156	</span>	if r.Form == nil {
+<span id="L1157" class="ln">  1157	</span>		if len(r.PostForm) &gt; 0 {
+<span id="L1158" class="ln">  1158	</span>			r.Form = make(url.Values)
+<span id="L1159" class="ln">  1159	</span>			copyValues(r.Form, r.PostForm)
+<span id="L1160" class="ln">  1160	</span>		}
+<span id="L1161" class="ln">  1161	</span>		var newValues url.Values
+<span id="L1162" class="ln">  1162	</span>		if r.URL != nil {
+<span id="L1163" class="ln">  1163	</span>			var e error
+<span id="L1164" class="ln">  1164	</span>			newValues, e = url.ParseQuery(r.URL.RawQuery)
+<span id="L1165" class="ln">  1165	</span>			if err == nil {
+<span id="L1166" class="ln">  1166	</span>				err = e
+<span id="L1167" class="ln">  1167	</span>			}
+<span id="L1168" class="ln">  1168	</span>		}
+<span id="L1169" class="ln">  1169	</span>		if newValues == nil {
+<span id="L1170" class="ln">  1170	</span>			newValues = make(url.Values)
+<span id="L1171" class="ln">  1171	</span>		}
+<span id="L1172" class="ln">  1172	</span>		if r.Form == nil {
+<span id="L1173" class="ln">  1173	</span>			r.Form = newValues
+<span id="L1174" class="ln">  1174	</span>		} else {
+<span id="L1175" class="ln">  1175	</span>			copyValues(r.Form, newValues)
+<span id="L1176" class="ln">  1176	</span>		}
+<span id="L1177" class="ln">  1177	</span>	}
+<span id="L1178" class="ln">  1178	</span>	return err
+<span id="L1179" class="ln">  1179	</span>}
+<span id="L1180" class="ln">  1180	</span>
+<span id="L1181" class="ln">  1181	</span><span class="comment">// ParseMultipartForm parses a request body as multipart/form-data.</span>
+<span id="L1182" class="ln">  1182	</span><span class="comment">// The whole request body is parsed and up to a total of maxMemory bytes of</span>
+<span id="L1183" class="ln">  1183	</span><span class="comment">// its file parts are stored in memory, with the remainder stored on</span>
+<span id="L1184" class="ln">  1184	</span><span class="comment">// disk in temporary files.</span>
+<span id="L1185" class="ln">  1185	</span><span class="comment">// ParseMultipartForm calls ParseForm if necessary.</span>
+<span id="L1186" class="ln">  1186	</span><span class="comment">// After one call to ParseMultipartForm, subsequent calls have no effect.</span>
+<span id="L1187" class="ln">  1187	</span>func (r *Request) ParseMultipartForm(maxMemory int64) error {
+<span id="L1188" class="ln">  1188	</span>	if r.MultipartForm == multipartByReader {
+<span id="L1189" class="ln">  1189	</span>		return errors.New(&#34;http: multipart handled by MultipartReader&#34;)
+<span id="L1190" class="ln">  1190	</span>	}
+<span id="L1191" class="ln">  1191	</span>	if r.Form == nil {
+<span id="L1192" class="ln">  1192	</span>		err := r.ParseForm()
+<span id="L1193" class="ln">  1193	</span>		if err != nil {
+<span id="L1194" class="ln">  1194	</span>			return err
+<span id="L1195" class="ln">  1195	</span>		}
+<span id="L1196" class="ln">  1196	</span>	}
+<span id="L1197" class="ln">  1197	</span>	if r.MultipartForm != nil {
+<span id="L1198" class="ln">  1198	</span>		return nil
+<span id="L1199" class="ln">  1199	</span>	}
+<span id="L1200" class="ln">  1200	</span>
+<span id="L1201" class="ln">  1201	</span>	mr, err := r.multipartReader()
+<span id="L1202" class="ln">  1202	</span>	if err != nil {
+<span id="L1203" class="ln">  1203	</span>		return err
+<span id="L1204" class="ln">  1204	</span>	}
+<span id="L1205" class="ln">  1205	</span>
+<span id="L1206" class="ln">  1206	</span>	f, err := mr.ReadForm(maxMemory)
+<span id="L1207" class="ln">  1207	</span>	if err != nil {
+<span id="L1208" class="ln">  1208	</span>		return err
+<span id="L1209" class="ln">  1209	</span>	}
+<span id="L1210" class="ln">  1210	</span>
+<span id="L1211" class="ln">  1211	</span>	if r.PostForm == nil {
+<span id="L1212" class="ln">  1212	</span>		r.PostForm = make(url.Values)
+<span id="L1213" class="ln">  1213	</span>	}
+<span id="L1214" class="ln">  1214	</span>	for k, v := range f.Value {
+<span id="L1215" class="ln">  1215	</span>		r.Form[k] = append(r.Form[k], v...)
+<span id="L1216" class="ln">  1216	</span>		<span class="comment">// r.PostForm should also be populated. See Issue 9305.</span>
+<span id="L1217" class="ln">  1217	</span>		r.PostForm[k] = append(r.PostForm[k], v...)
+<span id="L1218" class="ln">  1218	</span>	}
+<span id="L1219" class="ln">  1219	</span>
+<span id="L1220" class="ln">  1220	</span>	r.MultipartForm = f
+<span id="L1221" class="ln">  1221	</span>
+<span id="L1222" class="ln">  1222	</span>	return nil
+<span id="L1223" class="ln">  1223	</span>}
+<span id="L1224" class="ln">  1224	</span>
+<span id="L1225" class="ln">  1225	</span><span class="comment">// FormValue returns the first value for the named component of the query.</span>
+<span id="L1226" class="ln">  1226	</span><span class="comment">// POST and PUT body parameters take precedence over URL query string values.</span>
+<span id="L1227" class="ln">  1227	</span><span class="comment">// FormValue calls ParseMultipartForm and ParseForm if necessary and ignores</span>
+<span id="L1228" class="ln">  1228	</span><span class="comment">// any errors returned by these functions.</span>
+<span id="L1229" class="ln">  1229	</span><span class="comment">// If key is not present, FormValue returns the empty string.</span>
+<span id="L1230" class="ln">  1230	</span><span class="comment">// To access multiple values of the same key, call ParseForm and</span>
+<span id="L1231" class="ln">  1231	</span><span class="comment">// then inspect Request.Form directly.</span>
+<span id="L1232" class="ln">  1232	</span>func (r *Request) FormValue(key string) string {
+<span id="L1233" class="ln">  1233	</span>	if r.Form == nil {
+<span id="L1234" class="ln">  1234	</span>		r.ParseMultipartForm(defaultMaxMemory)
+<span id="L1235" class="ln">  1235	</span>	}
+<span id="L1236" class="ln">  1236	</span>	if vs := r.Form[key]; len(vs) &gt; 0 {
+<span id="L1237" class="ln">  1237	</span>		return vs[0]
+<span id="L1238" class="ln">  1238	</span>	}
+<span id="L1239" class="ln">  1239	</span>	return &#34;&#34;
+<span id="L1240" class="ln">  1240	</span>}
+<span id="L1241" class="ln">  1241	</span>
+<span id="L1242" class="ln">  1242	</span><span class="comment">// PostFormValue returns the first value for the named component of the POST</span>
+<span id="L1243" class="ln">  1243	</span><span class="comment">// or PUT request body. URL query parameters are ignored.</span>
+<span id="L1244" class="ln">  1244	</span><span class="comment">// PostFormValue calls ParseMultipartForm and ParseForm if necessary and ignores</span>
+<span id="L1245" class="ln">  1245	</span><span class="comment">// any errors returned by these functions.</span>
+<span id="L1246" class="ln">  1246	</span><span class="comment">// If key is not present, PostFormValue returns the empty string.</span>
+<span id="L1247" class="ln">  1247	</span>func (r *Request) PostFormValue(key string) string {
+<span id="L1248" class="ln">  1248	</span>	if r.PostForm == nil {
+<span id="L1249" class="ln">  1249	</span>		r.ParseMultipartForm(defaultMaxMemory)
+<span id="L1250" class="ln">  1250	</span>	}
+<span id="L1251" class="ln">  1251	</span>	if vs := r.PostForm[key]; len(vs) &gt; 0 {
+<span id="L1252" class="ln">  1252	</span>		return vs[0]
+<span id="L1253" class="ln">  1253	</span>	}
+<span id="L1254" class="ln">  1254	</span>	return &#34;&#34;
+<span id="L1255" class="ln">  1255	</span>}
+<span id="L1256" class="ln">  1256	</span>
+<span id="L1257" class="ln">  1257	</span><span class="comment">// FormFile returns the first file for the provided form key.</span>
+<span id="L1258" class="ln">  1258	</span><span class="comment">// FormFile calls ParseMultipartForm and ParseForm if necessary.</span>
+<span id="L1259" class="ln">  1259	</span>func (r *Request) FormFile(key string) (multipart.File, *multipart.FileHeader, error) {
+<span id="L1260" class="ln">  1260	</span>	if r.MultipartForm == multipartByReader {
+<span id="L1261" class="ln">  1261	</span>		return nil, nil, errors.New(&#34;http: multipart handled by MultipartReader&#34;)
+<span id="L1262" class="ln">  1262	</span>	}
+<span id="L1263" class="ln">  1263	</span>	if r.MultipartForm == nil {
+<span id="L1264" class="ln">  1264	</span>		err := r.ParseMultipartForm(defaultMaxMemory)
+<span id="L1265" class="ln">  1265	</span>		if err != nil {
+<span id="L1266" class="ln">  1266	</span>			return nil, nil, err
+<span id="L1267" class="ln">  1267	</span>		}
+<span id="L1268" class="ln">  1268	</span>	}
+<span id="L1269" class="ln">  1269	</span>	if r.MultipartForm != nil &amp;&amp; r.MultipartForm.File != nil {
+<span id="L1270" class="ln">  1270	</span>		if fhs := r.MultipartForm.File[key]; len(fhs) &gt; 0 {
+<span id="L1271" class="ln">  1271	</span>			f, err := fhs[0].Open()
+<span id="L1272" class="ln">  1272	</span>			return f, fhs[0], err
+<span id="L1273" class="ln">  1273	</span>		}
+<span id="L1274" class="ln">  1274	</span>	}
+<span id="L1275" class="ln">  1275	</span>	return nil, nil, ErrMissingFile
+<span id="L1276" class="ln">  1276	</span>}
+<span id="L1277" class="ln">  1277	</span>
+<span id="L1278" class="ln">  1278	</span>func (r *Request) expectsContinue() bool {
+<span id="L1279" class="ln">  1279	</span>	return hasToken(r.Header.get(&#34;Expect&#34;), &#34;100-continue&#34;)
+<span id="L1280" class="ln">  1280	</span>}
+<span id="L1281" class="ln">  1281	</span>
+<span id="L1282" class="ln">  1282	</span>func (r *Request) wantsHttp10KeepAlive() bool {
+<span id="L1283" class="ln">  1283	</span>	if r.ProtoMajor != 1 || r.ProtoMinor != 0 {
+<span id="L1284" class="ln">  1284	</span>		return false
+<span id="L1285" class="ln">  1285	</span>	}
+<span id="L1286" class="ln">  1286	</span>	return hasToken(r.Header.get(&#34;Connection&#34;), &#34;keep-alive&#34;)
+<span id="L1287" class="ln">  1287	</span>}
+<span id="L1288" class="ln">  1288	</span>
+<span id="L1289" class="ln">  1289	</span>func (r *Request) wantsClose() bool {
+<span id="L1290" class="ln">  1290	</span>	return hasToken(r.Header.get(&#34;Connection&#34;), &#34;close&#34;)
+<span id="L1291" class="ln">  1291	</span>}
+<span id="L1292" class="ln">  1292	</span>
+<span id="L1293" class="ln">  1293	</span>func (r *Request) closeBody() {
+<span id="L1294" class="ln">  1294	</span>	if r.Body != nil {
+<span id="L1295" class="ln">  1295	</span>		r.Body.Close()
+<span id="L1296" class="ln">  1296	</span>	}
+<span id="L1297" class="ln">  1297	</span>}
+<span id="L1298" class="ln">  1298	</span>
+<span id="L1299" class="ln">  1299	</span>func (r *Request) isReplayable() bool {
+<span id="L1300" class="ln">  1300	</span>	if r.Body == nil {
+<span id="L1301" class="ln">  1301	</span>		switch valueOrDefault(r.Method, &#34;GET&#34;) {
+<span id="L1302" class="ln">  1302	</span>		case &#34;GET&#34;, &#34;HEAD&#34;, &#34;OPTIONS&#34;, &#34;TRACE&#34;:
+<span id="L1303" class="ln">  1303	</span>			return true
+<span id="L1304" class="ln">  1304	</span>		}
+<span id="L1305" class="ln">  1305	</span>	}
+<span id="L1306" class="ln">  1306	</span>	return false
+<span id="L1307" class="ln">  1307	</span>}
+<span id="L1308" class="ln">  1308	</span>
+<span id="L1309" class="ln">  1309	</span><span class="comment">// outgoingLength reports the Content-Length of this outgoing (Client) request.</span>
+<span id="L1310" class="ln">  1310	</span><span class="comment">// It maps 0 into -1 (unknown) when the Body is non-nil.</span>
+<span id="L1311" class="ln">  1311	</span>func (r *Request) outgoingLength() int64 {
+<span id="L1312" class="ln">  1312	</span>	if r.Body == nil || r.Body == NoBody {
+<span id="L1313" class="ln">  1313	</span>		return 0
+<span id="L1314" class="ln">  1314	</span>	}
+<span id="L1315" class="ln">  1315	</span>	if r.ContentLength != 0 {
+<span id="L1316" class="ln">  1316	</span>		return r.ContentLength
+<span id="L1317" class="ln">  1317	</span>	}
+<span id="L1318" class="ln">  1318	</span>	return -1
+<span id="L1319" class="ln">  1319	</span>}
+<span id="L1320" class="ln">  1320	</span>
+<span id="L1321" class="ln">  1321	</span><span class="comment">// requestMethodUsuallyLacksBody reports whether the given request</span>
+<span id="L1322" class="ln">  1322	</span><span class="comment">// method is one that typically does not involve a request body.</span>
+<span id="L1323" class="ln">  1323	</span><span class="comment">// This is used by the Transport (via</span>
+<span id="L1324" class="ln">  1324	</span><span class="comment">// transferWriter.shouldSendChunkedRequestBody) to determine whether</span>
+<span id="L1325" class="ln">  1325	</span><span class="comment">// we try to test-read a byte from a non-nil Request.Body when</span>
+<span id="L1326" class="ln">  1326	</span><span class="comment">// Request.outgoingLength() returns -1. See the comments in</span>
+<span id="L1327" class="ln">  1327	</span><span class="comment">// shouldSendChunkedRequestBody.</span>
+<span id="L1328" class="ln">  1328	</span>func requestMethodUsuallyLacksBody(method string) bool {
+<span id="L1329" class="ln">  1329	</span>	switch method {
+<span id="L1330" class="ln">  1330	</span>	case &#34;GET&#34;, &#34;HEAD&#34;, &#34;DELETE&#34;, &#34;OPTIONS&#34;, &#34;PROPFIND&#34;, &#34;SEARCH&#34;:
+<span id="L1331" class="ln">  1331	</span>		return true
+<span id="L1332" class="ln">  1332	</span>	}
+<span id="L1333" class="ln">  1333	</span>	return false
+<span id="L1334" class="ln">  1334	</span>}
+<span id="L1335" class="ln">  1335	</span>
+</pre><p><a href="request.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

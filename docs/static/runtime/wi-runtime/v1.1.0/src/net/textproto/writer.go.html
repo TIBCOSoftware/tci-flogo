@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/textproto/writer.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="writer.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/net/textproto/writer.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package textproto
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>import (
+<span id="L8" class="ln">     8	</span>	&#34;bufio&#34;
+<span id="L9" class="ln">     9	</span>	&#34;fmt&#34;
+<span id="L10" class="ln">    10	</span>	&#34;io&#34;
+<span id="L11" class="ln">    11	</span>)
+<span id="L12" class="ln">    12	</span>
+<span id="L13" class="ln">    13	</span><span class="comment">// A Writer implements convenience methods for writing</span>
+<span id="L14" class="ln">    14	</span><span class="comment">// requests or responses to a text protocol network connection.</span>
+<span id="L15" class="ln">    15	</span>type Writer struct {
+<span id="L16" class="ln">    16	</span>	W   *bufio.Writer
+<span id="L17" class="ln">    17	</span>	dot *dotWriter
+<span id="L18" class="ln">    18	</span>}
+<span id="L19" class="ln">    19	</span>
+<span id="L20" class="ln">    20	</span><span class="comment">// NewWriter returns a new Writer writing to w.</span>
+<span id="L21" class="ln">    21	</span>func NewWriter(w *bufio.Writer) *Writer {
+<span id="L22" class="ln">    22	</span>	return &amp;Writer{W: w}
+<span id="L23" class="ln">    23	</span>}
+<span id="L24" class="ln">    24	</span>
+<span id="L25" class="ln">    25	</span>var crnl = []byte{&#39;\r&#39;, &#39;\n&#39;}
+<span id="L26" class="ln">    26	</span>var dotcrnl = []byte{&#39;.&#39;, &#39;\r&#39;, &#39;\n&#39;}
+<span id="L27" class="ln">    27	</span>
+<span id="L28" class="ln">    28	</span><span class="comment">// PrintfLine writes the formatted output followed by \r\n.</span>
+<span id="L29" class="ln">    29	</span>func (w *Writer) PrintfLine(format string, args ...interface{}) error {
+<span id="L30" class="ln">    30	</span>	w.closeDot()
+<span id="L31" class="ln">    31	</span>	fmt.Fprintf(w.W, format, args...)
+<span id="L32" class="ln">    32	</span>	w.W.Write(crnl)
+<span id="L33" class="ln">    33	</span>	return w.W.Flush()
+<span id="L34" class="ln">    34	</span>}
+<span id="L35" class="ln">    35	</span>
+<span id="L36" class="ln">    36	</span><span class="comment">// DotWriter returns a writer that can be used to write a dot-encoding to w.</span>
+<span id="L37" class="ln">    37	</span><span class="comment">// It takes care of inserting leading dots when necessary,</span>
+<span id="L38" class="ln">    38	</span><span class="comment">// translating line-ending \n into \r\n, and adding the final .\r\n line</span>
+<span id="L39" class="ln">    39	</span><span class="comment">// when the DotWriter is closed. The caller should close the</span>
+<span id="L40" class="ln">    40	</span><span class="comment">// DotWriter before the next call to a method on w.</span>
+<span id="L41" class="ln">    41	</span><span class="comment">//</span>
+<span id="L42" class="ln">    42	</span><span class="comment">// See the documentation for Reader&#39;s DotReader method for details about dot-encoding.</span>
+<span id="L43" class="ln">    43	</span>func (w *Writer) DotWriter() io.WriteCloser {
+<span id="L44" class="ln">    44	</span>	w.closeDot()
+<span id="L45" class="ln">    45	</span>	w.dot = &amp;dotWriter{w: w}
+<span id="L46" class="ln">    46	</span>	return w.dot
+<span id="L47" class="ln">    47	</span>}
+<span id="L48" class="ln">    48	</span>
+<span id="L49" class="ln">    49	</span>func (w *Writer) closeDot() {
+<span id="L50" class="ln">    50	</span>	if w.dot != nil {
+<span id="L51" class="ln">    51	</span>		w.dot.Close() <span class="comment">// sets w.dot = nil</span>
+<span id="L52" class="ln">    52	</span>	}
+<span id="L53" class="ln">    53	</span>}
+<span id="L54" class="ln">    54	</span>
+<span id="L55" class="ln">    55	</span>type dotWriter struct {
+<span id="L56" class="ln">    56	</span>	w     *Writer
+<span id="L57" class="ln">    57	</span>	state int
+<span id="L58" class="ln">    58	</span>}
+<span id="L59" class="ln">    59	</span>
+<span id="L60" class="ln">    60	</span>const (
+<span id="L61" class="ln">    61	</span>	wstateBeginLine = iota <span class="comment">// beginning of line; initial state; must be zero</span>
+<span id="L62" class="ln">    62	</span>	wstateCR               <span class="comment">// wrote \r (possibly at end of line)</span>
+<span id="L63" class="ln">    63	</span>	wstateData             <span class="comment">// writing data in middle of line</span>
+<span id="L64" class="ln">    64	</span>)
+<span id="L65" class="ln">    65	</span>
+<span id="L66" class="ln">    66	</span>func (d *dotWriter) Write(b []byte) (n int, err error) {
+<span id="L67" class="ln">    67	</span>	bw := d.w.W
+<span id="L68" class="ln">    68	</span>	for n &lt; len(b) {
+<span id="L69" class="ln">    69	</span>		c := b[n]
+<span id="L70" class="ln">    70	</span>		switch d.state {
+<span id="L71" class="ln">    71	</span>		case wstateBeginLine:
+<span id="L72" class="ln">    72	</span>			d.state = wstateData
+<span id="L73" class="ln">    73	</span>			if c == &#39;.&#39; {
+<span id="L74" class="ln">    74	</span>				<span class="comment">// escape leading dot</span>
+<span id="L75" class="ln">    75	</span>				bw.WriteByte(&#39;.&#39;)
+<span id="L76" class="ln">    76	</span>			}
+<span id="L77" class="ln">    77	</span>			fallthrough
+<span id="L78" class="ln">    78	</span>
+<span id="L79" class="ln">    79	</span>		case wstateData:
+<span id="L80" class="ln">    80	</span>			if c == &#39;\r&#39; {
+<span id="L81" class="ln">    81	</span>				d.state = wstateCR
+<span id="L82" class="ln">    82	</span>			}
+<span id="L83" class="ln">    83	</span>			if c == &#39;\n&#39; {
+<span id="L84" class="ln">    84	</span>				bw.WriteByte(&#39;\r&#39;)
+<span id="L85" class="ln">    85	</span>				d.state = wstateBeginLine
+<span id="L86" class="ln">    86	</span>			}
+<span id="L87" class="ln">    87	</span>
+<span id="L88" class="ln">    88	</span>		case wstateCR:
+<span id="L89" class="ln">    89	</span>			d.state = wstateData
+<span id="L90" class="ln">    90	</span>			if c == &#39;\n&#39; {
+<span id="L91" class="ln">    91	</span>				d.state = wstateBeginLine
+<span id="L92" class="ln">    92	</span>			}
+<span id="L93" class="ln">    93	</span>		}
+<span id="L94" class="ln">    94	</span>		if err = bw.WriteByte(c); err != nil {
+<span id="L95" class="ln">    95	</span>			break
+<span id="L96" class="ln">    96	</span>		}
+<span id="L97" class="ln">    97	</span>		n++
+<span id="L98" class="ln">    98	</span>	}
+<span id="L99" class="ln">    99	</span>	return
+<span id="L100" class="ln">   100	</span>}
+<span id="L101" class="ln">   101	</span>
+<span id="L102" class="ln">   102	</span>func (d *dotWriter) Close() error {
+<span id="L103" class="ln">   103	</span>	if d.w.dot == d {
+<span id="L104" class="ln">   104	</span>		d.w.dot = nil
+<span id="L105" class="ln">   105	</span>	}
+<span id="L106" class="ln">   106	</span>	bw := d.w.W
+<span id="L107" class="ln">   107	</span>	switch d.state {
+<span id="L108" class="ln">   108	</span>	default:
+<span id="L109" class="ln">   109	</span>		bw.WriteByte(&#39;\r&#39;)
+<span id="L110" class="ln">   110	</span>		fallthrough
+<span id="L111" class="ln">   111	</span>	case wstateCR:
+<span id="L112" class="ln">   112	</span>		bw.WriteByte(&#39;\n&#39;)
+<span id="L113" class="ln">   113	</span>		fallthrough
+<span id="L114" class="ln">   114	</span>	case wstateBeginLine:
+<span id="L115" class="ln">   115	</span>		bw.Write(dotcrnl)
+<span id="L116" class="ln">   116	</span>	}
+<span id="L117" class="ln">   117	</span>	return bw.Flush()
+<span id="L118" class="ln">   118	</span>}
+<span id="L119" class="ln">   119	</span>
+</pre><p><a href="writer.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

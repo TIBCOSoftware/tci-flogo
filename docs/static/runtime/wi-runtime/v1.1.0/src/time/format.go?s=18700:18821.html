@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/time/format.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./format.go%3Fs=18700:18821.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/time/format.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package time
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>import &#34;errors&#34;
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span><span class="comment">// These are predefined layouts for use in Time.Format and Time.Parse.</span>
+<span id="L10" class="ln">    10	</span><span class="comment">// The reference time used in the layouts is the specific time:</span>
+<span id="L11" class="ln">    11	</span><span class="comment">//	Mon Jan 2 15:04:05 MST 2006</span>
+<span id="L12" class="ln">    12	</span><span class="comment">// which is Unix time 1136239445. Since MST is GMT-0700,</span>
+<span id="L13" class="ln">    13	</span><span class="comment">// the reference time can be thought of as</span>
+<span id="L14" class="ln">    14	</span><span class="comment">//	01/02 03:04:05PM &#39;06 -0700</span>
+<span id="L15" class="ln">    15	</span><span class="comment">// To define your own format, write down what the reference time would look</span>
+<span id="L16" class="ln">    16	</span><span class="comment">// like formatted your way; see the values of constants like ANSIC,</span>
+<span id="L17" class="ln">    17	</span><span class="comment">// StampMicro or Kitchen for examples. The model is to demonstrate what the</span>
+<span id="L18" class="ln">    18	</span><span class="comment">// reference time looks like so that the Format and Parse methods can apply</span>
+<span id="L19" class="ln">    19	</span><span class="comment">// the same transformation to a general time value.</span>
+<span id="L20" class="ln">    20	</span><span class="comment">//</span>
+<span id="L21" class="ln">    21	</span><span class="comment">// Within the format string, an underscore _ represents a space that may be</span>
+<span id="L22" class="ln">    22	</span><span class="comment">// replaced by a digit if the following number (a day) has two digits; for</span>
+<span id="L23" class="ln">    23	</span><span class="comment">// compatibility with fixed-width Unix time formats.</span>
+<span id="L24" class="ln">    24	</span><span class="comment">//</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// A decimal point followed by one or more zeros represents a fractional</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// second, printed to the given number of decimal places. A decimal point</span>
+<span id="L27" class="ln">    27	</span><span class="comment">// followed by one or more nines represents a fractional second, printed to</span>
+<span id="L28" class="ln">    28	</span><span class="comment">// the given number of decimal places, with trailing zeros removed.</span>
+<span id="L29" class="ln">    29	</span><span class="comment">// When parsing (only), the input may contain a fractional second</span>
+<span id="L30" class="ln">    30	</span><span class="comment">// field immediately after the seconds field, even if the layout does not</span>
+<span id="L31" class="ln">    31	</span><span class="comment">// signify its presence. In that case a decimal point followed by a maximal</span>
+<span id="L32" class="ln">    32	</span><span class="comment">// series of digits is parsed as a fractional second.</span>
+<span id="L33" class="ln">    33	</span><span class="comment">//</span>
+<span id="L34" class="ln">    34	</span><span class="comment">// Numeric time zone offsets format as follows:</span>
+<span id="L35" class="ln">    35	</span><span class="comment">//	-0700  ±hhmm</span>
+<span id="L36" class="ln">    36	</span><span class="comment">//	-07:00 ±hh:mm</span>
+<span id="L37" class="ln">    37	</span><span class="comment">//	-07    ±hh</span>
+<span id="L38" class="ln">    38	</span><span class="comment">// Replacing the sign in the format with a Z triggers</span>
+<span id="L39" class="ln">    39	</span><span class="comment">// the ISO 8601 behavior of printing Z instead of an</span>
+<span id="L40" class="ln">    40	</span><span class="comment">// offset for the UTC zone. Thus:</span>
+<span id="L41" class="ln">    41	</span><span class="comment">//	Z0700  Z or ±hhmm</span>
+<span id="L42" class="ln">    42	</span><span class="comment">//	Z07:00 Z or ±hh:mm</span>
+<span id="L43" class="ln">    43	</span><span class="comment">//	Z07    Z or ±hh</span>
+<span id="L44" class="ln">    44	</span><span class="comment">//</span>
+<span id="L45" class="ln">    45	</span><span class="comment">// The recognized day of week formats are &#34;Mon&#34; and &#34;Monday&#34;.</span>
+<span id="L46" class="ln">    46	</span><span class="comment">// The recognized month formats are &#34;Jan&#34; and &#34;January&#34;.</span>
+<span id="L47" class="ln">    47	</span><span class="comment">//</span>
+<span id="L48" class="ln">    48	</span><span class="comment">// Text in the format string that is not recognized as part of the reference</span>
+<span id="L49" class="ln">    49	</span><span class="comment">// time is echoed verbatim during Format and expected to appear verbatim</span>
+<span id="L50" class="ln">    50	</span><span class="comment">// in the input to Parse.</span>
+<span id="L51" class="ln">    51	</span><span class="comment">//</span>
+<span id="L52" class="ln">    52	</span><span class="comment">// The executable example for time.Format demonstrates the working</span>
+<span id="L53" class="ln">    53	</span><span class="comment">// of the layout string in detail and is a good reference.</span>
+<span id="L54" class="ln">    54	</span><span class="comment">//</span>
+<span id="L55" class="ln">    55	</span><span class="comment">// Note that the RFC822, RFC850, and RFC1123 formats should be applied</span>
+<span id="L56" class="ln">    56	</span><span class="comment">// only to local times. Applying them to UTC times will use &#34;UTC&#34; as the</span>
+<span id="L57" class="ln">    57	</span><span class="comment">// time zone abbreviation, while strictly speaking those RFCs require the</span>
+<span id="L58" class="ln">    58	</span><span class="comment">// use of &#34;GMT&#34; in that case.</span>
+<span id="L59" class="ln">    59	</span><span class="comment">// In general RFC1123Z should be used instead of RFC1123 for servers</span>
+<span id="L60" class="ln">    60	</span><span class="comment">// that insist on that format, and RFC3339 should be preferred for new protocols.</span>
+<span id="L61" class="ln">    61	</span><span class="comment">// RFC822, RFC822Z, RFC1123, and RFC1123Z are useful for formatting;</span>
+<span id="L62" class="ln">    62	</span><span class="comment">// when used with time.Parse they do not accept all the time formats</span>
+<span id="L63" class="ln">    63	</span><span class="comment">// permitted by the RFCs.</span>
+<span id="L64" class="ln">    64	</span>const (
+<span id="L65" class="ln">    65	</span>	ANSIC       = &#34;Mon Jan _2 15:04:05 2006&#34;
+<span id="L66" class="ln">    66	</span>	UnixDate    = &#34;Mon Jan _2 15:04:05 MST 2006&#34;
+<span id="L67" class="ln">    67	</span>	RubyDate    = &#34;Mon Jan 02 15:04:05 -0700 2006&#34;
+<span id="L68" class="ln">    68	</span>	RFC822      = &#34;02 Jan 06 15:04 MST&#34;
+<span id="L69" class="ln">    69	</span>	RFC822Z     = &#34;02 Jan 06 15:04 -0700&#34; <span class="comment">// RFC822 with numeric zone</span>
+<span id="L70" class="ln">    70	</span>	RFC850      = &#34;Monday, 02-Jan-06 15:04:05 MST&#34;
+<span id="L71" class="ln">    71	</span>	RFC1123     = &#34;Mon, 02 Jan 2006 15:04:05 MST&#34;
+<span id="L72" class="ln">    72	</span>	RFC1123Z    = &#34;Mon, 02 Jan 2006 15:04:05 -0700&#34; <span class="comment">// RFC1123 with numeric zone</span>
+<span id="L73" class="ln">    73	</span>	RFC3339     = &#34;2006-01-02T15:04:05Z07:00&#34;
+<span id="L74" class="ln">    74	</span>	RFC3339Nano = &#34;2006-01-02T15:04:05.999999999Z07:00&#34;
+<span id="L75" class="ln">    75	</span>	Kitchen     = &#34;3:04PM&#34;
+<span id="L76" class="ln">    76	</span>	<span class="comment">// Handy time stamps.</span>
+<span id="L77" class="ln">    77	</span>	Stamp      = &#34;Jan _2 15:04:05&#34;
+<span id="L78" class="ln">    78	</span>	StampMilli = &#34;Jan _2 15:04:05.000&#34;
+<span id="L79" class="ln">    79	</span>	StampMicro = &#34;Jan _2 15:04:05.000000&#34;
+<span id="L80" class="ln">    80	</span>	StampNano  = &#34;Jan _2 15:04:05.000000000&#34;
+<span id="L81" class="ln">    81	</span>)
+<span id="L82" class="ln">    82	</span>
+<span id="L83" class="ln">    83	</span>const (
+<span id="L84" class="ln">    84	</span>	_                        = iota
+<span id="L85" class="ln">    85	</span>	stdLongMonth             = iota + stdNeedDate  <span class="comment">// &#34;January&#34;</span>
+<span id="L86" class="ln">    86	</span>	stdMonth                                       <span class="comment">// &#34;Jan&#34;</span>
+<span id="L87" class="ln">    87	</span>	stdNumMonth                                    <span class="comment">// &#34;1&#34;</span>
+<span id="L88" class="ln">    88	</span>	stdZeroMonth                                   <span class="comment">// &#34;01&#34;</span>
+<span id="L89" class="ln">    89	</span>	stdLongWeekDay                                 <span class="comment">// &#34;Monday&#34;</span>
+<span id="L90" class="ln">    90	</span>	stdWeekDay                                     <span class="comment">// &#34;Mon&#34;</span>
+<span id="L91" class="ln">    91	</span>	stdDay                                         <span class="comment">// &#34;2&#34;</span>
+<span id="L92" class="ln">    92	</span>	stdUnderDay                                    <span class="comment">// &#34;_2&#34;</span>
+<span id="L93" class="ln">    93	</span>	stdZeroDay                                     <span class="comment">// &#34;02&#34;</span>
+<span id="L94" class="ln">    94	</span>	stdHour                  = iota + stdNeedClock <span class="comment">// &#34;15&#34;</span>
+<span id="L95" class="ln">    95	</span>	stdHour12                                      <span class="comment">// &#34;3&#34;</span>
+<span id="L96" class="ln">    96	</span>	stdZeroHour12                                  <span class="comment">// &#34;03&#34;</span>
+<span id="L97" class="ln">    97	</span>	stdMinute                                      <span class="comment">// &#34;4&#34;</span>
+<span id="L98" class="ln">    98	</span>	stdZeroMinute                                  <span class="comment">// &#34;04&#34;</span>
+<span id="L99" class="ln">    99	</span>	stdSecond                                      <span class="comment">// &#34;5&#34;</span>
+<span id="L100" class="ln">   100	</span>	stdZeroSecond                                  <span class="comment">// &#34;05&#34;</span>
+<span id="L101" class="ln">   101	</span>	stdLongYear              = iota + stdNeedDate  <span class="comment">// &#34;2006&#34;</span>
+<span id="L102" class="ln">   102	</span>	stdYear                                        <span class="comment">// &#34;06&#34;</span>
+<span id="L103" class="ln">   103	</span>	stdPM                    = iota + stdNeedClock <span class="comment">// &#34;PM&#34;</span>
+<span id="L104" class="ln">   104	</span>	stdpm                                          <span class="comment">// &#34;pm&#34;</span>
+<span id="L105" class="ln">   105	</span>	stdTZ                    = iota                <span class="comment">// &#34;MST&#34;</span>
+<span id="L106" class="ln">   106	</span>	stdISO8601TZ                                   <span class="comment">// &#34;Z0700&#34;  // prints Z for UTC</span>
+<span id="L107" class="ln">   107	</span>	stdISO8601SecondsTZ                            <span class="comment">// &#34;Z070000&#34;</span>
+<span id="L108" class="ln">   108	</span>	stdISO8601ShortTZ                              <span class="comment">// &#34;Z07&#34;</span>
+<span id="L109" class="ln">   109	</span>	stdISO8601ColonTZ                              <span class="comment">// &#34;Z07:00&#34; // prints Z for UTC</span>
+<span id="L110" class="ln">   110	</span>	stdISO8601ColonSecondsTZ                       <span class="comment">// &#34;Z07:00:00&#34;</span>
+<span id="L111" class="ln">   111	</span>	stdNumTZ                                       <span class="comment">// &#34;-0700&#34;  // always numeric</span>
+<span id="L112" class="ln">   112	</span>	stdNumSecondsTz                                <span class="comment">// &#34;-070000&#34;</span>
+<span id="L113" class="ln">   113	</span>	stdNumShortTZ                                  <span class="comment">// &#34;-07&#34;    // always numeric</span>
+<span id="L114" class="ln">   114	</span>	stdNumColonTZ                                  <span class="comment">// &#34;-07:00&#34; // always numeric</span>
+<span id="L115" class="ln">   115	</span>	stdNumColonSecondsTZ                           <span class="comment">// &#34;-07:00:00&#34;</span>
+<span id="L116" class="ln">   116	</span>	stdFracSecond0                                 <span class="comment">// &#34;.0&#34;, &#34;.00&#34;, ... , trailing zeros included</span>
+<span id="L117" class="ln">   117	</span>	stdFracSecond9                                 <span class="comment">// &#34;.9&#34;, &#34;.99&#34;, ..., trailing zeros omitted</span>
+<span id="L118" class="ln">   118	</span>
+<span id="L119" class="ln">   119	</span>	stdNeedDate  = 1 &lt;&lt; 8             <span class="comment">// need month, day, year</span>
+<span id="L120" class="ln">   120	</span>	stdNeedClock = 2 &lt;&lt; 8             <span class="comment">// need hour, minute, second</span>
+<span id="L121" class="ln">   121	</span>	stdArgShift  = 16                 <span class="comment">// extra argument in high bits, above low stdArgShift</span>
+<span id="L122" class="ln">   122	</span>	stdMask      = 1&lt;&lt;stdArgShift - 1 <span class="comment">// mask out argument</span>
+<span id="L123" class="ln">   123	</span>)
+<span id="L124" class="ln">   124	</span>
+<span id="L125" class="ln">   125	</span><span class="comment">// std0x records the std values for &#34;01&#34;, &#34;02&#34;, ..., &#34;06&#34;.</span>
+<span id="L126" class="ln">   126	</span>var std0x = [...]int{stdZeroMonth, stdZeroDay, stdZeroHour12, stdZeroMinute, stdZeroSecond, stdYear}
+<span id="L127" class="ln">   127	</span>
+<span id="L128" class="ln">   128	</span><span class="comment">// startsWithLowerCase reports whether the string has a lower-case letter at the beginning.</span>
+<span id="L129" class="ln">   129	</span><span class="comment">// Its purpose is to prevent matching strings like &#34;Month&#34; when looking for &#34;Mon&#34;.</span>
+<span id="L130" class="ln">   130	</span>func startsWithLowerCase(str string) bool {
+<span id="L131" class="ln">   131	</span>	if len(str) == 0 {
+<span id="L132" class="ln">   132	</span>		return false
+<span id="L133" class="ln">   133	</span>	}
+<span id="L134" class="ln">   134	</span>	c := str[0]
+<span id="L135" class="ln">   135	</span>	return &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;z&#39;
+<span id="L136" class="ln">   136	</span>}
+<span id="L137" class="ln">   137	</span>
+<span id="L138" class="ln">   138	</span><span class="comment">// nextStdChunk finds the first occurrence of a std string in</span>
+<span id="L139" class="ln">   139	</span><span class="comment">// layout and returns the text before, the std string, and the text after.</span>
+<span id="L140" class="ln">   140	</span>func nextStdChunk(layout string) (prefix string, std int, suffix string) {
+<span id="L141" class="ln">   141	</span>	for i := 0; i &lt; len(layout); i++ {
+<span id="L142" class="ln">   142	</span>		switch c := int(layout[i]); c {
+<span id="L143" class="ln">   143	</span>		case &#39;J&#39;: <span class="comment">// January, Jan</span>
+<span id="L144" class="ln">   144	</span>			if len(layout) &gt;= i+3 &amp;&amp; layout[i:i+3] == &#34;Jan&#34; {
+<span id="L145" class="ln">   145	</span>				if len(layout) &gt;= i+7 &amp;&amp; layout[i:i+7] == &#34;January&#34; {
+<span id="L146" class="ln">   146	</span>					return layout[0:i], stdLongMonth, layout[i+7:]
+<span id="L147" class="ln">   147	</span>				}
+<span id="L148" class="ln">   148	</span>				if !startsWithLowerCase(layout[i+3:]) {
+<span id="L149" class="ln">   149	</span>					return layout[0:i], stdMonth, layout[i+3:]
+<span id="L150" class="ln">   150	</span>				}
+<span id="L151" class="ln">   151	</span>			}
+<span id="L152" class="ln">   152	</span>
+<span id="L153" class="ln">   153	</span>		case &#39;M&#39;: <span class="comment">// Monday, Mon, MST</span>
+<span id="L154" class="ln">   154	</span>			if len(layout) &gt;= i+3 {
+<span id="L155" class="ln">   155	</span>				if layout[i:i+3] == &#34;Mon&#34; {
+<span id="L156" class="ln">   156	</span>					if len(layout) &gt;= i+6 &amp;&amp; layout[i:i+6] == &#34;Monday&#34; {
+<span id="L157" class="ln">   157	</span>						return layout[0:i], stdLongWeekDay, layout[i+6:]
+<span id="L158" class="ln">   158	</span>					}
+<span id="L159" class="ln">   159	</span>					if !startsWithLowerCase(layout[i+3:]) {
+<span id="L160" class="ln">   160	</span>						return layout[0:i], stdWeekDay, layout[i+3:]
+<span id="L161" class="ln">   161	</span>					}
+<span id="L162" class="ln">   162	</span>				}
+<span id="L163" class="ln">   163	</span>				if layout[i:i+3] == &#34;MST&#34; {
+<span id="L164" class="ln">   164	</span>					return layout[0:i], stdTZ, layout[i+3:]
+<span id="L165" class="ln">   165	</span>				}
+<span id="L166" class="ln">   166	</span>			}
+<span id="L167" class="ln">   167	</span>
+<span id="L168" class="ln">   168	</span>		case &#39;0&#39;: <span class="comment">// 01, 02, 03, 04, 05, 06</span>
+<span id="L169" class="ln">   169	</span>			if len(layout) &gt;= i+2 &amp;&amp; &#39;1&#39; &lt;= layout[i+1] &amp;&amp; layout[i+1] &lt;= &#39;6&#39; {
+<span id="L170" class="ln">   170	</span>				return layout[0:i], std0x[layout[i+1]-&#39;1&#39;], layout[i+2:]
+<span id="L171" class="ln">   171	</span>			}
+<span id="L172" class="ln">   172	</span>
+<span id="L173" class="ln">   173	</span>		case &#39;1&#39;: <span class="comment">// 15, 1</span>
+<span id="L174" class="ln">   174	</span>			if len(layout) &gt;= i+2 &amp;&amp; layout[i+1] == &#39;5&#39; {
+<span id="L175" class="ln">   175	</span>				return layout[0:i], stdHour, layout[i+2:]
+<span id="L176" class="ln">   176	</span>			}
+<span id="L177" class="ln">   177	</span>			return layout[0:i], stdNumMonth, layout[i+1:]
+<span id="L178" class="ln">   178	</span>
+<span id="L179" class="ln">   179	</span>		case &#39;2&#39;: <span class="comment">// 2006, 2</span>
+<span id="L180" class="ln">   180	</span>			if len(layout) &gt;= i+4 &amp;&amp; layout[i:i+4] == &#34;2006&#34; {
+<span id="L181" class="ln">   181	</span>				return layout[0:i], stdLongYear, layout[i+4:]
+<span id="L182" class="ln">   182	</span>			}
+<span id="L183" class="ln">   183	</span>			return layout[0:i], stdDay, layout[i+1:]
+<span id="L184" class="ln">   184	</span>
+<span id="L185" class="ln">   185	</span>		case &#39;_&#39;: <span class="comment">// _2, _2006</span>
+<span id="L186" class="ln">   186	</span>			if len(layout) &gt;= i+2 &amp;&amp; layout[i+1] == &#39;2&#39; {
+<span id="L187" class="ln">   187	</span>				<span class="comment">//_2006 is really a literal _, followed by stdLongYear</span>
+<span id="L188" class="ln">   188	</span>				if len(layout) &gt;= i+5 &amp;&amp; layout[i+1:i+5] == &#34;2006&#34; {
+<span id="L189" class="ln">   189	</span>					return layout[0 : i+1], stdLongYear, layout[i+5:]
+<span id="L190" class="ln">   190	</span>				}
+<span id="L191" class="ln">   191	</span>				return layout[0:i], stdUnderDay, layout[i+2:]
+<span id="L192" class="ln">   192	</span>			}
+<span id="L193" class="ln">   193	</span>
+<span id="L194" class="ln">   194	</span>		case &#39;3&#39;:
+<span id="L195" class="ln">   195	</span>			return layout[0:i], stdHour12, layout[i+1:]
+<span id="L196" class="ln">   196	</span>
+<span id="L197" class="ln">   197	</span>		case &#39;4&#39;:
+<span id="L198" class="ln">   198	</span>			return layout[0:i], stdMinute, layout[i+1:]
+<span id="L199" class="ln">   199	</span>
+<span id="L200" class="ln">   200	</span>		case &#39;5&#39;:
+<span id="L201" class="ln">   201	</span>			return layout[0:i], stdSecond, layout[i+1:]
+<span id="L202" class="ln">   202	</span>
+<span id="L203" class="ln">   203	</span>		case &#39;P&#39;: <span class="comment">// PM</span>
+<span id="L204" class="ln">   204	</span>			if len(layout) &gt;= i+2 &amp;&amp; layout[i+1] == &#39;M&#39; {
+<span id="L205" class="ln">   205	</span>				return layout[0:i], stdPM, layout[i+2:]
+<span id="L206" class="ln">   206	</span>			}
+<span id="L207" class="ln">   207	</span>
+<span id="L208" class="ln">   208	</span>		case &#39;p&#39;: <span class="comment">// pm</span>
+<span id="L209" class="ln">   209	</span>			if len(layout) &gt;= i+2 &amp;&amp; layout[i+1] == &#39;m&#39; {
+<span id="L210" class="ln">   210	</span>				return layout[0:i], stdpm, layout[i+2:]
+<span id="L211" class="ln">   211	</span>			}
+<span id="L212" class="ln">   212	</span>
+<span id="L213" class="ln">   213	</span>		case &#39;-&#39;: <span class="comment">// -070000, -07:00:00, -0700, -07:00, -07</span>
+<span id="L214" class="ln">   214	</span>			if len(layout) &gt;= i+7 &amp;&amp; layout[i:i+7] == &#34;-070000&#34; {
+<span id="L215" class="ln">   215	</span>				return layout[0:i], stdNumSecondsTz, layout[i+7:]
+<span id="L216" class="ln">   216	</span>			}
+<span id="L217" class="ln">   217	</span>			if len(layout) &gt;= i+9 &amp;&amp; layout[i:i+9] == &#34;-07:00:00&#34; {
+<span id="L218" class="ln">   218	</span>				return layout[0:i], stdNumColonSecondsTZ, layout[i+9:]
+<span id="L219" class="ln">   219	</span>			}
+<span id="L220" class="ln">   220	</span>			if len(layout) &gt;= i+5 &amp;&amp; layout[i:i+5] == &#34;-0700&#34; {
+<span id="L221" class="ln">   221	</span>				return layout[0:i], stdNumTZ, layout[i+5:]
+<span id="L222" class="ln">   222	</span>			}
+<span id="L223" class="ln">   223	</span>			if len(layout) &gt;= i+6 &amp;&amp; layout[i:i+6] == &#34;-07:00&#34; {
+<span id="L224" class="ln">   224	</span>				return layout[0:i], stdNumColonTZ, layout[i+6:]
+<span id="L225" class="ln">   225	</span>			}
+<span id="L226" class="ln">   226	</span>			if len(layout) &gt;= i+3 &amp;&amp; layout[i:i+3] == &#34;-07&#34; {
+<span id="L227" class="ln">   227	</span>				return layout[0:i], stdNumShortTZ, layout[i+3:]
+<span id="L228" class="ln">   228	</span>			}
+<span id="L229" class="ln">   229	</span>
+<span id="L230" class="ln">   230	</span>		case &#39;Z&#39;: <span class="comment">// Z070000, Z07:00:00, Z0700, Z07:00,</span>
+<span id="L231" class="ln">   231	</span>			if len(layout) &gt;= i+7 &amp;&amp; layout[i:i+7] == &#34;Z070000&#34; {
+<span id="L232" class="ln">   232	</span>				return layout[0:i], stdISO8601SecondsTZ, layout[i+7:]
+<span id="L233" class="ln">   233	</span>			}
+<span id="L234" class="ln">   234	</span>			if len(layout) &gt;= i+9 &amp;&amp; layout[i:i+9] == &#34;Z07:00:00&#34; {
+<span id="L235" class="ln">   235	</span>				return layout[0:i], stdISO8601ColonSecondsTZ, layout[i+9:]
+<span id="L236" class="ln">   236	</span>			}
+<span id="L237" class="ln">   237	</span>			if len(layout) &gt;= i+5 &amp;&amp; layout[i:i+5] == &#34;Z0700&#34; {
+<span id="L238" class="ln">   238	</span>				return layout[0:i], stdISO8601TZ, layout[i+5:]
+<span id="L239" class="ln">   239	</span>			}
+<span id="L240" class="ln">   240	</span>			if len(layout) &gt;= i+6 &amp;&amp; layout[i:i+6] == &#34;Z07:00&#34; {
+<span id="L241" class="ln">   241	</span>				return layout[0:i], stdISO8601ColonTZ, layout[i+6:]
+<span id="L242" class="ln">   242	</span>			}
+<span id="L243" class="ln">   243	</span>			if len(layout) &gt;= i+3 &amp;&amp; layout[i:i+3] == &#34;Z07&#34; {
+<span id="L244" class="ln">   244	</span>				return layout[0:i], stdISO8601ShortTZ, layout[i+3:]
+<span id="L245" class="ln">   245	</span>			}
+<span id="L246" class="ln">   246	</span>
+<span id="L247" class="ln">   247	</span>		case &#39;.&#39;: <span class="comment">// .000 or .999 - repeated digits for fractional seconds.</span>
+<span id="L248" class="ln">   248	</span>			if i+1 &lt; len(layout) &amp;&amp; (layout[i+1] == &#39;0&#39; || layout[i+1] == &#39;9&#39;) {
+<span id="L249" class="ln">   249	</span>				ch := layout[i+1]
+<span id="L250" class="ln">   250	</span>				j := i + 1
+<span id="L251" class="ln">   251	</span>				for j &lt; len(layout) &amp;&amp; layout[j] == ch {
+<span id="L252" class="ln">   252	</span>					j++
+<span id="L253" class="ln">   253	</span>				}
+<span id="L254" class="ln">   254	</span>				<span class="comment">// String of digits must end here - only fractional second is all digits.</span>
+<span id="L255" class="ln">   255	</span>				if !isDigit(layout, j) {
+<span id="L256" class="ln">   256	</span>					std := stdFracSecond0
+<span id="L257" class="ln">   257	</span>					if layout[i+1] == &#39;9&#39; {
+<span id="L258" class="ln">   258	</span>						std = stdFracSecond9
+<span id="L259" class="ln">   259	</span>					}
+<span id="L260" class="ln">   260	</span>					std |= (j - (i + 1)) &lt;&lt; stdArgShift
+<span id="L261" class="ln">   261	</span>					return layout[0:i], std, layout[j:]
+<span id="L262" class="ln">   262	</span>				}
+<span id="L263" class="ln">   263	</span>			}
+<span id="L264" class="ln">   264	</span>		}
+<span id="L265" class="ln">   265	</span>	}
+<span id="L266" class="ln">   266	</span>	return layout, 0, &#34;&#34;
+<span id="L267" class="ln">   267	</span>}
+<span id="L268" class="ln">   268	</span>
+<span id="L269" class="ln">   269	</span>var longDayNames = []string{
+<span id="L270" class="ln">   270	</span>	&#34;Sunday&#34;,
+<span id="L271" class="ln">   271	</span>	&#34;Monday&#34;,
+<span id="L272" class="ln">   272	</span>	&#34;Tuesday&#34;,
+<span id="L273" class="ln">   273	</span>	&#34;Wednesday&#34;,
+<span id="L274" class="ln">   274	</span>	&#34;Thursday&#34;,
+<span id="L275" class="ln">   275	</span>	&#34;Friday&#34;,
+<span id="L276" class="ln">   276	</span>	&#34;Saturday&#34;,
+<span id="L277" class="ln">   277	</span>}
+<span id="L278" class="ln">   278	</span>
+<span id="L279" class="ln">   279	</span>var shortDayNames = []string{
+<span id="L280" class="ln">   280	</span>	&#34;Sun&#34;,
+<span id="L281" class="ln">   281	</span>	&#34;Mon&#34;,
+<span id="L282" class="ln">   282	</span>	&#34;Tue&#34;,
+<span id="L283" class="ln">   283	</span>	&#34;Wed&#34;,
+<span id="L284" class="ln">   284	</span>	&#34;Thu&#34;,
+<span id="L285" class="ln">   285	</span>	&#34;Fri&#34;,
+<span id="L286" class="ln">   286	</span>	&#34;Sat&#34;,
+<span id="L287" class="ln">   287	</span>}
+<span id="L288" class="ln">   288	</span>
+<span id="L289" class="ln">   289	</span>var shortMonthNames = []string{
+<span id="L290" class="ln">   290	</span>	&#34;---&#34;,
+<span id="L291" class="ln">   291	</span>	&#34;Jan&#34;,
+<span id="L292" class="ln">   292	</span>	&#34;Feb&#34;,
+<span id="L293" class="ln">   293	</span>	&#34;Mar&#34;,
+<span id="L294" class="ln">   294	</span>	&#34;Apr&#34;,
+<span id="L295" class="ln">   295	</span>	&#34;May&#34;,
+<span id="L296" class="ln">   296	</span>	&#34;Jun&#34;,
+<span id="L297" class="ln">   297	</span>	&#34;Jul&#34;,
+<span id="L298" class="ln">   298	</span>	&#34;Aug&#34;,
+<span id="L299" class="ln">   299	</span>	&#34;Sep&#34;,
+<span id="L300" class="ln">   300	</span>	&#34;Oct&#34;,
+<span id="L301" class="ln">   301	</span>	&#34;Nov&#34;,
+<span id="L302" class="ln">   302	</span>	&#34;Dec&#34;,
+<span id="L303" class="ln">   303	</span>}
+<span id="L304" class="ln">   304	</span>
+<span id="L305" class="ln">   305	</span>var longMonthNames = []string{
+<span id="L306" class="ln">   306	</span>	&#34;---&#34;,
+<span id="L307" class="ln">   307	</span>	&#34;January&#34;,
+<span id="L308" class="ln">   308	</span>	&#34;February&#34;,
+<span id="L309" class="ln">   309	</span>	&#34;March&#34;,
+<span id="L310" class="ln">   310	</span>	&#34;April&#34;,
+<span id="L311" class="ln">   311	</span>	&#34;May&#34;,
+<span id="L312" class="ln">   312	</span>	&#34;June&#34;,
+<span id="L313" class="ln">   313	</span>	&#34;July&#34;,
+<span id="L314" class="ln">   314	</span>	&#34;August&#34;,
+<span id="L315" class="ln">   315	</span>	&#34;September&#34;,
+<span id="L316" class="ln">   316	</span>	&#34;October&#34;,
+<span id="L317" class="ln">   317	</span>	&#34;November&#34;,
+<span id="L318" class="ln">   318	</span>	&#34;December&#34;,
+<span id="L319" class="ln">   319	</span>}
+<span id="L320" class="ln">   320	</span>
+<span id="L321" class="ln">   321	</span><span class="comment">// match reports whether s1 and s2 match ignoring case.</span>
+<span id="L322" class="ln">   322	</span><span class="comment">// It is assumed s1 and s2 are the same length.</span>
+<span id="L323" class="ln">   323	</span>func match(s1, s2 string) bool {
+<span id="L324" class="ln">   324	</span>	for i := 0; i &lt; len(s1); i++ {
+<span id="L325" class="ln">   325	</span>		c1 := s1[i]
+<span id="L326" class="ln">   326	</span>		c2 := s2[i]
+<span id="L327" class="ln">   327	</span>		if c1 != c2 {
+<span id="L328" class="ln">   328	</span>			<span class="comment">// Switch to lower-case; &#39;a&#39;-&#39;A&#39; is known to be a single bit.</span>
+<span id="L329" class="ln">   329	</span>			c1 |= &#39;a&#39; - &#39;A&#39;
+<span id="L330" class="ln">   330	</span>			c2 |= &#39;a&#39; - &#39;A&#39;
+<span id="L331" class="ln">   331	</span>			if c1 != c2 || c1 &lt; &#39;a&#39; || c1 &gt; &#39;z&#39; {
+<span id="L332" class="ln">   332	</span>				return false
+<span id="L333" class="ln">   333	</span>			}
+<span id="L334" class="ln">   334	</span>		}
+<span id="L335" class="ln">   335	</span>	}
+<span id="L336" class="ln">   336	</span>	return true
+<span id="L337" class="ln">   337	</span>}
+<span id="L338" class="ln">   338	</span>
+<span id="L339" class="ln">   339	</span>func lookup(tab []string, val string) (int, string, error) {
+<span id="L340" class="ln">   340	</span>	for i, v := range tab {
+<span id="L341" class="ln">   341	</span>		if len(val) &gt;= len(v) &amp;&amp; match(val[0:len(v)], v) {
+<span id="L342" class="ln">   342	</span>			return i, val[len(v):], nil
+<span id="L343" class="ln">   343	</span>		}
+<span id="L344" class="ln">   344	</span>	}
+<span id="L345" class="ln">   345	</span>	return -1, val, errBad
+<span id="L346" class="ln">   346	</span>}
+<span id="L347" class="ln">   347	</span>
+<span id="L348" class="ln">   348	</span><span class="comment">// appendInt appends the decimal form of x to b and returns the result.</span>
+<span id="L349" class="ln">   349	</span><span class="comment">// If the decimal form (excluding sign) is shorter than width, the result is padded with leading 0&#39;s.</span>
+<span id="L350" class="ln">   350	</span><span class="comment">// Duplicates functionality in strconv, but avoids dependency.</span>
+<span id="L351" class="ln">   351	</span>func appendInt(b []byte, x int, width int) []byte {
+<span id="L352" class="ln">   352	</span>	u := uint(x)
+<span id="L353" class="ln">   353	</span>	if x &lt; 0 {
+<span id="L354" class="ln">   354	</span>		b = append(b, &#39;-&#39;)
+<span id="L355" class="ln">   355	</span>		u = uint(-x)
+<span id="L356" class="ln">   356	</span>	}
+<span id="L357" class="ln">   357	</span>
+<span id="L358" class="ln">   358	</span>	<span class="comment">// Assemble decimal in reverse order.</span>
+<span id="L359" class="ln">   359	</span>	var buf [20]byte
+<span id="L360" class="ln">   360	</span>	i := len(buf)
+<span id="L361" class="ln">   361	</span>	for u &gt;= 10 {
+<span id="L362" class="ln">   362	</span>		i--
+<span id="L363" class="ln">   363	</span>		q := u / 10
+<span id="L364" class="ln">   364	</span>		buf[i] = byte(&#39;0&#39; + u - q*10)
+<span id="L365" class="ln">   365	</span>		u = q
+<span id="L366" class="ln">   366	</span>	}
+<span id="L367" class="ln">   367	</span>	i--
+<span id="L368" class="ln">   368	</span>	buf[i] = byte(&#39;0&#39; + u)
+<span id="L369" class="ln">   369	</span>
+<span id="L370" class="ln">   370	</span>	<span class="comment">// Add 0-padding.</span>
+<span id="L371" class="ln">   371	</span>	for w := len(buf) - i; w &lt; width; w++ {
+<span id="L372" class="ln">   372	</span>		b = append(b, &#39;0&#39;)
+<span id="L373" class="ln">   373	</span>	}
+<span id="L374" class="ln">   374	</span>
+<span id="L375" class="ln">   375	</span>	return append(b, buf[i:]...)
+<span id="L376" class="ln">   376	</span>}
+<span id="L377" class="ln">   377	</span>
+<span id="L378" class="ln">   378	</span><span class="comment">// Never printed, just needs to be non-nil for return by atoi.</span>
+<span id="L379" class="ln">   379	</span>var atoiError = errors.New(&#34;time: invalid number&#34;)
+<span id="L380" class="ln">   380	</span>
+<span id="L381" class="ln">   381	</span><span class="comment">// Duplicates functionality in strconv, but avoids dependency.</span>
+<span id="L382" class="ln">   382	</span>func atoi(s string) (x int, err error) {
+<span id="L383" class="ln">   383	</span>	neg := false
+<span id="L384" class="ln">   384	</span>	if s != &#34;&#34; &amp;&amp; (s[0] == &#39;-&#39; || s[0] == &#39;+&#39;) {
+<span id="L385" class="ln">   385	</span>		neg = s[0] == &#39;-&#39;
+<span id="L386" class="ln">   386	</span>		s = s[1:]
+<span id="L387" class="ln">   387	</span>	}
+<span id="L388" class="ln">   388	</span>	q, rem, err := leadingInt(s)
+<span id="L389" class="ln">   389	</span>	x = int(q)
+<span id="L390" class="ln">   390	</span>	if err != nil || rem != &#34;&#34; {
+<span id="L391" class="ln">   391	</span>		return 0, atoiError
+<span id="L392" class="ln">   392	</span>	}
+<span id="L393" class="ln">   393	</span>	if neg {
+<span id="L394" class="ln">   394	</span>		x = -x
+<span id="L395" class="ln">   395	</span>	}
+<span id="L396" class="ln">   396	</span>	return x, nil
+<span id="L397" class="ln">   397	</span>}
+<span id="L398" class="ln">   398	</span>
+<span id="L399" class="ln">   399	</span><span class="comment">// formatNano appends a fractional second, as nanoseconds, to b</span>
+<span id="L400" class="ln">   400	</span><span class="comment">// and returns the result.</span>
+<span id="L401" class="ln">   401	</span>func formatNano(b []byte, nanosec uint, n int, trim bool) []byte {
+<span id="L402" class="ln">   402	</span>	u := nanosec
+<span id="L403" class="ln">   403	</span>	var buf [9]byte
+<span id="L404" class="ln">   404	</span>	for start := len(buf); start &gt; 0; {
+<span id="L405" class="ln">   405	</span>		start--
+<span id="L406" class="ln">   406	</span>		buf[start] = byte(u%10 + &#39;0&#39;)
+<span id="L407" class="ln">   407	</span>		u /= 10
+<span id="L408" class="ln">   408	</span>	}
+<span id="L409" class="ln">   409	</span>
+<span id="L410" class="ln">   410	</span>	if n &gt; 9 {
+<span id="L411" class="ln">   411	</span>		n = 9
+<span id="L412" class="ln">   412	</span>	}
+<span id="L413" class="ln">   413	</span>	if trim {
+<span id="L414" class="ln">   414	</span>		for n &gt; 0 &amp;&amp; buf[n-1] == &#39;0&#39; {
+<span id="L415" class="ln">   415	</span>			n--
+<span id="L416" class="ln">   416	</span>		}
+<span id="L417" class="ln">   417	</span>		if n == 0 {
+<span id="L418" class="ln">   418	</span>			return b
+<span id="L419" class="ln">   419	</span>		}
+<span id="L420" class="ln">   420	</span>	}
+<span id="L421" class="ln">   421	</span>	b = append(b, &#39;.&#39;)
+<span id="L422" class="ln">   422	</span>	return append(b, buf[:n]...)
+<span id="L423" class="ln">   423	</span>}
+<span id="L424" class="ln">   424	</span>
+<span id="L425" class="ln">   425	</span><span class="comment">// String returns the time formatted using the format string</span>
+<span id="L426" class="ln">   426	</span><span class="comment">//	&#34;2006-01-02 15:04:05.999999999 -0700 MST&#34;</span>
+<span id="L427" class="ln">   427	</span>func (t Time) String() string {
+<span id="L428" class="ln">   428	</span>	return t.Format(&#34;2006-01-02 15:04:05.999999999 -0700 MST&#34;)
+<span id="L429" class="ln">   429	</span>}
+<span id="L430" class="ln">   430	</span>
+<span id="L431" class="ln">   431	</span><span class="comment">// Format returns a textual representation of the time value formatted</span>
+<span id="L432" class="ln">   432	</span><span class="comment">// according to layout, which defines the format by showing how the reference</span>
+<span id="L433" class="ln">   433	</span><span class="comment">// time, defined to be</span>
+<span id="L434" class="ln">   434	</span><span class="comment">//	Mon Jan 2 15:04:05 -0700 MST 2006</span>
+<span id="L435" class="ln">   435	</span><span class="comment">// would be displayed if it were the value; it serves as an example of the</span>
+<span id="L436" class="ln">   436	</span><span class="comment">// desired output. The same display rules will then be applied to the time</span>
+<span id="L437" class="ln">   437	</span><span class="comment">// value.</span>
+<span id="L438" class="ln">   438	</span><span class="comment">//</span>
+<span id="L439" class="ln">   439	</span><span class="comment">// A fractional second is represented by adding a period and zeros</span>
+<span id="L440" class="ln">   440	</span><span class="comment">// to the end of the seconds section of layout string, as in &#34;15:04:05.000&#34;</span>
+<span id="L441" class="ln">   441	</span><span class="comment">// to format a time stamp with millisecond precision.</span>
+<span id="L442" class="ln">   442	</span><span class="comment">//</span>
+<span id="L443" class="ln">   443	</span><span class="comment">// Predefined layouts ANSIC, UnixDate, RFC3339 and others describe standard</span>
+<span id="L444" class="ln">   444	</span><span class="comment">// and convenient representations of the reference time. For more information</span>
+<span id="L445" class="ln">   445	</span><span class="comment">// about the formats and the definition of the reference time, see the</span>
+<span id="L446" class="ln">   446	</span><span class="comment">// documentation for ANSIC and the other constants defined by this package.</span>
+<span id="L447" class="ln">   447	</span>func (t Time) Format(layout string) string {
+<span id="L448" class="ln">   448	</span>	const bufSize = 64
+<span id="L449" class="ln">   449	</span>	var b []byte
+<span id="L450" class="ln">   450	</span>	max := len(layout) + 10
+<span id="L451" class="ln">   451	</span>	if max &lt; bufSize {
+<span id="L452" class="ln">   452	</span>		var buf [bufSize]byte
+<span id="L453" class="ln">   453	</span>		b = buf[:0]
+<span id="L454" class="ln">   454	</span>	} else {
+<span id="L455" class="ln">   455	</span>		b = make([]byte, 0, max)
+<span id="L456" class="ln">   456	</span>	}
+<span id="L457" class="ln">   457	</span>	b = t.AppendFormat(b, layout)
+<span id="L458" class="ln">   458	</span>	return string(b)
+<span id="L459" class="ln">   459	</span>}
+<span id="L460" class="ln">   460	</span>
+<span id="L461" class="ln">   461	</span><span class="comment">// AppendFormat is like Format but appends the textual</span>
+<span id="L462" class="ln">   462	</span><span class="comment">// representation to b and returns the extended buffer.</span>
+<span id="L463" class="ln">   463	</span>func (t Time) AppendFormat(b []byte, layout string) []byte {
+<span id="L464" class="ln">   464	</span>	var (
+<span id="L465" class="ln">   465	</span>		name, offset, abs = t.locabs()
+<span id="L466" class="ln">   466	</span>
+<span id="L467" class="ln">   467	</span>		year  int = -1
+<span id="L468" class="ln">   468	</span>		month Month
+<span id="L469" class="ln">   469	</span>		day   int
+<span id="L470" class="ln">   470	</span>		hour  int = -1
+<span id="L471" class="ln">   471	</span>		min   int
+<span id="L472" class="ln">   472	</span>		sec   int
+<span id="L473" class="ln">   473	</span>	)
+<span id="L474" class="ln">   474	</span>	<span class="comment">// Each iteration generates one std value.</span>
+<span id="L475" class="ln">   475	</span>	for layout != &#34;&#34; {
+<span id="L476" class="ln">   476	</span>		prefix, std, suffix := nextStdChunk(layout)
+<span id="L477" class="ln">   477	</span>		if prefix != &#34;&#34; {
+<span id="L478" class="ln">   478	</span>			b = append(b, prefix...)
+<span id="L479" class="ln">   479	</span>		}
+<span id="L480" class="ln">   480	</span>		if std == 0 {
+<span id="L481" class="ln">   481	</span>			break
+<span id="L482" class="ln">   482	</span>		}
+<span id="L483" class="ln">   483	</span>		layout = suffix
+<span id="L484" class="ln">   484	</span>
+<span id="L485" class="ln">   485	</span>		<span class="comment">// Compute year, month, day if needed.</span>
+<span id="L486" class="ln">   486	</span>		if year &lt; 0 &amp;&amp; std&amp;stdNeedDate != 0 {
+<span id="L487" class="ln">   487	</span>			year, month, day, _ = absDate(abs, true)
+<span id="L488" class="ln">   488	</span>		}
+<span id="L489" class="ln">   489	</span>
+<span id="L490" class="ln">   490	</span>		<span class="comment">// Compute hour, minute, second if needed.</span>
+<span id="L491" class="ln">   491	</span>		if hour &lt; 0 &amp;&amp; std&amp;stdNeedClock != 0 {
+<span id="L492" class="ln">   492	</span>			hour, min, sec = absClock(abs)
+<span id="L493" class="ln">   493	</span>		}
+<span id="L494" class="ln">   494	</span>
+<span id="L495" class="ln">   495	</span>		switch std &amp; stdMask {
+<span id="L496" class="ln">   496	</span>		case stdYear:
+<span id="L497" class="ln">   497	</span>			y := year
+<span id="L498" class="ln">   498	</span>			if y &lt; 0 {
+<span id="L499" class="ln">   499	</span>				y = -y
+<span id="L500" class="ln">   500	</span>			}
+<span id="L501" class="ln">   501	</span>			b = appendInt(b, y%100, 2)
+<span id="L502" class="ln">   502	</span>		case stdLongYear:
+<span id="L503" class="ln">   503	</span>			b = appendInt(b, year, 4)
+<span id="L504" class="ln">   504	</span>		case stdMonth:
+<span id="L505" class="ln">   505	</span>			b = append(b, month.String()[:3]...)
+<span id="L506" class="ln">   506	</span>		case stdLongMonth:
+<span id="L507" class="ln">   507	</span>			m := month.String()
+<span id="L508" class="ln">   508	</span>			b = append(b, m...)
+<span id="L509" class="ln">   509	</span>		case stdNumMonth:
+<span id="L510" class="ln">   510	</span>			b = appendInt(b, int(month), 0)
+<span id="L511" class="ln">   511	</span>		case stdZeroMonth:
+<span id="L512" class="ln">   512	</span>			b = appendInt(b, int(month), 2)
+<span id="L513" class="ln">   513	</span>		case stdWeekDay:
+<span id="L514" class="ln">   514	</span>			b = append(b, absWeekday(abs).String()[:3]...)
+<span id="L515" class="ln">   515	</span>		case stdLongWeekDay:
+<span id="L516" class="ln">   516	</span>			s := absWeekday(abs).String()
+<span id="L517" class="ln">   517	</span>			b = append(b, s...)
+<span id="L518" class="ln">   518	</span>		case stdDay:
+<span id="L519" class="ln">   519	</span>			b = appendInt(b, day, 0)
+<span id="L520" class="ln">   520	</span>		case stdUnderDay:
+<span id="L521" class="ln">   521	</span>			if day &lt; 10 {
+<span id="L522" class="ln">   522	</span>				b = append(b, &#39; &#39;)
+<span id="L523" class="ln">   523	</span>			}
+<span id="L524" class="ln">   524	</span>			b = appendInt(b, day, 0)
+<span id="L525" class="ln">   525	</span>		case stdZeroDay:
+<span id="L526" class="ln">   526	</span>			b = appendInt(b, day, 2)
+<span id="L527" class="ln">   527	</span>		case stdHour:
+<span id="L528" class="ln">   528	</span>			b = appendInt(b, hour, 2)
+<span id="L529" class="ln">   529	</span>		case stdHour12:
+<span id="L530" class="ln">   530	</span>			<span class="comment">// Noon is 12PM, midnight is 12AM.</span>
+<span id="L531" class="ln">   531	</span>			hr := hour % 12
+<span id="L532" class="ln">   532	</span>			if hr == 0 {
+<span id="L533" class="ln">   533	</span>				hr = 12
+<span id="L534" class="ln">   534	</span>			}
+<span id="L535" class="ln">   535	</span>			b = appendInt(b, hr, 0)
+<span id="L536" class="ln">   536	</span>		case stdZeroHour12:
+<span id="L537" class="ln">   537	</span>			<span class="comment">// Noon is 12PM, midnight is 12AM.</span>
+<span id="L538" class="ln">   538	</span>			hr := hour % 12
+<span id="L539" class="ln">   539	</span>			if hr == 0 {
+<span id="L540" class="ln">   540	</span>				hr = 12
+<span id="L541" class="ln">   541	</span>			}
+<span id="L542" class="ln">   542	</span>			b = appendInt(b, hr, 2)
+<span id="L543" class="ln">   543	</span>		case stdMinute:
+<span id="L544" class="ln">   544	</span>			b = appendInt(b, min, 0)
+<span id="L545" class="ln">   545	</span>		case stdZeroMinute:
+<span id="L546" class="ln">   546	</span>			b = appendInt(b, min, 2)
+<span id="L547" class="ln">   547	</span>		case stdSecond:
+<span id="L548" class="ln">   548	</span>			b = appendInt(b, sec, 0)
+<span id="L549" class="ln">   549	</span>		case stdZeroSecond:
+<span id="L550" class="ln">   550	</span>			b = appendInt(b, sec, 2)
+<span id="L551" class="ln">   551	</span>		case stdPM:
+<span id="L552" class="ln">   552	</span>			if hour &gt;= 12 {
+<span id="L553" class="ln">   553	</span>				b = append(b, &#34;PM&#34;...)
+<span id="L554" class="ln">   554	</span>			} else {
+<span id="L555" class="ln">   555	</span>				b = append(b, &#34;AM&#34;...)
+<span id="L556" class="ln">   556	</span>			}
+<span id="L557" class="ln">   557	</span>		case stdpm:
+<span id="L558" class="ln">   558	</span>			if hour &gt;= 12 {
+<span id="L559" class="ln">   559	</span>				b = append(b, &#34;pm&#34;...)
+<span id="L560" class="ln">   560	</span>			} else {
+<span id="L561" class="ln">   561	</span>				b = append(b, &#34;am&#34;...)
+<span id="L562" class="ln">   562	</span>			}
+<span id="L563" class="ln">   563	</span>		case stdISO8601TZ, stdISO8601ColonTZ, stdISO8601SecondsTZ, stdISO8601ShortTZ, stdISO8601ColonSecondsTZ, stdNumTZ, stdNumColonTZ, stdNumSecondsTz, stdNumShortTZ, stdNumColonSecondsTZ:
+<span id="L564" class="ln">   564	</span>			<span class="comment">// Ugly special case. We cheat and take the &#34;Z&#34; variants</span>
+<span id="L565" class="ln">   565	</span>			<span class="comment">// to mean &#34;the time zone as formatted for ISO 8601&#34;.</span>
+<span id="L566" class="ln">   566	</span>			if offset == 0 &amp;&amp; (std == stdISO8601TZ || std == stdISO8601ColonTZ || std == stdISO8601SecondsTZ || std == stdISO8601ShortTZ || std == stdISO8601ColonSecondsTZ) {
+<span id="L567" class="ln">   567	</span>				b = append(b, &#39;Z&#39;)
+<span id="L568" class="ln">   568	</span>				break
+<span id="L569" class="ln">   569	</span>			}
+<span id="L570" class="ln">   570	</span>			zone := offset / 60 <span class="comment">// convert to minutes</span>
+<span id="L571" class="ln">   571	</span>			absoffset := offset
+<span id="L572" class="ln">   572	</span>			if zone &lt; 0 {
+<span id="L573" class="ln">   573	</span>				b = append(b, &#39;-&#39;)
+<span id="L574" class="ln">   574	</span>				zone = -zone
+<span id="L575" class="ln">   575	</span>				absoffset = -absoffset
+<span id="L576" class="ln">   576	</span>			} else {
+<span id="L577" class="ln">   577	</span>				b = append(b, &#39;+&#39;)
+<span id="L578" class="ln">   578	</span>			}
+<span id="L579" class="ln">   579	</span>			b = appendInt(b, zone/60, 2)
+<span id="L580" class="ln">   580	</span>			if std == stdISO8601ColonTZ || std == stdNumColonTZ || std == stdISO8601ColonSecondsTZ || std == stdNumColonSecondsTZ {
+<span id="L581" class="ln">   581	</span>				b = append(b, &#39;:&#39;)
+<span id="L582" class="ln">   582	</span>			}
+<span id="L583" class="ln">   583	</span>			if std != stdNumShortTZ &amp;&amp; std != stdISO8601ShortTZ {
+<span id="L584" class="ln">   584	</span>				b = appendInt(b, zone%60, 2)
+<span id="L585" class="ln">   585	</span>			}
+<span id="L586" class="ln">   586	</span>
+<span id="L587" class="ln">   587	</span>			<span class="comment">// append seconds if appropriate</span>
+<span id="L588" class="ln">   588	</span>			if std == stdISO8601SecondsTZ || std == stdNumSecondsTz || std == stdNumColonSecondsTZ || std == stdISO8601ColonSecondsTZ {
+<span id="L589" class="ln">   589	</span>				if std == stdNumColonSecondsTZ || std == stdISO8601ColonSecondsTZ {
+<span id="L590" class="ln">   590	</span>					b = append(b, &#39;:&#39;)
+<span id="L591" class="ln">   591	</span>				}
+<span id="L592" class="ln">   592	</span>				b = appendInt(b, absoffset%60, 2)
+<span id="L593" class="ln">   593	</span>			}
+<span id="L594" class="ln">   594	</span>
+<span id="L595" class="ln">   595	</span>		case stdTZ:
+<span id="L596" class="ln">   596	</span>			if name != &#34;&#34; {
+<span id="L597" class="ln">   597	</span>				b = append(b, name...)
+<span id="L598" class="ln">   598	</span>				break
+<span id="L599" class="ln">   599	</span>			}
+<span id="L600" class="ln">   600	</span>			<span class="comment">// No time zone known for this time, but we must print one.</span>
+<span id="L601" class="ln">   601	</span>			<span class="comment">// Use the -0700 format.</span>
+<span id="L602" class="ln">   602	</span>			zone := offset / 60 <span class="comment">// convert to minutes</span>
+<span id="L603" class="ln">   603	</span>			if zone &lt; 0 {
+<span id="L604" class="ln">   604	</span>				b = append(b, &#39;-&#39;)
+<span id="L605" class="ln">   605	</span>				zone = -zone
+<span id="L606" class="ln">   606	</span>			} else {
+<span id="L607" class="ln">   607	</span>				b = append(b, &#39;+&#39;)
+<span id="L608" class="ln">   608	</span>			}
+<span id="L609" class="ln">   609	</span>			b = appendInt(b, zone/60, 2)
+<span id="L610" class="ln">   610	</span>			b = appendInt(b, zone%60, 2)
+<span id="L611" class="ln">   611	</span>		case stdFracSecond0, stdFracSecond9:
+<span id="L612" class="ln">   612	</span>			b = formatNano(b, uint(t.Nanosecond()), std&gt;&gt;stdArgShift, std&amp;stdMask == stdFracSecond9)
+<span id="L613" class="ln">   613	</span>		}
+<span id="L614" class="ln">   614	</span>	}
+<span id="L615" class="ln">   615	</span>	return b
+<span id="L616" class="ln">   616	</span>}
+<span id="L617" class="ln">   617	</span>
+<span id="L618" class="ln">   618	</span>var errBad = errors.New(&#34;bad value for field&#34;) <span class="comment">// placeholder not passed to user</span>
+<span id="L619" class="ln">   619	</span>
+<span id="L620" class="ln">   620	</span><span class="comment">// ParseError describes a problem parsing a time string.</span>
+<span id="L621" class="ln">   621	</span><span class="selection">type ParseError struct {
+<span id="L622" class="ln">   622	</span>	Layout     string
+<span id="L623" class="ln">   623	</span>	Value      string
+<span id="L624" class="ln">   624	</span>	LayoutElem string
+<span id="L625" class="ln">   625	</span>	ValueElem  string
+<span id="L626" class="ln">   626	</span>	Message    string
+<span id="L627" class="ln">   627	</span>}</span>
+<span id="L628" class="ln">   628	</span>
+<span id="L629" class="ln">   629	</span>func quote(s string) string {
+<span id="L630" class="ln">   630	</span>	return &#34;\&#34;&#34; + s + &#34;\&#34;&#34;
+<span id="L631" class="ln">   631	</span>}
+<span id="L632" class="ln">   632	</span>
+<span id="L633" class="ln">   633	</span><span class="comment">// Error returns the string representation of a ParseError.</span>
+<span id="L634" class="ln">   634	</span>func (e *ParseError) Error() string {
+<span id="L635" class="ln">   635	</span>	if e.Message == &#34;&#34; {
+<span id="L636" class="ln">   636	</span>		return &#34;parsing time &#34; +
+<span id="L637" class="ln">   637	</span>			quote(e.Value) + &#34; as &#34; +
+<span id="L638" class="ln">   638	</span>			quote(e.Layout) + &#34;: cannot parse &#34; +
+<span id="L639" class="ln">   639	</span>			quote(e.ValueElem) + &#34; as &#34; +
+<span id="L640" class="ln">   640	</span>			quote(e.LayoutElem)
+<span id="L641" class="ln">   641	</span>	}
+<span id="L642" class="ln">   642	</span>	return &#34;parsing time &#34; +
+<span id="L643" class="ln">   643	</span>		quote(e.Value) + e.Message
+<span id="L644" class="ln">   644	</span>}
+<span id="L645" class="ln">   645	</span>
+<span id="L646" class="ln">   646	</span><span class="comment">// isDigit reports whether s[i] is in range and is a decimal digit.</span>
+<span id="L647" class="ln">   647	</span>func isDigit(s string, i int) bool {
+<span id="L648" class="ln">   648	</span>	if len(s) &lt;= i {
+<span id="L649" class="ln">   649	</span>		return false
+<span id="L650" class="ln">   650	</span>	}
+<span id="L651" class="ln">   651	</span>	c := s[i]
+<span id="L652" class="ln">   652	</span>	return &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39;
+<span id="L653" class="ln">   653	</span>}
+<span id="L654" class="ln">   654	</span>
+<span id="L655" class="ln">   655	</span><span class="comment">// getnum parses s[0:1] or s[0:2] (fixed forces the latter)</span>
+<span id="L656" class="ln">   656	</span><span class="comment">// as a decimal integer and returns the integer and the</span>
+<span id="L657" class="ln">   657	</span><span class="comment">// remainder of the string.</span>
+<span id="L658" class="ln">   658	</span>func getnum(s string, fixed bool) (int, string, error) {
+<span id="L659" class="ln">   659	</span>	if !isDigit(s, 0) {
+<span id="L660" class="ln">   660	</span>		return 0, s, errBad
+<span id="L661" class="ln">   661	</span>	}
+<span id="L662" class="ln">   662	</span>	if !isDigit(s, 1) {
+<span id="L663" class="ln">   663	</span>		if fixed {
+<span id="L664" class="ln">   664	</span>			return 0, s, errBad
+<span id="L665" class="ln">   665	</span>		}
+<span id="L666" class="ln">   666	</span>		return int(s[0] - &#39;0&#39;), s[1:], nil
+<span id="L667" class="ln">   667	</span>	}
+<span id="L668" class="ln">   668	</span>	return int(s[0]-&#39;0&#39;)*10 + int(s[1]-&#39;0&#39;), s[2:], nil
+<span id="L669" class="ln">   669	</span>}
+<span id="L670" class="ln">   670	</span>
+<span id="L671" class="ln">   671	</span>func cutspace(s string) string {
+<span id="L672" class="ln">   672	</span>	for len(s) &gt; 0 &amp;&amp; s[0] == &#39; &#39; {
+<span id="L673" class="ln">   673	</span>		s = s[1:]
+<span id="L674" class="ln">   674	</span>	}
+<span id="L675" class="ln">   675	</span>	return s
+<span id="L676" class="ln">   676	</span>}
+<span id="L677" class="ln">   677	</span>
+<span id="L678" class="ln">   678	</span><span class="comment">// skip removes the given prefix from value,</span>
+<span id="L679" class="ln">   679	</span><span class="comment">// treating runs of space characters as equivalent.</span>
+<span id="L680" class="ln">   680	</span>func skip(value, prefix string) (string, error) {
+<span id="L681" class="ln">   681	</span>	for len(prefix) &gt; 0 {
+<span id="L682" class="ln">   682	</span>		if prefix[0] == &#39; &#39; {
+<span id="L683" class="ln">   683	</span>			if len(value) &gt; 0 &amp;&amp; value[0] != &#39; &#39; {
+<span id="L684" class="ln">   684	</span>				return value, errBad
+<span id="L685" class="ln">   685	</span>			}
+<span id="L686" class="ln">   686	</span>			prefix = cutspace(prefix)
+<span id="L687" class="ln">   687	</span>			value = cutspace(value)
+<span id="L688" class="ln">   688	</span>			continue
+<span id="L689" class="ln">   689	</span>		}
+<span id="L690" class="ln">   690	</span>		if len(value) == 0 || value[0] != prefix[0] {
+<span id="L691" class="ln">   691	</span>			return value, errBad
+<span id="L692" class="ln">   692	</span>		}
+<span id="L693" class="ln">   693	</span>		prefix = prefix[1:]
+<span id="L694" class="ln">   694	</span>		value = value[1:]
+<span id="L695" class="ln">   695	</span>	}
+<span id="L696" class="ln">   696	</span>	return value, nil
+<span id="L697" class="ln">   697	</span>}
+<span id="L698" class="ln">   698	</span>
+<span id="L699" class="ln">   699	</span><span class="comment">// Parse parses a formatted string and returns the time value it represents.</span>
+<span id="L700" class="ln">   700	</span><span class="comment">// The layout  defines the format by showing how the reference time,</span>
+<span id="L701" class="ln">   701	</span><span class="comment">// defined to be</span>
+<span id="L702" class="ln">   702	</span><span class="comment">//	Mon Jan 2 15:04:05 -0700 MST 2006</span>
+<span id="L703" class="ln">   703	</span><span class="comment">// would be interpreted if it were the value; it serves as an example of</span>
+<span id="L704" class="ln">   704	</span><span class="comment">// the input format. The same interpretation will then be made to the</span>
+<span id="L705" class="ln">   705	</span><span class="comment">// input string.</span>
+<span id="L706" class="ln">   706	</span><span class="comment">//</span>
+<span id="L707" class="ln">   707	</span><span class="comment">// Predefined layouts ANSIC, UnixDate, RFC3339 and others describe standard</span>
+<span id="L708" class="ln">   708	</span><span class="comment">// and convenient representations of the reference time. For more information</span>
+<span id="L709" class="ln">   709	</span><span class="comment">// about the formats and the definition of the reference time, see the</span>
+<span id="L710" class="ln">   710	</span><span class="comment">// documentation for ANSIC and the other constants defined by this package.</span>
+<span id="L711" class="ln">   711	</span><span class="comment">// Also, the executable example for time.Format demonstrates the working</span>
+<span id="L712" class="ln">   712	</span><span class="comment">// of the layout string in detail and is a good reference.</span>
+<span id="L713" class="ln">   713	</span><span class="comment">//</span>
+<span id="L714" class="ln">   714	</span><span class="comment">// Elements omitted from the value are assumed to be zero or, when</span>
+<span id="L715" class="ln">   715	</span><span class="comment">// zero is impossible, one, so parsing &#34;3:04pm&#34; returns the time</span>
+<span id="L716" class="ln">   716	</span><span class="comment">// corresponding to Jan 1, year 0, 15:04:00 UTC (note that because the year is</span>
+<span id="L717" class="ln">   717	</span><span class="comment">// 0, this time is before the zero Time).</span>
+<span id="L718" class="ln">   718	</span><span class="comment">// Years must be in the range 0000..9999. The day of the week is checked</span>
+<span id="L719" class="ln">   719	</span><span class="comment">// for syntax but it is otherwise ignored.</span>
+<span id="L720" class="ln">   720	</span><span class="comment">//</span>
+<span id="L721" class="ln">   721	</span><span class="comment">// In the absence of a time zone indicator, Parse returns a time in UTC.</span>
+<span id="L722" class="ln">   722	</span><span class="comment">//</span>
+<span id="L723" class="ln">   723	</span><span class="comment">// When parsing a time with a zone offset like -0700, if the offset corresponds</span>
+<span id="L724" class="ln">   724	</span><span class="comment">// to a time zone used by the current location (Local), then Parse uses that</span>
+<span id="L725" class="ln">   725	</span><span class="comment">// location and zone in the returned time. Otherwise it records the time as</span>
+<span id="L726" class="ln">   726	</span><span class="comment">// being in a fabricated location with time fixed at the given zone offset.</span>
+<span id="L727" class="ln">   727	</span><span class="comment">//</span>
+<span id="L728" class="ln">   728	</span><span class="comment">// No checking is done that the day of the month is within the month&#39;s</span>
+<span id="L729" class="ln">   729	</span><span class="comment">// valid dates; any one- or two-digit value is accepted. For example</span>
+<span id="L730" class="ln">   730	</span><span class="comment">// February 31 and even February 99 are valid dates, specifying dates</span>
+<span id="L731" class="ln">   731	</span><span class="comment">// in March and May. This behavior is consistent with time.Date.</span>
+<span id="L732" class="ln">   732	</span><span class="comment">//</span>
+<span id="L733" class="ln">   733	</span><span class="comment">// When parsing a time with a zone abbreviation like MST, if the zone abbreviation</span>
+<span id="L734" class="ln">   734	</span><span class="comment">// has a defined offset in the current location, then that offset is used.</span>
+<span id="L735" class="ln">   735	</span><span class="comment">// The zone abbreviation &#34;UTC&#34; is recognized as UTC regardless of location.</span>
+<span id="L736" class="ln">   736	</span><span class="comment">// If the zone abbreviation is unknown, Parse records the time as being</span>
+<span id="L737" class="ln">   737	</span><span class="comment">// in a fabricated location with the given zone abbreviation and a zero offset.</span>
+<span id="L738" class="ln">   738	</span><span class="comment">// This choice means that such a time can be parsed and reformatted with the</span>
+<span id="L739" class="ln">   739	</span><span class="comment">// same layout losslessly, but the exact instant used in the representation will</span>
+<span id="L740" class="ln">   740	</span><span class="comment">// differ by the actual zone offset. To avoid such problems, prefer time layouts</span>
+<span id="L741" class="ln">   741	</span><span class="comment">// that use a numeric zone offset, or use ParseInLocation.</span>
+<span id="L742" class="ln">   742	</span>func Parse(layout, value string) (Time, error) {
+<span id="L743" class="ln">   743	</span>	return parse(layout, value, UTC, Local)
+<span id="L744" class="ln">   744	</span>}
+<span id="L745" class="ln">   745	</span>
+<span id="L746" class="ln">   746	</span><span class="comment">// ParseInLocation is like Parse but differs in two important ways.</span>
+<span id="L747" class="ln">   747	</span><span class="comment">// First, in the absence of time zone information, Parse interprets a time as UTC;</span>
+<span id="L748" class="ln">   748	</span><span class="comment">// ParseInLocation interprets the time as in the given location.</span>
+<span id="L749" class="ln">   749	</span><span class="comment">// Second, when given a zone offset or abbreviation, Parse tries to match it</span>
+<span id="L750" class="ln">   750	</span><span class="comment">// against the Local location; ParseInLocation uses the given location.</span>
+<span id="L751" class="ln">   751	</span>func ParseInLocation(layout, value string, loc *Location) (Time, error) {
+<span id="L752" class="ln">   752	</span>	return parse(layout, value, loc, loc)
+<span id="L753" class="ln">   753	</span>}
+<span id="L754" class="ln">   754	</span>
+<span id="L755" class="ln">   755	</span>func parse(layout, value string, defaultLocation, local *Location) (Time, error) {
+<span id="L756" class="ln">   756	</span>	alayout, avalue := layout, value
+<span id="L757" class="ln">   757	</span>	rangeErrString := &#34;&#34; <span class="comment">// set if a value is out of range</span>
+<span id="L758" class="ln">   758	</span>	amSet := false       <span class="comment">// do we need to subtract 12 from the hour for midnight?</span>
+<span id="L759" class="ln">   759	</span>	pmSet := false       <span class="comment">// do we need to add 12 to the hour?</span>
+<span id="L760" class="ln">   760	</span>
+<span id="L761" class="ln">   761	</span>	<span class="comment">// Time being constructed.</span>
+<span id="L762" class="ln">   762	</span>	var (
+<span id="L763" class="ln">   763	</span>		year       int
+<span id="L764" class="ln">   764	</span>		month      int = 1 <span class="comment">// January</span>
+<span id="L765" class="ln">   765	</span>		day        int = 1
+<span id="L766" class="ln">   766	</span>		hour       int
+<span id="L767" class="ln">   767	</span>		min        int
+<span id="L768" class="ln">   768	</span>		sec        int
+<span id="L769" class="ln">   769	</span>		nsec       int
+<span id="L770" class="ln">   770	</span>		z          *Location
+<span id="L771" class="ln">   771	</span>		zoneOffset int = -1
+<span id="L772" class="ln">   772	</span>		zoneName   string
+<span id="L773" class="ln">   773	</span>	)
+<span id="L774" class="ln">   774	</span>
+<span id="L775" class="ln">   775	</span>	<span class="comment">// Each iteration processes one std value.</span>
+<span id="L776" class="ln">   776	</span>	for {
+<span id="L777" class="ln">   777	</span>		var err error
+<span id="L778" class="ln">   778	</span>		prefix, std, suffix := nextStdChunk(layout)
+<span id="L779" class="ln">   779	</span>		stdstr := layout[len(prefix) : len(layout)-len(suffix)]
+<span id="L780" class="ln">   780	</span>		value, err = skip(value, prefix)
+<span id="L781" class="ln">   781	</span>		if err != nil {
+<span id="L782" class="ln">   782	</span>			return Time{}, &amp;ParseError{alayout, avalue, prefix, value, &#34;&#34;}
+<span id="L783" class="ln">   783	</span>		}
+<span id="L784" class="ln">   784	</span>		if std == 0 {
+<span id="L785" class="ln">   785	</span>			if len(value) != 0 {
+<span id="L786" class="ln">   786	</span>				return Time{}, &amp;ParseError{alayout, avalue, &#34;&#34;, value, &#34;: extra text: &#34; + value}
+<span id="L787" class="ln">   787	</span>			}
+<span id="L788" class="ln">   788	</span>			break
+<span id="L789" class="ln">   789	</span>		}
+<span id="L790" class="ln">   790	</span>		layout = suffix
+<span id="L791" class="ln">   791	</span>		var p string
+<span id="L792" class="ln">   792	</span>		switch std &amp; stdMask {
+<span id="L793" class="ln">   793	</span>		case stdYear:
+<span id="L794" class="ln">   794	</span>			if len(value) &lt; 2 {
+<span id="L795" class="ln">   795	</span>				err = errBad
+<span id="L796" class="ln">   796	</span>				break
+<span id="L797" class="ln">   797	</span>			}
+<span id="L798" class="ln">   798	</span>			p, value = value[0:2], value[2:]
+<span id="L799" class="ln">   799	</span>			year, err = atoi(p)
+<span id="L800" class="ln">   800	</span>			if year &gt;= 69 { <span class="comment">// Unix time starts Dec 31 1969 in some time zones</span>
+<span id="L801" class="ln">   801	</span>				year += 1900
+<span id="L802" class="ln">   802	</span>			} else {
+<span id="L803" class="ln">   803	</span>				year += 2000
+<span id="L804" class="ln">   804	</span>			}
+<span id="L805" class="ln">   805	</span>		case stdLongYear:
+<span id="L806" class="ln">   806	</span>			if len(value) &lt; 4 || !isDigit(value, 0) {
+<span id="L807" class="ln">   807	</span>				err = errBad
+<span id="L808" class="ln">   808	</span>				break
+<span id="L809" class="ln">   809	</span>			}
+<span id="L810" class="ln">   810	</span>			p, value = value[0:4], value[4:]
+<span id="L811" class="ln">   811	</span>			year, err = atoi(p)
+<span id="L812" class="ln">   812	</span>		case stdMonth:
+<span id="L813" class="ln">   813	</span>			month, value, err = lookup(shortMonthNames, value)
+<span id="L814" class="ln">   814	</span>		case stdLongMonth:
+<span id="L815" class="ln">   815	</span>			month, value, err = lookup(longMonthNames, value)
+<span id="L816" class="ln">   816	</span>		case stdNumMonth, stdZeroMonth:
+<span id="L817" class="ln">   817	</span>			month, value, err = getnum(value, std == stdZeroMonth)
+<span id="L818" class="ln">   818	</span>			if month &lt;= 0 || 12 &lt; month {
+<span id="L819" class="ln">   819	</span>				rangeErrString = &#34;month&#34;
+<span id="L820" class="ln">   820	</span>			}
+<span id="L821" class="ln">   821	</span>		case stdWeekDay:
+<span id="L822" class="ln">   822	</span>			<span class="comment">// Ignore weekday except for error checking.</span>
+<span id="L823" class="ln">   823	</span>			_, value, err = lookup(shortDayNames, value)
+<span id="L824" class="ln">   824	</span>		case stdLongWeekDay:
+<span id="L825" class="ln">   825	</span>			_, value, err = lookup(longDayNames, value)
+<span id="L826" class="ln">   826	</span>		case stdDay, stdUnderDay, stdZeroDay:
+<span id="L827" class="ln">   827	</span>			if std == stdUnderDay &amp;&amp; len(value) &gt; 0 &amp;&amp; value[0] == &#39; &#39; {
+<span id="L828" class="ln">   828	</span>				value = value[1:]
+<span id="L829" class="ln">   829	</span>			}
+<span id="L830" class="ln">   830	</span>			day, value, err = getnum(value, std == stdZeroDay)
+<span id="L831" class="ln">   831	</span>			if day &lt; 0 {
+<span id="L832" class="ln">   832	</span>				<span class="comment">// Note that we allow any one- or two-digit day here.</span>
+<span id="L833" class="ln">   833	</span>				rangeErrString = &#34;day&#34;
+<span id="L834" class="ln">   834	</span>			}
+<span id="L835" class="ln">   835	</span>		case stdHour:
+<span id="L836" class="ln">   836	</span>			hour, value, err = getnum(value, false)
+<span id="L837" class="ln">   837	</span>			if hour &lt; 0 || 24 &lt;= hour {
+<span id="L838" class="ln">   838	</span>				rangeErrString = &#34;hour&#34;
+<span id="L839" class="ln">   839	</span>			}
+<span id="L840" class="ln">   840	</span>		case stdHour12, stdZeroHour12:
+<span id="L841" class="ln">   841	</span>			hour, value, err = getnum(value, std == stdZeroHour12)
+<span id="L842" class="ln">   842	</span>			if hour &lt; 0 || 12 &lt; hour {
+<span id="L843" class="ln">   843	</span>				rangeErrString = &#34;hour&#34;
+<span id="L844" class="ln">   844	</span>			}
+<span id="L845" class="ln">   845	</span>		case stdMinute, stdZeroMinute:
+<span id="L846" class="ln">   846	</span>			min, value, err = getnum(value, std == stdZeroMinute)
+<span id="L847" class="ln">   847	</span>			if min &lt; 0 || 60 &lt;= min {
+<span id="L848" class="ln">   848	</span>				rangeErrString = &#34;minute&#34;
+<span id="L849" class="ln">   849	</span>			}
+<span id="L850" class="ln">   850	</span>		case stdSecond, stdZeroSecond:
+<span id="L851" class="ln">   851	</span>			sec, value, err = getnum(value, std == stdZeroSecond)
+<span id="L852" class="ln">   852	</span>			if sec &lt; 0 || 60 &lt;= sec {
+<span id="L853" class="ln">   853	</span>				rangeErrString = &#34;second&#34;
+<span id="L854" class="ln">   854	</span>				break
+<span id="L855" class="ln">   855	</span>			}
+<span id="L856" class="ln">   856	</span>			<span class="comment">// Special case: do we have a fractional second but no</span>
+<span id="L857" class="ln">   857	</span>			<span class="comment">// fractional second in the format?</span>
+<span id="L858" class="ln">   858	</span>			if len(value) &gt;= 2 &amp;&amp; value[0] == &#39;.&#39; &amp;&amp; isDigit(value, 1) {
+<span id="L859" class="ln">   859	</span>				_, std, _ = nextStdChunk(layout)
+<span id="L860" class="ln">   860	</span>				std &amp;= stdMask
+<span id="L861" class="ln">   861	</span>				if std == stdFracSecond0 || std == stdFracSecond9 {
+<span id="L862" class="ln">   862	</span>					<span class="comment">// Fractional second in the layout; proceed normally</span>
+<span id="L863" class="ln">   863	</span>					break
+<span id="L864" class="ln">   864	</span>				}
+<span id="L865" class="ln">   865	</span>				<span class="comment">// No fractional second in the layout but we have one in the input.</span>
+<span id="L866" class="ln">   866	</span>				n := 2
+<span id="L867" class="ln">   867	</span>				for ; n &lt; len(value) &amp;&amp; isDigit(value, n); n++ {
+<span id="L868" class="ln">   868	</span>				}
+<span id="L869" class="ln">   869	</span>				nsec, rangeErrString, err = parseNanoseconds(value, n)
+<span id="L870" class="ln">   870	</span>				value = value[n:]
+<span id="L871" class="ln">   871	</span>			}
+<span id="L872" class="ln">   872	</span>		case stdPM:
+<span id="L873" class="ln">   873	</span>			if len(value) &lt; 2 {
+<span id="L874" class="ln">   874	</span>				err = errBad
+<span id="L875" class="ln">   875	</span>				break
+<span id="L876" class="ln">   876	</span>			}
+<span id="L877" class="ln">   877	</span>			p, value = value[0:2], value[2:]
+<span id="L878" class="ln">   878	</span>			switch p {
+<span id="L879" class="ln">   879	</span>			case &#34;PM&#34;:
+<span id="L880" class="ln">   880	</span>				pmSet = true
+<span id="L881" class="ln">   881	</span>			case &#34;AM&#34;:
+<span id="L882" class="ln">   882	</span>				amSet = true
+<span id="L883" class="ln">   883	</span>			default:
+<span id="L884" class="ln">   884	</span>				err = errBad
+<span id="L885" class="ln">   885	</span>			}
+<span id="L886" class="ln">   886	</span>		case stdpm:
+<span id="L887" class="ln">   887	</span>			if len(value) &lt; 2 {
+<span id="L888" class="ln">   888	</span>				err = errBad
+<span id="L889" class="ln">   889	</span>				break
+<span id="L890" class="ln">   890	</span>			}
+<span id="L891" class="ln">   891	</span>			p, value = value[0:2], value[2:]
+<span id="L892" class="ln">   892	</span>			switch p {
+<span id="L893" class="ln">   893	</span>			case &#34;pm&#34;:
+<span id="L894" class="ln">   894	</span>				pmSet = true
+<span id="L895" class="ln">   895	</span>			case &#34;am&#34;:
+<span id="L896" class="ln">   896	</span>				amSet = true
+<span id="L897" class="ln">   897	</span>			default:
+<span id="L898" class="ln">   898	</span>				err = errBad
+<span id="L899" class="ln">   899	</span>			}
+<span id="L900" class="ln">   900	</span>		case stdISO8601TZ, stdISO8601ColonTZ, stdISO8601SecondsTZ, stdISO8601ShortTZ, stdISO8601ColonSecondsTZ, stdNumTZ, stdNumShortTZ, stdNumColonTZ, stdNumSecondsTz, stdNumColonSecondsTZ:
+<span id="L901" class="ln">   901	</span>			if (std == stdISO8601TZ || std == stdISO8601ShortTZ || std == stdISO8601ColonTZ) &amp;&amp; len(value) &gt;= 1 &amp;&amp; value[0] == &#39;Z&#39; {
+<span id="L902" class="ln">   902	</span>				value = value[1:]
+<span id="L903" class="ln">   903	</span>				z = UTC
+<span id="L904" class="ln">   904	</span>				break
+<span id="L905" class="ln">   905	</span>			}
+<span id="L906" class="ln">   906	</span>			var sign, hour, min, seconds string
+<span id="L907" class="ln">   907	</span>			if std == stdISO8601ColonTZ || std == stdNumColonTZ {
+<span id="L908" class="ln">   908	</span>				if len(value) &lt; 6 {
+<span id="L909" class="ln">   909	</span>					err = errBad
+<span id="L910" class="ln">   910	</span>					break
+<span id="L911" class="ln">   911	</span>				}
+<span id="L912" class="ln">   912	</span>				if value[3] != &#39;:&#39; {
+<span id="L913" class="ln">   913	</span>					err = errBad
+<span id="L914" class="ln">   914	</span>					break
+<span id="L915" class="ln">   915	</span>				}
+<span id="L916" class="ln">   916	</span>				sign, hour, min, seconds, value = value[0:1], value[1:3], value[4:6], &#34;00&#34;, value[6:]
+<span id="L917" class="ln">   917	</span>			} else if std == stdNumShortTZ || std == stdISO8601ShortTZ {
+<span id="L918" class="ln">   918	</span>				if len(value) &lt; 3 {
+<span id="L919" class="ln">   919	</span>					err = errBad
+<span id="L920" class="ln">   920	</span>					break
+<span id="L921" class="ln">   921	</span>				}
+<span id="L922" class="ln">   922	</span>				sign, hour, min, seconds, value = value[0:1], value[1:3], &#34;00&#34;, &#34;00&#34;, value[3:]
+<span id="L923" class="ln">   923	</span>			} else if std == stdISO8601ColonSecondsTZ || std == stdNumColonSecondsTZ {
+<span id="L924" class="ln">   924	</span>				if len(value) &lt; 9 {
+<span id="L925" class="ln">   925	</span>					err = errBad
+<span id="L926" class="ln">   926	</span>					break
+<span id="L927" class="ln">   927	</span>				}
+<span id="L928" class="ln">   928	</span>				if value[3] != &#39;:&#39; || value[6] != &#39;:&#39; {
+<span id="L929" class="ln">   929	</span>					err = errBad
+<span id="L930" class="ln">   930	</span>					break
+<span id="L931" class="ln">   931	</span>				}
+<span id="L932" class="ln">   932	</span>				sign, hour, min, seconds, value = value[0:1], value[1:3], value[4:6], value[7:9], value[9:]
+<span id="L933" class="ln">   933	</span>			} else if std == stdISO8601SecondsTZ || std == stdNumSecondsTz {
+<span id="L934" class="ln">   934	</span>				if len(value) &lt; 7 {
+<span id="L935" class="ln">   935	</span>					err = errBad
+<span id="L936" class="ln">   936	</span>					break
+<span id="L937" class="ln">   937	</span>				}
+<span id="L938" class="ln">   938	</span>				sign, hour, min, seconds, value = value[0:1], value[1:3], value[3:5], value[5:7], value[7:]
+<span id="L939" class="ln">   939	</span>			} else {
+<span id="L940" class="ln">   940	</span>				if len(value) &lt; 5 {
+<span id="L941" class="ln">   941	</span>					err = errBad
+<span id="L942" class="ln">   942	</span>					break
+<span id="L943" class="ln">   943	</span>				}
+<span id="L944" class="ln">   944	</span>				sign, hour, min, seconds, value = value[0:1], value[1:3], value[3:5], &#34;00&#34;, value[5:]
+<span id="L945" class="ln">   945	</span>			}
+<span id="L946" class="ln">   946	</span>			var hr, mm, ss int
+<span id="L947" class="ln">   947	</span>			hr, err = atoi(hour)
+<span id="L948" class="ln">   948	</span>			if err == nil {
+<span id="L949" class="ln">   949	</span>				mm, err = atoi(min)
+<span id="L950" class="ln">   950	</span>			}
+<span id="L951" class="ln">   951	</span>			if err == nil {
+<span id="L952" class="ln">   952	</span>				ss, err = atoi(seconds)
+<span id="L953" class="ln">   953	</span>			}
+<span id="L954" class="ln">   954	</span>			zoneOffset = (hr*60+mm)*60 + ss <span class="comment">// offset is in seconds</span>
+<span id="L955" class="ln">   955	</span>			switch sign[0] {
+<span id="L956" class="ln">   956	</span>			case &#39;+&#39;:
+<span id="L957" class="ln">   957	</span>			case &#39;-&#39;:
+<span id="L958" class="ln">   958	</span>				zoneOffset = -zoneOffset
+<span id="L959" class="ln">   959	</span>			default:
+<span id="L960" class="ln">   960	</span>				err = errBad
+<span id="L961" class="ln">   961	</span>			}
+<span id="L962" class="ln">   962	</span>		case stdTZ:
+<span id="L963" class="ln">   963	</span>			<span class="comment">// Does it look like a time zone?</span>
+<span id="L964" class="ln">   964	</span>			if len(value) &gt;= 3 &amp;&amp; value[0:3] == &#34;UTC&#34; {
+<span id="L965" class="ln">   965	</span>				z = UTC
+<span id="L966" class="ln">   966	</span>				value = value[3:]
+<span id="L967" class="ln">   967	</span>				break
+<span id="L968" class="ln">   968	</span>			}
+<span id="L969" class="ln">   969	</span>			n, ok := parseTimeZone(value)
+<span id="L970" class="ln">   970	</span>			if !ok {
+<span id="L971" class="ln">   971	</span>				err = errBad
+<span id="L972" class="ln">   972	</span>				break
+<span id="L973" class="ln">   973	</span>			}
+<span id="L974" class="ln">   974	</span>			zoneName, value = value[:n], value[n:]
+<span id="L975" class="ln">   975	</span>
+<span id="L976" class="ln">   976	</span>		case stdFracSecond0:
+<span id="L977" class="ln">   977	</span>			<span class="comment">// stdFracSecond0 requires the exact number of digits as specified in</span>
+<span id="L978" class="ln">   978	</span>			<span class="comment">// the layout.</span>
+<span id="L979" class="ln">   979	</span>			ndigit := 1 + (std &gt;&gt; stdArgShift)
+<span id="L980" class="ln">   980	</span>			if len(value) &lt; ndigit {
+<span id="L981" class="ln">   981	</span>				err = errBad
+<span id="L982" class="ln">   982	</span>				break
+<span id="L983" class="ln">   983	</span>			}
+<span id="L984" class="ln">   984	</span>			nsec, rangeErrString, err = parseNanoseconds(value, ndigit)
+<span id="L985" class="ln">   985	</span>			value = value[ndigit:]
+<span id="L986" class="ln">   986	</span>
+<span id="L987" class="ln">   987	</span>		case stdFracSecond9:
+<span id="L988" class="ln">   988	</span>			if len(value) &lt; 2 || value[0] != &#39;.&#39; || value[1] &lt; &#39;0&#39; || &#39;9&#39; &lt; value[1] {
+<span id="L989" class="ln">   989	</span>				<span class="comment">// Fractional second omitted.</span>
+<span id="L990" class="ln">   990	</span>				break
+<span id="L991" class="ln">   991	</span>			}
+<span id="L992" class="ln">   992	</span>			<span class="comment">// Take any number of digits, even more than asked for,</span>
+<span id="L993" class="ln">   993	</span>			<span class="comment">// because it is what the stdSecond case would do.</span>
+<span id="L994" class="ln">   994	</span>			i := 0
+<span id="L995" class="ln">   995	</span>			for i &lt; 9 &amp;&amp; i+1 &lt; len(value) &amp;&amp; &#39;0&#39; &lt;= value[i+1] &amp;&amp; value[i+1] &lt;= &#39;9&#39; {
+<span id="L996" class="ln">   996	</span>				i++
+<span id="L997" class="ln">   997	</span>			}
+<span id="L998" class="ln">   998	</span>			nsec, rangeErrString, err = parseNanoseconds(value, 1+i)
+<span id="L999" class="ln">   999	</span>			value = value[1+i:]
+<span id="L1000" class="ln">  1000	</span>		}
+<span id="L1001" class="ln">  1001	</span>		if rangeErrString != &#34;&#34; {
+<span id="L1002" class="ln">  1002	</span>			return Time{}, &amp;ParseError{alayout, avalue, stdstr, value, &#34;: &#34; + rangeErrString + &#34; out of range&#34;}
+<span id="L1003" class="ln">  1003	</span>		}
+<span id="L1004" class="ln">  1004	</span>		if err != nil {
+<span id="L1005" class="ln">  1005	</span>			return Time{}, &amp;ParseError{alayout, avalue, stdstr, value, &#34;&#34;}
+<span id="L1006" class="ln">  1006	</span>		}
+<span id="L1007" class="ln">  1007	</span>	}
+<span id="L1008" class="ln">  1008	</span>	if pmSet &amp;&amp; hour &lt; 12 {
+<span id="L1009" class="ln">  1009	</span>		hour += 12
+<span id="L1010" class="ln">  1010	</span>	} else if amSet &amp;&amp; hour == 12 {
+<span id="L1011" class="ln">  1011	</span>		hour = 0
+<span id="L1012" class="ln">  1012	</span>	}
+<span id="L1013" class="ln">  1013	</span>
+<span id="L1014" class="ln">  1014	</span>	<span class="comment">// Validate the day of the month.</span>
+<span id="L1015" class="ln">  1015	</span>	if day &lt; 1 || day &gt; daysIn(Month(month), year) {
+<span id="L1016" class="ln">  1016	</span>		return Time{}, &amp;ParseError{alayout, avalue, &#34;&#34;, value, &#34;: day out of range&#34;}
+<span id="L1017" class="ln">  1017	</span>	}
+<span id="L1018" class="ln">  1018	</span>
+<span id="L1019" class="ln">  1019	</span>	if z != nil {
+<span id="L1020" class="ln">  1020	</span>		return Date(year, Month(month), day, hour, min, sec, nsec, z), nil
+<span id="L1021" class="ln">  1021	</span>	}
+<span id="L1022" class="ln">  1022	</span>
+<span id="L1023" class="ln">  1023	</span>	if zoneOffset != -1 {
+<span id="L1024" class="ln">  1024	</span>		t := Date(year, Month(month), day, hour, min, sec, nsec, UTC)
+<span id="L1025" class="ln">  1025	</span>		t.sec -= int64(zoneOffset)
+<span id="L1026" class="ln">  1026	</span>
+<span id="L1027" class="ln">  1027	</span>		<span class="comment">// Look for local zone with the given offset.</span>
+<span id="L1028" class="ln">  1028	</span>		<span class="comment">// If that zone was in effect at the given time, use it.</span>
+<span id="L1029" class="ln">  1029	</span>		name, offset, _, _, _ := local.lookup(t.sec + internalToUnix)
+<span id="L1030" class="ln">  1030	</span>		if offset == zoneOffset &amp;&amp; (zoneName == &#34;&#34; || name == zoneName) {
+<span id="L1031" class="ln">  1031	</span>			t.setLoc(local)
+<span id="L1032" class="ln">  1032	</span>			return t, nil
+<span id="L1033" class="ln">  1033	</span>		}
+<span id="L1034" class="ln">  1034	</span>
+<span id="L1035" class="ln">  1035	</span>		<span class="comment">// Otherwise create fake zone to record offset.</span>
+<span id="L1036" class="ln">  1036	</span>		t.setLoc(FixedZone(zoneName, zoneOffset))
+<span id="L1037" class="ln">  1037	</span>		return t, nil
+<span id="L1038" class="ln">  1038	</span>	}
+<span id="L1039" class="ln">  1039	</span>
+<span id="L1040" class="ln">  1040	</span>	if zoneName != &#34;&#34; {
+<span id="L1041" class="ln">  1041	</span>		t := Date(year, Month(month), day, hour, min, sec, nsec, UTC)
+<span id="L1042" class="ln">  1042	</span>		<span class="comment">// Look for local zone with the given offset.</span>
+<span id="L1043" class="ln">  1043	</span>		<span class="comment">// If that zone was in effect at the given time, use it.</span>
+<span id="L1044" class="ln">  1044	</span>		offset, _, ok := local.lookupName(zoneName, t.sec+internalToUnix)
+<span id="L1045" class="ln">  1045	</span>		if ok {
+<span id="L1046" class="ln">  1046	</span>			t.sec -= int64(offset)
+<span id="L1047" class="ln">  1047	</span>			t.setLoc(local)
+<span id="L1048" class="ln">  1048	</span>			return t, nil
+<span id="L1049" class="ln">  1049	</span>		}
+<span id="L1050" class="ln">  1050	</span>
+<span id="L1051" class="ln">  1051	</span>		<span class="comment">// Otherwise, create fake zone with unknown offset.</span>
+<span id="L1052" class="ln">  1052	</span>		if len(zoneName) &gt; 3 &amp;&amp; zoneName[:3] == &#34;GMT&#34; {
+<span id="L1053" class="ln">  1053	</span>			offset, _ = atoi(zoneName[3:]) <span class="comment">// Guaranteed OK by parseGMT.</span>
+<span id="L1054" class="ln">  1054	</span>			offset *= 3600
+<span id="L1055" class="ln">  1055	</span>		}
+<span id="L1056" class="ln">  1056	</span>		t.setLoc(FixedZone(zoneName, offset))
+<span id="L1057" class="ln">  1057	</span>		return t, nil
+<span id="L1058" class="ln">  1058	</span>	}
+<span id="L1059" class="ln">  1059	</span>
+<span id="L1060" class="ln">  1060	</span>	<span class="comment">// Otherwise, fall back to default.</span>
+<span id="L1061" class="ln">  1061	</span>	return Date(year, Month(month), day, hour, min, sec, nsec, defaultLocation), nil
+<span id="L1062" class="ln">  1062	</span>}
+<span id="L1063" class="ln">  1063	</span>
+<span id="L1064" class="ln">  1064	</span><span class="comment">// parseTimeZone parses a time zone string and returns its length. Time zones</span>
+<span id="L1065" class="ln">  1065	</span><span class="comment">// are human-generated and unpredictable. We can&#39;t do precise error checking.</span>
+<span id="L1066" class="ln">  1066	</span><span class="comment">// On the other hand, for a correct parse there must be a time zone at the</span>
+<span id="L1067" class="ln">  1067	</span><span class="comment">// beginning of the string, so it&#39;s almost always true that there&#39;s one</span>
+<span id="L1068" class="ln">  1068	</span><span class="comment">// there. We look at the beginning of the string for a run of upper-case letters.</span>
+<span id="L1069" class="ln">  1069	</span><span class="comment">// If there are more than 5, it&#39;s an error.</span>
+<span id="L1070" class="ln">  1070	</span><span class="comment">// If there are 4 or 5 and the last is a T, it&#39;s a time zone.</span>
+<span id="L1071" class="ln">  1071	</span><span class="comment">// If there are 3, it&#39;s a time zone.</span>
+<span id="L1072" class="ln">  1072	</span><span class="comment">// Otherwise, other than special cases, it&#39;s not a time zone.</span>
+<span id="L1073" class="ln">  1073	</span><span class="comment">// GMT is special because it can have an hour offset.</span>
+<span id="L1074" class="ln">  1074	</span>func parseTimeZone(value string) (length int, ok bool) {
+<span id="L1075" class="ln">  1075	</span>	if len(value) &lt; 3 {
+<span id="L1076" class="ln">  1076	</span>		return 0, false
+<span id="L1077" class="ln">  1077	</span>	}
+<span id="L1078" class="ln">  1078	</span>	<span class="comment">// Special case 1: ChST and MeST are the only zones with a lower-case letter.</span>
+<span id="L1079" class="ln">  1079	</span>	if len(value) &gt;= 4 &amp;&amp; (value[:4] == &#34;ChST&#34; || value[:4] == &#34;MeST&#34;) {
+<span id="L1080" class="ln">  1080	</span>		return 4, true
+<span id="L1081" class="ln">  1081	</span>	}
+<span id="L1082" class="ln">  1082	</span>	<span class="comment">// Special case 2: GMT may have an hour offset; treat it specially.</span>
+<span id="L1083" class="ln">  1083	</span>	if value[:3] == &#34;GMT&#34; {
+<span id="L1084" class="ln">  1084	</span>		length = parseGMT(value)
+<span id="L1085" class="ln">  1085	</span>		return length, true
+<span id="L1086" class="ln">  1086	</span>	}
+<span id="L1087" class="ln">  1087	</span>	<span class="comment">// How many upper-case letters are there? Need at least three, at most five.</span>
+<span id="L1088" class="ln">  1088	</span>	var nUpper int
+<span id="L1089" class="ln">  1089	</span>	for nUpper = 0; nUpper &lt; 6; nUpper++ {
+<span id="L1090" class="ln">  1090	</span>		if nUpper &gt;= len(value) {
+<span id="L1091" class="ln">  1091	</span>			break
+<span id="L1092" class="ln">  1092	</span>		}
+<span id="L1093" class="ln">  1093	</span>		if c := value[nUpper]; c &lt; &#39;A&#39; || &#39;Z&#39; &lt; c {
+<span id="L1094" class="ln">  1094	</span>			break
+<span id="L1095" class="ln">  1095	</span>		}
+<span id="L1096" class="ln">  1096	</span>	}
+<span id="L1097" class="ln">  1097	</span>	switch nUpper {
+<span id="L1098" class="ln">  1098	</span>	case 0, 1, 2, 6:
+<span id="L1099" class="ln">  1099	</span>		return 0, false
+<span id="L1100" class="ln">  1100	</span>	case 5: <span class="comment">// Must end in T to match.</span>
+<span id="L1101" class="ln">  1101	</span>		if value[4] == &#39;T&#39; {
+<span id="L1102" class="ln">  1102	</span>			return 5, true
+<span id="L1103" class="ln">  1103	</span>		}
+<span id="L1104" class="ln">  1104	</span>	case 4:
+<span id="L1105" class="ln">  1105	</span>		<span class="comment">// Must end in T, except one special case.</span>
+<span id="L1106" class="ln">  1106	</span>		if value[3] == &#39;T&#39; || value[:4] == &#34;WITA&#34; {
+<span id="L1107" class="ln">  1107	</span>			return 4, true
+<span id="L1108" class="ln">  1108	</span>		}
+<span id="L1109" class="ln">  1109	</span>	case 3:
+<span id="L1110" class="ln">  1110	</span>		return 3, true
+<span id="L1111" class="ln">  1111	</span>	}
+<span id="L1112" class="ln">  1112	</span>	return 0, false
+<span id="L1113" class="ln">  1113	</span>}
+<span id="L1114" class="ln">  1114	</span>
+<span id="L1115" class="ln">  1115	</span><span class="comment">// parseGMT parses a GMT time zone. The input string is known to start &#34;GMT&#34;.</span>
+<span id="L1116" class="ln">  1116	</span><span class="comment">// The function checks whether that is followed by a sign and a number in the</span>
+<span id="L1117" class="ln">  1117	</span><span class="comment">// range -14 through 12 excluding zero.</span>
+<span id="L1118" class="ln">  1118	</span>func parseGMT(value string) int {
+<span id="L1119" class="ln">  1119	</span>	value = value[3:]
+<span id="L1120" class="ln">  1120	</span>	if len(value) == 0 {
+<span id="L1121" class="ln">  1121	</span>		return 3
+<span id="L1122" class="ln">  1122	</span>	}
+<span id="L1123" class="ln">  1123	</span>	sign := value[0]
+<span id="L1124" class="ln">  1124	</span>	if sign != &#39;-&#39; &amp;&amp; sign != &#39;+&#39; {
+<span id="L1125" class="ln">  1125	</span>		return 3
+<span id="L1126" class="ln">  1126	</span>	}
+<span id="L1127" class="ln">  1127	</span>	x, rem, err := leadingInt(value[1:])
+<span id="L1128" class="ln">  1128	</span>	if err != nil {
+<span id="L1129" class="ln">  1129	</span>		return 3
+<span id="L1130" class="ln">  1130	</span>	}
+<span id="L1131" class="ln">  1131	</span>	if sign == &#39;-&#39; {
+<span id="L1132" class="ln">  1132	</span>		x = -x
+<span id="L1133" class="ln">  1133	</span>	}
+<span id="L1134" class="ln">  1134	</span>	if x == 0 || x &lt; -14 || 12 &lt; x {
+<span id="L1135" class="ln">  1135	</span>		return 3
+<span id="L1136" class="ln">  1136	</span>	}
+<span id="L1137" class="ln">  1137	</span>	return 3 + len(value) - len(rem)
+<span id="L1138" class="ln">  1138	</span>}
+<span id="L1139" class="ln">  1139	</span>
+<span id="L1140" class="ln">  1140	</span>func parseNanoseconds(value string, nbytes int) (ns int, rangeErrString string, err error) {
+<span id="L1141" class="ln">  1141	</span>	if value[0] != &#39;.&#39; {
+<span id="L1142" class="ln">  1142	</span>		err = errBad
+<span id="L1143" class="ln">  1143	</span>		return
+<span id="L1144" class="ln">  1144	</span>	}
+<span id="L1145" class="ln">  1145	</span>	if ns, err = atoi(value[1:nbytes]); err != nil {
+<span id="L1146" class="ln">  1146	</span>		return
+<span id="L1147" class="ln">  1147	</span>	}
+<span id="L1148" class="ln">  1148	</span>	if ns &lt; 0 || 1e9 &lt;= ns {
+<span id="L1149" class="ln">  1149	</span>		rangeErrString = &#34;fractional second&#34;
+<span id="L1150" class="ln">  1150	</span>		return
+<span id="L1151" class="ln">  1151	</span>	}
+<span id="L1152" class="ln">  1152	</span>	<span class="comment">// We need nanoseconds, which means scaling by the number</span>
+<span id="L1153" class="ln">  1153	</span>	<span class="comment">// of missing digits in the format, maximum length 10. If it&#39;s</span>
+<span id="L1154" class="ln">  1154	</span>	<span class="comment">// longer than 10, we won&#39;t scale.</span>
+<span id="L1155" class="ln">  1155	</span>	scaleDigits := 10 - nbytes
+<span id="L1156" class="ln">  1156	</span>	for i := 0; i &lt; scaleDigits; i++ {
+<span id="L1157" class="ln">  1157	</span>		ns *= 10
+<span id="L1158" class="ln">  1158	</span>	}
+<span id="L1159" class="ln">  1159	</span>	return
+<span id="L1160" class="ln">  1160	</span>}
+<span id="L1161" class="ln">  1161	</span>
+<span id="L1162" class="ln">  1162	</span>var errLeadingInt = errors.New(&#34;time: bad [0-9]*&#34;) <span class="comment">// never printed</span>
+<span id="L1163" class="ln">  1163	</span>
+<span id="L1164" class="ln">  1164	</span><span class="comment">// leadingInt consumes the leading [0-9]* from s.</span>
+<span id="L1165" class="ln">  1165	</span>func leadingInt(s string) (x int64, rem string, err error) {
+<span id="L1166" class="ln">  1166	</span>	i := 0
+<span id="L1167" class="ln">  1167	</span>	for ; i &lt; len(s); i++ {
+<span id="L1168" class="ln">  1168	</span>		c := s[i]
+<span id="L1169" class="ln">  1169	</span>		if c &lt; &#39;0&#39; || c &gt; &#39;9&#39; {
+<span id="L1170" class="ln">  1170	</span>			break
+<span id="L1171" class="ln">  1171	</span>		}
+<span id="L1172" class="ln">  1172	</span>		if x &gt; (1&lt;&lt;63-1)/10 {
+<span id="L1173" class="ln">  1173	</span>			<span class="comment">// overflow</span>
+<span id="L1174" class="ln">  1174	</span>			return 0, &#34;&#34;, errLeadingInt
+<span id="L1175" class="ln">  1175	</span>		}
+<span id="L1176" class="ln">  1176	</span>		x = x*10 + int64(c) - &#39;0&#39;
+<span id="L1177" class="ln">  1177	</span>		if x &lt; 0 {
+<span id="L1178" class="ln">  1178	</span>			<span class="comment">// overflow</span>
+<span id="L1179" class="ln">  1179	</span>			return 0, &#34;&#34;, errLeadingInt
+<span id="L1180" class="ln">  1180	</span>		}
+<span id="L1181" class="ln">  1181	</span>	}
+<span id="L1182" class="ln">  1182	</span>	return x, s[i:], nil
+<span id="L1183" class="ln">  1183	</span>}
+<span id="L1184" class="ln">  1184	</span>
+<span id="L1185" class="ln">  1185	</span><span class="comment">// leadingFraction consumes the leading [0-9]* from s.</span>
+<span id="L1186" class="ln">  1186	</span><span class="comment">// It is used only for fractions, so does not return an error on overflow,</span>
+<span id="L1187" class="ln">  1187	</span><span class="comment">// it just stops accumulating precision.</span>
+<span id="L1188" class="ln">  1188	</span>func leadingFraction(s string) (x int64, scale float64, rem string) {
+<span id="L1189" class="ln">  1189	</span>	i := 0
+<span id="L1190" class="ln">  1190	</span>	scale = 1
+<span id="L1191" class="ln">  1191	</span>	overflow := false
+<span id="L1192" class="ln">  1192	</span>	for ; i &lt; len(s); i++ {
+<span id="L1193" class="ln">  1193	</span>		c := s[i]
+<span id="L1194" class="ln">  1194	</span>		if c &lt; &#39;0&#39; || c &gt; &#39;9&#39; {
+<span id="L1195" class="ln">  1195	</span>			break
+<span id="L1196" class="ln">  1196	</span>		}
+<span id="L1197" class="ln">  1197	</span>		if overflow {
+<span id="L1198" class="ln">  1198	</span>			continue
+<span id="L1199" class="ln">  1199	</span>		}
+<span id="L1200" class="ln">  1200	</span>		if x &gt; (1&lt;&lt;63-1)/10 {
+<span id="L1201" class="ln">  1201	</span>			<span class="comment">// It&#39;s possible for overflow to give a positive number, so take care.</span>
+<span id="L1202" class="ln">  1202	</span>			overflow = true
+<span id="L1203" class="ln">  1203	</span>			continue
+<span id="L1204" class="ln">  1204	</span>		}
+<span id="L1205" class="ln">  1205	</span>		y := x*10 + int64(c) - &#39;0&#39;
+<span id="L1206" class="ln">  1206	</span>		if y &lt; 0 {
+<span id="L1207" class="ln">  1207	</span>			overflow = true
+<span id="L1208" class="ln">  1208	</span>			continue
+<span id="L1209" class="ln">  1209	</span>		}
+<span id="L1210" class="ln">  1210	</span>		x = y
+<span id="L1211" class="ln">  1211	</span>		scale *= 10
+<span id="L1212" class="ln">  1212	</span>	}
+<span id="L1213" class="ln">  1213	</span>	return x, scale, s[i:]
+<span id="L1214" class="ln">  1214	</span>}
+<span id="L1215" class="ln">  1215	</span>
+<span id="L1216" class="ln">  1216	</span>var unitMap = map[string]int64{
+<span id="L1217" class="ln">  1217	</span>	&#34;ns&#34;: int64(Nanosecond),
+<span id="L1218" class="ln">  1218	</span>	&#34;us&#34;: int64(Microsecond),
+<span id="L1219" class="ln">  1219	</span>	&#34;µs&#34;: int64(Microsecond), <span class="comment">// U+00B5 = micro symbol</span>
+<span id="L1220" class="ln">  1220	</span>	&#34;μs&#34;: int64(Microsecond), <span class="comment">// U+03BC = Greek letter mu</span>
+<span id="L1221" class="ln">  1221	</span>	&#34;ms&#34;: int64(Millisecond),
+<span id="L1222" class="ln">  1222	</span>	&#34;s&#34;:  int64(Second),
+<span id="L1223" class="ln">  1223	</span>	&#34;m&#34;:  int64(Minute),
+<span id="L1224" class="ln">  1224	</span>	&#34;h&#34;:  int64(Hour),
+<span id="L1225" class="ln">  1225	</span>}
+<span id="L1226" class="ln">  1226	</span>
+<span id="L1227" class="ln">  1227	</span><span class="comment">// ParseDuration parses a duration string.</span>
+<span id="L1228" class="ln">  1228	</span><span class="comment">// A duration string is a possibly signed sequence of</span>
+<span id="L1229" class="ln">  1229	</span><span class="comment">// decimal numbers, each with optional fraction and a unit suffix,</span>
+<span id="L1230" class="ln">  1230	</span><span class="comment">// such as &#34;300ms&#34;, &#34;-1.5h&#34; or &#34;2h45m&#34;.</span>
+<span id="L1231" class="ln">  1231	</span><span class="comment">// Valid time units are &#34;ns&#34;, &#34;us&#34; (or &#34;µs&#34;), &#34;ms&#34;, &#34;s&#34;, &#34;m&#34;, &#34;h&#34;.</span>
+<span id="L1232" class="ln">  1232	</span>func ParseDuration(s string) (Duration, error) {
+<span id="L1233" class="ln">  1233	</span>	<span class="comment">// [-+]?([0-9]*(\.[0-9]*)?[a-z]+)+</span>
+<span id="L1234" class="ln">  1234	</span>	orig := s
+<span id="L1235" class="ln">  1235	</span>	var d int64
+<span id="L1236" class="ln">  1236	</span>	neg := false
+<span id="L1237" class="ln">  1237	</span>
+<span id="L1238" class="ln">  1238	</span>	<span class="comment">// Consume [-+]?</span>
+<span id="L1239" class="ln">  1239	</span>	if s != &#34;&#34; {
+<span id="L1240" class="ln">  1240	</span>		c := s[0]
+<span id="L1241" class="ln">  1241	</span>		if c == &#39;-&#39; || c == &#39;+&#39; {
+<span id="L1242" class="ln">  1242	</span>			neg = c == &#39;-&#39;
+<span id="L1243" class="ln">  1243	</span>			s = s[1:]
+<span id="L1244" class="ln">  1244	</span>		}
+<span id="L1245" class="ln">  1245	</span>	}
+<span id="L1246" class="ln">  1246	</span>	<span class="comment">// Special case: if all that is left is &#34;0&#34;, this is zero.</span>
+<span id="L1247" class="ln">  1247	</span>	if s == &#34;0&#34; {
+<span id="L1248" class="ln">  1248	</span>		return 0, nil
+<span id="L1249" class="ln">  1249	</span>	}
+<span id="L1250" class="ln">  1250	</span>	if s == &#34;&#34; {
+<span id="L1251" class="ln">  1251	</span>		return 0, errors.New(&#34;time: invalid duration &#34; + orig)
+<span id="L1252" class="ln">  1252	</span>	}
+<span id="L1253" class="ln">  1253	</span>	for s != &#34;&#34; {
+<span id="L1254" class="ln">  1254	</span>		var (
+<span id="L1255" class="ln">  1255	</span>			v, f  int64       <span class="comment">// integers before, after decimal point</span>
+<span id="L1256" class="ln">  1256	</span>			scale float64 = 1 <span class="comment">// value = v + f/scale</span>
+<span id="L1257" class="ln">  1257	</span>		)
+<span id="L1258" class="ln">  1258	</span>
+<span id="L1259" class="ln">  1259	</span>		var err error
+<span id="L1260" class="ln">  1260	</span>
+<span id="L1261" class="ln">  1261	</span>		<span class="comment">// The next character must be [0-9.]</span>
+<span id="L1262" class="ln">  1262	</span>		if !(s[0] == &#39;.&#39; || &#39;0&#39; &lt;= s[0] &amp;&amp; s[0] &lt;= &#39;9&#39;) {
+<span id="L1263" class="ln">  1263	</span>			return 0, errors.New(&#34;time: invalid duration &#34; + orig)
+<span id="L1264" class="ln">  1264	</span>		}
+<span id="L1265" class="ln">  1265	</span>		<span class="comment">// Consume [0-9]*</span>
+<span id="L1266" class="ln">  1266	</span>		pl := len(s)
+<span id="L1267" class="ln">  1267	</span>		v, s, err = leadingInt(s)
+<span id="L1268" class="ln">  1268	</span>		if err != nil {
+<span id="L1269" class="ln">  1269	</span>			return 0, errors.New(&#34;time: invalid duration &#34; + orig)
+<span id="L1270" class="ln">  1270	</span>		}
+<span id="L1271" class="ln">  1271	</span>		pre := pl != len(s) <span class="comment">// whether we consumed anything before a period</span>
+<span id="L1272" class="ln">  1272	</span>
+<span id="L1273" class="ln">  1273	</span>		<span class="comment">// Consume (\.[0-9]*)?</span>
+<span id="L1274" class="ln">  1274	</span>		post := false
+<span id="L1275" class="ln">  1275	</span>		if s != &#34;&#34; &amp;&amp; s[0] == &#39;.&#39; {
+<span id="L1276" class="ln">  1276	</span>			s = s[1:]
+<span id="L1277" class="ln">  1277	</span>			pl := len(s)
+<span id="L1278" class="ln">  1278	</span>			f, scale, s = leadingFraction(s)
+<span id="L1279" class="ln">  1279	</span>			post = pl != len(s)
+<span id="L1280" class="ln">  1280	</span>		}
+<span id="L1281" class="ln">  1281	</span>		if !pre &amp;&amp; !post {
+<span id="L1282" class="ln">  1282	</span>			<span class="comment">// no digits (e.g. &#34;.s&#34; or &#34;-.s&#34;)</span>
+<span id="L1283" class="ln">  1283	</span>			return 0, errors.New(&#34;time: invalid duration &#34; + orig)
+<span id="L1284" class="ln">  1284	</span>		}
+<span id="L1285" class="ln">  1285	</span>
+<span id="L1286" class="ln">  1286	</span>		<span class="comment">// Consume unit.</span>
+<span id="L1287" class="ln">  1287	</span>		i := 0
+<span id="L1288" class="ln">  1288	</span>		for ; i &lt; len(s); i++ {
+<span id="L1289" class="ln">  1289	</span>			c := s[i]
+<span id="L1290" class="ln">  1290	</span>			if c == &#39;.&#39; || &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39; {
+<span id="L1291" class="ln">  1291	</span>				break
+<span id="L1292" class="ln">  1292	</span>			}
+<span id="L1293" class="ln">  1293	</span>		}
+<span id="L1294" class="ln">  1294	</span>		if i == 0 {
+<span id="L1295" class="ln">  1295	</span>			return 0, errors.New(&#34;time: missing unit in duration &#34; + orig)
+<span id="L1296" class="ln">  1296	</span>		}
+<span id="L1297" class="ln">  1297	</span>		u := s[:i]
+<span id="L1298" class="ln">  1298	</span>		s = s[i:]
+<span id="L1299" class="ln">  1299	</span>		unit, ok := unitMap[u]
+<span id="L1300" class="ln">  1300	</span>		if !ok {
+<span id="L1301" class="ln">  1301	</span>			return 0, errors.New(&#34;time: unknown unit &#34; + u + &#34; in duration &#34; + orig)
+<span id="L1302" class="ln">  1302	</span>		}
+<span id="L1303" class="ln">  1303	</span>		if v &gt; (1&lt;&lt;63-1)/unit {
+<span id="L1304" class="ln">  1304	</span>			<span class="comment">// overflow</span>
+<span id="L1305" class="ln">  1305	</span>			return 0, errors.New(&#34;time: invalid duration &#34; + orig)
+<span id="L1306" class="ln">  1306	</span>		}
+<span id="L1307" class="ln">  1307	</span>		v *= unit
+<span id="L1308" class="ln">  1308	</span>		if f &gt; 0 {
+<span id="L1309" class="ln">  1309	</span>			<span class="comment">// float64 is needed to be nanosecond accurate for fractions of hours.</span>
+<span id="L1310" class="ln">  1310	</span>			<span class="comment">// v &gt;= 0 &amp;&amp; (f*unit/scale) &lt;= 3.6e+12 (ns/h, h is the largest unit)</span>
+<span id="L1311" class="ln">  1311	</span>			v += int64(float64(f) * (float64(unit) / scale))
+<span id="L1312" class="ln">  1312	</span>			if v &lt; 0 {
+<span id="L1313" class="ln">  1313	</span>				<span class="comment">// overflow</span>
+<span id="L1314" class="ln">  1314	</span>				return 0, errors.New(&#34;time: invalid duration &#34; + orig)
+<span id="L1315" class="ln">  1315	</span>			}
+<span id="L1316" class="ln">  1316	</span>		}
+<span id="L1317" class="ln">  1317	</span>		d += v
+<span id="L1318" class="ln">  1318	</span>		if d &lt; 0 {
+<span id="L1319" class="ln">  1319	</span>			<span class="comment">// overflow</span>
+<span id="L1320" class="ln">  1320	</span>			return 0, errors.New(&#34;time: invalid duration &#34; + orig)
+<span id="L1321" class="ln">  1321	</span>		}
+<span id="L1322" class="ln">  1322	</span>	}
+<span id="L1323" class="ln">  1323	</span>
+<span id="L1324" class="ln">  1324	</span>	if neg {
+<span id="L1325" class="ln">  1325	</span>		d = -d
+<span id="L1326" class="ln">  1326	</span>	}
+<span id="L1327" class="ln">  1327	</span>	return Duration(d), nil
+<span id="L1328" class="ln">  1328	</span>}
+<span id="L1329" class="ln">  1329	</span>
+</pre><p><a href="format.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

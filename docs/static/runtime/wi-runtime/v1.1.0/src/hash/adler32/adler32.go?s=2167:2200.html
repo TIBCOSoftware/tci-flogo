@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/hash/adler32/adler32.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./adler32.go%3Fs=2167:2200.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/hash/adler32/adler32.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// Package adler32 implements the Adler-32 checksum.</span>
+<span id="L6" class="ln">     6	</span><span class="comment">//</span>
+<span id="L7" class="ln">     7	</span><span class="comment">// It is defined in RFC 1950:</span>
+<span id="L8" class="ln">     8	</span><span class="comment">//	Adler-32 is composed of two sums accumulated per byte: s1 is</span>
+<span id="L9" class="ln">     9	</span><span class="comment">//	the sum of all bytes, s2 is the sum of all s1 values. Both sums</span>
+<span id="L10" class="ln">    10	</span><span class="comment">//	are done modulo 65521. s1 is initialized to 1, s2 to zero.  The</span>
+<span id="L11" class="ln">    11	</span><span class="comment">//	Adler-32 checksum is stored as s2*65536 + s1 in most-</span>
+<span id="L12" class="ln">    12	</span><span class="comment">//	significant-byte first (network) order.</span>
+<span id="L13" class="ln">    13	</span>package adler32
+<span id="L14" class="ln">    14	</span>
+<span id="L15" class="ln">    15	</span>import &#34;hash&#34;
+<span id="L16" class="ln">    16	</span>
+<span id="L17" class="ln">    17	</span>const (
+<span id="L18" class="ln">    18	</span>	<span class="comment">// mod is the largest prime that is less than 65536.</span>
+<span id="L19" class="ln">    19	</span>	mod = 65521
+<span id="L20" class="ln">    20	</span>	<span class="comment">// nmax is the largest n such that</span>
+<span id="L21" class="ln">    21	</span>	<span class="comment">// 255 * n * (n+1) / 2 + (n+1) * (mod-1) &lt;= 2^32-1.</span>
+<span id="L22" class="ln">    22	</span>	<span class="comment">// It is mentioned in RFC 1950 (search for &#34;5552&#34;).</span>
+<span id="L23" class="ln">    23	</span>	nmax = 5552
+<span id="L24" class="ln">    24	</span>)
+<span id="L25" class="ln">    25	</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// The size of an Adler-32 checksum in bytes.</span>
+<span id="L27" class="ln">    27	</span>const Size = 4
+<span id="L28" class="ln">    28	</span>
+<span id="L29" class="ln">    29	</span><span class="comment">// digest represents the partial evaluation of a checksum.</span>
+<span id="L30" class="ln">    30	</span><span class="comment">// The low 16 bits are s1, the high 16 bits are s2.</span>
+<span id="L31" class="ln">    31	</span>type digest uint32
+<span id="L32" class="ln">    32	</span>
+<span id="L33" class="ln">    33	</span>func (d *digest) Reset() { *d = 1 }
+<span id="L34" class="ln">    34	</span>
+<span id="L35" class="ln">    35	</span><span class="comment">// New returns a new hash.Hash32 computing the Adler-32 checksum.</span>
+<span id="L36" class="ln">    36	</span><span class="comment">// Its Sum method will lay the value out in big-endian byte order.</span>
+<span id="L37" class="ln">    37	</span>func New() hash.Hash32 {
+<span id="L38" class="ln">    38	</span>	d := new(digest)
+<span id="L39" class="ln">    39	</span>	d.Reset()
+<span id="L40" class="ln">    40	</span>	return d
+<span id="L41" class="ln">    41	</span>}
+<span id="L42" class="ln">    42	</span>
+<span id="L43" class="ln">    43	</span>func (d *digest) Size() int { return Size }
+<span id="L44" class="ln">    44	</span>
+<span id="L45" class="ln">    45	</span>func (d *digest) BlockSize() int { return 4 }
+<span id="L46" class="ln">    46	</span>
+<span id="L47" class="ln">    47	</span><span class="comment">// Add p to the running checksum d.</span>
+<span id="L48" class="ln">    48	</span>func update(d digest, p []byte) digest {
+<span id="L49" class="ln">    49	</span>	s1, s2 := uint32(d&amp;0xffff), uint32(d&gt;&gt;16)
+<span id="L50" class="ln">    50	</span>	for len(p) &gt; 0 {
+<span id="L51" class="ln">    51	</span>		var q []byte
+<span id="L52" class="ln">    52	</span>		if len(p) &gt; nmax {
+<span id="L53" class="ln">    53	</span>			p, q = p[:nmax], p[nmax:]
+<span id="L54" class="ln">    54	</span>		}
+<span id="L55" class="ln">    55	</span>		for len(p) &gt;= 4 {
+<span id="L56" class="ln">    56	</span>			s1 += uint32(p[0])
+<span id="L57" class="ln">    57	</span>			s2 += s1
+<span id="L58" class="ln">    58	</span>			s1 += uint32(p[1])
+<span id="L59" class="ln">    59	</span>			s2 += s1
+<span id="L60" class="ln">    60	</span>			s1 += uint32(p[2])
+<span id="L61" class="ln">    61	</span>			s2 += s1
+<span id="L62" class="ln">    62	</span>			s1 += uint32(p[3])
+<span id="L63" class="ln">    63	</span>			s2 += s1
+<span id="L64" class="ln">    64	</span>			p = p[4:]
+<span id="L65" class="ln">    65	</span>		}
+<span id="L66" class="ln">    66	</span>		for _, x := range p {
+<span id="L67" class="ln">    67	</span>			s1 += uint32(x)
+<span id="L68" class="ln">    68	</span>			s2 += s1
+<span id="L69" class="ln">    69	</span>		}
+<span id="L70" class="ln">    70	</span>		s1 %= mod
+<span id="L71" class="ln">    71	</span>		s2 %= mod
+<span id="L72" class="ln">    72	</span>		p = q
+<span id="L73" class="ln">    73	</span>	}
+<span id="L74" class="ln">    74	</span>	return digest(s2&lt;&lt;16 | s1)
+<span id="L75" class="ln">    75	</span>}
+<span id="L76" class="ln">    76	</span>
+<span id="L77" class="ln">    77	</span>func (d *digest) Write(p []byte) (nn int, err error) {
+<span id="L78" class="ln">    78	</span>	*d = update(*d, p)
+<span id="L79" class="ln">    79	</span>	return len(p), nil
+<span id="L80" class="ln">    80	</span>}
+<span id="L81" class="ln">    81	</span>
+<span id="L82" class="ln">    82	</span>func (d *digest) Sum32() uint32 { return uint32(*d) }
+<span id="L83" class="ln">    83	</span>
+<span id="L84" class="ln">    84	</span>func (d *digest) Sum(in []byte) []byte {
+<span id="L85" class="ln">    85	</span>	s := uint32(*d)
+<span id="L86" class="ln">    86	</span>	return append(in, byte(s&gt;&gt;24), byte(s&gt;&gt;16), byte(s&gt;&gt;8), byte(s))
+<span id="L87" class="ln">    87	</span>}
+<span id="L88" class="ln">    88	</span>
+<span id="L89" class="ln">    89	</span><span class="comment">// Checksum returns the Adler-32 checksum of data.</span>
+<span id="L90" class="ln">    90	</span><span class="selection">func Checksum(data []byte) uint32</span> { return uint32(update(1, data)) }
+<span id="L91" class="ln">    91	</span>
+</pre><p><a href="adler32.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+
