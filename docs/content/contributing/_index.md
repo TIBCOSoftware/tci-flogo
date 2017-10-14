@@ -1,11 +1,11 @@
 ---
-title: Contribute
-weight: 2
+title: Contributing
+weight: 5
 chapter: true
 ---
 
-### Chapter 2
+### Chapter 4
 
-# Contribute
+# Contributing
 
 Discover how you can contribute!

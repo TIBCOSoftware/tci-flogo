@@ -1,11 +1,11 @@
 ---
-title: Samples
-weight: 4
+title: Building extensions
+weight: 3
 chapter: true
 ---
 
-### Chapter 3
+### Chapter 2
 
-# Samples
+# Building extensions
 
 Now that everything is set up, let's get to coding!

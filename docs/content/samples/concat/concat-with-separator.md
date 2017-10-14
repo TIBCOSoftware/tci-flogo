@@ -1,11 +1,11 @@
 ---
 date: 2016-04-09T16:50:16+02:00
-title: Simple concat (2)
+title: Adding a separator token
 weight: 20
 ---
 
 ## Adding user input to the "Concat" activity
-Let's enhance our Concat activity tolet users select a separator for concatenation.
+Let's enhance our Concat activity to let users select a separator for concatenation.
 
 ### activity.json
 ```json

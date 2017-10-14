@@ -1,3 +1,8 @@
+![](https://travis-ci.org/TIBCOSoftware/tci-webintegrator.svg)
+![](https://img.shields.io/badge/dependencies-up%20to%20date-green.svg)
+![](https://img.shields.io/badge/license-BSD%20style-blue.svg)
+![](https://img.shields.io/badge/version-1.1.0-ff69b4.svg)
+
 # TIBCO Cloud Integration
 
 [TIBCO Cloud Integration](https://www.tibco.com/products/tibco-cloud-integration) is a way to seamlessly connect cloud-based services and on-premises applications, and easily model, create, test, and deploy custom APIs.
@@ -24,7 +29,7 @@ If you have feedback, don't hesitate to talk to us!
 
 ## Other TIBCO Cloud Integration repos
 You might also want to visit our other repos
-* [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome), a curated set of awesome projects built on TIBCO Cloud Integration
+* [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome), a curated set of awesome projects built on or for TIBCO Cloud Integration
 * [Connectors for TIBCO Business Studio - Cloud Edition](https://github.com/TIBCOSoftware/tci-studio-samples)
 * [Visual Studio Code extension for Node.js](https://github.com/TIBCOSoftware/vscode-extension-tci)
 * [Command Line Interface for Node.js](https://github.com/TIBCOSoftware/tibcli-node)
