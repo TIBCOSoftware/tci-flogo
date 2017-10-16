@@ -14,10 +14,10 @@ To follow along, please make sure you have:
 
 If you follow along with the steps your layout at the end should be:
 
-![sqs.png](https://github.com/TIBCOSoftware/tci-webintegrator/blob/master/images/sqs.png)
+![sqs.png](https://raw.githubusercontent.com/TIBCOSoftware/tci-webintegrator/master/images/sqs.png)
 
 The steps:
 
-* Create the [[SQS Connector]]
-* Create a [[SQS Send Message Activity]]
-* Create a [[SQS Receive Message Activity]]
+* Create the SQS Connector
+* Create a SQS Send Message Activity
+* Create a SQS Receive Message Activity

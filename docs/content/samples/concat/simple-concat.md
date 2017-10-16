@@ -10,7 +10,7 @@ Now that you are familiar with the the layout of the different [files](https://g
 
 ### The folder
 The first step is tocCreate a folder named **concat** in the TIBCO category with following files:
-![concat-activity.png](https://github.com/TIBCOSoftware/tci-webintegrator/blob/master/images/concat-activity.png)
+![concat-activity.png](https://raw.githubusercontent.com/TIBCOSoftware/tci-webintegrator/master/images/concat-activity.png)
 
 ### activity.json
 ```json

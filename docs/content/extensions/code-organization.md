@@ -114,7 +114,7 @@ Every extension must write the runtime code in **Go** (_activity.go_). You can
 
 ## Folder Layout 
 Your contributions must follow below folder layout.
-![layout.png](https://github.com/TIBCOSoftware/tci-webintegrator/blob/master/images/layout.png)
+![layout.png](https://raw.githubusercontent.com/TIBCOSoftware/tci-webintegrator/master/images/layout.png)
 
 where,
 

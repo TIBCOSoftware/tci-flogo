@@ -9,7 +9,7 @@ In the [other](https://github.com/TIBCOSoftware/tci/wiki/Concat-activity-with-se
 
 We need two TypeScript files for our Concat activity. In those files we'll make the separator field visible only when users wants to use it and we'll also construct and return separator list. The new layout of the folder will look something like this
 
-![concat-activity-updated.png](https://github.com/TIBCOSoftware/tci-webintegrator/blob/master/images/concat-activity-updated.png)
+![concat-activity-updated.png](https://raw.githubusercontent.com/TIBCOSoftware/tci-webintegrator/master/images/concat-activity-updated.png)
 
 ### activity.json
 ```json
