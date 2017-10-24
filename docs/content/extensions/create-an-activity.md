@@ -40,7 +40,8 @@ It is very easy to develop an activity for Web Integrator. Just create the mode
        "smallIcon": "demo-small-icon.png"
     },
  
-    // This value is used by runtime to load the activity implantation.
+    // This value is used by runtime to load the activity implementation.
+    // It must include category name followed by lower case activity name.
     // Prepend your Github repository path in case you are hosting your contributions on github.com.
     // e.g. "ref": "github.com/TIBCOSoftware/tci/examples/TIBCO/activity/concat"
     "ref":  "<CATEGORY SPECIFIED IN DISPLAY CONFIGURATION>/activity/<LOWER CASE ACTIVITY NAME>",
