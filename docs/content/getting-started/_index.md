@@ -2,9 +2,8 @@
 title: Getting started
 weight: 2
 chapter: true
+pre: "<i class=\"fa fa-bolt\" aria-hidden=\"true\"></i> "
 ---
-
-### Chapter 1
 
 # Getting started
 

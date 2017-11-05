@@ -1,18 +1,24 @@
 ---
 date: 2016-04-09T16:50:16+02:00
 title: Simple concat
-weight: 10
+weight: 252
 ---
 
-## Creating "Concat" activity
+Let's create a simple **concat** activity. The activity takes two input strings and returns a single string which will be the concatenation of the input. To structure our extensions we'll put them in the **TIBCO** category, but you're free to choose your own 😄 
 
-Now that you are familiar with the the layout of the different [files](https://github.com/TIBCOSoftware/tci/wiki/Create-an-Activity), let's create a simple `concat` activity. The activity takes two input strings and returns a single string which will be the concatenation of the input. To structure our extensions we'll put them in the `TIBCO` category, but you're free to choose your own 😄 
+## The folder
+The first step is to create a folder named **concat** in the TIBCO category with following files:
+```
+TIBCO
+└───activity
+    └───concat
+        ├───activity.json
+        |───activity.go
+        |───activity_test.go
+        └───concat.png
+```
 
-### The folder
-The first step is tocCreate a folder named **concat** in the TIBCO category with following files:
-![concat-activity.png](https://raw.githubusercontent.com/TIBCOSoftware/tci-webintegrator/master/images/concat-activity.png)
-
-### activity.json
+## activity.json
 ```json
 {
     "name": "concat",
@@ -50,7 +56,7 @@ The first step is tocCreate a folder named **concat** in the TIBCO category wit
 }
 ```
 
-### activity.go
+## activity.go
 ```go
 package concat
 
@@ -101,10 +107,10 @@ func (a *ConcatActivity) Eval(context activity.Context) (done bool, err error) {
 }
 ```
 
-### Unit testing
+## Unit testing
 As a good practice you should always have runtime unit test cases. For our activitieswWe will use the Golang [testing](https://golang.org/pkg/testing/) package.
 
-### activity_test.go
+## activity_test.go
 ```go
 package concat
 
@@ -151,15 +157,12 @@ func TestEval(t *testing.T) {
 }
 ```
 
-### Test your code!
-You can test your runtime code using [Project Flogo](http://www.flogo.io/).
+## Test your code!
+You can test your Go code by running the below command from your **<Category>** folder
 ```
-1. Ensure $GOPATH variable is set
-2. Add your <Category> folder to the $GOPATH
-3. Pull Flogo code:
-    -  go get github.com/TIBCOSoftware/flogo-lib
-    -  go get github.com/TIBCOSoftware/flogo-contrib
-4. Run - `go test ./..` from your <Category> folder
+go test ./..
 ```
 
-And your _**Concat**_ activity is ready for the use in Web Integrator! 
+{{% notice tip %}}
+Please make sure you have installed the right tools. Check out the [prerequisites](../../../getting-started/prerequisites/) to see if you have everything
+{{% /notice %}}

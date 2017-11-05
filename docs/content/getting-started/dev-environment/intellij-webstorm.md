@@ -1,6 +1,6 @@
 ---
 date: 2016-04-09T16:50:16+02:00
-title: WebStorm as your IDE
+title: Using IntelliJ WebStorm
 weight: 7
 ---
 

@@ -1,13 +1,13 @@
 ---
 date: 2016-04-09T16:50:16+02:00
 title: Adding a separator token
-weight: 20
+weight: 253
 ---
 
-## Adding user input to the "Concat" activity
-Let's enhance our Concat activity to let users select a separator for concatenation.
+Let's enhance the [concat](../simple-concat) activity to let users select a separator for concatenation.
 
-### activity.json
+## activity.json
+The activity.json file needs a few small changes and now has a third input for the separator, that also shows which separators are allowed.
 ```json
 
 {
@@ -59,7 +59,8 @@ Let's enhance our Concat activity to let users select a separator for concatenat
 }
 ```
 
-### activity.go
+## activity.go
+The activity.go has a few extra pieces as well. We've commented the parts that have been changed from the previous version.
 ```go
 package concat
 
@@ -70,7 +71,8 @@ import (
 
 const (
 	ivField1    = "firstString"
-	ivField2    = "secondString"
+    ivField2    = "secondString"
+    // Adding a new input field
     ivField3    = "separator"
     ovResult    = "result"
 )
@@ -90,24 +92,18 @@ func (a *ConcatActivity) Metadata() *activity.Metadata {
 }
 func (a *ConcatActivity) Eval(context activity.Context) (done bool, err error) {
     activityLog.Info("Executing Concat activity")
-    //Read Inputs
     if context.GetInput(ivField1) == nil {
-      // First string is not configured
-      // return error to the engine 
       return false, activity.NewError("First string is not configured", "CONCAT-4001", nil)
     }
     field1v := context.GetInput(ivField1).(string)
      
     if context.GetInput(ivField2) == nil {
-      // Second string is not configured
-      // return error to the engine 
       return false, activity.NewError("Second string is not configured", "CONCAT-4002", nil)
     }
     field2v := context.GetInput(ivField2).(string)
   
+    // Get the separator field
     if context.GetInput(ivField3) == nil {
-      // Separator is not configured
-      // return error to the engine 
       return false, activity.NewError("Separator is not configured", "CONCAT-4003", nil)
     }
     field3v := context.GetInput(ivField3).(string)
@@ -118,7 +114,9 @@ func (a *ConcatActivity) Eval(context activity.Context) (done bool, err error) {
 }
 
 ```
-### activity_test.go
+
+## activity_test.go
+The activity_test.go has a few extra pieces as well. We've commented the parts that have been changed from the previous version.
 ```go
 package concat
 
@@ -155,14 +153,17 @@ func TestActivityRegistration(t *testing.T) {
 func TestEval(t *testing.T) {
 	act := NewActivity(getActivityMetadata())
 	tc := test.NewTestActivityContext(act.Metadata())
-	//setup attrs
 	tc.SetInput("firstString", "Hello")
     tc.SetInput("secondString", "World!")
+
+    // Set a new separator
     tc.SetInput("separator", "#")
-	_, err := act.Eval(tc)
+
+    _, err := act.Eval(tc)
     assert.Nil(t, err)
     result := tc.GetOutput("result")
+    
+    // Check the new output
     assert.Equal(t, result, "Hello#World!")
 }
-
 ```

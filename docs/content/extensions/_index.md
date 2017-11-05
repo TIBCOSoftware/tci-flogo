@@ -1,11 +1,10 @@
 ---
 title: Building extensions
-weight: 3
+weight: 50
 chapter: true
+pre: "<i class=\"fa fa-wrench\" aria-hidden=\"true\"></i> "
 ---
-
-### Chapter 2
 
 # Building extensions
 
-Now that everything is set up, let's get to coding!
+Now that everything is set up, let's get coding! In this section we'll walk through the different files you might need and the complete sample we use here is available on [GitHub](https://github.com/retgits/wi-ifttt-extension) too!

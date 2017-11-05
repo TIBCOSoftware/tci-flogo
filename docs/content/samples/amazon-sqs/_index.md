@@ -1,23 +1,42 @@
 ---
+date: 2016-04-09T16:50:16+02:00
 title: Amazon SQS
-weight: 4
-
+weight: 255
 ---
 
 Let's develop a connector for [Amazon Simple Queue Service](https://aws.amazon.com/sqs/), also known as SQS and create two activities that will use the SQS connector to send and receive messages. 
 
 To follow along, please make sure you have:
 
-*   An access key ID for AWS account
-*   A Secret Access Key for AWS account
-*   SQS service running in your favorite region
+* An access key ID for your AWS account
+* A Secret Access Key for your AWS account
+* Access to SQS in your favorite region
 
 If you follow along with the steps your layout at the end should be:
 
-![sqs.png](https://raw.githubusercontent.com/TIBCOSoftware/tci-webintegrator/master/images/sqs.png)
+```
+AWS
+├───activity
+│   ├───sqsreceivemessage
+│   |   ├───activity.json
+│   |   |───activity.go
+│   |   |───activity_test.go
+│   |   |───activity.ts
+│   |   |───activity.module.ts
+│   |   └───sqsreceivemessage.png
+│   └───sqssendmessage
+│       ├───activity.json
+│       |───activity.go
+│       |───activity_test.go
+│       |───activity.ts
+│       |───activity.module.ts
+│       └───sqssendmessage.png
+└───connector
+    └───sqs
+        ├───connector.json
+        |───connector.ts
+        |───connector.module.ts
+        └───sqs.png
+```
 
-The steps:
-
-* Create the SQS Connector
-* Create a SQS Send Message Activity
-* Create a SQS Receive Message Activity
+The complete code of this connector and the two activities can be found in our [GitHub](https://github.com/TIBCOSoftware/tci-webintegrator/tree/master/examples/AWS) repo too.

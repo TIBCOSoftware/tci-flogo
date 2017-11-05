@@ -1,13 +1,12 @@
 ---
 date: 2016-04-09T16:50:16+02:00
 title: Receiving a message
-weight: 20
+weight: 258
 ---
 
-## Receive a message
 To receive a message from Amazon SQS we'll create a Receive Message activity. The API that we follow is documented by [Amazon](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html).
 
-### activity.json
+## activity.json
 ```
 {
 	"name": "sqsreceivemessage",
@@ -102,7 +101,7 @@ To receive a message from Amazon SQS we'll create a Receive Message activity. Th
 }
 ```
 
-### activity.module.ts
+## activity.module.ts
 ```typescript
 import { HttpModule } from "@angular/http";
 import { NgModule } from "@angular/core";
@@ -129,7 +128,7 @@ export default class SQSReceiveMessageActivityModule {
 }
 ```
 
-### activity.ts
+## activity.ts
 The TypeScript code to fetch SQS connection and Queue URLs.
 ```typescript
 import { Observable } from "rxjs/Observable";
@@ -273,7 +272,7 @@ export class RecvMsgActivityContribution extends WiServiceHandlerContribution {
 }
 ```
 
-### activity.go
+## activity.go
 The runtime code
 ```go
 package sqsreceivemessage
@@ -443,8 +442,8 @@ func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, e
 }
 ```
 
-### activity_test.go
-And, yes, the unit tests 😄 
+## activity_test.go
+And, yes, the unit tests 
 ```go
 package sqsreceivemessage
 

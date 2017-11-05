@@ -1,14 +1,12 @@
 ---
 date: 2016-04-09T16:50:16+02:00
 title: Sending a message
-weight: 30
+weight: 257
 ---
 
-## Send a message
-To send a message to Amazon SQS we'll create a Send Message activity.
- The API that we follow is documented by [Amazon](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html).
+To send a message to Amazon SQS we'll create a Send Message activity. The API that we follow is documented by [Amazon](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html).
 
-### activity.json
+## activity.json
 ```
 {
     "name": "sqssendmessage",
@@ -84,7 +82,7 @@ To send a message to Amazon SQS we'll create a Send Message activity.
 }
 ```
 
-### activity.module.ts
+## activity.module.ts
 ```typescript
 import { HttpModule } from "@angular/http";
 import { NgModule } from "@angular/core";
@@ -111,7 +109,7 @@ export default class ConcatActivityModule {
 }
 ```
 
-### activity.ts
+## activity.ts
 The TypeScript code to fetch the SQS connection and Queue URLs.
 ```typescript
 import { Observable } from "rxjs/Observable";
@@ -233,7 +231,7 @@ export class SendMsgActivityContribution extends WiServiceHandlerContribution {
 }
 ```
 
-### activity.go
+## activity.go
 The runtime code
 ```go
 package sqssendmessage
@@ -362,8 +360,8 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 }
 ```
 
-### activity_test.go
-The unit tests 😄 
+## activity_test.go
+The unit tests
 ```go
 /*
  * Copyright © 2017. TIBCO Software Inc.

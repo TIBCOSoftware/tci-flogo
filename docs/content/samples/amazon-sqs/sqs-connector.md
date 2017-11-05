@@ -1,14 +1,12 @@
 ---
 date: 2016-04-09T16:50:16+02:00
-title: Amazon SQS Connector
-weight: 10
+title: Connector
+weight: 256
 ---
-
-## The connector model
 
 The connector will use a bunch of files `connector.json` for the model and `connector.module.ts` and `connector.ts` for the UI
 
-### connector.json
+## connector.json
 ```
 {
     "name": "tibco-sqs",
@@ -91,7 +89,7 @@ The connector will use a bunch of files `connector.json` for the model and `conn
 }
 ```
 
-### connector.module.ts
+## connector.module.ts
 ```typescript
 import { HttpModule } from "@angular/http";
 import { NgModule } from "@angular/core";
@@ -117,7 +115,7 @@ export default class TibcoSQSConnectorModule {
 }
 ```
 
-### connector.ts
+## connector.ts
 ```typescript
 import {AWS} from 'aws-sdk';
 
