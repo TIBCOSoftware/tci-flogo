@@ -48,7 +48,7 @@ func TestEval(t *testing.T) {
 	dummyConnectionSettings := make([]interface{}, 4)
 
 	accesskeyId := make(map[string]interface{})
-	accesskeyId["name"] = "accesskeyId"
+	accesskeyId["name"] = "accessKeyId"
 	accesskeyId["value"] = "<YOUR ACCESS KEY ID>"
 	dummyConnectionSettings[0] = accesskeyId
 
