@@ -409,7 +409,7 @@ func TestEval(t *testing.T) {
 	dummyConnectionData := make(map[string]interface{})
 	dummyConnectionSettings := make(map[string]interface{}, 4)
 	//Use your AWS information
-	dummyConnectionSettings["accesskeyId"] = "<YOUR ACCESS KEY ID>"
+	dummyConnectionSettings["accessKeyId"] = "<YOUR ACCESS KEY ID>"
 	dummyConnectionSettings["secreteAccessKey"] = "<YOUR SECRETE ACCESS KEY>"
 	dummyConnectionSettings["region"] = "<REGION NAME WHERE SQS IS RUNNING>"
 	dummyConnectionSettings["name"] = "My SQS Connection"
