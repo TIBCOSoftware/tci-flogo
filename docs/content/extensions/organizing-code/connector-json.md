@@ -18,7 +18,7 @@ The connector.json describes the model, the meta data, of the connector. It desc
       "visible": true,
       "smallIcon": "ifttt.png"
     },
-    "ref": "IFTTT/connector/ifttt",
+    "ref": "IFTTT/connector/wi-ext-ifttt",
     "keyfield": "name",
     "settings": [
       {

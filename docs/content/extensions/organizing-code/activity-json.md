@@ -18,7 +18,7 @@ The activity.json describes the model, the meta data, of the activity. It descri
         "smallIcon": "ifttt.png",
         "description": "This activity sends a message to an IFTTT WebHook"
     },
-    "ref": "IFTTT/activity/ifttt",
+    "ref": "IFTTT/activity/webhook",
     "inputs": [
         {
             "name": "iftttConnection",
