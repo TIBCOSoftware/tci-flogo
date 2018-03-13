@@ -17,10 +17,18 @@ gzcat wi-cli.tar.gz | docker import - wi-cli:latest
 #!/bin/bash
 docker exec --rm -ti -v $PWD:/src wi-cli:latest $@
 ```
-### Run the `wi-cli` shell command from your plugin project work folder
+### 3. Run the `wi-cli` shell command from your plugin project work folder
 ```
 >cd <your project folder>
 >wi-cli --help
+```
+### 4. Testing
+Run a test container as shown below from your plugin project work folder
+```
+>cd <your project folder> 
+>docker run --rm -ti -v $PWD:/src --entrypoint bash wi-cli:latest
+# cd /src
+# wi-test
 ```
 ## Command Line Help Documentation
 ### `wi-cli --help`
@@ -251,12 +259,4 @@ $ tsc
 Done in 6.39s.
  
 Compilation exited with code 0 
-```
-## Testing
-Run a test container as shown below from your plugin project work folder
-```
->cd <your project folder> 
->docker run --rm -ti -v $PWD:/src --entrypoint bash wi-cli:latest
-# cd /src
-# wi-test
 ```
