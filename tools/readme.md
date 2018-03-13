@@ -1,137 +1,262 @@
-# tibcli-wi
-The commandline tool designed to help developers with the Web Integrator SDK
+# wi-cli
+The commandline tool designed to help developers with the Web Integrator SDK. The SDK is bundled inside a docker image which can be run without downloading the SDK's separately.
+
+## Pre-requisites
+1. Docker - [download](https://www.docker.com/get-docker)
 
 ## Install
-You can install tibcli-wi by downloading the tibcli-wi.tgz from the releases section and executing
+You can install tibcli-wi by downloading the wi-cli.tar.gz from the releases section 
+
+
+### 1. Import the docker image from wi-cli.tar.gz to your docker machine installation
 ```
-npm install -g ./tibcli-wi-x.x.x.tgz
+gzcat wi-cli.tar.gz | docker import - wi-cli:latest
 ```
-
-## Usage and commands
+### 2. Create a executable shell script in your shell $PATH  called `wi-cli` with the following contents
 ```
- __   __ __          __ __                  __
-|  |_|__|  |--.----.|  |__|______.--.--.--.|__|
-|   _|  |  _  |  __||  |  |______|  |  |  ||  |
-|____|__|_____|____||__|__|      |________||__|
-The tibcli for Web Integrator extensions, v0.0.1
+#!/bin/bash
+docker exec --rm -ti -v $PWD:/src wi-cli:latest $@
+```
+### Run the `wi-cli` shell command from your plugin project work folder
+```
+>cd <your project folder>
+>wi-cli --help
+```
+## Command Line Help Documentation
+### `wi-cli --help`
+The wi-cli has three basic commands as follows in order of their execution.
 
-  Usage: tibcli-wi [options] [command]
+  1. `init | initialize` -  This is the first step to initialize a wi-studio contribution project with the creation of the following files :-
+      * `package.json` - Node Package Manager configuration
+      * `wi-studio.json` - wi-studio command line interface configuration
+      * `tsconfig.json` - Typescript compiler configuration
+      * `tslint.json` - Typescript language and coding standard configuration.
+1. `add` -  This is the second step to add contribution service artifacts. The user can choose between `Handler` or a `Provider` contribution implementation styles and add their respective input parameters which are then stored in the wi-cli.json file
 
-  Help developers with the Web Integrator SDK
-
-
+1. The third step is to add the triggers, activities,connector to the  `Handler` or `Provider`
+1. `compile` -  This the fourth and the final step
+```
+>cd <your project folder>
+>wi-cli --help
+ 
+  Usage: wi-cli [options] [command]
+ 
+  Welcome to wi-cli command line
+ 
+ 
   Options:
-
+ 
     -V, --version  output the version number
     -h, --help     output usage information
-
-
+ 
+ 
   Commands:
-
-    sdk         Download, unpack or update the SDK
-    init        Create a new extension for Web Integrator
-    add         Add an activity or connector to your extension
-    package     Create a zip file of your extension
+ 
+    initialize|init   Initialize wi-cli contribution project
+    add|add           Add service artifacts
+    compile|compile   Add service artifacts
+    help [cmd]        display help for [cmd]
+```
+### `wi-cli init --help`
+```
+>cd <your project folder>
+>wi-cli init --help
+ 
+  Usage: wi-cli-initialize [options]
+ 
+ 
+  Options:
+ 
+    -c, --category [categoryName]  <required> Category Name
+    -s, --sdkpath [sdkpath]        <optional> wi-cli.tar.gz file path OR wi-cli sdk folder path
+    -h, --help                     output usage information
+  Examples:
+ 
+    $ wi-cli --help
+    $ wi-cli -h
+```
+### `wi-cli add --help`
+```
+>cd <your project folder>
+>wi-cli add --help
+ 
+  Usage: wi-cli-add [options] [command]
+ 
+ 
+  Options:
+ 
+    -h, --help  output usage information
+ 
+ 
+  Commands:
+ 
+    activity    Add an Activity to your category
+    connector   Add a Connector to your category
+    trigger     Add a Trigger to your category
+    handler     Add a Module Handler Contribution Type
+    provider    Add a Module Provider Contribution Type
     help [cmd]  display help for [cmd]
 ```
-
-## sdk
+### `wi-cli add activity --help`
 ```
-  Usage: tibcli-wi sdk [options] [command]
-
-  Download, unpack or update the SDK
-
-
+>cd <your project folder>
+>wi-cli add activity --help
+ 
+  Usage: wi-cli-add-activity [options]
+ 
+ 
   Options:
-
-    --location <location>  The location where the Web Integrator SDK should be unpacked
-    --clean                Clean up the downloaded files after unzipping
+ 
+    -n, --name [activityName]  <required> Activity Name
+    -y, --yes                  <optional> Overwrite Yes/No
     -h, --help                 output usage information
-
-
-  Commands:
-
-    get   Download the latest SDK from GitHub
+  Examples:
+ 
+    $ wi-cli add activity -n ACTIVITY_NAME
 ```
-
-To get the latest SDK from GitHub and store it in `c:/temp`
+### `wi-cli add connector --help`
 ```
-tibcli-wi sdk get --location c:/temp
-```
-
-## init
-```
-  Usage: tibcli-wi init [options]
-
-  Create a new extension for Web Integrator
-
-
+>cd <your project folder>
+>wi-cli add connector --help
+ 
+  Usage: wi-cli-add-connector [options]
+ 
+ 
   Options:
-
-    --location <location>  The location where the extension will be created
-    --category <category>  The category for the extension
-    -h, --help                 output usage information
+ 
+    -n, --name [connectorName]  <required> Connector Name
+    -y, --yes                   <optional> Overwrite Yes/No
+    -h, --help                  output usage information
+  Examples:
+ 
+    $ wi-cli add connector -n CONNECTOR_NAME
 ```
-
-To initialize a new extension for `tools` in `c:/temp`
+### `wi-cli add trigger --help`
 ```
-tibcli-wi init --location c:/temp --category tools
-```
-
-## add
-```
-  Usage: tibcli-wi add [options] [command]
-
-  Add an activity or connector to your extension
-
-
+>cd <your project folder>
+>wi-cli add trigger --help
+ 
+  Usage: wi-cli-add-trigger [options]
+ 
+ 
   Options:
-
-    --location [location]  The root location of the extension, will default to this folder if not set
-    --category [category]  The category of the extension, will default to the name of this folder if not set
-    --name <name>          The name of the connector or activity
-    --author <author>      The author of the connector or activity
-    --ver [version]        The version of the connector or activity, will default to 0.0.1 if not set
-    --activityTypescript   Create the TypeScript templates for a new activity
-    --help                 output usage information
-
-
-  Commands:
-
-    connector   Add a connector to your extension
-    activity    Add an activity to your extension
+ 
+    -n, --name [triggerName]  <required> Trigger Name
+    -y, --yes                 <optional> Overwrite Yes/No
+    -h, --help                output usage information
+  Examples:
+ 
+    $ wi-cli add trigger -n TRIGGER_NAME
 ```
-### connector
-To create the template code for an ifttt connector in the tools category
+### `wi-cli add handler --help`
 ```
-tibcli-wi add connector --location c:/temp --category tools --name ifttt --author someone --ver 0.0.1
-```
-### activity
-To create the template code for an ifttt activity in the tools category
-```
-tibcli-wi add activity --location c:/temp --category tools --name ifttt --author someone --ver 0.0.1
-```
-To also create the TypeScript templates for the activity (which you can use to enhance the user experience)
-To create the template code for an ifttt connector in the tools category
-```
-tibcli-wi add connector --location c:/temp --category tools --name ifttt --author someone --ver 0.0.1 --activityTypescript
-```
-
-## package
-```
-  Usage: tibcli-wi package [options]
-
-  Create a zip file of your extension
-
-
+>cd <your project folder>
+>wi-cli add handler --help
+ 
+  Usage: wi-cli-add-handler [options]
+ 
+ 
   Options:
-
-    --location [location]  The root location of the extension, will default to this folder if not set
-    --target [target]      The target location for the zip file, will default to the name of this folder if not set
-    -h, --help                 output usage information
+ 
+    -n, --name [contributionName]  <required> Contribution Name
+    -y, --yes                      <optional> Overwrite Yes/No
+    -sa, --sample                  <optional> Generate sample tests
+    -h, --help                     output usage information
+  Examples:
+ 
+    $ wi-cli add handler -n CONTRIBUTION_NAME --sample
+```
+### `wi-cli compile`
+```
+>cd <your project folder>
+>wi-cli compile
 ```
 
-To package up the extension in c:/temp and store it in the same folder
+## Example
 ```
-tibcli-wi package --location c:/temp --target c:/temp
+>cd <your project folder> 
+>wi-cli init -c myCategory
+Using default SDK path:/usr/local/share/.config/yarn/global/node_modules/wi-cli/wi-studio
+  Setting up metadata [==========          ] 50% 0.0syarn install v1.3.2
+...
+
+>wi-cli add activity -n myActivity
+Using current directory for output
+  Adding Activity [====================] 100% 0.0s
+Generating the activity
+  Generating Code [====================] 100% 9.2s
+ 
+complete
+...
+
+>wi-cli add trigger -n myTrigger
+Using current directory for output
+  Adding Trigger [====================] 100% 0.0s
+Generating the trigger
+  Generating Code [====================] 100% 9.2s
+ 
+complete
+...
+
+>wi-cli add connector -n myConnector
+Using current directory for output
+  Adding Connector [====================] 100% 0.0s
+Generating the connector
+  Generating Code [====================] 100% 9.2s
+ 
+complete
+...
+
+>wi-cli add handler -n myActivity --sample
+Using current directory for output
+  Adding Handler [====================] 100% 0.0s
+Generating the handlers
+  Generating Code [====================] 100% 9.2s
+ 
+complete
+...
+
+>wi-cli add handler -n myTrigger --sample
+Using current directory for output
+  Adding Handler [====================] 100% 0.0s
+Generating the handlers
+  Generating Code [====================] 100% 9.2s
+ 
+complete
+...
+
+>wi-cli add handler -n myConnector --sample
+Using current directory for output
+  Adding Handler [====================] 100% 0.0s
+Generating the handlers
+  Generating Code [====================] 100% 9.2s
+ 
+complete
+...
+
+>wi-cli compile
+  Setting up metadata [===                 ] 13% 0.0syarn install v1.3.2
+ 
+[1/4] Resolving packages...
+ 
+success Already up-to-date.
+ 
+Done in 1.34s.
+ 
+Checking for yarn packages exited with code 0
+  Setting up metadata [=====               ] 25% 1.7syarn run v1.3.2
+ 
+$ tsc
+ 
+Done in 6.39s.
+ 
+Compilation exited with code 0 
+```
+## Testing
+Run a test container as shown below from your plugin project work folder
+```
+>cd <your project folder> 
+>docker run --rm -ti -v $PWD:/src --entrypoint bash wi-cli:latest
+# cd /src
+# wi-test
 ```
