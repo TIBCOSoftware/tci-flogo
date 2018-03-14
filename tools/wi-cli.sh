@@ -1,2 +1,2 @@
 #!/bin/bash
-docker exec --rm -ti -v $PWD:/src wi-cli:latest $@
+docker run --rm -ti -v $PWD:/src wi-cli:latest $@
