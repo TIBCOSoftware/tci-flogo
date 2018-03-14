@@ -10,12 +10,12 @@ You can install tibcli-wi by downloading the wi-cli.tar.gz from the releases sec
 
 ### 1. Import the docker image from wi-cli.tar.gz to your docker machine installation or download the scripts from the `tools` folder of this github repository.
 ```
-gzcat wi-cli.tar.gz | docker import - wi-cli:latest
+gunzip -c wi-cli.tar.gz| docker load
 ```
 ### 2. Create a executable shell script in your shell $PATH  called `wi-cli` with the following contents or download the script from the `tools` folder of this github repository.
 ```
 #!/bin/bash
-docker exec --rm -ti -v $PWD:/src wi-cli:latest $@
+docker run --rm -ti -v $PWD:/src wi-cli:latest $@
 ```
 ### 3. Run the `wi-cli` shell command from your plugin project work folder
 ```
