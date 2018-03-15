@@ -12,24 +12,24 @@ You can install tibcli-wi by downloading the wi-cli.tar.gz from the releases sec
 ```
 gunzip -c wi-cli.tar.gz| docker load
 ```
-### 2. Create a executable shell script in your shell $PATH  called `wi-cli` with the following contents or download the script from the `tools` folder of this github repository.
+### 2. Create a executable shell script in your shell $PATH  called `wi-cli.sh` with the following contents or download the script from the `tools` folder of this github repository.
 ```
 #!/bin/bash
 docker run --rm -ti -v $PWD:/src wi-cli:latest $@
 ```
-### 3. Run the `wi-cli` shell command from your plugin project work folder
+### 3. Run the `wi-cli.sh` shell command from your plugin project work folder
 ```
 >cd <your project folder>
->wi-cli --help
+>wi-cli.sh --help
 ```
-### 4. Run a test container as shown below from your plugin project work folder or download the  scripts from the `tools` folder of this github repository.
+### 4. Run a test container as shown below from your plugin project work folder or download the  `test.sh` script from the `tools` folder of this github repository.
 ```
 >cd <your project folder> 
 >docker run --rm -ti -v $PWD:/src --entrypoint bash wi-cli:latest
 # cd /src
 # wi-test
 ```
-### 5. Packaging Steps - Create a file jszip.json in your project folder with the following contents or download json from the `tools` folder of this github repository.
+### 5. Packaging Steps - Create a file jszip.json in your project folder with the following contents or download `jszip.json` from the `tools` folder of this github repository.
   ```
   {
       "entities": [
@@ -47,13 +47,13 @@ docker run --rm -ti -v $PWD:/src wi-cli:latest $@
   ```
   to
   ```
-  "zip": "node ./node_modules/.bin/jszip --config ./jszip.json -o ../myContribution.zip",
+  "zip": "node ./node_modules/.bin/jszip --config ./jszip.json",
   ```
   then run as per usage example below
   
 
 ## Command Line Help Documentation
-### `wi-cli --help`
+### `wi-cli.sh --help`
 The wi-cli has three basic commands as follows in order of their execution.
 
   1. `init | initialize` -  This is the first step to initialize a wi-studio contribution project with the creation of the following files :-
@@ -70,7 +70,7 @@ The wi-cli has three basic commands as follows in order of their execution.
 1. `compile` -  This the fourth and the final step
 ```
 >cd <your project folder>
->wi-cli --help
+>wi-cli.sh --help
  
   Usage: wi-cli [options] [command]
  
@@ -90,10 +90,10 @@ The wi-cli has three basic commands as follows in order of their execution.
     compile|compile   Add service artifacts
     help [cmd]        display help for [cmd]
 ```
-### `wi-cli init --help`
+### `wi-cli.sh init --help`
 ```
 >cd <your project folder>
->wi-cli init --help
+>wi-cli.sh init --help
  
   Usage: wi-cli-initialize [options]
  
@@ -108,10 +108,10 @@ The wi-cli has three basic commands as follows in order of their execution.
     $ wi-cli --help
     $ wi-cli -h
 ```
-### `wi-cli add --help`
+### `wi-cli.sh add --help`
 ```
 >cd <your project folder>
->wi-cli add --help
+>wi-cli.sh add --help
  
   Usage: wi-cli-add [options] [command]
  
@@ -130,10 +130,10 @@ The wi-cli has three basic commands as follows in order of their execution.
     provider    Add a Module Provider Contribution Type
     help [cmd]  display help for [cmd]
 ```
-### `wi-cli add activity --help`
+### `wi-cli.sh add activity --help`
 ```
 >cd <your project folder>
->wi-cli add activity --help
+>wi-cli.sh add activity --help
  
   Usage: wi-cli-add-activity [options]
  
@@ -147,10 +147,10 @@ The wi-cli has three basic commands as follows in order of their execution.
  
     $ wi-cli add activity -n ACTIVITY_NAME
 ```
-### `wi-cli add connector --help`
+### `wi-cli.sh add connector --help`
 ```
 >cd <your project folder>
->wi-cli add connector --help
+>wi-cli.sh add connector --help
  
   Usage: wi-cli-add-connector [options]
  
@@ -164,10 +164,10 @@ The wi-cli has three basic commands as follows in order of their execution.
  
     $ wi-cli add connector -n CONNECTOR_NAME
 ```
-### `wi-cli add trigger --help`
+### `wi-cli.sh add trigger --help`
 ```
 >cd <your project folder>
->wi-cli add trigger --help
+>wi-cli.sh add trigger --help
  
   Usage: wi-cli-add-trigger [options]
  
@@ -181,10 +181,10 @@ The wi-cli has three basic commands as follows in order of their execution.
  
     $ wi-cli add trigger -n TRIGGER_NAME
 ```
-### `wi-cli add handler --help`
+### `wi-cli.sh add handler --help`
 ```
 >cd <your project folder>
->wi-cli add handler --help
+>wi-cli.sh add handler --help
  
   Usage: wi-cli-add-handler [options]
  
@@ -199,21 +199,21 @@ The wi-cli has three basic commands as follows in order of their execution.
  
     $ wi-cli add handler -n CONTRIBUTION_NAME --sample
 ```
-### `wi-cli compile`
+### `wi-cli.sh compile`
 ```
 >cd <your project folder>
->wi-cli compile
+>wi-cli.sh compile
 ```
 
 ## Example Usage
 ```
 >cd <your project folder> 
->wi-cli init -c myCategory
+>wi-cli.sh init -c myCategory
 Using default SDK path:/usr/local/share/.config/yarn/global/node_modules/wi-cli/wi-studio
   Setting up metadata [==========          ] 50% 0.0syarn install v1.3.2
 ...
 
->wi-cli add activity -n myActivity
+>wi-cli.sh add activity -n myActivity
 Using current directory for output
   Adding Activity [====================] 100% 0.0s
 Generating the activity
@@ -222,7 +222,7 @@ Generating the activity
 complete
 ...
 
->wi-cli add trigger -n myTrigger
+>wi-cli.sh add trigger -n myTrigger
 Using current directory for output
   Adding Trigger [====================] 100% 0.0s
 Generating the trigger
@@ -231,7 +231,7 @@ Generating the trigger
 complete
 ...
 
->wi-cli add connector -n myConnector
+>wi-cli.sh add connector -n myConnector
 Using current directory for output
   Adding Connector [====================] 100% 0.0s
 Generating the connector
@@ -240,7 +240,7 @@ Generating the connector
 complete
 ...
 
->wi-cli add handler -n myActivity --sample
+>wi-cli.sh add handler -n myActivity --sample
 Using current directory for output
   Adding Handler [====================] 100% 0.0s
 Generating the handlers
@@ -249,7 +249,7 @@ Generating the handlers
 complete
 ...
 
->wi-cli add handler -n myTrigger --sample
+>wi-cli.sh add handler -n myTrigger --sample
 Using current directory for output
   Adding Handler [====================] 100% 0.0s
 Generating the handlers
@@ -258,7 +258,7 @@ Generating the handlers
 complete
 ...
 
->wi-cli add handler -n myConnector --sample
+>wi-cli.sh add handler -n myConnector --sample
 Using current directory for output
   Adding Handler [====================] 100% 0.0s
 Generating the handlers
@@ -267,7 +267,7 @@ Generating the handlers
 complete
 ...
 
->wi-cli compile
+>wi-cli.sh compile
   Setting up metadata [===                 ] 13% 0.0syarn install v1.3.2
  
 [1/4] Resolving packages...
@@ -286,7 +286,7 @@ Done in 6.39s.
 Compilation exited with code 0 
 ...
 
->docker run --rm -ti -v $PWD:/src --entrypoint bash tci-cli-wi:latest
+>test.sh
 bash-4.4# cd /src
 bash-4.4# wi-test
 yarn run v1.3.2
