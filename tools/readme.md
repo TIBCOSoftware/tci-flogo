@@ -29,27 +29,12 @@ docker run --rm -ti -v $PWD:/src wi-cli:latest $@
 # cd /src
 # wi-test
 ```
-### 5. Packaging Steps - Create a file jszip.json in your project folder with the following contents or download `jszip.json` from the `tools` folder of this github repository.
-  ```
-  {
-      "entities": [
-          { "name": "./src/app/", "flatten": false, "root": true }
-          
-      ],
-      "options": {
-          "output": "./myContribution.zip"
-      }
-  }
-  ```
-  Edit the package.json on the line from
-  ```
-  "zip": "node ./node_modules/.bin/jszip ./<contribution-folder> -o ../contribution.zip",
-  ```
-  to
-  ```
-  "zip": "node ./node_modules/.bin/jszip --config ./jszip.json",
-  ```
-  then run as per usage example below
+### 5. Packaging Steps - The packaging file jszip.json is generated in your project folder. It can be done separately as shown below.
+```
+>cd <your project folder>
+>npm run zip
+```
+### 6. Node module Reinstall - In case you need to re-install `node_modules/packages` you can use the `test.sh` to create a docker container shell where you can run `yarn install`.
   
 
 ## Command Line Help Documentation
@@ -64,10 +49,11 @@ The wi-cli has three basic commands as follows in order of their execution.
       * `karma-test-shim.js` - Karma testing framework file.
       * `karma.conf.js` - Karma test framework configuration.
       * `test-setup.sh` - Karma pre-test script.
+      * `jszip.json` - jsZip configuration.
 1. `add` -  This is the second step to add contribution service artifacts. The user can choose between `Handler` or a `Provider` contribution implementation styles and add their respective input parameters which are then stored in the wi-cli.json file. `Handler` contribution implementation style is the most easier style to use and is recommended. `Provider` contribution implementation style is recommended for advanced users who prefer better and smaller code management and readability. **It is recommended to use only one style for the whole plugin instead of mixing and matching and can lead to unpredictable results**.
 
 1. The third step is to add the triggers, activities,connector to the  `Handler` or `Provider`
-1. `compile` -  This the fourth and the final step
+1. `compile` -  The compile step compiles the typescript `*.ts` files to `*.js` files using the typescript compiler. This is the fourth and the final step.
 ```
 >cd <your project folder>
 >wi-cli.sh --help
