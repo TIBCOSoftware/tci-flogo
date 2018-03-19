@@ -5,7 +5,7 @@
 
 # TIBCO Cloud Integration
 
-[TIBCO Cloud Integration](https://www.tibco.com/products/tibco-cloud-integration) is a way to seamlessly connect cloud-based services and on-premises applications, and easily model, create, test, and deploy custom APIs.
+[TIBCO Cloud Integration](https://www.tibco.com/products/cloud-integration) is a way to seamlessly connect cloud-based services and on-premises applications, and easily model, create, test, and deploy custom APIs.
 
 The [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome) repository is where we have an overview of the exciting extensions that are developed by the community! This is the place to find the docs and tools to build those cool projects. There are a few ways you can help us!
 
