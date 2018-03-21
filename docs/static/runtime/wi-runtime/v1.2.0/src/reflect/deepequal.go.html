@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/reflect/deepequal.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="deepequal.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/reflect/deepequal.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// Deep equality test via reflection</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package reflect
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import &#34;unsafe&#34;
+<span id="L10" class="ln">    10	</span>
+<span id="L11" class="ln">    11	</span><span class="comment">// During deepValueEqual, must keep track of checks that are</span>
+<span id="L12" class="ln">    12	</span><span class="comment">// in progress. The comparison algorithm assumes that all</span>
+<span id="L13" class="ln">    13	</span><span class="comment">// checks in progress are true when it reencounters them.</span>
+<span id="L14" class="ln">    14	</span><span class="comment">// Visited comparisons are stored in a map indexed by visit.</span>
+<span id="L15" class="ln">    15	</span>type visit struct {
+<span id="L16" class="ln">    16	</span>	a1  unsafe.Pointer
+<span id="L17" class="ln">    17	</span>	a2  unsafe.Pointer
+<span id="L18" class="ln">    18	</span>	typ Type
+<span id="L19" class="ln">    19	</span>}
+<span id="L20" class="ln">    20	</span>
+<span id="L21" class="ln">    21	</span><span class="comment">// Tests for deep equality using reflected types. The map argument tracks</span>
+<span id="L22" class="ln">    22	</span><span class="comment">// comparisons that have already been seen, which allows short circuiting on</span>
+<span id="L23" class="ln">    23	</span><span class="comment">// recursive types.</span>
+<span id="L24" class="ln">    24	</span>func deepValueEqual(v1, v2 Value, visited map[visit]bool, depth int) bool {
+<span id="L25" class="ln">    25	</span>	if !v1.IsValid() || !v2.IsValid() {
+<span id="L26" class="ln">    26	</span>		return v1.IsValid() == v2.IsValid()
+<span id="L27" class="ln">    27	</span>	}
+<span id="L28" class="ln">    28	</span>	if v1.Type() != v2.Type() {
+<span id="L29" class="ln">    29	</span>		return false
+<span id="L30" class="ln">    30	</span>	}
+<span id="L31" class="ln">    31	</span>
+<span id="L32" class="ln">    32	</span>	<span class="comment">// if depth &gt; 10 { panic(&#34;deepValueEqual&#34;) }	// for debugging</span>
+<span id="L33" class="ln">    33	</span>
+<span id="L34" class="ln">    34	</span>	<span class="comment">// We want to avoid putting more in the visited map than we need to.</span>
+<span id="L35" class="ln">    35	</span>	<span class="comment">// For any possible reference cycle that might be encountered,</span>
+<span id="L36" class="ln">    36	</span>	<span class="comment">// hard(t) needs to return true for at least one of the types in the cycle.</span>
+<span id="L37" class="ln">    37	</span>	hard := func(k Kind) bool {
+<span id="L38" class="ln">    38	</span>		switch k {
+<span id="L39" class="ln">    39	</span>		case Map, Slice, Ptr, Interface:
+<span id="L40" class="ln">    40	</span>			return true
+<span id="L41" class="ln">    41	</span>		}
+<span id="L42" class="ln">    42	</span>		return false
+<span id="L43" class="ln">    43	</span>	}
+<span id="L44" class="ln">    44	</span>
+<span id="L45" class="ln">    45	</span>	if v1.CanAddr() &amp;&amp; v2.CanAddr() &amp;&amp; hard(v1.Kind()) {
+<span id="L46" class="ln">    46	</span>		addr1 := unsafe.Pointer(v1.UnsafeAddr())
+<span id="L47" class="ln">    47	</span>		addr2 := unsafe.Pointer(v2.UnsafeAddr())
+<span id="L48" class="ln">    48	</span>		if uintptr(addr1) &gt; uintptr(addr2) {
+<span id="L49" class="ln">    49	</span>			<span class="comment">// Canonicalize order to reduce number of entries in visited.</span>
+<span id="L50" class="ln">    50	</span>			<span class="comment">// Assumes non-moving garbage collector.</span>
+<span id="L51" class="ln">    51	</span>			addr1, addr2 = addr2, addr1
+<span id="L52" class="ln">    52	</span>		}
+<span id="L53" class="ln">    53	</span>
+<span id="L54" class="ln">    54	</span>		<span class="comment">// Short circuit if references are already seen.</span>
+<span id="L55" class="ln">    55	</span>		typ := v1.Type()
+<span id="L56" class="ln">    56	</span>		v := visit{addr1, addr2, typ}
+<span id="L57" class="ln">    57	</span>		if visited[v] {
+<span id="L58" class="ln">    58	</span>			return true
+<span id="L59" class="ln">    59	</span>		}
+<span id="L60" class="ln">    60	</span>
+<span id="L61" class="ln">    61	</span>		<span class="comment">// Remember for later.</span>
+<span id="L62" class="ln">    62	</span>		visited[v] = true
+<span id="L63" class="ln">    63	</span>	}
+<span id="L64" class="ln">    64	</span>
+<span id="L65" class="ln">    65	</span>	switch v1.Kind() {
+<span id="L66" class="ln">    66	</span>	case Array:
+<span id="L67" class="ln">    67	</span>		for i := 0; i &lt; v1.Len(); i++ {
+<span id="L68" class="ln">    68	</span>			if !deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
+<span id="L69" class="ln">    69	</span>				return false
+<span id="L70" class="ln">    70	</span>			}
+<span id="L71" class="ln">    71	</span>		}
+<span id="L72" class="ln">    72	</span>		return true
+<span id="L73" class="ln">    73	</span>	case Slice:
+<span id="L74" class="ln">    74	</span>		if v1.IsNil() != v2.IsNil() {
+<span id="L75" class="ln">    75	</span>			return false
+<span id="L76" class="ln">    76	</span>		}
+<span id="L77" class="ln">    77	</span>		if v1.Len() != v2.Len() {
+<span id="L78" class="ln">    78	</span>			return false
+<span id="L79" class="ln">    79	</span>		}
+<span id="L80" class="ln">    80	</span>		if v1.Pointer() == v2.Pointer() {
+<span id="L81" class="ln">    81	</span>			return true
+<span id="L82" class="ln">    82	</span>		}
+<span id="L83" class="ln">    83	</span>		for i := 0; i &lt; v1.Len(); i++ {
+<span id="L84" class="ln">    84	</span>			if !deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
+<span id="L85" class="ln">    85	</span>				return false
+<span id="L86" class="ln">    86	</span>			}
+<span id="L87" class="ln">    87	</span>		}
+<span id="L88" class="ln">    88	</span>		return true
+<span id="L89" class="ln">    89	</span>	case Interface:
+<span id="L90" class="ln">    90	</span>		if v1.IsNil() || v2.IsNil() {
+<span id="L91" class="ln">    91	</span>			return v1.IsNil() == v2.IsNil()
+<span id="L92" class="ln">    92	</span>		}
+<span id="L93" class="ln">    93	</span>		return deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
+<span id="L94" class="ln">    94	</span>	case Ptr:
+<span id="L95" class="ln">    95	</span>		if v1.Pointer() == v2.Pointer() {
+<span id="L96" class="ln">    96	</span>			return true
+<span id="L97" class="ln">    97	</span>		}
+<span id="L98" class="ln">    98	</span>		return deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
+<span id="L99" class="ln">    99	</span>	case Struct:
+<span id="L100" class="ln">   100	</span>		for i, n := 0, v1.NumField(); i &lt; n; i++ {
+<span id="L101" class="ln">   101	</span>			if !deepValueEqual(v1.Field(i), v2.Field(i), visited, depth+1) {
+<span id="L102" class="ln">   102	</span>				return false
+<span id="L103" class="ln">   103	</span>			}
+<span id="L104" class="ln">   104	</span>		}
+<span id="L105" class="ln">   105	</span>		return true
+<span id="L106" class="ln">   106	</span>	case Map:
+<span id="L107" class="ln">   107	</span>		if v1.IsNil() != v2.IsNil() {
+<span id="L108" class="ln">   108	</span>			return false
+<span id="L109" class="ln">   109	</span>		}
+<span id="L110" class="ln">   110	</span>		if v1.Len() != v2.Len() {
+<span id="L111" class="ln">   111	</span>			return false
+<span id="L112" class="ln">   112	</span>		}
+<span id="L113" class="ln">   113	</span>		if v1.Pointer() == v2.Pointer() {
+<span id="L114" class="ln">   114	</span>			return true
+<span id="L115" class="ln">   115	</span>		}
+<span id="L116" class="ln">   116	</span>		for _, k := range v1.MapKeys() {
+<span id="L117" class="ln">   117	</span>			val1 := v1.MapIndex(k)
+<span id="L118" class="ln">   118	</span>			val2 := v2.MapIndex(k)
+<span id="L119" class="ln">   119	</span>			if !val1.IsValid() || !val2.IsValid() || !deepValueEqual(v1.MapIndex(k), v2.MapIndex(k), visited, depth+1) {
+<span id="L120" class="ln">   120	</span>				return false
+<span id="L121" class="ln">   121	</span>			}
+<span id="L122" class="ln">   122	</span>		}
+<span id="L123" class="ln">   123	</span>		return true
+<span id="L124" class="ln">   124	</span>	case Func:
+<span id="L125" class="ln">   125	</span>		if v1.IsNil() &amp;&amp; v2.IsNil() {
+<span id="L126" class="ln">   126	</span>			return true
+<span id="L127" class="ln">   127	</span>		}
+<span id="L128" class="ln">   128	</span>		<span class="comment">// Can&#39;t do better than this:</span>
+<span id="L129" class="ln">   129	</span>		return false
+<span id="L130" class="ln">   130	</span>	default:
+<span id="L131" class="ln">   131	</span>		<span class="comment">// Normal equality suffices</span>
+<span id="L132" class="ln">   132	</span>		return valueInterface(v1, false) == valueInterface(v2, false)
+<span id="L133" class="ln">   133	</span>	}
+<span id="L134" class="ln">   134	</span>}
+<span id="L135" class="ln">   135	</span>
+<span id="L136" class="ln">   136	</span><span class="comment">// DeepEqual reports whether x and y are ``deeply equal,&#39;&#39; defined as follows.</span>
+<span id="L137" class="ln">   137	</span><span class="comment">// Two values of identical type are deeply equal if one of the following cases applies.</span>
+<span id="L138" class="ln">   138	</span><span class="comment">// Values of distinct types are never deeply equal.</span>
+<span id="L139" class="ln">   139	</span><span class="comment">//</span>
+<span id="L140" class="ln">   140	</span><span class="comment">// Array values are deeply equal when their corresponding elements are deeply equal.</span>
+<span id="L141" class="ln">   141	</span><span class="comment">//</span>
+<span id="L142" class="ln">   142	</span><span class="comment">// Struct values are deeply equal if their corresponding fields,</span>
+<span id="L143" class="ln">   143	</span><span class="comment">// both exported and unexported, are deeply equal.</span>
+<span id="L144" class="ln">   144	</span><span class="comment">//</span>
+<span id="L145" class="ln">   145	</span><span class="comment">// Func values are deeply equal if both are nil; otherwise they are not deeply equal.</span>
+<span id="L146" class="ln">   146	</span><span class="comment">//</span>
+<span id="L147" class="ln">   147	</span><span class="comment">// Interface values are deeply equal if they hold deeply equal concrete values.</span>
+<span id="L148" class="ln">   148	</span><span class="comment">//</span>
+<span id="L149" class="ln">   149	</span><span class="comment">// Map values are deeply equal when all of the following are true:</span>
+<span id="L150" class="ln">   150	</span><span class="comment">// they are both nil or both non-nil, they have the same length,</span>
+<span id="L151" class="ln">   151	</span><span class="comment">// and either they are the same map object or their corresponding keys</span>
+<span id="L152" class="ln">   152	</span><span class="comment">// (matched using Go equality) map to deeply equal values.</span>
+<span id="L153" class="ln">   153	</span><span class="comment">//</span>
+<span id="L154" class="ln">   154	</span><span class="comment">// Pointer values are deeply equal if they are equal using Go&#39;s == operator</span>
+<span id="L155" class="ln">   155	</span><span class="comment">// or if they point to deeply equal values.</span>
+<span id="L156" class="ln">   156	</span><span class="comment">//</span>
+<span id="L157" class="ln">   157	</span><span class="comment">// Slice values are deeply equal when all of the following are true:</span>
+<span id="L158" class="ln">   158	</span><span class="comment">// they are both nil or both non-nil, they have the same length,</span>
+<span id="L159" class="ln">   159	</span><span class="comment">// and either they point to the same initial entry of the same underlying array</span>
+<span id="L160" class="ln">   160	</span><span class="comment">// (that is, &amp;x[0] == &amp;y[0]) or their corresponding elements (up to length) are deeply equal.</span>
+<span id="L161" class="ln">   161	</span><span class="comment">// Note that a non-nil empty slice and a nil slice (for example, []byte{} and []byte(nil))</span>
+<span id="L162" class="ln">   162	</span><span class="comment">// are not deeply equal.</span>
+<span id="L163" class="ln">   163	</span><span class="comment">//</span>
+<span id="L164" class="ln">   164	</span><span class="comment">// Other values - numbers, bools, strings, and channels - are deeply equal</span>
+<span id="L165" class="ln">   165	</span><span class="comment">// if they are equal using Go&#39;s == operator.</span>
+<span id="L166" class="ln">   166	</span><span class="comment">//</span>
+<span id="L167" class="ln">   167	</span><span class="comment">// In general DeepEqual is a recursive relaxation of Go&#39;s == operator.</span>
+<span id="L168" class="ln">   168	</span><span class="comment">// However, this idea is impossible to implement without some inconsistency.</span>
+<span id="L169" class="ln">   169	</span><span class="comment">// Specifically, it is possible for a value to be unequal to itself,</span>
+<span id="L170" class="ln">   170	</span><span class="comment">// either because it is of func type (uncomparable in general)</span>
+<span id="L171" class="ln">   171	</span><span class="comment">// or because it is a floating-point NaN value (not equal to itself in floating-point comparison),</span>
+<span id="L172" class="ln">   172	</span><span class="comment">// or because it is an array, struct, or interface containing</span>
+<span id="L173" class="ln">   173	</span><span class="comment">// such a value.</span>
+<span id="L174" class="ln">   174	</span><span class="comment">// On the other hand, pointer values are always equal to themselves,</span>
+<span id="L175" class="ln">   175	</span><span class="comment">// even if they point at or contain such problematic values,</span>
+<span id="L176" class="ln">   176	</span><span class="comment">// because they compare equal using Go&#39;s == operator, and that</span>
+<span id="L177" class="ln">   177	</span><span class="comment">// is a sufficient condition to be deeply equal, regardless of content.</span>
+<span id="L178" class="ln">   178	</span><span class="comment">// DeepEqual has been defined so that the same short-cut applies</span>
+<span id="L179" class="ln">   179	</span><span class="comment">// to slices and maps: if x and y are the same slice or the same map,</span>
+<span id="L180" class="ln">   180	</span><span class="comment">// they are deeply equal regardless of content.</span>
+<span id="L181" class="ln">   181	</span>func DeepEqual(x, y interface{}) bool {
+<span id="L182" class="ln">   182	</span>	if x == nil || y == nil {
+<span id="L183" class="ln">   183	</span>		return x == y
+<span id="L184" class="ln">   184	</span>	}
+<span id="L185" class="ln">   185	</span>	v1 := ValueOf(x)
+<span id="L186" class="ln">   186	</span>	v2 := ValueOf(y)
+<span id="L187" class="ln">   187	</span>	if v1.Type() != v2.Type() {
+<span id="L188" class="ln">   188	</span>		return false
+<span id="L189" class="ln">   189	</span>	}
+<span id="L190" class="ln">   190	</span>	return deepValueEqual(v1, v2, make(map[visit]bool), 0)
+<span id="L191" class="ln">   191	</span>}
+<span id="L192" class="ln">   192	</span>
+</pre><p><a href="deepequal.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

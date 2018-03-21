@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/github.com/TIBCOSoftware/flogo-lib/core/trigger/registry.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./registry.go%3Fs=3682:3723.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/github.com/TIBCOSoftware/flogo-lib/core/trigger/registry.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span>package trigger
+<span id="L2" class="ln">     2	</span>
+<span id="L3" class="ln">     3	</span>import (
+<span id="L4" class="ln">     4	</span>	&#34;fmt&#34;
+<span id="L5" class="ln">     5	</span>	&#34;github.com/TIBCOSoftware/flogo-lib/core/data&#34;
+<span id="L6" class="ln">     6	</span>	&#34;github.com/TIBCOSoftware/flogo-lib/core/expr&#34;
+<span id="L7" class="ln">     7	</span>	&#34;github.com/TIBCOSoftware/flogo-lib/logger&#34;
+<span id="L8" class="ln">     8	</span>	&#34;sync&#34;
+<span id="L9" class="ln">     9	</span>)
+<span id="L10" class="ln">    10	</span>
+<span id="L11" class="ln">    11	</span>var (
+<span id="L12" class="ln">    12	</span>	triggersMu sync.Mutex
+<span id="L13" class="ln">    13	</span>	triggers   = make(map[string]TriggerDeprecated)
+<span id="L14" class="ln">    14	</span>	reg        = &amp;registry{}
+<span id="L15" class="ln">    15	</span>)
+<span id="L16" class="ln">    16	</span>
+<span id="L17" class="ln">    17	</span>type Registry interface {
+<span id="L18" class="ln">    18	</span>	AddFactory(ref string, f Factory) error
+<span id="L19" class="ln">    19	</span>	GetFactories() map[string]Factory
+<span id="L20" class="ln">    20	</span>	AddInstance(id string, instance *TriggerInstance) error
+<span id="L21" class="ln">    21	</span>	GetInstance(id string) *TriggerInstance
+<span id="L22" class="ln">    22	</span>}
+<span id="L23" class="ln">    23	</span>
+<span id="L24" class="ln">    24	</span>type registry struct {
+<span id="L25" class="ln">    25	</span>	factories map[string]Factory
+<span id="L26" class="ln">    26	</span>	instances map[string]*TriggerInstance
+<span id="L27" class="ln">    27	</span>}
+<span id="L28" class="ln">    28	</span>
+<span id="L29" class="ln">    29	</span><span class="comment">// Resolver resolves the trigger for a given scope and path</span>
+<span id="L30" class="ln">    30	</span>type resolver struct {
+<span id="L31" class="ln">    31	</span>	scope data.Scope
+<span id="L32" class="ln">    32	</span>}
+<span id="L33" class="ln">    33	</span>
+<span id="L34" class="ln">    34	</span>func newResolver(scope data.Scope) expr.Resolver {
+<span id="L35" class="ln">    35	</span>	return &amp;resolver{scope: scope}
+<span id="L36" class="ln">    36	</span>}
+<span id="L37" class="ln">    37	</span>
+<span id="L38" class="ln">    38	</span>func (r *resolver) Resolve(path string) (interface{}, bool) {
+<span id="L39" class="ln">    39	</span>	attrName, attrPath, pathType := data.GetAttrPath(path)
+<span id="L40" class="ln">    40	</span>	return data.GetAttrValue(attrName, attrPath, pathType, r.scope)
+<span id="L41" class="ln">    41	</span>}
+<span id="L42" class="ln">    42	</span>
+<span id="L43" class="ln">    43	</span>func GetRegistry() Registry {
+<span id="L44" class="ln">    44	</span>	return reg
+<span id="L45" class="ln">    45	</span>}
+<span id="L46" class="ln">    46	</span>
+<span id="L47" class="ln">    47	</span>func RegisterFactory(ref string, f Factory) error {
+<span id="L48" class="ln">    48	</span>	return reg.AddFactory(ref, f)
+<span id="L49" class="ln">    49	</span>}
+<span id="L50" class="ln">    50	</span>
+<span id="L51" class="ln">    51	</span>func (r *registry) AddFactory(ref string, f Factory) error {
+<span id="L52" class="ln">    52	</span>	triggersMu.Lock()
+<span id="L53" class="ln">    53	</span>	defer triggersMu.Unlock()
+<span id="L54" class="ln">    54	</span>
+<span id="L55" class="ln">    55	</span>	logger.Debugf(&#34;Registering trigger factory: &#39;%s&#39;&#34;, ref)
+<span id="L56" class="ln">    56	</span>
+<span id="L57" class="ln">    57	</span>	if len(ref) == 0 {
+<span id="L58" class="ln">    58	</span>		return fmt.Errorf(&#34;registry.RegisterFactory: ref is empty&#34;)
+<span id="L59" class="ln">    59	</span>	}
+<span id="L60" class="ln">    60	</span>
+<span id="L61" class="ln">    61	</span>	if f == nil {
+<span id="L62" class="ln">    62	</span>		return fmt.Errorf(&#34;registry.RegisterFactory: factory is nil&#34;)
+<span id="L63" class="ln">    63	</span>	}
+<span id="L64" class="ln">    64	</span>
+<span id="L65" class="ln">    65	</span>	<span class="comment">// copy on write to avoid synchronization on access</span>
+<span id="L66" class="ln">    66	</span>	newFs := make(map[string]Factory, len(r.factories))
+<span id="L67" class="ln">    67	</span>
+<span id="L68" class="ln">    68	</span>	for k, v := range r.factories {
+<span id="L69" class="ln">    69	</span>		newFs[k] = v
+<span id="L70" class="ln">    70	</span>	}
+<span id="L71" class="ln">    71	</span>
+<span id="L72" class="ln">    72	</span>	if newFs[ref] != nil {
+<span id="L73" class="ln">    73	</span>		return fmt.Errorf(&#34;registry.RegisterFactory: already registered factory for ref &#39;%s&#39;&#34;, ref)
+<span id="L74" class="ln">    74	</span>	}
+<span id="L75" class="ln">    75	</span>
+<span id="L76" class="ln">    76	</span>	newFs[ref] = f
+<span id="L77" class="ln">    77	</span>
+<span id="L78" class="ln">    78	</span>	r.factories = newFs
+<span id="L79" class="ln">    79	</span>
+<span id="L80" class="ln">    80	</span>	return nil
+<span id="L81" class="ln">    81	</span>}
+<span id="L82" class="ln">    82	</span>
+<span id="L83" class="ln">    83	</span>func Factories() map[string]Factory {
+<span id="L84" class="ln">    84	</span>	return reg.GetFactories()
+<span id="L85" class="ln">    85	</span>}
+<span id="L86" class="ln">    86	</span>
+<span id="L87" class="ln">    87	</span><span class="comment">// GetFactories returns a copy of the factories map</span>
+<span id="L88" class="ln">    88	</span>func (r *registry) GetFactories() map[string]Factory {
+<span id="L89" class="ln">    89	</span>
+<span id="L90" class="ln">    90	</span>	newFs := make(map[string]Factory, len(r.factories))
+<span id="L91" class="ln">    91	</span>
+<span id="L92" class="ln">    92	</span>	for k, v := range r.factories {
+<span id="L93" class="ln">    93	</span>		newFs[k] = v
+<span id="L94" class="ln">    94	</span>	}
+<span id="L95" class="ln">    95	</span>
+<span id="L96" class="ln">    96	</span>	return newFs
+<span id="L97" class="ln">    97	</span>}
+<span id="L98" class="ln">    98	</span>
+<span id="L99" class="ln">    99	</span>func RegisterInstance(id string, inst *TriggerInstance) error {
+<span id="L100" class="ln">   100	</span>	return reg.AddInstance(id, inst)
+<span id="L101" class="ln">   101	</span>}
+<span id="L102" class="ln">   102	</span>
+<span id="L103" class="ln">   103	</span>func (r *registry) AddInstance(id string, inst *TriggerInstance) error {
+<span id="L104" class="ln">   104	</span>	triggersMu.Lock()
+<span id="L105" class="ln">   105	</span>	defer triggersMu.Unlock()
+<span id="L106" class="ln">   106	</span>
+<span id="L107" class="ln">   107	</span>	if len(id) == 0 {
+<span id="L108" class="ln">   108	</span>		return fmt.Errorf(&#34;registry.RegisterInstance: id is empty&#34;)
+<span id="L109" class="ln">   109	</span>	}
+<span id="L110" class="ln">   110	</span>
+<span id="L111" class="ln">   111	</span>	if inst == nil {
+<span id="L112" class="ln">   112	</span>		return fmt.Errorf(&#34;registry.RegisterInstance: instance is nil&#34;)
+<span id="L113" class="ln">   113	</span>	}
+<span id="L114" class="ln">   114	</span>
+<span id="L115" class="ln">   115	</span>	<span class="comment">// copy on write to avoid synchronization on access</span>
+<span id="L116" class="ln">   116	</span>	newInst := make(map[string]*TriggerInstance, len(r.instances))
+<span id="L117" class="ln">   117	</span>
+<span id="L118" class="ln">   118	</span>	for k, v := range r.instances {
+<span id="L119" class="ln">   119	</span>		newInst[k] = v
+<span id="L120" class="ln">   120	</span>	}
+<span id="L121" class="ln">   121	</span>
+<span id="L122" class="ln">   122	</span>	if newInst[id] != nil {
+<span id="L123" class="ln">   123	</span>		return fmt.Errorf(&#34;registry.RegisterInstance: already registered instance for id &#39;%s&#39;&#34;, id)
+<span id="L124" class="ln">   124	</span>	}
+<span id="L125" class="ln">   125	</span>
+<span id="L126" class="ln">   126	</span>	newInst[id] = inst
+<span id="L127" class="ln">   127	</span>
+<span id="L128" class="ln">   128	</span>	r.instances = newInst
+<span id="L129" class="ln">   129	</span>
+<span id="L130" class="ln">   130	</span>	return nil
+<span id="L131" class="ln">   131	</span>}
+<span id="L132" class="ln">   132	</span>
+<span id="L133" class="ln">   133	</span><span class="comment">// Register registers the specified trigger</span>
+<span id="L134" class="ln">   134	</span>func Register(trigger TriggerDeprecated) {
+<span id="L135" class="ln">   135	</span>	triggersMu.Lock()
+<span id="L136" class="ln">   136	</span>	defer triggersMu.Unlock()
+<span id="L137" class="ln">   137	</span>
+<span id="L138" class="ln">   138	</span>	if trigger == nil {
+<span id="L139" class="ln">   139	</span>		panic(&#34;trigger.Register: trigger is nil&#34;)
+<span id="L140" class="ln">   140	</span>	}
+<span id="L141" class="ln">   141	</span>	id := trigger.Metadata().ID
+<span id="L142" class="ln">   142	</span>
+<span id="L143" class="ln">   143	</span>	if _, dup := triggers[id]; dup {
+<span id="L144" class="ln">   144	</span>		panic(&#34;trigger.Register: Register called twice for trigger &#34; + id)
+<span id="L145" class="ln">   145	</span>	}
+<span id="L146" class="ln">   146	</span>	<span class="comment">// copy on write to avoid synchronization on access</span>
+<span id="L147" class="ln">   147	</span>	newTriggers := make(map[string]TriggerDeprecated, len(triggers))
+<span id="L148" class="ln">   148	</span>
+<span id="L149" class="ln">   149	</span>	for k, v := range triggers {
+<span id="L150" class="ln">   150	</span>		newTriggers[k] = v
+<span id="L151" class="ln">   151	</span>	}
+<span id="L152" class="ln">   152	</span>
+<span id="L153" class="ln">   153	</span>	newTriggers[id] = trigger
+<span id="L154" class="ln">   154	</span>	triggers = newTriggers
+<span id="L155" class="ln">   155	</span>}
+<span id="L156" class="ln">   156	</span>
+<span id="L157" class="ln">   157	</span><span class="comment">// Triggers gets all the registered triggers</span>
+<span id="L158" class="ln">   158	</span>func Triggers() []TriggerDeprecated {
+<span id="L159" class="ln">   159	</span>
+<span id="L160" class="ln">   160	</span>	var curTriggers = triggers
+<span id="L161" class="ln">   161	</span>
+<span id="L162" class="ln">   162	</span>	list := make([]TriggerDeprecated, 0, len(curTriggers))
+<span id="L163" class="ln">   163	</span>
+<span id="L164" class="ln">   164	</span>	for _, value := range curTriggers {
+<span id="L165" class="ln">   165	</span>		list = append(list, value)
+<span id="L166" class="ln">   166	</span>	}
+<span id="L167" class="ln">   167	</span>
+<span id="L168" class="ln">   168	</span>	return list
+<span id="L169" class="ln">   169	</span>}
+<span id="L170" class="ln">   170	</span>
+<span id="L171" class="ln">   171	</span><span class="comment">// Instance gets specified trigger instance</span>
+<span id="L172" class="ln">   172	</span><span class="selection">func Instance(id string) *TriggerInstance</span> {
+<span id="L173" class="ln">   173	</span>	return reg.GetInstance(id)
+<span id="L174" class="ln">   174	</span>}
+<span id="L175" class="ln">   175	</span>
+<span id="L176" class="ln">   176	</span><span class="comment">// GetInstances gets specified trigger instance</span>
+<span id="L177" class="ln">   177	</span>func (r registry) GetInstance(id string) *TriggerInstance {
+<span id="L178" class="ln">   178	</span>	return r.instances[id]
+<span id="L179" class="ln">   179	</span>}
+<span id="L180" class="ln">   180	</span>
+<span id="L181" class="ln">   181	</span><span class="comment">// Get gets specified trigger</span>
+<span id="L182" class="ln">   182	</span>func Get(id string) TriggerDeprecated {
+<span id="L183" class="ln">   183	</span>	<span class="comment">//var curTriggers = triggers</span>
+<span id="L184" class="ln">   184	</span>	return triggers[id]
+<span id="L185" class="ln">   185	</span>}
+<span id="L186" class="ln">   186	</span>
+<span id="L187" class="ln">   187	</span>func GetTriggerInstanceInfo() []TriggerInstanceInfo {
+<span id="L188" class="ln">   188	</span>	currentInstances := reg.instances
+<span id="L189" class="ln">   189	</span>	list := make([]TriggerInstanceInfo, 0, len(currentInstances))
+<span id="L190" class="ln">   190	</span>	for id, triggerInstance := range currentInstances {
+<span id="L191" class="ln">   191	</span>		list = append(list, TriggerInstanceInfo{
+<span id="L192" class="ln">   192	</span>			Name:   id,
+<span id="L193" class="ln">   193	</span>			Status: triggerInstance.Status,
+<span id="L194" class="ln">   194	</span>			Error:  triggerInstance.Error,
+<span id="L195" class="ln">   195	</span>		})
+<span id="L196" class="ln">   196	</span>	}
+<span id="L197" class="ln">   197	</span>	return list
+<span id="L198" class="ln">   198	</span>}
+<span id="L199" class="ln">   199	</span>
+<span id="L200" class="ln">   200	</span><span class="comment">// Resolve will resolve the activity for the given path</span>
+<span id="L201" class="ln">   201	</span>func Resolve(scope data.Scope, path string) (interface{}, bool) {
+<span id="L202" class="ln">   202	</span>	return newResolver(scope).Resolve(path)
+<span id="L203" class="ln">   203	</span>}
+<span id="L204" class="ln">   204	</span>
+</pre><p><a href="registry.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

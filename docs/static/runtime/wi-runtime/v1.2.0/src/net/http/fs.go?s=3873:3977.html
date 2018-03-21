@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/http/fs.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./fs.go%3Fs=3873:3977.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/net/http/fs.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// HTTP file system request handler</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package http
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;errors&#34;
+<span id="L11" class="ln">    11	</span>	&#34;fmt&#34;
+<span id="L12" class="ln">    12	</span>	&#34;io&#34;
+<span id="L13" class="ln">    13	</span>	&#34;mime&#34;
+<span id="L14" class="ln">    14	</span>	&#34;mime/multipart&#34;
+<span id="L15" class="ln">    15	</span>	&#34;net/textproto&#34;
+<span id="L16" class="ln">    16	</span>	&#34;net/url&#34;
+<span id="L17" class="ln">    17	</span>	&#34;os&#34;
+<span id="L18" class="ln">    18	</span>	&#34;path&#34;
+<span id="L19" class="ln">    19	</span>	&#34;path/filepath&#34;
+<span id="L20" class="ln">    20	</span>	&#34;sort&#34;
+<span id="L21" class="ln">    21	</span>	&#34;strconv&#34;
+<span id="L22" class="ln">    22	</span>	&#34;strings&#34;
+<span id="L23" class="ln">    23	</span>	&#34;time&#34;
+<span id="L24" class="ln">    24	</span>)
+<span id="L25" class="ln">    25	</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// A Dir implements FileSystem using the native file system restricted to a</span>
+<span id="L27" class="ln">    27	</span><span class="comment">// specific directory tree.</span>
+<span id="L28" class="ln">    28	</span><span class="comment">//</span>
+<span id="L29" class="ln">    29	</span><span class="comment">// While the FileSystem.Open method takes &#39;/&#39;-separated paths, a Dir&#39;s string</span>
+<span id="L30" class="ln">    30	</span><span class="comment">// value is a filename on the native file system, not a URL, so it is separated</span>
+<span id="L31" class="ln">    31	</span><span class="comment">// by filepath.Separator, which isn&#39;t necessarily &#39;/&#39;.</span>
+<span id="L32" class="ln">    32	</span><span class="comment">//</span>
+<span id="L33" class="ln">    33	</span><span class="comment">// An empty Dir is treated as &#34;.&#34;.</span>
+<span id="L34" class="ln">    34	</span>type Dir string
+<span id="L35" class="ln">    35	</span>
+<span id="L36" class="ln">    36	</span>func (d Dir) Open(name string) (File, error) {
+<span id="L37" class="ln">    37	</span>	if filepath.Separator != &#39;/&#39; &amp;&amp; strings.ContainsRune(name, filepath.Separator) ||
+<span id="L38" class="ln">    38	</span>		strings.Contains(name, &#34;\x00&#34;) {
+<span id="L39" class="ln">    39	</span>		return nil, errors.New(&#34;http: invalid character in file path&#34;)
+<span id="L40" class="ln">    40	</span>	}
+<span id="L41" class="ln">    41	</span>	dir := string(d)
+<span id="L42" class="ln">    42	</span>	if dir == &#34;&#34; {
+<span id="L43" class="ln">    43	</span>		dir = &#34;.&#34;
+<span id="L44" class="ln">    44	</span>	}
+<span id="L45" class="ln">    45	</span>	f, err := os.Open(filepath.Join(dir, filepath.FromSlash(path.Clean(&#34;/&#34;+name))))
+<span id="L46" class="ln">    46	</span>	if err != nil {
+<span id="L47" class="ln">    47	</span>		return nil, err
+<span id="L48" class="ln">    48	</span>	}
+<span id="L49" class="ln">    49	</span>	return f, nil
+<span id="L50" class="ln">    50	</span>}
+<span id="L51" class="ln">    51	</span>
+<span id="L52" class="ln">    52	</span><span class="comment">// A FileSystem implements access to a collection of named files.</span>
+<span id="L53" class="ln">    53	</span><span class="comment">// The elements in a file path are separated by slash (&#39;/&#39;, U+002F)</span>
+<span id="L54" class="ln">    54	</span><span class="comment">// characters, regardless of host operating system convention.</span>
+<span id="L55" class="ln">    55	</span>type FileSystem interface {
+<span id="L56" class="ln">    56	</span>	Open(name string) (File, error)
+<span id="L57" class="ln">    57	</span>}
+<span id="L58" class="ln">    58	</span>
+<span id="L59" class="ln">    59	</span><span class="comment">// A File is returned by a FileSystem&#39;s Open method and can be</span>
+<span id="L60" class="ln">    60	</span><span class="comment">// served by the FileServer implementation.</span>
+<span id="L61" class="ln">    61	</span><span class="comment">//</span>
+<span id="L62" class="ln">    62	</span><span class="comment">// The methods should behave the same as those on an *os.File.</span>
+<span id="L63" class="ln">    63	</span>type File interface {
+<span id="L64" class="ln">    64	</span>	io.Closer
+<span id="L65" class="ln">    65	</span>	io.Reader
+<span id="L66" class="ln">    66	</span>	io.Seeker
+<span id="L67" class="ln">    67	</span>	Readdir(count int) ([]os.FileInfo, error)
+<span id="L68" class="ln">    68	</span>	Stat() (os.FileInfo, error)
+<span id="L69" class="ln">    69	</span>}
+<span id="L70" class="ln">    70	</span>
+<span id="L71" class="ln">    71	</span>func dirList(w ResponseWriter, f File) {
+<span id="L72" class="ln">    72	</span>	dirs, err := f.Readdir(-1)
+<span id="L73" class="ln">    73	</span>	if err != nil {
+<span id="L74" class="ln">    74	</span>		<span class="comment">// TODO: log err.Error() to the Server.ErrorLog, once it&#39;s possible</span>
+<span id="L75" class="ln">    75	</span>		<span class="comment">// for a handler to get at its Server via the ResponseWriter. See</span>
+<span id="L76" class="ln">    76	</span>		<span class="comment">// Issue 12438.</span>
+<span id="L77" class="ln">    77	</span>		Error(w, &#34;Error reading directory&#34;, StatusInternalServerError)
+<span id="L78" class="ln">    78	</span>		return
+<span id="L79" class="ln">    79	</span>	}
+<span id="L80" class="ln">    80	</span>	sort.Slice(dirs, func(i, j int) bool { return dirs[i].Name() &lt; dirs[j].Name() })
+<span id="L81" class="ln">    81	</span>
+<span id="L82" class="ln">    82	</span>	w.Header().Set(&#34;Content-Type&#34;, &#34;text/html; charset=utf-8&#34;)
+<span id="L83" class="ln">    83	</span>	fmt.Fprintf(w, &#34;&lt;pre&gt;\n&#34;)
+<span id="L84" class="ln">    84	</span>	for _, d := range dirs {
+<span id="L85" class="ln">    85	</span>		name := d.Name()
+<span id="L86" class="ln">    86	</span>		if d.IsDir() {
+<span id="L87" class="ln">    87	</span>			name += &#34;/&#34;
+<span id="L88" class="ln">    88	</span>		}
+<span id="L89" class="ln">    89	</span>		<span class="comment">// name may contain &#39;?&#39; or &#39;#&#39;, which must be escaped to remain</span>
+<span id="L90" class="ln">    90	</span>		<span class="comment">// part of the URL path, and not indicate the start of a query</span>
+<span id="L91" class="ln">    91	</span>		<span class="comment">// string or fragment.</span>
+<span id="L92" class="ln">    92	</span>		url := url.URL{Path: name}
+<span id="L93" class="ln">    93	</span>		fmt.Fprintf(w, &#34;&lt;a href=\&#34;%s\&#34;&gt;%s&lt;/a&gt;\n&#34;, url.String(), htmlReplacer.Replace(name))
+<span id="L94" class="ln">    94	</span>	}
+<span id="L95" class="ln">    95	</span>	fmt.Fprintf(w, &#34;&lt;/pre&gt;\n&#34;)
+<span id="L96" class="ln">    96	</span>}
+<span id="L97" class="ln">    97	</span>
+<span id="L98" class="ln">    98	</span><span class="comment">// ServeContent replies to the request using the content in the</span>
+<span id="L99" class="ln">    99	</span><span class="comment">// provided ReadSeeker. The main benefit of ServeContent over io.Copy</span>
+<span id="L100" class="ln">   100	</span><span class="comment">// is that it handles Range requests properly, sets the MIME type, and</span>
+<span id="L101" class="ln">   101	</span><span class="comment">// handles If-Match, If-Unmodified-Since, If-None-Match, If-Modified-Since,</span>
+<span id="L102" class="ln">   102	</span><span class="comment">// and If-Range requests.</span>
+<span id="L103" class="ln">   103	</span><span class="comment">//</span>
+<span id="L104" class="ln">   104	</span><span class="comment">// If the response&#39;s Content-Type header is not set, ServeContent</span>
+<span id="L105" class="ln">   105	</span><span class="comment">// first tries to deduce the type from name&#39;s file extension and,</span>
+<span id="L106" class="ln">   106	</span><span class="comment">// if that fails, falls back to reading the first block of the content</span>
+<span id="L107" class="ln">   107	</span><span class="comment">// and passing it to DetectContentType.</span>
+<span id="L108" class="ln">   108	</span><span class="comment">// The name is otherwise unused; in particular it can be empty and is</span>
+<span id="L109" class="ln">   109	</span><span class="comment">// never sent in the response.</span>
+<span id="L110" class="ln">   110	</span><span class="comment">//</span>
+<span id="L111" class="ln">   111	</span><span class="comment">// If modtime is not the zero time or Unix epoch, ServeContent</span>
+<span id="L112" class="ln">   112	</span><span class="comment">// includes it in a Last-Modified header in the response. If the</span>
+<span id="L113" class="ln">   113	</span><span class="comment">// request includes an If-Modified-Since header, ServeContent uses</span>
+<span id="L114" class="ln">   114	</span><span class="comment">// modtime to decide whether the content needs to be sent at all.</span>
+<span id="L115" class="ln">   115	</span><span class="comment">//</span>
+<span id="L116" class="ln">   116	</span><span class="comment">// The content&#39;s Seek method must work: ServeContent uses</span>
+<span id="L117" class="ln">   117	</span><span class="comment">// a seek to the end of the content to determine its size.</span>
+<span id="L118" class="ln">   118	</span><span class="comment">//</span>
+<span id="L119" class="ln">   119	</span><span class="comment">// If the caller has set w&#39;s ETag header formatted per RFC 7232, section 2.3,</span>
+<span id="L120" class="ln">   120	</span><span class="comment">// ServeContent uses it to handle requests using If-Match, If-None-Match, or If-Range.</span>
+<span id="L121" class="ln">   121	</span><span class="comment">//</span>
+<span id="L122" class="ln">   122	</span><span class="comment">// Note that *os.File implements the io.ReadSeeker interface.</span>
+<span id="L123" class="ln">   123	</span><span class="selection">func ServeContent(w ResponseWriter, req *Request, name string, modtime time.Time, content io.ReadSeeker)</span> {
+<span id="L124" class="ln">   124	</span>	sizeFunc := func() (int64, error) {
+<span id="L125" class="ln">   125	</span>		size, err := content.Seek(0, io.SeekEnd)
+<span id="L126" class="ln">   126	</span>		if err != nil {
+<span id="L127" class="ln">   127	</span>			return 0, errSeeker
+<span id="L128" class="ln">   128	</span>		}
+<span id="L129" class="ln">   129	</span>		_, err = content.Seek(0, io.SeekStart)
+<span id="L130" class="ln">   130	</span>		if err != nil {
+<span id="L131" class="ln">   131	</span>			return 0, errSeeker
+<span id="L132" class="ln">   132	</span>		}
+<span id="L133" class="ln">   133	</span>		return size, nil
+<span id="L134" class="ln">   134	</span>	}
+<span id="L135" class="ln">   135	</span>	serveContent(w, req, name, modtime, sizeFunc, content)
+<span id="L136" class="ln">   136	</span>}
+<span id="L137" class="ln">   137	</span>
+<span id="L138" class="ln">   138	</span><span class="comment">// errSeeker is returned by ServeContent&#39;s sizeFunc when the content</span>
+<span id="L139" class="ln">   139	</span><span class="comment">// doesn&#39;t seek properly. The underlying Seeker&#39;s error text isn&#39;t</span>
+<span id="L140" class="ln">   140	</span><span class="comment">// included in the sizeFunc reply so it&#39;s not sent over HTTP to end</span>
+<span id="L141" class="ln">   141	</span><span class="comment">// users.</span>
+<span id="L142" class="ln">   142	</span>var errSeeker = errors.New(&#34;seeker can&#39;t seek&#34;)
+<span id="L143" class="ln">   143	</span>
+<span id="L144" class="ln">   144	</span><span class="comment">// errNoOverlap is returned by serveContent&#39;s parseRange if first-byte-pos of</span>
+<span id="L145" class="ln">   145	</span><span class="comment">// all of the byte-range-spec values is greater than the content size.</span>
+<span id="L146" class="ln">   146	</span>var errNoOverlap = errors.New(&#34;invalid range: failed to overlap&#34;)
+<span id="L147" class="ln">   147	</span>
+<span id="L148" class="ln">   148	</span><span class="comment">// if name is empty, filename is unknown. (used for mime type, before sniffing)</span>
+<span id="L149" class="ln">   149	</span><span class="comment">// if modtime.IsZero(), modtime is unknown.</span>
+<span id="L150" class="ln">   150	</span><span class="comment">// content must be seeked to the beginning of the file.</span>
+<span id="L151" class="ln">   151	</span><span class="comment">// The sizeFunc is called at most once. Its error, if any, is sent in the HTTP response.</span>
+<span id="L152" class="ln">   152	</span>func serveContent(w ResponseWriter, r *Request, name string, modtime time.Time, sizeFunc func() (int64, error), content io.ReadSeeker) {
+<span id="L153" class="ln">   153	</span>	setLastModified(w, modtime)
+<span id="L154" class="ln">   154	</span>	done, rangeReq := checkPreconditions(w, r, modtime)
+<span id="L155" class="ln">   155	</span>	if done {
+<span id="L156" class="ln">   156	</span>		return
+<span id="L157" class="ln">   157	</span>	}
+<span id="L158" class="ln">   158	</span>
+<span id="L159" class="ln">   159	</span>	code := StatusOK
+<span id="L160" class="ln">   160	</span>
+<span id="L161" class="ln">   161	</span>	<span class="comment">// If Content-Type isn&#39;t set, use the file&#39;s extension to find it, but</span>
+<span id="L162" class="ln">   162	</span>	<span class="comment">// if the Content-Type is unset explicitly, do not sniff the type.</span>
+<span id="L163" class="ln">   163	</span>	ctypes, haveType := w.Header()[&#34;Content-Type&#34;]
+<span id="L164" class="ln">   164	</span>	var ctype string
+<span id="L165" class="ln">   165	</span>	if !haveType {
+<span id="L166" class="ln">   166	</span>		ctype = mime.TypeByExtension(filepath.Ext(name))
+<span id="L167" class="ln">   167	</span>		if ctype == &#34;&#34; {
+<span id="L168" class="ln">   168	</span>			<span class="comment">// read a chunk to decide between utf-8 text and binary</span>
+<span id="L169" class="ln">   169	</span>			var buf [sniffLen]byte
+<span id="L170" class="ln">   170	</span>			n, _ := io.ReadFull(content, buf[:])
+<span id="L171" class="ln">   171	</span>			ctype = DetectContentType(buf[:n])
+<span id="L172" class="ln">   172	</span>			_, err := content.Seek(0, io.SeekStart) <span class="comment">// rewind to output whole file</span>
+<span id="L173" class="ln">   173	</span>			if err != nil {
+<span id="L174" class="ln">   174	</span>				Error(w, &#34;seeker can&#39;t seek&#34;, StatusInternalServerError)
+<span id="L175" class="ln">   175	</span>				return
+<span id="L176" class="ln">   176	</span>			}
+<span id="L177" class="ln">   177	</span>		}
+<span id="L178" class="ln">   178	</span>		w.Header().Set(&#34;Content-Type&#34;, ctype)
+<span id="L179" class="ln">   179	</span>	} else if len(ctypes) &gt; 0 {
+<span id="L180" class="ln">   180	</span>		ctype = ctypes[0]
+<span id="L181" class="ln">   181	</span>	}
+<span id="L182" class="ln">   182	</span>
+<span id="L183" class="ln">   183	</span>	size, err := sizeFunc()
+<span id="L184" class="ln">   184	</span>	if err != nil {
+<span id="L185" class="ln">   185	</span>		Error(w, err.Error(), StatusInternalServerError)
+<span id="L186" class="ln">   186	</span>		return
+<span id="L187" class="ln">   187	</span>	}
+<span id="L188" class="ln">   188	</span>
+<span id="L189" class="ln">   189	</span>	<span class="comment">// handle Content-Range header.</span>
+<span id="L190" class="ln">   190	</span>	sendSize := size
+<span id="L191" class="ln">   191	</span>	var sendContent io.Reader = content
+<span id="L192" class="ln">   192	</span>	if size &gt;= 0 {
+<span id="L193" class="ln">   193	</span>		ranges, err := parseRange(rangeReq, size)
+<span id="L194" class="ln">   194	</span>		if err != nil {
+<span id="L195" class="ln">   195	</span>			if err == errNoOverlap {
+<span id="L196" class="ln">   196	</span>				w.Header().Set(&#34;Content-Range&#34;, fmt.Sprintf(&#34;bytes */%d&#34;, size))
+<span id="L197" class="ln">   197	</span>			}
+<span id="L198" class="ln">   198	</span>			Error(w, err.Error(), StatusRequestedRangeNotSatisfiable)
+<span id="L199" class="ln">   199	</span>			return
+<span id="L200" class="ln">   200	</span>		}
+<span id="L201" class="ln">   201	</span>		if sumRangesSize(ranges) &gt; size {
+<span id="L202" class="ln">   202	</span>			<span class="comment">// The total number of bytes in all the ranges</span>
+<span id="L203" class="ln">   203	</span>			<span class="comment">// is larger than the size of the file by</span>
+<span id="L204" class="ln">   204	</span>			<span class="comment">// itself, so this is probably an attack, or a</span>
+<span id="L205" class="ln">   205	</span>			<span class="comment">// dumb client. Ignore the range request.</span>
+<span id="L206" class="ln">   206	</span>			ranges = nil
+<span id="L207" class="ln">   207	</span>		}
+<span id="L208" class="ln">   208	</span>		switch {
+<span id="L209" class="ln">   209	</span>		case len(ranges) == 1:
+<span id="L210" class="ln">   210	</span>			<span class="comment">// RFC 2616, Section 14.16:</span>
+<span id="L211" class="ln">   211	</span>			<span class="comment">// &#34;When an HTTP message includes the content of a single</span>
+<span id="L212" class="ln">   212	</span>			<span class="comment">// range (for example, a response to a request for a</span>
+<span id="L213" class="ln">   213	</span>			<span class="comment">// single range, or to a request for a set of ranges</span>
+<span id="L214" class="ln">   214	</span>			<span class="comment">// that overlap without any holes), this content is</span>
+<span id="L215" class="ln">   215	</span>			<span class="comment">// transmitted with a Content-Range header, and a</span>
+<span id="L216" class="ln">   216	</span>			<span class="comment">// Content-Length header showing the number of bytes</span>
+<span id="L217" class="ln">   217	</span>			<span class="comment">// actually transferred.</span>
+<span id="L218" class="ln">   218	</span>			<span class="comment">// ...</span>
+<span id="L219" class="ln">   219	</span>			<span class="comment">// A response to a request for a single range MUST NOT</span>
+<span id="L220" class="ln">   220	</span>			<span class="comment">// be sent using the multipart/byteranges media type.&#34;</span>
+<span id="L221" class="ln">   221	</span>			ra := ranges[0]
+<span id="L222" class="ln">   222	</span>			if _, err := content.Seek(ra.start, io.SeekStart); err != nil {
+<span id="L223" class="ln">   223	</span>				Error(w, err.Error(), StatusRequestedRangeNotSatisfiable)
+<span id="L224" class="ln">   224	</span>				return
+<span id="L225" class="ln">   225	</span>			}
+<span id="L226" class="ln">   226	</span>			sendSize = ra.length
+<span id="L227" class="ln">   227	</span>			code = StatusPartialContent
+<span id="L228" class="ln">   228	</span>			w.Header().Set(&#34;Content-Range&#34;, ra.contentRange(size))
+<span id="L229" class="ln">   229	</span>		case len(ranges) &gt; 1:
+<span id="L230" class="ln">   230	</span>			sendSize = rangesMIMESize(ranges, ctype, size)
+<span id="L231" class="ln">   231	</span>			code = StatusPartialContent
+<span id="L232" class="ln">   232	</span>
+<span id="L233" class="ln">   233	</span>			pr, pw := io.Pipe()
+<span id="L234" class="ln">   234	</span>			mw := multipart.NewWriter(pw)
+<span id="L235" class="ln">   235	</span>			w.Header().Set(&#34;Content-Type&#34;, &#34;multipart/byteranges; boundary=&#34;+mw.Boundary())
+<span id="L236" class="ln">   236	</span>			sendContent = pr
+<span id="L237" class="ln">   237	</span>			defer pr.Close() <span class="comment">// cause writing goroutine to fail and exit if CopyN doesn&#39;t finish.</span>
+<span id="L238" class="ln">   238	</span>			go func() {
+<span id="L239" class="ln">   239	</span>				for _, ra := range ranges {
+<span id="L240" class="ln">   240	</span>					part, err := mw.CreatePart(ra.mimeHeader(ctype, size))
+<span id="L241" class="ln">   241	</span>					if err != nil {
+<span id="L242" class="ln">   242	</span>						pw.CloseWithError(err)
+<span id="L243" class="ln">   243	</span>						return
+<span id="L244" class="ln">   244	</span>					}
+<span id="L245" class="ln">   245	</span>					if _, err := content.Seek(ra.start, io.SeekStart); err != nil {
+<span id="L246" class="ln">   246	</span>						pw.CloseWithError(err)
+<span id="L247" class="ln">   247	</span>						return
+<span id="L248" class="ln">   248	</span>					}
+<span id="L249" class="ln">   249	</span>					if _, err := io.CopyN(part, content, ra.length); err != nil {
+<span id="L250" class="ln">   250	</span>						pw.CloseWithError(err)
+<span id="L251" class="ln">   251	</span>						return
+<span id="L252" class="ln">   252	</span>					}
+<span id="L253" class="ln">   253	</span>				}
+<span id="L254" class="ln">   254	</span>				mw.Close()
+<span id="L255" class="ln">   255	</span>				pw.Close()
+<span id="L256" class="ln">   256	</span>			}()
+<span id="L257" class="ln">   257	</span>		}
+<span id="L258" class="ln">   258	</span>
+<span id="L259" class="ln">   259	</span>		w.Header().Set(&#34;Accept-Ranges&#34;, &#34;bytes&#34;)
+<span id="L260" class="ln">   260	</span>		if w.Header().Get(&#34;Content-Encoding&#34;) == &#34;&#34; {
+<span id="L261" class="ln">   261	</span>			w.Header().Set(&#34;Content-Length&#34;, strconv.FormatInt(sendSize, 10))
+<span id="L262" class="ln">   262	</span>		}
+<span id="L263" class="ln">   263	</span>	}
+<span id="L264" class="ln">   264	</span>
+<span id="L265" class="ln">   265	</span>	w.WriteHeader(code)
+<span id="L266" class="ln">   266	</span>
+<span id="L267" class="ln">   267	</span>	if r.Method != &#34;HEAD&#34; {
+<span id="L268" class="ln">   268	</span>		io.CopyN(w, sendContent, sendSize)
+<span id="L269" class="ln">   269	</span>	}
+<span id="L270" class="ln">   270	</span>}
+<span id="L271" class="ln">   271	</span>
+<span id="L272" class="ln">   272	</span><span class="comment">// scanETag determines if a syntactically valid ETag is present at s. If so,</span>
+<span id="L273" class="ln">   273	</span><span class="comment">// the ETag and remaining text after consuming ETag is returned. Otherwise,</span>
+<span id="L274" class="ln">   274	</span><span class="comment">// it returns &#34;&#34;, &#34;&#34;.</span>
+<span id="L275" class="ln">   275	</span>func scanETag(s string) (etag string, remain string) {
+<span id="L276" class="ln">   276	</span>	s = textproto.TrimString(s)
+<span id="L277" class="ln">   277	</span>	start := 0
+<span id="L278" class="ln">   278	</span>	if strings.HasPrefix(s, &#34;W/&#34;) {
+<span id="L279" class="ln">   279	</span>		start = 2
+<span id="L280" class="ln">   280	</span>	}
+<span id="L281" class="ln">   281	</span>	if len(s[start:]) &lt; 2 || s[start] != &#39;&#34;&#39; {
+<span id="L282" class="ln">   282	</span>		return &#34;&#34;, &#34;&#34;
+<span id="L283" class="ln">   283	</span>	}
+<span id="L284" class="ln">   284	</span>	<span class="comment">// ETag is either W/&#34;text&#34; or &#34;text&#34;.</span>
+<span id="L285" class="ln">   285	</span>	<span class="comment">// See RFC 7232 2.3.</span>
+<span id="L286" class="ln">   286	</span>	for i := start + 1; i &lt; len(s); i++ {
+<span id="L287" class="ln">   287	</span>		c := s[i]
+<span id="L288" class="ln">   288	</span>		switch {
+<span id="L289" class="ln">   289	</span>		<span class="comment">// Character values allowed in ETags.</span>
+<span id="L290" class="ln">   290	</span>		case c == 0x21 || c &gt;= 0x23 &amp;&amp; c &lt;= 0x7E || c &gt;= 0x80:
+<span id="L291" class="ln">   291	</span>		case c == &#39;&#34;&#39;:
+<span id="L292" class="ln">   292	</span>			return string(s[:i+1]), s[i+1:]
+<span id="L293" class="ln">   293	</span>		default:
+<span id="L294" class="ln">   294	</span>			break
+<span id="L295" class="ln">   295	</span>		}
+<span id="L296" class="ln">   296	</span>	}
+<span id="L297" class="ln">   297	</span>	return &#34;&#34;, &#34;&#34;
+<span id="L298" class="ln">   298	</span>}
+<span id="L299" class="ln">   299	</span>
+<span id="L300" class="ln">   300	</span><span class="comment">// etagStrongMatch reports whether a and b match using strong ETag comparison.</span>
+<span id="L301" class="ln">   301	</span><span class="comment">// Assumes a and b are valid ETags.</span>
+<span id="L302" class="ln">   302	</span>func etagStrongMatch(a, b string) bool {
+<span id="L303" class="ln">   303	</span>	return a == b &amp;&amp; a != &#34;&#34; &amp;&amp; a[0] == &#39;&#34;&#39;
+<span id="L304" class="ln">   304	</span>}
+<span id="L305" class="ln">   305	</span>
+<span id="L306" class="ln">   306	</span><span class="comment">// etagWeakMatch reports whether a and b match using weak ETag comparison.</span>
+<span id="L307" class="ln">   307	</span><span class="comment">// Assumes a and b are valid ETags.</span>
+<span id="L308" class="ln">   308	</span>func etagWeakMatch(a, b string) bool {
+<span id="L309" class="ln">   309	</span>	return strings.TrimPrefix(a, &#34;W/&#34;) == strings.TrimPrefix(b, &#34;W/&#34;)
+<span id="L310" class="ln">   310	</span>}
+<span id="L311" class="ln">   311	</span>
+<span id="L312" class="ln">   312	</span><span class="comment">// condResult is the result of an HTTP request precondition check.</span>
+<span id="L313" class="ln">   313	</span><span class="comment">// See https://tools.ietf.org/html/rfc7232 section 3.</span>
+<span id="L314" class="ln">   314	</span>type condResult int
+<span id="L315" class="ln">   315	</span>
+<span id="L316" class="ln">   316	</span>const (
+<span id="L317" class="ln">   317	</span>	condNone condResult = iota
+<span id="L318" class="ln">   318	</span>	condTrue
+<span id="L319" class="ln">   319	</span>	condFalse
+<span id="L320" class="ln">   320	</span>)
+<span id="L321" class="ln">   321	</span>
+<span id="L322" class="ln">   322	</span>func checkIfMatch(w ResponseWriter, r *Request) condResult {
+<span id="L323" class="ln">   323	</span>	im := r.Header.Get(&#34;If-Match&#34;)
+<span id="L324" class="ln">   324	</span>	if im == &#34;&#34; {
+<span id="L325" class="ln">   325	</span>		return condNone
+<span id="L326" class="ln">   326	</span>	}
+<span id="L327" class="ln">   327	</span>	for {
+<span id="L328" class="ln">   328	</span>		im = textproto.TrimString(im)
+<span id="L329" class="ln">   329	</span>		if len(im) == 0 {
+<span id="L330" class="ln">   330	</span>			break
+<span id="L331" class="ln">   331	</span>		}
+<span id="L332" class="ln">   332	</span>		if im[0] == &#39;,&#39; {
+<span id="L333" class="ln">   333	</span>			im = im[1:]
+<span id="L334" class="ln">   334	</span>			continue
+<span id="L335" class="ln">   335	</span>		}
+<span id="L336" class="ln">   336	</span>		if im[0] == &#39;*&#39; {
+<span id="L337" class="ln">   337	</span>			return condTrue
+<span id="L338" class="ln">   338	</span>		}
+<span id="L339" class="ln">   339	</span>		etag, remain := scanETag(im)
+<span id="L340" class="ln">   340	</span>		if etag == &#34;&#34; {
+<span id="L341" class="ln">   341	</span>			break
+<span id="L342" class="ln">   342	</span>		}
+<span id="L343" class="ln">   343	</span>		if etagStrongMatch(etag, w.Header().get(&#34;Etag&#34;)) {
+<span id="L344" class="ln">   344	</span>			return condTrue
+<span id="L345" class="ln">   345	</span>		}
+<span id="L346" class="ln">   346	</span>		im = remain
+<span id="L347" class="ln">   347	</span>	}
+<span id="L348" class="ln">   348	</span>
+<span id="L349" class="ln">   349	</span>	return condFalse
+<span id="L350" class="ln">   350	</span>}
+<span id="L351" class="ln">   351	</span>
+<span id="L352" class="ln">   352	</span>func checkIfUnmodifiedSince(w ResponseWriter, r *Request, modtime time.Time) condResult {
+<span id="L353" class="ln">   353	</span>	ius := r.Header.Get(&#34;If-Unmodified-Since&#34;)
+<span id="L354" class="ln">   354	</span>	if ius == &#34;&#34; || isZeroTime(modtime) {
+<span id="L355" class="ln">   355	</span>		return condNone
+<span id="L356" class="ln">   356	</span>	}
+<span id="L357" class="ln">   357	</span>	if t, err := ParseTime(ius); err == nil {
+<span id="L358" class="ln">   358	</span>		<span class="comment">// The Date-Modified header truncates sub-second precision, so</span>
+<span id="L359" class="ln">   359	</span>		<span class="comment">// use mtime &lt; t+1s instead of mtime &lt;= t to check for unmodified.</span>
+<span id="L360" class="ln">   360	</span>		if modtime.Before(t.Add(1 * time.Second)) {
+<span id="L361" class="ln">   361	</span>			return condTrue
+<span id="L362" class="ln">   362	</span>		}
+<span id="L363" class="ln">   363	</span>		return condFalse
+<span id="L364" class="ln">   364	</span>	}
+<span id="L365" class="ln">   365	</span>	return condNone
+<span id="L366" class="ln">   366	</span>}
+<span id="L367" class="ln">   367	</span>
+<span id="L368" class="ln">   368	</span>func checkIfNoneMatch(w ResponseWriter, r *Request) condResult {
+<span id="L369" class="ln">   369	</span>	inm := r.Header.get(&#34;If-None-Match&#34;)
+<span id="L370" class="ln">   370	</span>	if inm == &#34;&#34; {
+<span id="L371" class="ln">   371	</span>		return condNone
+<span id="L372" class="ln">   372	</span>	}
+<span id="L373" class="ln">   373	</span>	buf := inm
+<span id="L374" class="ln">   374	</span>	for {
+<span id="L375" class="ln">   375	</span>		buf = textproto.TrimString(buf)
+<span id="L376" class="ln">   376	</span>		if len(buf) == 0 {
+<span id="L377" class="ln">   377	</span>			break
+<span id="L378" class="ln">   378	</span>		}
+<span id="L379" class="ln">   379	</span>		if buf[0] == &#39;,&#39; {
+<span id="L380" class="ln">   380	</span>			buf = buf[1:]
+<span id="L381" class="ln">   381	</span>		}
+<span id="L382" class="ln">   382	</span>		if buf[0] == &#39;*&#39; {
+<span id="L383" class="ln">   383	</span>			return condFalse
+<span id="L384" class="ln">   384	</span>		}
+<span id="L385" class="ln">   385	</span>		etag, remain := scanETag(buf)
+<span id="L386" class="ln">   386	</span>		if etag == &#34;&#34; {
+<span id="L387" class="ln">   387	</span>			break
+<span id="L388" class="ln">   388	</span>		}
+<span id="L389" class="ln">   389	</span>		if etagWeakMatch(etag, w.Header().get(&#34;Etag&#34;)) {
+<span id="L390" class="ln">   390	</span>			return condFalse
+<span id="L391" class="ln">   391	</span>		}
+<span id="L392" class="ln">   392	</span>		buf = remain
+<span id="L393" class="ln">   393	</span>	}
+<span id="L394" class="ln">   394	</span>	return condTrue
+<span id="L395" class="ln">   395	</span>}
+<span id="L396" class="ln">   396	</span>
+<span id="L397" class="ln">   397	</span>func checkIfModifiedSince(w ResponseWriter, r *Request, modtime time.Time) condResult {
+<span id="L398" class="ln">   398	</span>	if r.Method != &#34;GET&#34; &amp;&amp; r.Method != &#34;HEAD&#34; {
+<span id="L399" class="ln">   399	</span>		return condNone
+<span id="L400" class="ln">   400	</span>	}
+<span id="L401" class="ln">   401	</span>	ims := r.Header.Get(&#34;If-Modified-Since&#34;)
+<span id="L402" class="ln">   402	</span>	if ims == &#34;&#34; || isZeroTime(modtime) {
+<span id="L403" class="ln">   403	</span>		return condNone
+<span id="L404" class="ln">   404	</span>	}
+<span id="L405" class="ln">   405	</span>	t, err := ParseTime(ims)
+<span id="L406" class="ln">   406	</span>	if err != nil {
+<span id="L407" class="ln">   407	</span>		return condNone
+<span id="L408" class="ln">   408	</span>	}
+<span id="L409" class="ln">   409	</span>	<span class="comment">// The Date-Modified header truncates sub-second precision, so</span>
+<span id="L410" class="ln">   410	</span>	<span class="comment">// use mtime &lt; t+1s instead of mtime &lt;= t to check for unmodified.</span>
+<span id="L411" class="ln">   411	</span>	if modtime.Before(t.Add(1 * time.Second)) {
+<span id="L412" class="ln">   412	</span>		return condFalse
+<span id="L413" class="ln">   413	</span>	}
+<span id="L414" class="ln">   414	</span>	return condTrue
+<span id="L415" class="ln">   415	</span>}
+<span id="L416" class="ln">   416	</span>
+<span id="L417" class="ln">   417	</span>func checkIfRange(w ResponseWriter, r *Request, modtime time.Time) condResult {
+<span id="L418" class="ln">   418	</span>	if r.Method != &#34;GET&#34; {
+<span id="L419" class="ln">   419	</span>		return condNone
+<span id="L420" class="ln">   420	</span>	}
+<span id="L421" class="ln">   421	</span>	ir := r.Header.get(&#34;If-Range&#34;)
+<span id="L422" class="ln">   422	</span>	if ir == &#34;&#34; {
+<span id="L423" class="ln">   423	</span>		return condNone
+<span id="L424" class="ln">   424	</span>	}
+<span id="L425" class="ln">   425	</span>	etag, _ := scanETag(ir)
+<span id="L426" class="ln">   426	</span>	if etag != &#34;&#34; {
+<span id="L427" class="ln">   427	</span>		if etagStrongMatch(etag, w.Header().Get(&#34;Etag&#34;)) {
+<span id="L428" class="ln">   428	</span>			return condTrue
+<span id="L429" class="ln">   429	</span>		} else {
+<span id="L430" class="ln">   430	</span>			return condFalse
+<span id="L431" class="ln">   431	</span>		}
+<span id="L432" class="ln">   432	</span>	}
+<span id="L433" class="ln">   433	</span>	<span class="comment">// The If-Range value is typically the ETag value, but it may also be</span>
+<span id="L434" class="ln">   434	</span>	<span class="comment">// the modtime date. See golang.org/issue/8367.</span>
+<span id="L435" class="ln">   435	</span>	if modtime.IsZero() {
+<span id="L436" class="ln">   436	</span>		return condFalse
+<span id="L437" class="ln">   437	</span>	}
+<span id="L438" class="ln">   438	</span>	t, err := ParseTime(ir)
+<span id="L439" class="ln">   439	</span>	if err != nil {
+<span id="L440" class="ln">   440	</span>		return condFalse
+<span id="L441" class="ln">   441	</span>	}
+<span id="L442" class="ln">   442	</span>	if t.Unix() == modtime.Unix() {
+<span id="L443" class="ln">   443	</span>		return condTrue
+<span id="L444" class="ln">   444	</span>	}
+<span id="L445" class="ln">   445	</span>	return condFalse
+<span id="L446" class="ln">   446	</span>}
+<span id="L447" class="ln">   447	</span>
+<span id="L448" class="ln">   448	</span>var unixEpochTime = time.Unix(0, 0)
+<span id="L449" class="ln">   449	</span>
+<span id="L450" class="ln">   450	</span><span class="comment">// isZeroTime reports whether t is obviously unspecified (either zero or Unix()=0).</span>
+<span id="L451" class="ln">   451	</span>func isZeroTime(t time.Time) bool {
+<span id="L452" class="ln">   452	</span>	return t.IsZero() || t.Equal(unixEpochTime)
+<span id="L453" class="ln">   453	</span>}
+<span id="L454" class="ln">   454	</span>
+<span id="L455" class="ln">   455	</span>func setLastModified(w ResponseWriter, modtime time.Time) {
+<span id="L456" class="ln">   456	</span>	if !isZeroTime(modtime) {
+<span id="L457" class="ln">   457	</span>		w.Header().Set(&#34;Last-Modified&#34;, modtime.UTC().Format(TimeFormat))
+<span id="L458" class="ln">   458	</span>	}
+<span id="L459" class="ln">   459	</span>}
+<span id="L460" class="ln">   460	</span>
+<span id="L461" class="ln">   461	</span>func writeNotModified(w ResponseWriter) {
+<span id="L462" class="ln">   462	</span>	<span class="comment">// RFC 7232 section 4.1:</span>
+<span id="L463" class="ln">   463	</span>	<span class="comment">// a sender SHOULD NOT generate representation metadata other than the</span>
+<span id="L464" class="ln">   464	</span>	<span class="comment">// above listed fields unless said metadata exists for the purpose of</span>
+<span id="L465" class="ln">   465	</span>	<span class="comment">// guiding cache updates (e.g., Last-Modified might be useful if the</span>
+<span id="L466" class="ln">   466	</span>	<span class="comment">// response does not have an ETag field).</span>
+<span id="L467" class="ln">   467	</span>	h := w.Header()
+<span id="L468" class="ln">   468	</span>	delete(h, &#34;Content-Type&#34;)
+<span id="L469" class="ln">   469	</span>	delete(h, &#34;Content-Length&#34;)
+<span id="L470" class="ln">   470	</span>	if h.Get(&#34;Etag&#34;) != &#34;&#34; {
+<span id="L471" class="ln">   471	</span>		delete(h, &#34;Last-Modified&#34;)
+<span id="L472" class="ln">   472	</span>	}
+<span id="L473" class="ln">   473	</span>	w.WriteHeader(StatusNotModified)
+<span id="L474" class="ln">   474	</span>}
+<span id="L475" class="ln">   475	</span>
+<span id="L476" class="ln">   476	</span><span class="comment">// checkPreconditions evaluates request preconditions and reports whether a precondition</span>
+<span id="L477" class="ln">   477	</span><span class="comment">// resulted in sending StatusNotModified or StatusPreconditionFailed.</span>
+<span id="L478" class="ln">   478	</span>func checkPreconditions(w ResponseWriter, r *Request, modtime time.Time) (done bool, rangeHeader string) {
+<span id="L479" class="ln">   479	</span>	<span class="comment">// This function carefully follows RFC 7232 section 6.</span>
+<span id="L480" class="ln">   480	</span>	ch := checkIfMatch(w, r)
+<span id="L481" class="ln">   481	</span>	if ch == condNone {
+<span id="L482" class="ln">   482	</span>		ch = checkIfUnmodifiedSince(w, r, modtime)
+<span id="L483" class="ln">   483	</span>	}
+<span id="L484" class="ln">   484	</span>	if ch == condFalse {
+<span id="L485" class="ln">   485	</span>		w.WriteHeader(StatusPreconditionFailed)
+<span id="L486" class="ln">   486	</span>		return true, &#34;&#34;
+<span id="L487" class="ln">   487	</span>	}
+<span id="L488" class="ln">   488	</span>	switch checkIfNoneMatch(w, r) {
+<span id="L489" class="ln">   489	</span>	case condFalse:
+<span id="L490" class="ln">   490	</span>		if r.Method == &#34;GET&#34; || r.Method == &#34;HEAD&#34; {
+<span id="L491" class="ln">   491	</span>			writeNotModified(w)
+<span id="L492" class="ln">   492	</span>			return true, &#34;&#34;
+<span id="L493" class="ln">   493	</span>		} else {
+<span id="L494" class="ln">   494	</span>			w.WriteHeader(StatusPreconditionFailed)
+<span id="L495" class="ln">   495	</span>			return true, &#34;&#34;
+<span id="L496" class="ln">   496	</span>		}
+<span id="L497" class="ln">   497	</span>	case condNone:
+<span id="L498" class="ln">   498	</span>		if checkIfModifiedSince(w, r, modtime) == condFalse {
+<span id="L499" class="ln">   499	</span>			writeNotModified(w)
+<span id="L500" class="ln">   500	</span>			return true, &#34;&#34;
+<span id="L501" class="ln">   501	</span>		}
+<span id="L502" class="ln">   502	</span>	}
+<span id="L503" class="ln">   503	</span>
+<span id="L504" class="ln">   504	</span>	rangeHeader = r.Header.get(&#34;Range&#34;)
+<span id="L505" class="ln">   505	</span>	if rangeHeader != &#34;&#34; {
+<span id="L506" class="ln">   506	</span>		if checkIfRange(w, r, modtime) == condFalse {
+<span id="L507" class="ln">   507	</span>			rangeHeader = &#34;&#34;
+<span id="L508" class="ln">   508	</span>		}
+<span id="L509" class="ln">   509	</span>	}
+<span id="L510" class="ln">   510	</span>	return false, rangeHeader
+<span id="L511" class="ln">   511	</span>}
+<span id="L512" class="ln">   512	</span>
+<span id="L513" class="ln">   513	</span><span class="comment">// name is &#39;/&#39;-separated, not filepath.Separator.</span>
+<span id="L514" class="ln">   514	</span>func serveFile(w ResponseWriter, r *Request, fs FileSystem, name string, redirect bool) {
+<span id="L515" class="ln">   515	</span>	const indexPage = &#34;/index.html&#34;
+<span id="L516" class="ln">   516	</span>
+<span id="L517" class="ln">   517	</span>	<span class="comment">// redirect .../index.html to .../</span>
+<span id="L518" class="ln">   518	</span>	<span class="comment">// can&#39;t use Redirect() because that would make the path absolute,</span>
+<span id="L519" class="ln">   519	</span>	<span class="comment">// which would be a problem running under StripPrefix</span>
+<span id="L520" class="ln">   520	</span>	if strings.HasSuffix(r.URL.Path, indexPage) {
+<span id="L521" class="ln">   521	</span>		localRedirect(w, r, &#34;./&#34;)
+<span id="L522" class="ln">   522	</span>		return
+<span id="L523" class="ln">   523	</span>	}
+<span id="L524" class="ln">   524	</span>
+<span id="L525" class="ln">   525	</span>	f, err := fs.Open(name)
+<span id="L526" class="ln">   526	</span>	if err != nil {
+<span id="L527" class="ln">   527	</span>		msg, code := toHTTPError(err)
+<span id="L528" class="ln">   528	</span>		Error(w, msg, code)
+<span id="L529" class="ln">   529	</span>		return
+<span id="L530" class="ln">   530	</span>	}
+<span id="L531" class="ln">   531	</span>	defer f.Close()
+<span id="L532" class="ln">   532	</span>
+<span id="L533" class="ln">   533	</span>	d, err := f.Stat()
+<span id="L534" class="ln">   534	</span>	if err != nil {
+<span id="L535" class="ln">   535	</span>		msg, code := toHTTPError(err)
+<span id="L536" class="ln">   536	</span>		Error(w, msg, code)
+<span id="L537" class="ln">   537	</span>		return
+<span id="L538" class="ln">   538	</span>	}
+<span id="L539" class="ln">   539	</span>
+<span id="L540" class="ln">   540	</span>	if redirect {
+<span id="L541" class="ln">   541	</span>		<span class="comment">// redirect to canonical path: / at end of directory url</span>
+<span id="L542" class="ln">   542	</span>		<span class="comment">// r.URL.Path always begins with /</span>
+<span id="L543" class="ln">   543	</span>		url := r.URL.Path
+<span id="L544" class="ln">   544	</span>		if d.IsDir() {
+<span id="L545" class="ln">   545	</span>			if url[len(url)-1] != &#39;/&#39; {
+<span id="L546" class="ln">   546	</span>				localRedirect(w, r, path.Base(url)+&#34;/&#34;)
+<span id="L547" class="ln">   547	</span>				return
+<span id="L548" class="ln">   548	</span>			}
+<span id="L549" class="ln">   549	</span>		} else {
+<span id="L550" class="ln">   550	</span>			if url[len(url)-1] == &#39;/&#39; {
+<span id="L551" class="ln">   551	</span>				localRedirect(w, r, &#34;../&#34;+path.Base(url))
+<span id="L552" class="ln">   552	</span>				return
+<span id="L553" class="ln">   553	</span>			}
+<span id="L554" class="ln">   554	</span>		}
+<span id="L555" class="ln">   555	</span>	}
+<span id="L556" class="ln">   556	</span>
+<span id="L557" class="ln">   557	</span>	<span class="comment">// redirect if the directory name doesn&#39;t end in a slash</span>
+<span id="L558" class="ln">   558	</span>	if d.IsDir() {
+<span id="L559" class="ln">   559	</span>		url := r.URL.Path
+<span id="L560" class="ln">   560	</span>		if url[len(url)-1] != &#39;/&#39; {
+<span id="L561" class="ln">   561	</span>			localRedirect(w, r, path.Base(url)+&#34;/&#34;)
+<span id="L562" class="ln">   562	</span>			return
+<span id="L563" class="ln">   563	</span>		}
+<span id="L564" class="ln">   564	</span>	}
+<span id="L565" class="ln">   565	</span>
+<span id="L566" class="ln">   566	</span>	<span class="comment">// use contents of index.html for directory, if present</span>
+<span id="L567" class="ln">   567	</span>	if d.IsDir() {
+<span id="L568" class="ln">   568	</span>		index := strings.TrimSuffix(name, &#34;/&#34;) + indexPage
+<span id="L569" class="ln">   569	</span>		ff, err := fs.Open(index)
+<span id="L570" class="ln">   570	</span>		if err == nil {
+<span id="L571" class="ln">   571	</span>			defer ff.Close()
+<span id="L572" class="ln">   572	</span>			dd, err := ff.Stat()
+<span id="L573" class="ln">   573	</span>			if err == nil {
+<span id="L574" class="ln">   574	</span>				name = index
+<span id="L575" class="ln">   575	</span>				d = dd
+<span id="L576" class="ln">   576	</span>				f = ff
+<span id="L577" class="ln">   577	</span>			}
+<span id="L578" class="ln">   578	</span>		}
+<span id="L579" class="ln">   579	</span>	}
+<span id="L580" class="ln">   580	</span>
+<span id="L581" class="ln">   581	</span>	<span class="comment">// Still a directory? (we didn&#39;t find an index.html file)</span>
+<span id="L582" class="ln">   582	</span>	if d.IsDir() {
+<span id="L583" class="ln">   583	</span>		if checkIfModifiedSince(w, r, d.ModTime()) == condFalse {
+<span id="L584" class="ln">   584	</span>			writeNotModified(w)
+<span id="L585" class="ln">   585	</span>			return
+<span id="L586" class="ln">   586	</span>		}
+<span id="L587" class="ln">   587	</span>		w.Header().Set(&#34;Last-Modified&#34;, d.ModTime().UTC().Format(TimeFormat))
+<span id="L588" class="ln">   588	</span>		dirList(w, f)
+<span id="L589" class="ln">   589	</span>		return
+<span id="L590" class="ln">   590	</span>	}
+<span id="L591" class="ln">   591	</span>
+<span id="L592" class="ln">   592	</span>	<span class="comment">// serveContent will check modification time</span>
+<span id="L593" class="ln">   593	</span>	sizeFunc := func() (int64, error) { return d.Size(), nil }
+<span id="L594" class="ln">   594	</span>	serveContent(w, r, d.Name(), d.ModTime(), sizeFunc, f)
+<span id="L595" class="ln">   595	</span>}
+<span id="L596" class="ln">   596	</span>
+<span id="L597" class="ln">   597	</span><span class="comment">// toHTTPError returns a non-specific HTTP error message and status code</span>
+<span id="L598" class="ln">   598	</span><span class="comment">// for a given non-nil error value. It&#39;s important that toHTTPError does not</span>
+<span id="L599" class="ln">   599	</span><span class="comment">// actually return err.Error(), since msg and httpStatus are returned to users,</span>
+<span id="L600" class="ln">   600	</span><span class="comment">// and historically Go&#39;s ServeContent always returned just &#34;404 Not Found&#34; for</span>
+<span id="L601" class="ln">   601	</span><span class="comment">// all errors. We don&#39;t want to start leaking information in error messages.</span>
+<span id="L602" class="ln">   602	</span>func toHTTPError(err error) (msg string, httpStatus int) {
+<span id="L603" class="ln">   603	</span>	if os.IsNotExist(err) {
+<span id="L604" class="ln">   604	</span>		return &#34;404 page not found&#34;, StatusNotFound
+<span id="L605" class="ln">   605	</span>	}
+<span id="L606" class="ln">   606	</span>	if os.IsPermission(err) {
+<span id="L607" class="ln">   607	</span>		return &#34;403 Forbidden&#34;, StatusForbidden
+<span id="L608" class="ln">   608	</span>	}
+<span id="L609" class="ln">   609	</span>	<span class="comment">// Default:</span>
+<span id="L610" class="ln">   610	</span>	return &#34;500 Internal Server Error&#34;, StatusInternalServerError
+<span id="L611" class="ln">   611	</span>}
+<span id="L612" class="ln">   612	</span>
+<span id="L613" class="ln">   613	</span><span class="comment">// localRedirect gives a Moved Permanently response.</span>
+<span id="L614" class="ln">   614	</span><span class="comment">// It does not convert relative paths to absolute paths like Redirect does.</span>
+<span id="L615" class="ln">   615	</span>func localRedirect(w ResponseWriter, r *Request, newPath string) {
+<span id="L616" class="ln">   616	</span>	if q := r.URL.RawQuery; q != &#34;&#34; {
+<span id="L617" class="ln">   617	</span>		newPath += &#34;?&#34; + q
+<span id="L618" class="ln">   618	</span>	}
+<span id="L619" class="ln">   619	</span>	w.Header().Set(&#34;Location&#34;, newPath)
+<span id="L620" class="ln">   620	</span>	w.WriteHeader(StatusMovedPermanently)
+<span id="L621" class="ln">   621	</span>}
+<span id="L622" class="ln">   622	</span>
+<span id="L623" class="ln">   623	</span><span class="comment">// ServeFile replies to the request with the contents of the named</span>
+<span id="L624" class="ln">   624	</span><span class="comment">// file or directory.</span>
+<span id="L625" class="ln">   625	</span><span class="comment">//</span>
+<span id="L626" class="ln">   626	</span><span class="comment">// If the provided file or directory name is a relative path, it is</span>
+<span id="L627" class="ln">   627	</span><span class="comment">// interpreted relative to the current directory and may ascend to parent</span>
+<span id="L628" class="ln">   628	</span><span class="comment">// directories. If the provided name is constructed from user input, it</span>
+<span id="L629" class="ln">   629	</span><span class="comment">// should be sanitized before calling ServeFile. As a precaution, ServeFile</span>
+<span id="L630" class="ln">   630	</span><span class="comment">// will reject requests where r.URL.Path contains a &#34;..&#34; path element.</span>
+<span id="L631" class="ln">   631	</span><span class="comment">//</span>
+<span id="L632" class="ln">   632	</span><span class="comment">// As a special case, ServeFile redirects any request where r.URL.Path</span>
+<span id="L633" class="ln">   633	</span><span class="comment">// ends in &#34;/index.html&#34; to the same path, without the final</span>
+<span id="L634" class="ln">   634	</span><span class="comment">// &#34;index.html&#34;. To avoid such redirects either modify the path or</span>
+<span id="L635" class="ln">   635	</span><span class="comment">// use ServeContent.</span>
+<span id="L636" class="ln">   636	</span>func ServeFile(w ResponseWriter, r *Request, name string) {
+<span id="L637" class="ln">   637	</span>	if containsDotDot(r.URL.Path) {
+<span id="L638" class="ln">   638	</span>		<span class="comment">// Too many programs use r.URL.Path to construct the argument to</span>
+<span id="L639" class="ln">   639	</span>		<span class="comment">// serveFile. Reject the request under the assumption that happened</span>
+<span id="L640" class="ln">   640	</span>		<span class="comment">// here and &#34;..&#34; may not be wanted.</span>
+<span id="L641" class="ln">   641	</span>		<span class="comment">// Note that name might not contain &#34;..&#34;, for example if code (still</span>
+<span id="L642" class="ln">   642	</span>		<span class="comment">// incorrectly) used filepath.Join(myDir, r.URL.Path).</span>
+<span id="L643" class="ln">   643	</span>		Error(w, &#34;invalid URL path&#34;, StatusBadRequest)
+<span id="L644" class="ln">   644	</span>		return
+<span id="L645" class="ln">   645	</span>	}
+<span id="L646" class="ln">   646	</span>	dir, file := filepath.Split(name)
+<span id="L647" class="ln">   647	</span>	serveFile(w, r, Dir(dir), file, false)
+<span id="L648" class="ln">   648	</span>}
+<span id="L649" class="ln">   649	</span>
+<span id="L650" class="ln">   650	</span>func containsDotDot(v string) bool {
+<span id="L651" class="ln">   651	</span>	if !strings.Contains(v, &#34;..&#34;) {
+<span id="L652" class="ln">   652	</span>		return false
+<span id="L653" class="ln">   653	</span>	}
+<span id="L654" class="ln">   654	</span>	for _, ent := range strings.FieldsFunc(v, isSlashRune) {
+<span id="L655" class="ln">   655	</span>		if ent == &#34;..&#34; {
+<span id="L656" class="ln">   656	</span>			return true
+<span id="L657" class="ln">   657	</span>		}
+<span id="L658" class="ln">   658	</span>	}
+<span id="L659" class="ln">   659	</span>	return false
+<span id="L660" class="ln">   660	</span>}
+<span id="L661" class="ln">   661	</span>
+<span id="L662" class="ln">   662	</span>func isSlashRune(r rune) bool { return r == &#39;/&#39; || r == &#39;\\&#39; }
+<span id="L663" class="ln">   663	</span>
+<span id="L664" class="ln">   664	</span>type fileHandler struct {
+<span id="L665" class="ln">   665	</span>	root FileSystem
+<span id="L666" class="ln">   666	</span>}
+<span id="L667" class="ln">   667	</span>
+<span id="L668" class="ln">   668	</span><span class="comment">// FileServer returns a handler that serves HTTP requests</span>
+<span id="L669" class="ln">   669	</span><span class="comment">// with the contents of the file system rooted at root.</span>
+<span id="L670" class="ln">   670	</span><span class="comment">//</span>
+<span id="L671" class="ln">   671	</span><span class="comment">// To use the operating system&#39;s file system implementation,</span>
+<span id="L672" class="ln">   672	</span><span class="comment">// use http.Dir:</span>
+<span id="L673" class="ln">   673	</span><span class="comment">//</span>
+<span id="L674" class="ln">   674	</span><span class="comment">//     http.Handle(&#34;/&#34;, http.FileServer(http.Dir(&#34;/tmp&#34;)))</span>
+<span id="L675" class="ln">   675	</span><span class="comment">//</span>
+<span id="L676" class="ln">   676	</span><span class="comment">// As a special case, the returned file server redirects any request</span>
+<span id="L677" class="ln">   677	</span><span class="comment">// ending in &#34;/index.html&#34; to the same path, without the final</span>
+<span id="L678" class="ln">   678	</span><span class="comment">// &#34;index.html&#34;.</span>
+<span id="L679" class="ln">   679	</span>func FileServer(root FileSystem) Handler {
+<span id="L680" class="ln">   680	</span>	return &amp;fileHandler{root}
+<span id="L681" class="ln">   681	</span>}
+<span id="L682" class="ln">   682	</span>
+<span id="L683" class="ln">   683	</span>func (f *fileHandler) ServeHTTP(w ResponseWriter, r *Request) {
+<span id="L684" class="ln">   684	</span>	upath := r.URL.Path
+<span id="L685" class="ln">   685	</span>	if !strings.HasPrefix(upath, &#34;/&#34;) {
+<span id="L686" class="ln">   686	</span>		upath = &#34;/&#34; + upath
+<span id="L687" class="ln">   687	</span>		r.URL.Path = upath
+<span id="L688" class="ln">   688	</span>	}
+<span id="L689" class="ln">   689	</span>	serveFile(w, r, f.root, path.Clean(upath), true)
+<span id="L690" class="ln">   690	</span>}
+<span id="L691" class="ln">   691	</span>
+<span id="L692" class="ln">   692	</span><span class="comment">// httpRange specifies the byte range to be sent to the client.</span>
+<span id="L693" class="ln">   693	</span>type httpRange struct {
+<span id="L694" class="ln">   694	</span>	start, length int64
+<span id="L695" class="ln">   695	</span>}
+<span id="L696" class="ln">   696	</span>
+<span id="L697" class="ln">   697	</span>func (r httpRange) contentRange(size int64) string {
+<span id="L698" class="ln">   698	</span>	return fmt.Sprintf(&#34;bytes %d-%d/%d&#34;, r.start, r.start+r.length-1, size)
+<span id="L699" class="ln">   699	</span>}
+<span id="L700" class="ln">   700	</span>
+<span id="L701" class="ln">   701	</span>func (r httpRange) mimeHeader(contentType string, size int64) textproto.MIMEHeader {
+<span id="L702" class="ln">   702	</span>	return textproto.MIMEHeader{
+<span id="L703" class="ln">   703	</span>		&#34;Content-Range&#34;: {r.contentRange(size)},
+<span id="L704" class="ln">   704	</span>		&#34;Content-Type&#34;:  {contentType},
+<span id="L705" class="ln">   705	</span>	}
+<span id="L706" class="ln">   706	</span>}
+<span id="L707" class="ln">   707	</span>
+<span id="L708" class="ln">   708	</span><span class="comment">// parseRange parses a Range header string as per RFC 2616.</span>
+<span id="L709" class="ln">   709	</span><span class="comment">// errNoOverlap is returned if none of the ranges overlap.</span>
+<span id="L710" class="ln">   710	</span>func parseRange(s string, size int64) ([]httpRange, error) {
+<span id="L711" class="ln">   711	</span>	if s == &#34;&#34; {
+<span id="L712" class="ln">   712	</span>		return nil, nil <span class="comment">// header not present</span>
+<span id="L713" class="ln">   713	</span>	}
+<span id="L714" class="ln">   714	</span>	const b = &#34;bytes=&#34;
+<span id="L715" class="ln">   715	</span>	if !strings.HasPrefix(s, b) {
+<span id="L716" class="ln">   716	</span>		return nil, errors.New(&#34;invalid range&#34;)
+<span id="L717" class="ln">   717	</span>	}
+<span id="L718" class="ln">   718	</span>	var ranges []httpRange
+<span id="L719" class="ln">   719	</span>	noOverlap := false
+<span id="L720" class="ln">   720	</span>	for _, ra := range strings.Split(s[len(b):], &#34;,&#34;) {
+<span id="L721" class="ln">   721	</span>		ra = strings.TrimSpace(ra)
+<span id="L722" class="ln">   722	</span>		if ra == &#34;&#34; {
+<span id="L723" class="ln">   723	</span>			continue
+<span id="L724" class="ln">   724	</span>		}
+<span id="L725" class="ln">   725	</span>		i := strings.Index(ra, &#34;-&#34;)
+<span id="L726" class="ln">   726	</span>		if i &lt; 0 {
+<span id="L727" class="ln">   727	</span>			return nil, errors.New(&#34;invalid range&#34;)
+<span id="L728" class="ln">   728	</span>		}
+<span id="L729" class="ln">   729	</span>		start, end := strings.TrimSpace(ra[:i]), strings.TrimSpace(ra[i+1:])
+<span id="L730" class="ln">   730	</span>		var r httpRange
+<span id="L731" class="ln">   731	</span>		if start == &#34;&#34; {
+<span id="L732" class="ln">   732	</span>			<span class="comment">// If no start is specified, end specifies the</span>
+<span id="L733" class="ln">   733	</span>			<span class="comment">// range start relative to the end of the file.</span>
+<span id="L734" class="ln">   734	</span>			i, err := strconv.ParseInt(end, 10, 64)
+<span id="L735" class="ln">   735	</span>			if err != nil {
+<span id="L736" class="ln">   736	</span>				return nil, errors.New(&#34;invalid range&#34;)
+<span id="L737" class="ln">   737	</span>			}
+<span id="L738" class="ln">   738	</span>			if i &gt; size {
+<span id="L739" class="ln">   739	</span>				i = size
+<span id="L740" class="ln">   740	</span>			}
+<span id="L741" class="ln">   741	</span>			r.start = size - i
+<span id="L742" class="ln">   742	</span>			r.length = size - r.start
+<span id="L743" class="ln">   743	</span>		} else {
+<span id="L744" class="ln">   744	</span>			i, err := strconv.ParseInt(start, 10, 64)
+<span id="L745" class="ln">   745	</span>			if err != nil || i &lt; 0 {
+<span id="L746" class="ln">   746	</span>				return nil, errors.New(&#34;invalid range&#34;)
+<span id="L747" class="ln">   747	</span>			}
+<span id="L748" class="ln">   748	</span>			if i &gt;= size {
+<span id="L749" class="ln">   749	</span>				<span class="comment">// If the range begins after the size of the content,</span>
+<span id="L750" class="ln">   750	</span>				<span class="comment">// then it does not overlap.</span>
+<span id="L751" class="ln">   751	</span>				noOverlap = true
+<span id="L752" class="ln">   752	</span>				continue
+<span id="L753" class="ln">   753	</span>			}
+<span id="L754" class="ln">   754	</span>			r.start = i
+<span id="L755" class="ln">   755	</span>			if end == &#34;&#34; {
+<span id="L756" class="ln">   756	</span>				<span class="comment">// If no end is specified, range extends to end of the file.</span>
+<span id="L757" class="ln">   757	</span>				r.length = size - r.start
+<span id="L758" class="ln">   758	</span>			} else {
+<span id="L759" class="ln">   759	</span>				i, err := strconv.ParseInt(end, 10, 64)
+<span id="L760" class="ln">   760	</span>				if err != nil || r.start &gt; i {
+<span id="L761" class="ln">   761	</span>					return nil, errors.New(&#34;invalid range&#34;)
+<span id="L762" class="ln">   762	</span>				}
+<span id="L763" class="ln">   763	</span>				if i &gt;= size {
+<span id="L764" class="ln">   764	</span>					i = size - 1
+<span id="L765" class="ln">   765	</span>				}
+<span id="L766" class="ln">   766	</span>				r.length = i - r.start + 1
+<span id="L767" class="ln">   767	</span>			}
+<span id="L768" class="ln">   768	</span>		}
+<span id="L769" class="ln">   769	</span>		ranges = append(ranges, r)
+<span id="L770" class="ln">   770	</span>	}
+<span id="L771" class="ln">   771	</span>	if noOverlap &amp;&amp; len(ranges) == 0 {
+<span id="L772" class="ln">   772	</span>		<span class="comment">// The specified ranges did not overlap with the content.</span>
+<span id="L773" class="ln">   773	</span>		return nil, errNoOverlap
+<span id="L774" class="ln">   774	</span>	}
+<span id="L775" class="ln">   775	</span>	return ranges, nil
+<span id="L776" class="ln">   776	</span>}
+<span id="L777" class="ln">   777	</span>
+<span id="L778" class="ln">   778	</span><span class="comment">// countingWriter counts how many bytes have been written to it.</span>
+<span id="L779" class="ln">   779	</span>type countingWriter int64
+<span id="L780" class="ln">   780	</span>
+<span id="L781" class="ln">   781	</span>func (w *countingWriter) Write(p []byte) (n int, err error) {
+<span id="L782" class="ln">   782	</span>	*w += countingWriter(len(p))
+<span id="L783" class="ln">   783	</span>	return len(p), nil
+<span id="L784" class="ln">   784	</span>}
+<span id="L785" class="ln">   785	</span>
+<span id="L786" class="ln">   786	</span><span class="comment">// rangesMIMESize returns the number of bytes it takes to encode the</span>
+<span id="L787" class="ln">   787	</span><span class="comment">// provided ranges as a multipart response.</span>
+<span id="L788" class="ln">   788	</span>func rangesMIMESize(ranges []httpRange, contentType string, contentSize int64) (encSize int64) {
+<span id="L789" class="ln">   789	</span>	var w countingWriter
+<span id="L790" class="ln">   790	</span>	mw := multipart.NewWriter(&amp;w)
+<span id="L791" class="ln">   791	</span>	for _, ra := range ranges {
+<span id="L792" class="ln">   792	</span>		mw.CreatePart(ra.mimeHeader(contentType, contentSize))
+<span id="L793" class="ln">   793	</span>		encSize += ra.length
+<span id="L794" class="ln">   794	</span>	}
+<span id="L795" class="ln">   795	</span>	mw.Close()
+<span id="L796" class="ln">   796	</span>	encSize += int64(w)
+<span id="L797" class="ln">   797	</span>	return
+<span id="L798" class="ln">   798	</span>}
+<span id="L799" class="ln">   799	</span>
+<span id="L800" class="ln">   800	</span>func sumRangesSize(ranges []httpRange) (size int64) {
+<span id="L801" class="ln">   801	</span>	for _, ra := range ranges {
+<span id="L802" class="ln">   802	</span>		size += ra.length
+<span id="L803" class="ln">   803	</span>	}
+<span id="L804" class="ln">   804	</span>	return
+<span id="L805" class="ln">   805	</span>}
+<span id="L806" class="ln">   806	</span>
+</pre><p><a href="fs.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

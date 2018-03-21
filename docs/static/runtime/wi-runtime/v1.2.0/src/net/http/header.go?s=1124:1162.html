@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/http/header.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./header.go%3Fs=1124:1162.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/net/http/header.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package http
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>import (
+<span id="L8" class="ln">     8	</span>	&#34;io&#34;
+<span id="L9" class="ln">     9	</span>	&#34;net/textproto&#34;
+<span id="L10" class="ln">    10	</span>	&#34;sort&#34;
+<span id="L11" class="ln">    11	</span>	&#34;strings&#34;
+<span id="L12" class="ln">    12	</span>	&#34;sync&#34;
+<span id="L13" class="ln">    13	</span>	&#34;time&#34;
+<span id="L14" class="ln">    14	</span>)
+<span id="L15" class="ln">    15	</span>
+<span id="L16" class="ln">    16	</span>var raceEnabled = false <span class="comment">// set by race.go</span>
+<span id="L17" class="ln">    17	</span>
+<span id="L18" class="ln">    18	</span><span class="comment">// A Header represents the key-value pairs in an HTTP header.</span>
+<span id="L19" class="ln">    19	</span>type Header map[string][]string
+<span id="L20" class="ln">    20	</span>
+<span id="L21" class="ln">    21	</span><span class="comment">// Add adds the key, value pair to the header.</span>
+<span id="L22" class="ln">    22	</span><span class="comment">// It appends to any existing values associated with key.</span>
+<span id="L23" class="ln">    23	</span>func (h Header) Add(key, value string) {
+<span id="L24" class="ln">    24	</span>	textproto.MIMEHeader(h).Add(key, value)
+<span id="L25" class="ln">    25	</span>}
+<span id="L26" class="ln">    26	</span>
+<span id="L27" class="ln">    27	</span><span class="comment">// Set sets the header entries associated with key to</span>
+<span id="L28" class="ln">    28	</span><span class="comment">// the single element value. It replaces any existing</span>
+<span id="L29" class="ln">    29	</span><span class="comment">// values associated with key.</span>
+<span id="L30" class="ln">    30	</span>func (h Header) Set(key, value string) {
+<span id="L31" class="ln">    31	</span>	textproto.MIMEHeader(h).Set(key, value)
+<span id="L32" class="ln">    32	</span>}
+<span id="L33" class="ln">    33	</span>
+<span id="L34" class="ln">    34	</span><span class="comment">// Get gets the first value associated with the given key.</span>
+<span id="L35" class="ln">    35	</span><span class="comment">// It is case insensitive; textproto.CanonicalMIMEHeaderKey is used</span>
+<span id="L36" class="ln">    36	</span><span class="comment">// to canonicalize the provided key.</span>
+<span id="L37" class="ln">    37	</span><span class="comment">// If there are no values associated with the key, Get returns &#34;&#34;.</span>
+<span id="L38" class="ln">    38	</span><span class="comment">// To access multiple values of a key, or to use non-canonical keys,</span>
+<span id="L39" class="ln">    39	</span><span class="comment">// access the map directly.</span>
+<span id="L40" class="ln">    40	</span><span class="selection">func (h Header) Get(key string) string</span> {
+<span id="L41" class="ln">    41	</span>	return textproto.MIMEHeader(h).Get(key)
+<span id="L42" class="ln">    42	</span>}
+<span id="L43" class="ln">    43	</span>
+<span id="L44" class="ln">    44	</span><span class="comment">// get is like Get, but key must already be in CanonicalHeaderKey form.</span>
+<span id="L45" class="ln">    45	</span>func (h Header) get(key string) string {
+<span id="L46" class="ln">    46	</span>	if v := h[key]; len(v) &gt; 0 {
+<span id="L47" class="ln">    47	</span>		return v[0]
+<span id="L48" class="ln">    48	</span>	}
+<span id="L49" class="ln">    49	</span>	return &#34;&#34;
+<span id="L50" class="ln">    50	</span>}
+<span id="L51" class="ln">    51	</span>
+<span id="L52" class="ln">    52	</span><span class="comment">// Del deletes the values associated with key.</span>
+<span id="L53" class="ln">    53	</span>func (h Header) Del(key string) {
+<span id="L54" class="ln">    54	</span>	textproto.MIMEHeader(h).Del(key)
+<span id="L55" class="ln">    55	</span>}
+<span id="L56" class="ln">    56	</span>
+<span id="L57" class="ln">    57	</span><span class="comment">// Write writes a header in wire format.</span>
+<span id="L58" class="ln">    58	</span>func (h Header) Write(w io.Writer) error {
+<span id="L59" class="ln">    59	</span>	return h.WriteSubset(w, nil)
+<span id="L60" class="ln">    60	</span>}
+<span id="L61" class="ln">    61	</span>
+<span id="L62" class="ln">    62	</span>func (h Header) clone() Header {
+<span id="L63" class="ln">    63	</span>	h2 := make(Header, len(h))
+<span id="L64" class="ln">    64	</span>	for k, vv := range h {
+<span id="L65" class="ln">    65	</span>		vv2 := make([]string, len(vv))
+<span id="L66" class="ln">    66	</span>		copy(vv2, vv)
+<span id="L67" class="ln">    67	</span>		h2[k] = vv2
+<span id="L68" class="ln">    68	</span>	}
+<span id="L69" class="ln">    69	</span>	return h2
+<span id="L70" class="ln">    70	</span>}
+<span id="L71" class="ln">    71	</span>
+<span id="L72" class="ln">    72	</span>var timeFormats = []string{
+<span id="L73" class="ln">    73	</span>	TimeFormat,
+<span id="L74" class="ln">    74	</span>	time.RFC850,
+<span id="L75" class="ln">    75	</span>	time.ANSIC,
+<span id="L76" class="ln">    76	</span>}
+<span id="L77" class="ln">    77	</span>
+<span id="L78" class="ln">    78	</span><span class="comment">// ParseTime parses a time header (such as the Date: header),</span>
+<span id="L79" class="ln">    79	</span><span class="comment">// trying each of the three formats allowed by HTTP/1.1:</span>
+<span id="L80" class="ln">    80	</span><span class="comment">// TimeFormat, time.RFC850, and time.ANSIC.</span>
+<span id="L81" class="ln">    81	</span>func ParseTime(text string) (t time.Time, err error) {
+<span id="L82" class="ln">    82	</span>	for _, layout := range timeFormats {
+<span id="L83" class="ln">    83	</span>		t, err = time.Parse(layout, text)
+<span id="L84" class="ln">    84	</span>		if err == nil {
+<span id="L85" class="ln">    85	</span>			return
+<span id="L86" class="ln">    86	</span>		}
+<span id="L87" class="ln">    87	</span>	}
+<span id="L88" class="ln">    88	</span>	return
+<span id="L89" class="ln">    89	</span>}
+<span id="L90" class="ln">    90	</span>
+<span id="L91" class="ln">    91	</span>var headerNewlineToSpace = strings.NewReplacer(&#34;\n&#34;, &#34; &#34;, &#34;\r&#34;, &#34; &#34;)
+<span id="L92" class="ln">    92	</span>
+<span id="L93" class="ln">    93	</span>type writeStringer interface {
+<span id="L94" class="ln">    94	</span>	WriteString(string) (int, error)
+<span id="L95" class="ln">    95	</span>}
+<span id="L96" class="ln">    96	</span>
+<span id="L97" class="ln">    97	</span><span class="comment">// stringWriter implements WriteString on a Writer.</span>
+<span id="L98" class="ln">    98	</span>type stringWriter struct {
+<span id="L99" class="ln">    99	</span>	w io.Writer
+<span id="L100" class="ln">   100	</span>}
+<span id="L101" class="ln">   101	</span>
+<span id="L102" class="ln">   102	</span>func (w stringWriter) WriteString(s string) (n int, err error) {
+<span id="L103" class="ln">   103	</span>	return w.w.Write([]byte(s))
+<span id="L104" class="ln">   104	</span>}
+<span id="L105" class="ln">   105	</span>
+<span id="L106" class="ln">   106	</span>type keyValues struct {
+<span id="L107" class="ln">   107	</span>	key    string
+<span id="L108" class="ln">   108	</span>	values []string
+<span id="L109" class="ln">   109	</span>}
+<span id="L110" class="ln">   110	</span>
+<span id="L111" class="ln">   111	</span><span class="comment">// A headerSorter implements sort.Interface by sorting a []keyValues</span>
+<span id="L112" class="ln">   112	</span><span class="comment">// by key. It&#39;s used as a pointer, so it can fit in a sort.Interface</span>
+<span id="L113" class="ln">   113	</span><span class="comment">// interface value without allocation.</span>
+<span id="L114" class="ln">   114	</span>type headerSorter struct {
+<span id="L115" class="ln">   115	</span>	kvs []keyValues
+<span id="L116" class="ln">   116	</span>}
+<span id="L117" class="ln">   117	</span>
+<span id="L118" class="ln">   118	</span>func (s *headerSorter) Len() int           { return len(s.kvs) }
+<span id="L119" class="ln">   119	</span>func (s *headerSorter) Swap(i, j int)      { s.kvs[i], s.kvs[j] = s.kvs[j], s.kvs[i] }
+<span id="L120" class="ln">   120	</span>func (s *headerSorter) Less(i, j int) bool { return s.kvs[i].key &lt; s.kvs[j].key }
+<span id="L121" class="ln">   121	</span>
+<span id="L122" class="ln">   122	</span>var headerSorterPool = sync.Pool{
+<span id="L123" class="ln">   123	</span>	New: func() interface{} { return new(headerSorter) },
+<span id="L124" class="ln">   124	</span>}
+<span id="L125" class="ln">   125	</span>
+<span id="L126" class="ln">   126	</span><span class="comment">// sortedKeyValues returns h&#39;s keys sorted in the returned kvs</span>
+<span id="L127" class="ln">   127	</span><span class="comment">// slice. The headerSorter used to sort is also returned, for possible</span>
+<span id="L128" class="ln">   128	</span><span class="comment">// return to headerSorterCache.</span>
+<span id="L129" class="ln">   129	</span>func (h Header) sortedKeyValues(exclude map[string]bool) (kvs []keyValues, hs *headerSorter) {
+<span id="L130" class="ln">   130	</span>	hs = headerSorterPool.Get().(*headerSorter)
+<span id="L131" class="ln">   131	</span>	if cap(hs.kvs) &lt; len(h) {
+<span id="L132" class="ln">   132	</span>		hs.kvs = make([]keyValues, 0, len(h))
+<span id="L133" class="ln">   133	</span>	}
+<span id="L134" class="ln">   134	</span>	kvs = hs.kvs[:0]
+<span id="L135" class="ln">   135	</span>	for k, vv := range h {
+<span id="L136" class="ln">   136	</span>		if !exclude[k] {
+<span id="L137" class="ln">   137	</span>			kvs = append(kvs, keyValues{k, vv})
+<span id="L138" class="ln">   138	</span>		}
+<span id="L139" class="ln">   139	</span>	}
+<span id="L140" class="ln">   140	</span>	hs.kvs = kvs
+<span id="L141" class="ln">   141	</span>	sort.Sort(hs)
+<span id="L142" class="ln">   142	</span>	return kvs, hs
+<span id="L143" class="ln">   143	</span>}
+<span id="L144" class="ln">   144	</span>
+<span id="L145" class="ln">   145	</span><span class="comment">// WriteSubset writes a header in wire format.</span>
+<span id="L146" class="ln">   146	</span><span class="comment">// If exclude is not nil, keys where exclude[key] == true are not written.</span>
+<span id="L147" class="ln">   147	</span>func (h Header) WriteSubset(w io.Writer, exclude map[string]bool) error {
+<span id="L148" class="ln">   148	</span>	ws, ok := w.(writeStringer)
+<span id="L149" class="ln">   149	</span>	if !ok {
+<span id="L150" class="ln">   150	</span>		ws = stringWriter{w}
+<span id="L151" class="ln">   151	</span>	}
+<span id="L152" class="ln">   152	</span>	kvs, sorter := h.sortedKeyValues(exclude)
+<span id="L153" class="ln">   153	</span>	for _, kv := range kvs {
+<span id="L154" class="ln">   154	</span>		for _, v := range kv.values {
+<span id="L155" class="ln">   155	</span>			v = headerNewlineToSpace.Replace(v)
+<span id="L156" class="ln">   156	</span>			v = textproto.TrimString(v)
+<span id="L157" class="ln">   157	</span>			for _, s := range []string{kv.key, &#34;: &#34;, v, &#34;\r\n&#34;} {
+<span id="L158" class="ln">   158	</span>				if _, err := ws.WriteString(s); err != nil {
+<span id="L159" class="ln">   159	</span>					return err
+<span id="L160" class="ln">   160	</span>				}
+<span id="L161" class="ln">   161	</span>			}
+<span id="L162" class="ln">   162	</span>		}
+<span id="L163" class="ln">   163	</span>	}
+<span id="L164" class="ln">   164	</span>	headerSorterPool.Put(sorter)
+<span id="L165" class="ln">   165	</span>	return nil
+<span id="L166" class="ln">   166	</span>}
+<span id="L167" class="ln">   167	</span>
+<span id="L168" class="ln">   168	</span><span class="comment">// CanonicalHeaderKey returns the canonical format of the</span>
+<span id="L169" class="ln">   169	</span><span class="comment">// header key s. The canonicalization converts the first</span>
+<span id="L170" class="ln">   170	</span><span class="comment">// letter and any letter following a hyphen to upper case;</span>
+<span id="L171" class="ln">   171	</span><span class="comment">// the rest are converted to lowercase. For example, the</span>
+<span id="L172" class="ln">   172	</span><span class="comment">// canonical key for &#34;accept-encoding&#34; is &#34;Accept-Encoding&#34;.</span>
+<span id="L173" class="ln">   173	</span><span class="comment">// If s contains a space or invalid header field bytes, it is</span>
+<span id="L174" class="ln">   174	</span><span class="comment">// returned without modifications.</span>
+<span id="L175" class="ln">   175	</span>func CanonicalHeaderKey(s string) string { return textproto.CanonicalMIMEHeaderKey(s) }
+<span id="L176" class="ln">   176	</span>
+<span id="L177" class="ln">   177	</span><span class="comment">// hasToken reports whether token appears with v, ASCII</span>
+<span id="L178" class="ln">   178	</span><span class="comment">// case-insensitive, with space or comma boundaries.</span>
+<span id="L179" class="ln">   179	</span><span class="comment">// token must be all lowercase.</span>
+<span id="L180" class="ln">   180	</span><span class="comment">// v may contain mixed cased.</span>
+<span id="L181" class="ln">   181	</span>func hasToken(v, token string) bool {
+<span id="L182" class="ln">   182	</span>	if len(token) &gt; len(v) || token == &#34;&#34; {
+<span id="L183" class="ln">   183	</span>		return false
+<span id="L184" class="ln">   184	</span>	}
+<span id="L185" class="ln">   185	</span>	if v == token {
+<span id="L186" class="ln">   186	</span>		return true
+<span id="L187" class="ln">   187	</span>	}
+<span id="L188" class="ln">   188	</span>	for sp := 0; sp &lt;= len(v)-len(token); sp++ {
+<span id="L189" class="ln">   189	</span>		<span class="comment">// Check that first character is good.</span>
+<span id="L190" class="ln">   190	</span>		<span class="comment">// The token is ASCII, so checking only a single byte</span>
+<span id="L191" class="ln">   191	</span>		<span class="comment">// is sufficient. We skip this potential starting</span>
+<span id="L192" class="ln">   192	</span>		<span class="comment">// position if both the first byte and its potential</span>
+<span id="L193" class="ln">   193	</span>		<span class="comment">// ASCII uppercase equivalent (b|0x20) don&#39;t match.</span>
+<span id="L194" class="ln">   194	</span>		<span class="comment">// False positives (&#39;^&#39; =&gt; &#39;~&#39;) are caught by EqualFold.</span>
+<span id="L195" class="ln">   195	</span>		if b := v[sp]; b != token[0] &amp;&amp; b|0x20 != token[0] {
+<span id="L196" class="ln">   196	</span>			continue
+<span id="L197" class="ln">   197	</span>		}
+<span id="L198" class="ln">   198	</span>		<span class="comment">// Check that start pos is on a valid token boundary.</span>
+<span id="L199" class="ln">   199	</span>		if sp &gt; 0 &amp;&amp; !isTokenBoundary(v[sp-1]) {
+<span id="L200" class="ln">   200	</span>			continue
+<span id="L201" class="ln">   201	</span>		}
+<span id="L202" class="ln">   202	</span>		<span class="comment">// Check that end pos is on a valid token boundary.</span>
+<span id="L203" class="ln">   203	</span>		if endPos := sp + len(token); endPos != len(v) &amp;&amp; !isTokenBoundary(v[endPos]) {
+<span id="L204" class="ln">   204	</span>			continue
+<span id="L205" class="ln">   205	</span>		}
+<span id="L206" class="ln">   206	</span>		if strings.EqualFold(v[sp:sp+len(token)], token) {
+<span id="L207" class="ln">   207	</span>			return true
+<span id="L208" class="ln">   208	</span>		}
+<span id="L209" class="ln">   209	</span>	}
+<span id="L210" class="ln">   210	</span>	return false
+<span id="L211" class="ln">   211	</span>}
+<span id="L212" class="ln">   212	</span>
+<span id="L213" class="ln">   213	</span>func isTokenBoundary(b byte) bool {
+<span id="L214" class="ln">   214	</span>	return b == &#39; &#39; || b == &#39;,&#39; || b == &#39;\t&#39;
+<span id="L215" class="ln">   215	</span>}
+<span id="L216" class="ln">   216	</span>
+<span id="L217" class="ln">   217	</span>func cloneHeader(h Header) Header {
+<span id="L218" class="ln">   218	</span>	h2 := make(Header, len(h))
+<span id="L219" class="ln">   219	</span>	for k, vv := range h {
+<span id="L220" class="ln">   220	</span>		vv2 := make([]string, len(vv))
+<span id="L221" class="ln">   221	</span>		copy(vv2, vv)
+<span id="L222" class="ln">   222	</span>		h2[k] = vv2
+<span id="L223" class="ln">   223	</span>	}
+<span id="L224" class="ln">   224	</span>	return h2
+<span id="L225" class="ln">   225	</span>}
+<span id="L226" class="ln">   226	</span>
+</pre><p><a href="header.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

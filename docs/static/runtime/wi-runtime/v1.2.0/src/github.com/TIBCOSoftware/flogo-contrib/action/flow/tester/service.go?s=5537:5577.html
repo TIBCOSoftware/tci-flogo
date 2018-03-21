@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/github.com/TIBCOSoftware/flogo-contrib/action/flow/tester/service.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../../../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../../../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./service.go%3Fs=5537:5577.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/github.com/TIBCOSoftware/flogo-contrib/action/flow/tester/service.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span>package tester
+<span id="L2" class="ln">     2	</span>
+<span id="L3" class="ln">     3	</span>import (
+<span id="L4" class="ln">     4	</span>	&#34;encoding/json&#34;
+<span id="L5" class="ln">     5	</span>	&#34;net/http&#34;
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>	&#34;github.com/TIBCOSoftware/flogo-contrib/action/flow/instance&#34;
+<span id="L8" class="ln">     8	</span>	&#34;github.com/TIBCOSoftware/flogo-contrib/action/flow/service&#34;
+<span id="L9" class="ln">     9	</span>	&#34;github.com/TIBCOSoftware/flogo-lib/logger&#34;
+<span id="L10" class="ln">    10	</span>	&#34;github.com/TIBCOSoftware/flogo-lib/util&#34;
+<span id="L11" class="ln">    11	</span>	&#34;github.com/julienschmidt/httprouter&#34;
+<span id="L12" class="ln">    12	</span>)
+<span id="L13" class="ln">    13	</span>
+<span id="L14" class="ln">    14	</span><span class="comment">// RestEngineTester is default REST implementation of the EngineTester</span>
+<span id="L15" class="ln">    15	</span>type RestEngineTester struct {
+<span id="L16" class="ln">    16	</span>	reqProcessor *RequestProcessor
+<span id="L17" class="ln">    17	</span>	server       *Server
+<span id="L18" class="ln">    18	</span>	enabled      bool
+<span id="L19" class="ln">    19	</span>}
+<span id="L20" class="ln">    20	</span>
+<span id="L21" class="ln">    21	</span><span class="comment">// NewRestEngineTester creates a new REST EngineTester</span>
+<span id="L22" class="ln">    22	</span>func NewRestEngineTester(config *util.ServiceConfig) *RestEngineTester {
+<span id="L23" class="ln">    23	</span>	et := &amp;RestEngineTester{enabled: config.Enabled}
+<span id="L24" class="ln">    24	</span>	et.init(config.Settings)
+<span id="L25" class="ln">    25	</span>	et.reqProcessor = NewRequestProcessor()
+<span id="L26" class="ln">    26	</span>
+<span id="L27" class="ln">    27	</span>	return et
+<span id="L28" class="ln">    28	</span>}
+<span id="L29" class="ln">    29	</span>
+<span id="L30" class="ln">    30	</span>func (et *RestEngineTester) Name() string {
+<span id="L31" class="ln">    31	</span>	return service.ServiceEngineTester
+<span id="L32" class="ln">    32	</span>}
+<span id="L33" class="ln">    33	</span>
+<span id="L34" class="ln">    34	</span>func (et *RestEngineTester) Enabled() bool {
+<span id="L35" class="ln">    35	</span>	return et.enabled
+<span id="L36" class="ln">    36	</span>}
+<span id="L37" class="ln">    37	</span>
+<span id="L38" class="ln">    38	</span><span class="comment">// Start implements engine.EngineTester.Start</span>
+<span id="L39" class="ln">    39	</span>func (et *RestEngineTester) Start() error {
+<span id="L40" class="ln">    40	</span>	return et.server.Start()
+<span id="L41" class="ln">    41	</span>}
+<span id="L42" class="ln">    42	</span>
+<span id="L43" class="ln">    43	</span><span class="comment">// Stop implements engine.EngineTester.Stop</span>
+<span id="L44" class="ln">    44	</span>func (et *RestEngineTester) Stop() error {
+<span id="L45" class="ln">    45	</span>	return et.server.Stop()
+<span id="L46" class="ln">    46	</span>}
+<span id="L47" class="ln">    47	</span>
+<span id="L48" class="ln">    48	</span><span class="comment">// Init implements engine.EngineTester.Init</span>
+<span id="L49" class="ln">    49	</span>func (et *RestEngineTester) init(settings map[string]string) {
+<span id="L50" class="ln">    50	</span>
+<span id="L51" class="ln">    51	</span>	router := httprouter.New()
+<span id="L52" class="ln">    52	</span>	router.OPTIONS(&#34;/flow/start&#34;, handleOption)
+<span id="L53" class="ln">    53	</span>	router.POST(&#34;/flow/start&#34;, et.StartFlow)
+<span id="L54" class="ln">    54	</span>
+<span id="L55" class="ln">    55	</span>	router.OPTIONS(&#34;/flow/restart&#34;, handleOption)
+<span id="L56" class="ln">    56	</span>	router.POST(&#34;/flow/restart&#34;, et.RestartFlow)
+<span id="L57" class="ln">    57	</span>
+<span id="L58" class="ln">    58	</span>	router.OPTIONS(&#34;/flow/resume&#34;, handleOption)
+<span id="L59" class="ln">    59	</span>	router.POST(&#34;/flow/resume&#34;, et.ResumeFlow)
+<span id="L60" class="ln">    60	</span>
+<span id="L61" class="ln">    61	</span>	router.OPTIONS(&#34;/status&#34;, handleOption)
+<span id="L62" class="ln">    62	</span>	router.GET(&#34;/status&#34;, et.Status)
+<span id="L63" class="ln">    63	</span>
+<span id="L64" class="ln">    64	</span>	addr := &#34;:&#34; + settings[&#34;port&#34;]
+<span id="L65" class="ln">    65	</span>	et.server = NewServer(addr, router)
+<span id="L66" class="ln">    66	</span>}
+<span id="L67" class="ln">    67	</span>
+<span id="L68" class="ln">    68	</span>func handleOption(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+<span id="L69" class="ln">    69	</span>	w.Header().Add(&#34;Access-Control-Allow-Origin&#34;, &#34;*&#34;)
+<span id="L70" class="ln">    70	</span>	w.Header().Set(&#34;Access-Control-Allow-Methods&#34;, &#34;*&#34;)
+<span id="L71" class="ln">    71	</span>	w.Header().Add(&#34;Access-Control-Allow-Headers&#34;, &#34;Content-Type&#34;)
+<span id="L72" class="ln">    72	</span>	w.Header().Add(&#34;Access-Control-Allow-Headers&#34;, &#34;Origin&#34;)
+<span id="L73" class="ln">    73	</span>	w.Header().Add(&#34;Access-Control-Allow-Headers&#34;, &#34;X-Requested-With&#34;)
+<span id="L74" class="ln">    74	</span>	w.Header().Add(&#34;Access-Control-Allow-Headers&#34;, &#34;Accept&#34;)
+<span id="L75" class="ln">    75	</span>	w.Header().Add(&#34;Access-Control-Allow-Headers&#34;, &#34;Accept-Language&#34;)
+<span id="L76" class="ln">    76	</span>	w.Header().Set(&#34;Content-Type&#34;, &#34;application/json&#34;)
+<span id="L77" class="ln">    77	</span>}
+<span id="L78" class="ln">    78	</span>
+<span id="L79" class="ln">    79	</span><span class="comment">// StartFlow starts a new Flow Instance (POST &#34;/flow/start&#34;).</span>
+<span id="L80" class="ln">    80	</span><span class="comment">//</span>
+<span id="L81" class="ln">    81	</span><span class="comment">// To post a start flow, try this at a shell:</span>
+<span id="L82" class="ln">    82	</span><span class="comment">// $ curl -H &#34;Content-Type: application/json&#34; -X POST -d &#39;{&#34;flowUri&#34;:&#34;base&#34;}&#39; http://localhost:8080/flow/start</span>
+<span id="L83" class="ln">    83	</span>func (et *RestEngineTester) StartFlow(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+<span id="L84" class="ln">    84	</span>
+<span id="L85" class="ln">    85	</span>	w.Header().Add(&#34;Access-Control-Allow-Origin&#34;, &#34;*&#34;)
+<span id="L86" class="ln">    86	</span>
+<span id="L87" class="ln">    87	</span>	req := &amp;StartRequest{}
+<span id="L88" class="ln">    88	</span>	err := json.NewDecoder(r.Body).Decode(req)
+<span id="L89" class="ln">    89	</span>	if err != nil {
+<span id="L90" class="ln">    90	</span>		http.Error(w, err.Error(), http.StatusBadRequest)
+<span id="L91" class="ln">    91	</span>		return
+<span id="L92" class="ln">    92	</span>	}
+<span id="L93" class="ln">    93	</span>
+<span id="L94" class="ln">    94	</span>	_, data, err := et.reqProcessor.StartFlow(req)
+<span id="L95" class="ln">    95	</span>
+<span id="L96" class="ln">    96	</span>	if err != nil {
+<span id="L97" class="ln">    97	</span>		http.Error(w, err.Error(), http.StatusBadRequest)
+<span id="L98" class="ln">    98	</span>		return
+<span id="L99" class="ln">    99	</span>	}
+<span id="L100" class="ln">   100	</span>
+<span id="L101" class="ln">   101	</span>	if data != nil {
+<span id="L102" class="ln">   102	</span>		idResponse := data.(*instance.IDResponse)
+<span id="L103" class="ln">   103	</span>
+<span id="L104" class="ln">   104	</span>		logger.Debugf(&#34;Started Instance [ID:%s] for %s&#34;, idResponse.ID, req.FlowURI)
+<span id="L105" class="ln">   105	</span>
+<span id="L106" class="ln">   106	</span>		encoder := json.NewEncoder(w)
+<span id="L107" class="ln">   107	</span>		encoder.Encode(data)
+<span id="L108" class="ln">   108	</span>	} else {
+<span id="L109" class="ln">   109	</span>		w.WriteHeader(http.StatusOK)
+<span id="L110" class="ln">   110	</span>	}
+<span id="L111" class="ln">   111	</span>}
+<span id="L112" class="ln">   112	</span>
+<span id="L113" class="ln">   113	</span><span class="comment">// RestartFlow restarts a Flow Instance (POST &#34;/flow/restart&#34;).</span>
+<span id="L114" class="ln">   114	</span><span class="comment">//</span>
+<span id="L115" class="ln">   115	</span><span class="comment">// To post a restart flow, try this at a shell:</span>
+<span id="L116" class="ln">   116	</span><span class="comment">// $ curl -H &#34;Content-Type: application/json&#34; -X POST -d &#39;{...}&#39; http://localhost:8080/flow/restart</span>
+<span id="L117" class="ln">   117	</span>func (et *RestEngineTester) RestartFlow(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+<span id="L118" class="ln">   118	</span>
+<span id="L119" class="ln">   119	</span>	w.Header().Add(&#34;Access-Control-Allow-Origin&#34;, &#34;*&#34;)
+<span id="L120" class="ln">   120	</span>
+<span id="L121" class="ln">   121	</span>	<span class="comment">//defer func() {</span>
+<span id="L122" class="ln">   122	</span>	<span class="comment">//	if r := recover(); r != nil {</span>
+<span id="L123" class="ln">   123	</span>	<span class="comment">//		logger.Error(&#34;Unable to restart flow, make sure definition registered&#34;)</span>
+<span id="L124" class="ln">   124	</span>	<span class="comment">//	}</span>
+<span id="L125" class="ln">   125	</span>	<span class="comment">//}()</span>
+<span id="L126" class="ln">   126	</span>
+<span id="L127" class="ln">   127	</span>	req := &amp;RestartRequest{}
+<span id="L128" class="ln">   128	</span>	err := json.NewDecoder(r.Body).Decode(req)
+<span id="L129" class="ln">   129	</span>	if err != nil {
+<span id="L130" class="ln">   130	</span>		http.Error(w, err.Error(), http.StatusBadRequest)
+<span id="L131" class="ln">   131	</span>		return
+<span id="L132" class="ln">   132	</span>	}
+<span id="L133" class="ln">   133	</span>
+<span id="L134" class="ln">   134	</span>	_, data, err := et.reqProcessor.RestartFlow(req)
+<span id="L135" class="ln">   135	</span>
+<span id="L136" class="ln">   136	</span>	if err != nil {
+<span id="L137" class="ln">   137	</span>		http.Error(w, err.Error(), http.StatusBadRequest)
+<span id="L138" class="ln">   138	</span>		return
+<span id="L139" class="ln">   139	</span>	}
+<span id="L140" class="ln">   140	</span>
+<span id="L141" class="ln">   141	</span>	if data != nil {
+<span id="L142" class="ln">   142	</span>		idResponse := data.(*instance.IDResponse)
+<span id="L143" class="ln">   143	</span>
+<span id="L144" class="ln">   144	</span>		logger.Debugf(&#34;Restarted Instance [ID:%s] for %s&#34;, idResponse.ID, req.InitialState.FlowURI)
+<span id="L145" class="ln">   145	</span>
+<span id="L146" class="ln">   146	</span>		encoder := json.NewEncoder(w)
+<span id="L147" class="ln">   147	</span>		encoder.Encode(data)
+<span id="L148" class="ln">   148	</span>	} else {
+<span id="L149" class="ln">   149	</span>		w.WriteHeader(http.StatusOK)
+<span id="L150" class="ln">   150	</span>	}
+<span id="L151" class="ln">   151	</span>}
+<span id="L152" class="ln">   152	</span>
+<span id="L153" class="ln">   153	</span><span class="comment">// ResumeFlow resumes a Flow Instance (POST &#34;/flow/resume&#34;).</span>
+<span id="L154" class="ln">   154	</span><span class="comment">//</span>
+<span id="L155" class="ln">   155	</span><span class="comment">// To post a resume flow, try this at a shell:</span>
+<span id="L156" class="ln">   156	</span><span class="comment">// $ curl -H &#34;Content-Type: application/json&#34; -X POST -d &#39;{...}&#39; http://localhost:8080/flow/resume</span>
+<span id="L157" class="ln">   157	</span>func (et *RestEngineTester) ResumeFlow(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+<span id="L158" class="ln">   158	</span>
+<span id="L159" class="ln">   159	</span>	w.Header().Add(&#34;Access-Control-Allow-Origin&#34;, &#34;*&#34;)
+<span id="L160" class="ln">   160	</span>
+<span id="L161" class="ln">   161	</span>	defer func() {
+<span id="L162" class="ln">   162	</span>		if r := recover(); r != nil {
+<span id="L163" class="ln">   163	</span>			logger.Error(&#34;Unable to resume flow, make sure definition registered&#34;)
+<span id="L164" class="ln">   164	</span>		}
+<span id="L165" class="ln">   165	</span>	}()
+<span id="L166" class="ln">   166	</span>
+<span id="L167" class="ln">   167	</span>	req := &amp;ResumeRequest{}
+<span id="L168" class="ln">   168	</span>	err := json.NewDecoder(r.Body).Decode(req)
+<span id="L169" class="ln">   169	</span>	if err != nil {
+<span id="L170" class="ln">   170	</span>		http.Error(w, err.Error(), http.StatusBadRequest)
+<span id="L171" class="ln">   171	</span>		return
+<span id="L172" class="ln">   172	</span>	}
+<span id="L173" class="ln">   173	</span>
+<span id="L174" class="ln">   174	</span>	_, data, err := et.reqProcessor.ResumeFlow(req)
+<span id="L175" class="ln">   175	</span>
+<span id="L176" class="ln">   176	</span>	if err != nil {
+<span id="L177" class="ln">   177	</span>		http.Error(w, err.Error(), http.StatusBadRequest)
+<span id="L178" class="ln">   178	</span>		return
+<span id="L179" class="ln">   179	</span>	}
+<span id="L180" class="ln">   180	</span>
+<span id="L181" class="ln">   181	</span>	if data != nil {
+<span id="L182" class="ln">   182	</span>		idResponse := data.(*instance.IDResponse)
+<span id="L183" class="ln">   183	</span>
+<span id="L184" class="ln">   184	</span>		logger.Debugf(&#34;Resumed Instance [ID:%s] for %s&#34;, idResponse.ID, req.State.FlowURI)
+<span id="L185" class="ln">   185	</span>
+<span id="L186" class="ln">   186	</span>		encoder := json.NewEncoder(w)
+<span id="L187" class="ln">   187	</span>		encoder.Encode(data)
+<span id="L188" class="ln">   188	</span>	} else {
+<span id="L189" class="ln">   189	</span>		w.WriteHeader(http.StatusOK)
+<span id="L190" class="ln">   190	</span>	}
+<span id="L191" class="ln">   191	</span>}
+<span id="L192" class="ln">   192	</span>
+<span id="L193" class="ln">   193	</span><span class="comment">// Status is a basic health check for the server to determine if it is up</span>
+<span id="L194" class="ln">   194	</span>func (et *RestEngineTester) Status(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+<span id="L195" class="ln">   195	</span>
+<span id="L196" class="ln">   196	</span>	w.Header().Add(&#34;Access-Control-Allow-Origin&#34;, &#34;*&#34;)
+<span id="L197" class="ln">   197	</span>
+<span id="L198" class="ln">   198	</span>	w.Write([]byte(`{&#34;status&#34;:&#34;ok&#34;}`))
+<span id="L199" class="ln">   199	</span>	<span class="comment">//w.WriteHeader(http.StatusOK)</span>
+<span id="L200" class="ln">   200	</span>}
+<span id="L201" class="ln">   201	</span>
+<span id="L202" class="ln">   202	</span><span class="selection">func DefaultConfig() *util.ServiceConfig</span> {
+<span id="L203" class="ln">   203	</span>	return &amp;util.ServiceConfig{Name: service.ServiceEngineTester, Enabled: true, Settings: map[string]string{&#34;port&#34;: &#34;8080&#34;}}
+<span id="L204" class="ln">   204	</span>}
+<span id="L205" class="ln">   205	</span>
+</pre><p><a href="service.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../../../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../../../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../../../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../../../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

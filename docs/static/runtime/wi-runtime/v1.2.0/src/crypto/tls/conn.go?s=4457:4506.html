@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/tls/conn.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./conn.go%3Fs=4457:4506.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/crypto/tls/conn.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// TLS low level connection and record layer</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package tls
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;bytes&#34;
+<span id="L11" class="ln">    11	</span>	&#34;crypto/cipher&#34;
+<span id="L12" class="ln">    12	</span>	&#34;crypto/subtle&#34;
+<span id="L13" class="ln">    13	</span>	&#34;crypto/x509&#34;
+<span id="L14" class="ln">    14	</span>	&#34;errors&#34;
+<span id="L15" class="ln">    15	</span>	&#34;fmt&#34;
+<span id="L16" class="ln">    16	</span>	&#34;io&#34;
+<span id="L17" class="ln">    17	</span>	&#34;net&#34;
+<span id="L18" class="ln">    18	</span>	&#34;sync&#34;
+<span id="L19" class="ln">    19	</span>	&#34;sync/atomic&#34;
+<span id="L20" class="ln">    20	</span>	&#34;time&#34;
+<span id="L21" class="ln">    21	</span>)
+<span id="L22" class="ln">    22	</span>
+<span id="L23" class="ln">    23	</span><span class="comment">// A Conn represents a secured connection.</span>
+<span id="L24" class="ln">    24	</span><span class="comment">// It implements the net.Conn interface.</span>
+<span id="L25" class="ln">    25	</span>type Conn struct {
+<span id="L26" class="ln">    26	</span>	<span class="comment">// constant</span>
+<span id="L27" class="ln">    27	</span>	conn     net.Conn
+<span id="L28" class="ln">    28	</span>	isClient bool
+<span id="L29" class="ln">    29	</span>
+<span id="L30" class="ln">    30	</span>	<span class="comment">// constant after handshake; protected by handshakeMutex</span>
+<span id="L31" class="ln">    31	</span>	handshakeMutex sync.Mutex <span class="comment">// handshakeMutex &lt; in.Mutex, out.Mutex, errMutex</span>
+<span id="L32" class="ln">    32	</span>	<span class="comment">// handshakeCond, if not nil, indicates that a goroutine is committed</span>
+<span id="L33" class="ln">    33	</span>	<span class="comment">// to running the handshake for this Conn. Other goroutines that need</span>
+<span id="L34" class="ln">    34	</span>	<span class="comment">// to wait for the handshake can wait on this, under handshakeMutex.</span>
+<span id="L35" class="ln">    35	</span>	handshakeCond *sync.Cond
+<span id="L36" class="ln">    36	</span>	handshakeErr  error   <span class="comment">// error resulting from handshake</span>
+<span id="L37" class="ln">    37	</span>	vers          uint16  <span class="comment">// TLS version</span>
+<span id="L38" class="ln">    38	</span>	haveVers      bool    <span class="comment">// version has been negotiated</span>
+<span id="L39" class="ln">    39	</span>	config        *Config <span class="comment">// configuration passed to constructor</span>
+<span id="L40" class="ln">    40	</span>	<span class="comment">// handshakeComplete is true if the connection is currently transferring</span>
+<span id="L41" class="ln">    41	</span>	<span class="comment">// application data (i.e. is not currently processing a handshake).</span>
+<span id="L42" class="ln">    42	</span>	handshakeComplete bool
+<span id="L43" class="ln">    43	</span>	<span class="comment">// handshakes counts the number of handshakes performed on the</span>
+<span id="L44" class="ln">    44	</span>	<span class="comment">// connection so far. If renegotiation is disabled then this is either</span>
+<span id="L45" class="ln">    45	</span>	<span class="comment">// zero or one.</span>
+<span id="L46" class="ln">    46	</span>	handshakes       int
+<span id="L47" class="ln">    47	</span>	didResume        bool <span class="comment">// whether this connection was a session resumption</span>
+<span id="L48" class="ln">    48	</span>	cipherSuite      uint16
+<span id="L49" class="ln">    49	</span>	ocspResponse     []byte   <span class="comment">// stapled OCSP response</span>
+<span id="L50" class="ln">    50	</span>	scts             [][]byte <span class="comment">// signed certificate timestamps from server</span>
+<span id="L51" class="ln">    51	</span>	peerCertificates []*x509.Certificate
+<span id="L52" class="ln">    52	</span>	<span class="comment">// verifiedChains contains the certificate chains that we built, as</span>
+<span id="L53" class="ln">    53	</span>	<span class="comment">// opposed to the ones presented by the server.</span>
+<span id="L54" class="ln">    54	</span>	verifiedChains [][]*x509.Certificate
+<span id="L55" class="ln">    55	</span>	<span class="comment">// serverName contains the server name indicated by the client, if any.</span>
+<span id="L56" class="ln">    56	</span>	serverName string
+<span id="L57" class="ln">    57	</span>	<span class="comment">// secureRenegotiation is true if the server echoed the secure</span>
+<span id="L58" class="ln">    58	</span>	<span class="comment">// renegotiation extension. (This is meaningless as a server because</span>
+<span id="L59" class="ln">    59	</span>	<span class="comment">// renegotiation is not supported in that case.)</span>
+<span id="L60" class="ln">    60	</span>	secureRenegotiation bool
+<span id="L61" class="ln">    61	</span>
+<span id="L62" class="ln">    62	</span>	<span class="comment">// clientFinishedIsFirst is true if the client sent the first Finished</span>
+<span id="L63" class="ln">    63	</span>	<span class="comment">// message during the most recent handshake. This is recorded because</span>
+<span id="L64" class="ln">    64	</span>	<span class="comment">// the first transmitted Finished message is the tls-unique</span>
+<span id="L65" class="ln">    65	</span>	<span class="comment">// channel-binding value.</span>
+<span id="L66" class="ln">    66	</span>	clientFinishedIsFirst bool
+<span id="L67" class="ln">    67	</span>
+<span id="L68" class="ln">    68	</span>	<span class="comment">// closeNotifyErr is any error from sending the alertCloseNotify record.</span>
+<span id="L69" class="ln">    69	</span>	closeNotifyErr error
+<span id="L70" class="ln">    70	</span>	<span class="comment">// closeNotifySent is true if the Conn attempted to send an</span>
+<span id="L71" class="ln">    71	</span>	<span class="comment">// alertCloseNotify record.</span>
+<span id="L72" class="ln">    72	</span>	closeNotifySent bool
+<span id="L73" class="ln">    73	</span>
+<span id="L74" class="ln">    74	</span>	<span class="comment">// clientFinished and serverFinished contain the Finished message sent</span>
+<span id="L75" class="ln">    75	</span>	<span class="comment">// by the client or server in the most recent handshake. This is</span>
+<span id="L76" class="ln">    76	</span>	<span class="comment">// retained to support the renegotiation extension and tls-unique</span>
+<span id="L77" class="ln">    77	</span>	<span class="comment">// channel-binding.</span>
+<span id="L78" class="ln">    78	</span>	clientFinished [12]byte
+<span id="L79" class="ln">    79	</span>	serverFinished [12]byte
+<span id="L80" class="ln">    80	</span>
+<span id="L81" class="ln">    81	</span>	clientProtocol         string
+<span id="L82" class="ln">    82	</span>	clientProtocolFallback bool
+<span id="L83" class="ln">    83	</span>
+<span id="L84" class="ln">    84	</span>	<span class="comment">// input/output</span>
+<span id="L85" class="ln">    85	</span>	in, out   halfConn     <span class="comment">// in.Mutex &lt; out.Mutex</span>
+<span id="L86" class="ln">    86	</span>	rawInput  *block       <span class="comment">// raw input, right off the wire</span>
+<span id="L87" class="ln">    87	</span>	input     *block       <span class="comment">// application data waiting to be read</span>
+<span id="L88" class="ln">    88	</span>	hand      bytes.Buffer <span class="comment">// handshake data waiting to be read</span>
+<span id="L89" class="ln">    89	</span>	buffering bool         <span class="comment">// whether records are buffered in sendBuf</span>
+<span id="L90" class="ln">    90	</span>	sendBuf   []byte       <span class="comment">// a buffer of records waiting to be sent</span>
+<span id="L91" class="ln">    91	</span>
+<span id="L92" class="ln">    92	</span>	<span class="comment">// bytesSent counts the bytes of application data sent.</span>
+<span id="L93" class="ln">    93	</span>	<span class="comment">// packetsSent counts packets.</span>
+<span id="L94" class="ln">    94	</span>	bytesSent   int64
+<span id="L95" class="ln">    95	</span>	packetsSent int64
+<span id="L96" class="ln">    96	</span>
+<span id="L97" class="ln">    97	</span>	<span class="comment">// activeCall is an atomic int32; the low bit is whether Close has</span>
+<span id="L98" class="ln">    98	</span>	<span class="comment">// been called. the rest of the bits are the number of goroutines</span>
+<span id="L99" class="ln">    99	</span>	<span class="comment">// in Conn.Write.</span>
+<span id="L100" class="ln">   100	</span>	activeCall int32
+<span id="L101" class="ln">   101	</span>
+<span id="L102" class="ln">   102	</span>	tmp [16]byte
+<span id="L103" class="ln">   103	</span>}
+<span id="L104" class="ln">   104	</span>
+<span id="L105" class="ln">   105	</span><span class="comment">// Access to net.Conn methods.</span>
+<span id="L106" class="ln">   106	</span><span class="comment">// Cannot just embed net.Conn because that would</span>
+<span id="L107" class="ln">   107	</span><span class="comment">// export the struct field too.</span>
+<span id="L108" class="ln">   108	</span>
+<span id="L109" class="ln">   109	</span><span class="comment">// LocalAddr returns the local network address.</span>
+<span id="L110" class="ln">   110	</span>func (c *Conn) LocalAddr() net.Addr {
+<span id="L111" class="ln">   111	</span>	return c.conn.LocalAddr()
+<span id="L112" class="ln">   112	</span>}
+<span id="L113" class="ln">   113	</span>
+<span id="L114" class="ln">   114	</span><span class="comment">// RemoteAddr returns the remote network address.</span>
+<span id="L115" class="ln">   115	</span>func (c *Conn) RemoteAddr() net.Addr {
+<span id="L116" class="ln">   116	</span>	return c.conn.RemoteAddr()
+<span id="L117" class="ln">   117	</span>}
+<span id="L118" class="ln">   118	</span>
+<span id="L119" class="ln">   119	</span><span class="comment">// SetDeadline sets the read and write deadlines associated with the connection.</span>
+<span id="L120" class="ln">   120	</span><span class="comment">// A zero value for t means Read and Write will not time out.</span>
+<span id="L121" class="ln">   121	</span><span class="comment">// After a Write has timed out, the TLS state is corrupt and all future writes will return the same error.</span>
+<span id="L122" class="ln">   122	</span>func (c *Conn) SetDeadline(t time.Time) error {
+<span id="L123" class="ln">   123	</span>	return c.conn.SetDeadline(t)
+<span id="L124" class="ln">   124	</span>}
+<span id="L125" class="ln">   125	</span>
+<span id="L126" class="ln">   126	</span><span class="comment">// SetReadDeadline sets the read deadline on the underlying connection.</span>
+<span id="L127" class="ln">   127	</span><span class="comment">// A zero value for t means Read will not time out.</span>
+<span id="L128" class="ln">   128	</span><span class="selection">func (c *Conn) SetReadDeadline(t time.Time) error</span> {
+<span id="L129" class="ln">   129	</span>	return c.conn.SetReadDeadline(t)
+<span id="L130" class="ln">   130	</span>}
+<span id="L131" class="ln">   131	</span>
+<span id="L132" class="ln">   132	</span><span class="comment">// SetWriteDeadline sets the write deadline on the underlying connection.</span>
+<span id="L133" class="ln">   133	</span><span class="comment">// A zero value for t means Write will not time out.</span>
+<span id="L134" class="ln">   134	</span><span class="comment">// After a Write has timed out, the TLS state is corrupt and all future writes will return the same error.</span>
+<span id="L135" class="ln">   135	</span>func (c *Conn) SetWriteDeadline(t time.Time) error {
+<span id="L136" class="ln">   136	</span>	return c.conn.SetWriteDeadline(t)
+<span id="L137" class="ln">   137	</span>}
+<span id="L138" class="ln">   138	</span>
+<span id="L139" class="ln">   139	</span><span class="comment">// A halfConn represents one direction of the record layer</span>
+<span id="L140" class="ln">   140	</span><span class="comment">// connection, either sending or receiving.</span>
+<span id="L141" class="ln">   141	</span>type halfConn struct {
+<span id="L142" class="ln">   142	</span>	sync.Mutex
+<span id="L143" class="ln">   143	</span>
+<span id="L144" class="ln">   144	</span>	err            error       <span class="comment">// first permanent error</span>
+<span id="L145" class="ln">   145	</span>	version        uint16      <span class="comment">// protocol version</span>
+<span id="L146" class="ln">   146	</span>	cipher         interface{} <span class="comment">// cipher algorithm</span>
+<span id="L147" class="ln">   147	</span>	mac            macFunction
+<span id="L148" class="ln">   148	</span>	seq            [8]byte  <span class="comment">// 64-bit sequence number</span>
+<span id="L149" class="ln">   149	</span>	bfree          *block   <span class="comment">// list of free blocks</span>
+<span id="L150" class="ln">   150	</span>	additionalData [13]byte <span class="comment">// to avoid allocs; interface method args escape</span>
+<span id="L151" class="ln">   151	</span>
+<span id="L152" class="ln">   152	</span>	nextCipher interface{} <span class="comment">// next encryption state</span>
+<span id="L153" class="ln">   153	</span>	nextMac    macFunction <span class="comment">// next MAC algorithm</span>
+<span id="L154" class="ln">   154	</span>
+<span id="L155" class="ln">   155	</span>	<span class="comment">// used to save allocating a new buffer for each MAC.</span>
+<span id="L156" class="ln">   156	</span>	inDigestBuf, outDigestBuf []byte
+<span id="L157" class="ln">   157	</span>}
+<span id="L158" class="ln">   158	</span>
+<span id="L159" class="ln">   159	</span>func (hc *halfConn) setErrorLocked(err error) error {
+<span id="L160" class="ln">   160	</span>	hc.err = err
+<span id="L161" class="ln">   161	</span>	return err
+<span id="L162" class="ln">   162	</span>}
+<span id="L163" class="ln">   163	</span>
+<span id="L164" class="ln">   164	</span><span class="comment">// prepareCipherSpec sets the encryption and MAC states</span>
+<span id="L165" class="ln">   165	</span><span class="comment">// that a subsequent changeCipherSpec will use.</span>
+<span id="L166" class="ln">   166	</span>func (hc *halfConn) prepareCipherSpec(version uint16, cipher interface{}, mac macFunction) {
+<span id="L167" class="ln">   167	</span>	hc.version = version
+<span id="L168" class="ln">   168	</span>	hc.nextCipher = cipher
+<span id="L169" class="ln">   169	</span>	hc.nextMac = mac
+<span id="L170" class="ln">   170	</span>}
+<span id="L171" class="ln">   171	</span>
+<span id="L172" class="ln">   172	</span><span class="comment">// changeCipherSpec changes the encryption and MAC states</span>
+<span id="L173" class="ln">   173	</span><span class="comment">// to the ones previously passed to prepareCipherSpec.</span>
+<span id="L174" class="ln">   174	</span>func (hc *halfConn) changeCipherSpec() error {
+<span id="L175" class="ln">   175	</span>	if hc.nextCipher == nil {
+<span id="L176" class="ln">   176	</span>		return alertInternalError
+<span id="L177" class="ln">   177	</span>	}
+<span id="L178" class="ln">   178	</span>	hc.cipher = hc.nextCipher
+<span id="L179" class="ln">   179	</span>	hc.mac = hc.nextMac
+<span id="L180" class="ln">   180	</span>	hc.nextCipher = nil
+<span id="L181" class="ln">   181	</span>	hc.nextMac = nil
+<span id="L182" class="ln">   182	</span>	for i := range hc.seq {
+<span id="L183" class="ln">   183	</span>		hc.seq[i] = 0
+<span id="L184" class="ln">   184	</span>	}
+<span id="L185" class="ln">   185	</span>	return nil
+<span id="L186" class="ln">   186	</span>}
+<span id="L187" class="ln">   187	</span>
+<span id="L188" class="ln">   188	</span><span class="comment">// incSeq increments the sequence number.</span>
+<span id="L189" class="ln">   189	</span>func (hc *halfConn) incSeq() {
+<span id="L190" class="ln">   190	</span>	for i := 7; i &gt;= 0; i-- {
+<span id="L191" class="ln">   191	</span>		hc.seq[i]++
+<span id="L192" class="ln">   192	</span>		if hc.seq[i] != 0 {
+<span id="L193" class="ln">   193	</span>			return
+<span id="L194" class="ln">   194	</span>		}
+<span id="L195" class="ln">   195	</span>	}
+<span id="L196" class="ln">   196	</span>
+<span id="L197" class="ln">   197	</span>	<span class="comment">// Not allowed to let sequence number wrap.</span>
+<span id="L198" class="ln">   198	</span>	<span class="comment">// Instead, must renegotiate before it does.</span>
+<span id="L199" class="ln">   199	</span>	<span class="comment">// Not likely enough to bother.</span>
+<span id="L200" class="ln">   200	</span>	panic(&#34;TLS: sequence number wraparound&#34;)
+<span id="L201" class="ln">   201	</span>}
+<span id="L202" class="ln">   202	</span>
+<span id="L203" class="ln">   203	</span><span class="comment">// extractPadding returns, in constant time, the length of the padding to remove</span>
+<span id="L204" class="ln">   204	</span><span class="comment">// from the end of payload. It also returns a byte which is equal to 255 if the</span>
+<span id="L205" class="ln">   205	</span><span class="comment">// padding was valid and 0 otherwise. See RFC 2246, section 6.2.3.2</span>
+<span id="L206" class="ln">   206	</span>func extractPadding(payload []byte) (toRemove int, good byte) {
+<span id="L207" class="ln">   207	</span>	if len(payload) &lt; 1 {
+<span id="L208" class="ln">   208	</span>		return 0, 0
+<span id="L209" class="ln">   209	</span>	}
+<span id="L210" class="ln">   210	</span>
+<span id="L211" class="ln">   211	</span>	paddingLen := payload[len(payload)-1]
+<span id="L212" class="ln">   212	</span>	t := uint(len(payload)-1) - uint(paddingLen)
+<span id="L213" class="ln">   213	</span>	<span class="comment">// if len(payload) &gt;= (paddingLen - 1) then the MSB of t is zero</span>
+<span id="L214" class="ln">   214	</span>	good = byte(int32(^t) &gt;&gt; 31)
+<span id="L215" class="ln">   215	</span>
+<span id="L216" class="ln">   216	</span>	toCheck := 255 <span class="comment">// the maximum possible padding length</span>
+<span id="L217" class="ln">   217	</span>	<span class="comment">// The length of the padded data is public, so we can use an if here</span>
+<span id="L218" class="ln">   218	</span>	if toCheck+1 &gt; len(payload) {
+<span id="L219" class="ln">   219	</span>		toCheck = len(payload) - 1
+<span id="L220" class="ln">   220	</span>	}
+<span id="L221" class="ln">   221	</span>
+<span id="L222" class="ln">   222	</span>	for i := 0; i &lt; toCheck; i++ {
+<span id="L223" class="ln">   223	</span>		t := uint(paddingLen) - uint(i)
+<span id="L224" class="ln">   224	</span>		<span class="comment">// if i &lt;= paddingLen then the MSB of t is zero</span>
+<span id="L225" class="ln">   225	</span>		mask := byte(int32(^t) &gt;&gt; 31)
+<span id="L226" class="ln">   226	</span>		b := payload[len(payload)-1-i]
+<span id="L227" class="ln">   227	</span>		good &amp;^= mask&amp;paddingLen ^ mask&amp;b
+<span id="L228" class="ln">   228	</span>	}
+<span id="L229" class="ln">   229	</span>
+<span id="L230" class="ln">   230	</span>	<span class="comment">// We AND together the bits of good and replicate the result across</span>
+<span id="L231" class="ln">   231	</span>	<span class="comment">// all the bits.</span>
+<span id="L232" class="ln">   232	</span>	good &amp;= good &lt;&lt; 4
+<span id="L233" class="ln">   233	</span>	good &amp;= good &lt;&lt; 2
+<span id="L234" class="ln">   234	</span>	good &amp;= good &lt;&lt; 1
+<span id="L235" class="ln">   235	</span>	good = uint8(int8(good) &gt;&gt; 7)
+<span id="L236" class="ln">   236	</span>
+<span id="L237" class="ln">   237	</span>	toRemove = int(paddingLen) + 1
+<span id="L238" class="ln">   238	</span>	return
+<span id="L239" class="ln">   239	</span>}
+<span id="L240" class="ln">   240	</span>
+<span id="L241" class="ln">   241	</span><span class="comment">// extractPaddingSSL30 is a replacement for extractPadding in the case that the</span>
+<span id="L242" class="ln">   242	</span><span class="comment">// protocol version is SSLv3. In this version, the contents of the padding</span>
+<span id="L243" class="ln">   243	</span><span class="comment">// are random and cannot be checked.</span>
+<span id="L244" class="ln">   244	</span>func extractPaddingSSL30(payload []byte) (toRemove int, good byte) {
+<span id="L245" class="ln">   245	</span>	if len(payload) &lt; 1 {
+<span id="L246" class="ln">   246	</span>		return 0, 0
+<span id="L247" class="ln">   247	</span>	}
+<span id="L248" class="ln">   248	</span>
+<span id="L249" class="ln">   249	</span>	paddingLen := int(payload[len(payload)-1]) + 1
+<span id="L250" class="ln">   250	</span>	if paddingLen &gt; len(payload) {
+<span id="L251" class="ln">   251	</span>		return 0, 0
+<span id="L252" class="ln">   252	</span>	}
+<span id="L253" class="ln">   253	</span>
+<span id="L254" class="ln">   254	</span>	return paddingLen, 255
+<span id="L255" class="ln">   255	</span>}
+<span id="L256" class="ln">   256	</span>
+<span id="L257" class="ln">   257	</span>func roundUp(a, b int) int {
+<span id="L258" class="ln">   258	</span>	return a + (b-a%b)%b
+<span id="L259" class="ln">   259	</span>}
+<span id="L260" class="ln">   260	</span>
+<span id="L261" class="ln">   261	</span><span class="comment">// cbcMode is an interface for block ciphers using cipher block chaining.</span>
+<span id="L262" class="ln">   262	</span>type cbcMode interface {
+<span id="L263" class="ln">   263	</span>	cipher.BlockMode
+<span id="L264" class="ln">   264	</span>	SetIV([]byte)
+<span id="L265" class="ln">   265	</span>}
+<span id="L266" class="ln">   266	</span>
+<span id="L267" class="ln">   267	</span><span class="comment">// decrypt checks and strips the mac and decrypts the data in b. Returns a</span>
+<span id="L268" class="ln">   268	</span><span class="comment">// success boolean, the number of bytes to skip from the start of the record in</span>
+<span id="L269" class="ln">   269	</span><span class="comment">// order to get the application payload, and an optional alert value.</span>
+<span id="L270" class="ln">   270	</span>func (hc *halfConn) decrypt(b *block) (ok bool, prefixLen int, alertValue alert) {
+<span id="L271" class="ln">   271	</span>	<span class="comment">// pull out payload</span>
+<span id="L272" class="ln">   272	</span>	payload := b.data[recordHeaderLen:]
+<span id="L273" class="ln">   273	</span>
+<span id="L274" class="ln">   274	</span>	macSize := 0
+<span id="L275" class="ln">   275	</span>	if hc.mac != nil {
+<span id="L276" class="ln">   276	</span>		macSize = hc.mac.Size()
+<span id="L277" class="ln">   277	</span>	}
+<span id="L278" class="ln">   278	</span>
+<span id="L279" class="ln">   279	</span>	paddingGood := byte(255)
+<span id="L280" class="ln">   280	</span>	paddingLen := 0
+<span id="L281" class="ln">   281	</span>	explicitIVLen := 0
+<span id="L282" class="ln">   282	</span>
+<span id="L283" class="ln">   283	</span>	<span class="comment">// decrypt</span>
+<span id="L284" class="ln">   284	</span>	if hc.cipher != nil {
+<span id="L285" class="ln">   285	</span>		switch c := hc.cipher.(type) {
+<span id="L286" class="ln">   286	</span>		case cipher.Stream:
+<span id="L287" class="ln">   287	</span>			c.XORKeyStream(payload, payload)
+<span id="L288" class="ln">   288	</span>		case aead:
+<span id="L289" class="ln">   289	</span>			explicitIVLen = c.explicitNonceLen()
+<span id="L290" class="ln">   290	</span>			if len(payload) &lt; explicitIVLen {
+<span id="L291" class="ln">   291	</span>				return false, 0, alertBadRecordMAC
+<span id="L292" class="ln">   292	</span>			}
+<span id="L293" class="ln">   293	</span>			nonce := payload[:explicitIVLen]
+<span id="L294" class="ln">   294	</span>			payload = payload[explicitIVLen:]
+<span id="L295" class="ln">   295	</span>
+<span id="L296" class="ln">   296	</span>			if len(nonce) == 0 {
+<span id="L297" class="ln">   297	</span>				nonce = hc.seq[:]
+<span id="L298" class="ln">   298	</span>			}
+<span id="L299" class="ln">   299	</span>
+<span id="L300" class="ln">   300	</span>			copy(hc.additionalData[:], hc.seq[:])
+<span id="L301" class="ln">   301	</span>			copy(hc.additionalData[8:], b.data[:3])
+<span id="L302" class="ln">   302	</span>			n := len(payload) - c.Overhead()
+<span id="L303" class="ln">   303	</span>			hc.additionalData[11] = byte(n &gt;&gt; 8)
+<span id="L304" class="ln">   304	</span>			hc.additionalData[12] = byte(n)
+<span id="L305" class="ln">   305	</span>			var err error
+<span id="L306" class="ln">   306	</span>			payload, err = c.Open(payload[:0], nonce, payload, hc.additionalData[:])
+<span id="L307" class="ln">   307	</span>			if err != nil {
+<span id="L308" class="ln">   308	</span>				return false, 0, alertBadRecordMAC
+<span id="L309" class="ln">   309	</span>			}
+<span id="L310" class="ln">   310	</span>			b.resize(recordHeaderLen + explicitIVLen + len(payload))
+<span id="L311" class="ln">   311	</span>		case cbcMode:
+<span id="L312" class="ln">   312	</span>			blockSize := c.BlockSize()
+<span id="L313" class="ln">   313	</span>			if hc.version &gt;= VersionTLS11 {
+<span id="L314" class="ln">   314	</span>				explicitIVLen = blockSize
+<span id="L315" class="ln">   315	</span>			}
+<span id="L316" class="ln">   316	</span>
+<span id="L317" class="ln">   317	</span>			if len(payload)%blockSize != 0 || len(payload) &lt; roundUp(explicitIVLen+macSize+1, blockSize) {
+<span id="L318" class="ln">   318	</span>				return false, 0, alertBadRecordMAC
+<span id="L319" class="ln">   319	</span>			}
+<span id="L320" class="ln">   320	</span>
+<span id="L321" class="ln">   321	</span>			if explicitIVLen &gt; 0 {
+<span id="L322" class="ln">   322	</span>				c.SetIV(payload[:explicitIVLen])
+<span id="L323" class="ln">   323	</span>				payload = payload[explicitIVLen:]
+<span id="L324" class="ln">   324	</span>			}
+<span id="L325" class="ln">   325	</span>			c.CryptBlocks(payload, payload)
+<span id="L326" class="ln">   326	</span>			if hc.version == VersionSSL30 {
+<span id="L327" class="ln">   327	</span>				paddingLen, paddingGood = extractPaddingSSL30(payload)
+<span id="L328" class="ln">   328	</span>			} else {
+<span id="L329" class="ln">   329	</span>				paddingLen, paddingGood = extractPadding(payload)
+<span id="L330" class="ln">   330	</span>
+<span id="L331" class="ln">   331	</span>				<span class="comment">// To protect against CBC padding oracles like Lucky13, the data</span>
+<span id="L332" class="ln">   332	</span>				<span class="comment">// past paddingLen (which is secret) is passed to the MAC</span>
+<span id="L333" class="ln">   333	</span>				<span class="comment">// function as extra data, to be fed into the HMAC after</span>
+<span id="L334" class="ln">   334	</span>				<span class="comment">// computing the digest. This makes the MAC constant time as</span>
+<span id="L335" class="ln">   335	</span>				<span class="comment">// long as the digest computation is constant time and does not</span>
+<span id="L336" class="ln">   336	</span>				<span class="comment">// affect the subsequent write.</span>
+<span id="L337" class="ln">   337	</span>			}
+<span id="L338" class="ln">   338	</span>		default:
+<span id="L339" class="ln">   339	</span>			panic(&#34;unknown cipher type&#34;)
+<span id="L340" class="ln">   340	</span>		}
+<span id="L341" class="ln">   341	</span>	}
+<span id="L342" class="ln">   342	</span>
+<span id="L343" class="ln">   343	</span>	<span class="comment">// check, strip mac</span>
+<span id="L344" class="ln">   344	</span>	if hc.mac != nil {
+<span id="L345" class="ln">   345	</span>		if len(payload) &lt; macSize {
+<span id="L346" class="ln">   346	</span>			return false, 0, alertBadRecordMAC
+<span id="L347" class="ln">   347	</span>		}
+<span id="L348" class="ln">   348	</span>
+<span id="L349" class="ln">   349	</span>		<span class="comment">// strip mac off payload, b.data</span>
+<span id="L350" class="ln">   350	</span>		n := len(payload) - macSize - paddingLen
+<span id="L351" class="ln">   351	</span>		n = subtle.ConstantTimeSelect(int(uint32(n)&gt;&gt;31), 0, n) <span class="comment">// if n &lt; 0 { n = 0 }</span>
+<span id="L352" class="ln">   352	</span>		b.data[3] = byte(n &gt;&gt; 8)
+<span id="L353" class="ln">   353	</span>		b.data[4] = byte(n)
+<span id="L354" class="ln">   354	</span>		remoteMAC := payload[n : n+macSize]
+<span id="L355" class="ln">   355	</span>		localMAC := hc.mac.MAC(hc.inDigestBuf, hc.seq[0:], b.data[:recordHeaderLen], payload[:n], payload[n+macSize:])
+<span id="L356" class="ln">   356	</span>
+<span id="L357" class="ln">   357	</span>		if subtle.ConstantTimeCompare(localMAC, remoteMAC) != 1 || paddingGood != 255 {
+<span id="L358" class="ln">   358	</span>			return false, 0, alertBadRecordMAC
+<span id="L359" class="ln">   359	</span>		}
+<span id="L360" class="ln">   360	</span>		hc.inDigestBuf = localMAC
+<span id="L361" class="ln">   361	</span>
+<span id="L362" class="ln">   362	</span>		b.resize(recordHeaderLen + explicitIVLen + n)
+<span id="L363" class="ln">   363	</span>	}
+<span id="L364" class="ln">   364	</span>	hc.incSeq()
+<span id="L365" class="ln">   365	</span>
+<span id="L366" class="ln">   366	</span>	return true, recordHeaderLen + explicitIVLen, 0
+<span id="L367" class="ln">   367	</span>}
+<span id="L368" class="ln">   368	</span>
+<span id="L369" class="ln">   369	</span><span class="comment">// padToBlockSize calculates the needed padding block, if any, for a payload.</span>
+<span id="L370" class="ln">   370	</span><span class="comment">// On exit, prefix aliases payload and extends to the end of the last full</span>
+<span id="L371" class="ln">   371	</span><span class="comment">// block of payload. finalBlock is a fresh slice which contains the contents of</span>
+<span id="L372" class="ln">   372	</span><span class="comment">// any suffix of payload as well as the needed padding to make finalBlock a</span>
+<span id="L373" class="ln">   373	</span><span class="comment">// full block.</span>
+<span id="L374" class="ln">   374	</span>func padToBlockSize(payload []byte, blockSize int) (prefix, finalBlock []byte) {
+<span id="L375" class="ln">   375	</span>	overrun := len(payload) % blockSize
+<span id="L376" class="ln">   376	</span>	paddingLen := blockSize - overrun
+<span id="L377" class="ln">   377	</span>	prefix = payload[:len(payload)-overrun]
+<span id="L378" class="ln">   378	</span>	finalBlock = make([]byte, blockSize)
+<span id="L379" class="ln">   379	</span>	copy(finalBlock, payload[len(payload)-overrun:])
+<span id="L380" class="ln">   380	</span>	for i := overrun; i &lt; blockSize; i++ {
+<span id="L381" class="ln">   381	</span>		finalBlock[i] = byte(paddingLen - 1)
+<span id="L382" class="ln">   382	</span>	}
+<span id="L383" class="ln">   383	</span>	return
+<span id="L384" class="ln">   384	</span>}
+<span id="L385" class="ln">   385	</span>
+<span id="L386" class="ln">   386	</span><span class="comment">// encrypt encrypts and macs the data in b.</span>
+<span id="L387" class="ln">   387	</span>func (hc *halfConn) encrypt(b *block, explicitIVLen int) (bool, alert) {
+<span id="L388" class="ln">   388	</span>	<span class="comment">// mac</span>
+<span id="L389" class="ln">   389	</span>	if hc.mac != nil {
+<span id="L390" class="ln">   390	</span>		mac := hc.mac.MAC(hc.outDigestBuf, hc.seq[0:], b.data[:recordHeaderLen], b.data[recordHeaderLen+explicitIVLen:], nil)
+<span id="L391" class="ln">   391	</span>
+<span id="L392" class="ln">   392	</span>		n := len(b.data)
+<span id="L393" class="ln">   393	</span>		b.resize(n + len(mac))
+<span id="L394" class="ln">   394	</span>		copy(b.data[n:], mac)
+<span id="L395" class="ln">   395	</span>		hc.outDigestBuf = mac
+<span id="L396" class="ln">   396	</span>	}
+<span id="L397" class="ln">   397	</span>
+<span id="L398" class="ln">   398	</span>	payload := b.data[recordHeaderLen:]
+<span id="L399" class="ln">   399	</span>
+<span id="L400" class="ln">   400	</span>	<span class="comment">// encrypt</span>
+<span id="L401" class="ln">   401	</span>	if hc.cipher != nil {
+<span id="L402" class="ln">   402	</span>		switch c := hc.cipher.(type) {
+<span id="L403" class="ln">   403	</span>		case cipher.Stream:
+<span id="L404" class="ln">   404	</span>			c.XORKeyStream(payload, payload)
+<span id="L405" class="ln">   405	</span>		case aead:
+<span id="L406" class="ln">   406	</span>			payloadLen := len(b.data) - recordHeaderLen - explicitIVLen
+<span id="L407" class="ln">   407	</span>			b.resize(len(b.data) + c.Overhead())
+<span id="L408" class="ln">   408	</span>			nonce := b.data[recordHeaderLen : recordHeaderLen+explicitIVLen]
+<span id="L409" class="ln">   409	</span>			if len(nonce) == 0 {
+<span id="L410" class="ln">   410	</span>				nonce = hc.seq[:]
+<span id="L411" class="ln">   411	</span>			}
+<span id="L412" class="ln">   412	</span>			payload := b.data[recordHeaderLen+explicitIVLen:]
+<span id="L413" class="ln">   413	</span>			payload = payload[:payloadLen]
+<span id="L414" class="ln">   414	</span>
+<span id="L415" class="ln">   415	</span>			copy(hc.additionalData[:], hc.seq[:])
+<span id="L416" class="ln">   416	</span>			copy(hc.additionalData[8:], b.data[:3])
+<span id="L417" class="ln">   417	</span>			hc.additionalData[11] = byte(payloadLen &gt;&gt; 8)
+<span id="L418" class="ln">   418	</span>			hc.additionalData[12] = byte(payloadLen)
+<span id="L419" class="ln">   419	</span>
+<span id="L420" class="ln">   420	</span>			c.Seal(payload[:0], nonce, payload, hc.additionalData[:])
+<span id="L421" class="ln">   421	</span>		case cbcMode:
+<span id="L422" class="ln">   422	</span>			blockSize := c.BlockSize()
+<span id="L423" class="ln">   423	</span>			if explicitIVLen &gt; 0 {
+<span id="L424" class="ln">   424	</span>				c.SetIV(payload[:explicitIVLen])
+<span id="L425" class="ln">   425	</span>				payload = payload[explicitIVLen:]
+<span id="L426" class="ln">   426	</span>			}
+<span id="L427" class="ln">   427	</span>			prefix, finalBlock := padToBlockSize(payload, blockSize)
+<span id="L428" class="ln">   428	</span>			b.resize(recordHeaderLen + explicitIVLen + len(prefix) + len(finalBlock))
+<span id="L429" class="ln">   429	</span>			c.CryptBlocks(b.data[recordHeaderLen+explicitIVLen:], prefix)
+<span id="L430" class="ln">   430	</span>			c.CryptBlocks(b.data[recordHeaderLen+explicitIVLen+len(prefix):], finalBlock)
+<span id="L431" class="ln">   431	</span>		default:
+<span id="L432" class="ln">   432	</span>			panic(&#34;unknown cipher type&#34;)
+<span id="L433" class="ln">   433	</span>		}
+<span id="L434" class="ln">   434	</span>	}
+<span id="L435" class="ln">   435	</span>
+<span id="L436" class="ln">   436	</span>	<span class="comment">// update length to include MAC and any block padding needed.</span>
+<span id="L437" class="ln">   437	</span>	n := len(b.data) - recordHeaderLen
+<span id="L438" class="ln">   438	</span>	b.data[3] = byte(n &gt;&gt; 8)
+<span id="L439" class="ln">   439	</span>	b.data[4] = byte(n)
+<span id="L440" class="ln">   440	</span>	hc.incSeq()
+<span id="L441" class="ln">   441	</span>
+<span id="L442" class="ln">   442	</span>	return true, 0
+<span id="L443" class="ln">   443	</span>}
+<span id="L444" class="ln">   444	</span>
+<span id="L445" class="ln">   445	</span><span class="comment">// A block is a simple data buffer.</span>
+<span id="L446" class="ln">   446	</span>type block struct {
+<span id="L447" class="ln">   447	</span>	data []byte
+<span id="L448" class="ln">   448	</span>	off  int <span class="comment">// index for Read</span>
+<span id="L449" class="ln">   449	</span>	link *block
+<span id="L450" class="ln">   450	</span>}
+<span id="L451" class="ln">   451	</span>
+<span id="L452" class="ln">   452	</span><span class="comment">// resize resizes block to be n bytes, growing if necessary.</span>
+<span id="L453" class="ln">   453	</span>func (b *block) resize(n int) {
+<span id="L454" class="ln">   454	</span>	if n &gt; cap(b.data) {
+<span id="L455" class="ln">   455	</span>		b.reserve(n)
+<span id="L456" class="ln">   456	</span>	}
+<span id="L457" class="ln">   457	</span>	b.data = b.data[0:n]
+<span id="L458" class="ln">   458	</span>}
+<span id="L459" class="ln">   459	</span>
+<span id="L460" class="ln">   460	</span><span class="comment">// reserve makes sure that block contains a capacity of at least n bytes.</span>
+<span id="L461" class="ln">   461	</span>func (b *block) reserve(n int) {
+<span id="L462" class="ln">   462	</span>	if cap(b.data) &gt;= n {
+<span id="L463" class="ln">   463	</span>		return
+<span id="L464" class="ln">   464	</span>	}
+<span id="L465" class="ln">   465	</span>	m := cap(b.data)
+<span id="L466" class="ln">   466	</span>	if m == 0 {
+<span id="L467" class="ln">   467	</span>		m = 1024
+<span id="L468" class="ln">   468	</span>	}
+<span id="L469" class="ln">   469	</span>	for m &lt; n {
+<span id="L470" class="ln">   470	</span>		m *= 2
+<span id="L471" class="ln">   471	</span>	}
+<span id="L472" class="ln">   472	</span>	data := make([]byte, len(b.data), m)
+<span id="L473" class="ln">   473	</span>	copy(data, b.data)
+<span id="L474" class="ln">   474	</span>	b.data = data
+<span id="L475" class="ln">   475	</span>}
+<span id="L476" class="ln">   476	</span>
+<span id="L477" class="ln">   477	</span><span class="comment">// readFromUntil reads from r into b until b contains at least n bytes</span>
+<span id="L478" class="ln">   478	</span><span class="comment">// or else returns an error.</span>
+<span id="L479" class="ln">   479	</span>func (b *block) readFromUntil(r io.Reader, n int) error {
+<span id="L480" class="ln">   480	</span>	<span class="comment">// quick case</span>
+<span id="L481" class="ln">   481	</span>	if len(b.data) &gt;= n {
+<span id="L482" class="ln">   482	</span>		return nil
+<span id="L483" class="ln">   483	</span>	}
+<span id="L484" class="ln">   484	</span>
+<span id="L485" class="ln">   485	</span>	<span class="comment">// read until have enough.</span>
+<span id="L486" class="ln">   486	</span>	b.reserve(n)
+<span id="L487" class="ln">   487	</span>	for {
+<span id="L488" class="ln">   488	</span>		m, err := r.Read(b.data[len(b.data):cap(b.data)])
+<span id="L489" class="ln">   489	</span>		b.data = b.data[0 : len(b.data)+m]
+<span id="L490" class="ln">   490	</span>		if len(b.data) &gt;= n {
+<span id="L491" class="ln">   491	</span>			<span class="comment">// TODO(bradfitz,agl): slightly suspicious</span>
+<span id="L492" class="ln">   492	</span>			<span class="comment">// that we&#39;re throwing away r.Read&#39;s err here.</span>
+<span id="L493" class="ln">   493	</span>			break
+<span id="L494" class="ln">   494	</span>		}
+<span id="L495" class="ln">   495	</span>		if err != nil {
+<span id="L496" class="ln">   496	</span>			return err
+<span id="L497" class="ln">   497	</span>		}
+<span id="L498" class="ln">   498	</span>	}
+<span id="L499" class="ln">   499	</span>	return nil
+<span id="L500" class="ln">   500	</span>}
+<span id="L501" class="ln">   501	</span>
+<span id="L502" class="ln">   502	</span>func (b *block) Read(p []byte) (n int, err error) {
+<span id="L503" class="ln">   503	</span>	n = copy(p, b.data[b.off:])
+<span id="L504" class="ln">   504	</span>	b.off += n
+<span id="L505" class="ln">   505	</span>	return
+<span id="L506" class="ln">   506	</span>}
+<span id="L507" class="ln">   507	</span>
+<span id="L508" class="ln">   508	</span><span class="comment">// newBlock allocates a new block, from hc&#39;s free list if possible.</span>
+<span id="L509" class="ln">   509	</span>func (hc *halfConn) newBlock() *block {
+<span id="L510" class="ln">   510	</span>	b := hc.bfree
+<span id="L511" class="ln">   511	</span>	if b == nil {
+<span id="L512" class="ln">   512	</span>		return new(block)
+<span id="L513" class="ln">   513	</span>	}
+<span id="L514" class="ln">   514	</span>	hc.bfree = b.link
+<span id="L515" class="ln">   515	</span>	b.link = nil
+<span id="L516" class="ln">   516	</span>	b.resize(0)
+<span id="L517" class="ln">   517	</span>	return b
+<span id="L518" class="ln">   518	</span>}
+<span id="L519" class="ln">   519	</span>
+<span id="L520" class="ln">   520	</span><span class="comment">// freeBlock returns a block to hc&#39;s free list.</span>
+<span id="L521" class="ln">   521	</span><span class="comment">// The protocol is such that each side only has a block or two on</span>
+<span id="L522" class="ln">   522	</span><span class="comment">// its free list at a time, so there&#39;s no need to worry about</span>
+<span id="L523" class="ln">   523	</span><span class="comment">// trimming the list, etc.</span>
+<span id="L524" class="ln">   524	</span>func (hc *halfConn) freeBlock(b *block) {
+<span id="L525" class="ln">   525	</span>	b.link = hc.bfree
+<span id="L526" class="ln">   526	</span>	hc.bfree = b
+<span id="L527" class="ln">   527	</span>}
+<span id="L528" class="ln">   528	</span>
+<span id="L529" class="ln">   529	</span><span class="comment">// splitBlock splits a block after the first n bytes,</span>
+<span id="L530" class="ln">   530	</span><span class="comment">// returning a block with those n bytes and a</span>
+<span id="L531" class="ln">   531	</span><span class="comment">// block with the remainder.  the latter may be nil.</span>
+<span id="L532" class="ln">   532	</span>func (hc *halfConn) splitBlock(b *block, n int) (*block, *block) {
+<span id="L533" class="ln">   533	</span>	if len(b.data) &lt;= n {
+<span id="L534" class="ln">   534	</span>		return b, nil
+<span id="L535" class="ln">   535	</span>	}
+<span id="L536" class="ln">   536	</span>	bb := hc.newBlock()
+<span id="L537" class="ln">   537	</span>	bb.resize(len(b.data) - n)
+<span id="L538" class="ln">   538	</span>	copy(bb.data, b.data[n:])
+<span id="L539" class="ln">   539	</span>	b.data = b.data[0:n]
+<span id="L540" class="ln">   540	</span>	return b, bb
+<span id="L541" class="ln">   541	</span>}
+<span id="L542" class="ln">   542	</span>
+<span id="L543" class="ln">   543	</span><span class="comment">// RecordHeaderError results when a TLS record header is invalid.</span>
+<span id="L544" class="ln">   544	</span>type RecordHeaderError struct {
+<span id="L545" class="ln">   545	</span>	<span class="comment">// Msg contains a human readable string that describes the error.</span>
+<span id="L546" class="ln">   546	</span>	Msg string
+<span id="L547" class="ln">   547	</span>	<span class="comment">// RecordHeader contains the five bytes of TLS record header that</span>
+<span id="L548" class="ln">   548	</span>	<span class="comment">// triggered the error.</span>
+<span id="L549" class="ln">   549	</span>	RecordHeader [5]byte
+<span id="L550" class="ln">   550	</span>}
+<span id="L551" class="ln">   551	</span>
+<span id="L552" class="ln">   552	</span>func (e RecordHeaderError) Error() string { return &#34;tls: &#34; + e.Msg }
+<span id="L553" class="ln">   553	</span>
+<span id="L554" class="ln">   554	</span>func (c *Conn) newRecordHeaderError(msg string) (err RecordHeaderError) {
+<span id="L555" class="ln">   555	</span>	err.Msg = msg
+<span id="L556" class="ln">   556	</span>	copy(err.RecordHeader[:], c.rawInput.data)
+<span id="L557" class="ln">   557	</span>	return err
+<span id="L558" class="ln">   558	</span>}
+<span id="L559" class="ln">   559	</span>
+<span id="L560" class="ln">   560	</span><span class="comment">// readRecord reads the next TLS record from the connection</span>
+<span id="L561" class="ln">   561	</span><span class="comment">// and updates the record layer state.</span>
+<span id="L562" class="ln">   562	</span><span class="comment">// c.in.Mutex &lt;= L; c.input == nil.</span>
+<span id="L563" class="ln">   563	</span>func (c *Conn) readRecord(want recordType) error {
+<span id="L564" class="ln">   564	</span>	<span class="comment">// Caller must be in sync with connection:</span>
+<span id="L565" class="ln">   565	</span>	<span class="comment">// handshake data if handshake not yet completed,</span>
+<span id="L566" class="ln">   566	</span>	<span class="comment">// else application data.</span>
+<span id="L567" class="ln">   567	</span>	switch want {
+<span id="L568" class="ln">   568	</span>	default:
+<span id="L569" class="ln">   569	</span>		c.sendAlert(alertInternalError)
+<span id="L570" class="ln">   570	</span>		return c.in.setErrorLocked(errors.New(&#34;tls: unknown record type requested&#34;))
+<span id="L571" class="ln">   571	</span>	case recordTypeHandshake, recordTypeChangeCipherSpec:
+<span id="L572" class="ln">   572	</span>		if c.handshakeComplete {
+<span id="L573" class="ln">   573	</span>			c.sendAlert(alertInternalError)
+<span id="L574" class="ln">   574	</span>			return c.in.setErrorLocked(errors.New(&#34;tls: handshake or ChangeCipherSpec requested while not in handshake&#34;))
+<span id="L575" class="ln">   575	</span>		}
+<span id="L576" class="ln">   576	</span>	case recordTypeApplicationData:
+<span id="L577" class="ln">   577	</span>		if !c.handshakeComplete {
+<span id="L578" class="ln">   578	</span>			c.sendAlert(alertInternalError)
+<span id="L579" class="ln">   579	</span>			return c.in.setErrorLocked(errors.New(&#34;tls: application data record requested while in handshake&#34;))
+<span id="L580" class="ln">   580	</span>		}
+<span id="L581" class="ln">   581	</span>	}
+<span id="L582" class="ln">   582	</span>
+<span id="L583" class="ln">   583	</span>Again:
+<span id="L584" class="ln">   584	</span>	if c.rawInput == nil {
+<span id="L585" class="ln">   585	</span>		c.rawInput = c.in.newBlock()
+<span id="L586" class="ln">   586	</span>	}
+<span id="L587" class="ln">   587	</span>	b := c.rawInput
+<span id="L588" class="ln">   588	</span>
+<span id="L589" class="ln">   589	</span>	<span class="comment">// Read header, payload.</span>
+<span id="L590" class="ln">   590	</span>	if err := b.readFromUntil(c.conn, recordHeaderLen); err != nil {
+<span id="L591" class="ln">   591	</span>		<span class="comment">// RFC suggests that EOF without an alertCloseNotify is</span>
+<span id="L592" class="ln">   592	</span>		<span class="comment">// an error, but popular web sites seem to do this,</span>
+<span id="L593" class="ln">   593	</span>		<span class="comment">// so we can&#39;t make it an error.</span>
+<span id="L594" class="ln">   594	</span>		<span class="comment">// if err == io.EOF {</span>
+<span id="L595" class="ln">   595	</span>		<span class="comment">// 	err = io.ErrUnexpectedEOF</span>
+<span id="L596" class="ln">   596	</span>		<span class="comment">// }</span>
+<span id="L597" class="ln">   597	</span>		if e, ok := err.(net.Error); !ok || !e.Temporary() {
+<span id="L598" class="ln">   598	</span>			c.in.setErrorLocked(err)
+<span id="L599" class="ln">   599	</span>		}
+<span id="L600" class="ln">   600	</span>		return err
+<span id="L601" class="ln">   601	</span>	}
+<span id="L602" class="ln">   602	</span>	typ := recordType(b.data[0])
+<span id="L603" class="ln">   603	</span>
+<span id="L604" class="ln">   604	</span>	<span class="comment">// No valid TLS record has a type of 0x80, however SSLv2 handshakes</span>
+<span id="L605" class="ln">   605	</span>	<span class="comment">// start with a uint16 length where the MSB is set and the first record</span>
+<span id="L606" class="ln">   606	</span>	<span class="comment">// is always &lt; 256 bytes long. Therefore typ == 0x80 strongly suggests</span>
+<span id="L607" class="ln">   607	</span>	<span class="comment">// an SSLv2 client.</span>
+<span id="L608" class="ln">   608	</span>	if want == recordTypeHandshake &amp;&amp; typ == 0x80 {
+<span id="L609" class="ln">   609	</span>		c.sendAlert(alertProtocolVersion)
+<span id="L610" class="ln">   610	</span>		return c.in.setErrorLocked(c.newRecordHeaderError(&#34;unsupported SSLv2 handshake received&#34;))
+<span id="L611" class="ln">   611	</span>	}
+<span id="L612" class="ln">   612	</span>
+<span id="L613" class="ln">   613	</span>	vers := uint16(b.data[1])&lt;&lt;8 | uint16(b.data[2])
+<span id="L614" class="ln">   614	</span>	n := int(b.data[3])&lt;&lt;8 | int(b.data[4])
+<span id="L615" class="ln">   615	</span>	if c.haveVers &amp;&amp; vers != c.vers {
+<span id="L616" class="ln">   616	</span>		c.sendAlert(alertProtocolVersion)
+<span id="L617" class="ln">   617	</span>		msg := fmt.Sprintf(&#34;received record with version %x when expecting version %x&#34;, vers, c.vers)
+<span id="L618" class="ln">   618	</span>		return c.in.setErrorLocked(c.newRecordHeaderError(msg))
+<span id="L619" class="ln">   619	</span>	}
+<span id="L620" class="ln">   620	</span>	if n &gt; maxCiphertext {
+<span id="L621" class="ln">   621	</span>		c.sendAlert(alertRecordOverflow)
+<span id="L622" class="ln">   622	</span>		msg := fmt.Sprintf(&#34;oversized record received with length %d&#34;, n)
+<span id="L623" class="ln">   623	</span>		return c.in.setErrorLocked(c.newRecordHeaderError(msg))
+<span id="L624" class="ln">   624	</span>	}
+<span id="L625" class="ln">   625	</span>	if !c.haveVers {
+<span id="L626" class="ln">   626	</span>		<span class="comment">// First message, be extra suspicious: this might not be a TLS</span>
+<span id="L627" class="ln">   627	</span>		<span class="comment">// client. Bail out before reading a full &#39;body&#39;, if possible.</span>
+<span id="L628" class="ln">   628	</span>		<span class="comment">// The current max version is 3.3 so if the version is &gt;= 16.0,</span>
+<span id="L629" class="ln">   629	</span>		<span class="comment">// it&#39;s probably not real.</span>
+<span id="L630" class="ln">   630	</span>		if (typ != recordTypeAlert &amp;&amp; typ != want) || vers &gt;= 0x1000 {
+<span id="L631" class="ln">   631	</span>			c.sendAlert(alertUnexpectedMessage)
+<span id="L632" class="ln">   632	</span>			return c.in.setErrorLocked(c.newRecordHeaderError(&#34;first record does not look like a TLS handshake&#34;))
+<span id="L633" class="ln">   633	</span>		}
+<span id="L634" class="ln">   634	</span>	}
+<span id="L635" class="ln">   635	</span>	if err := b.readFromUntil(c.conn, recordHeaderLen+n); err != nil {
+<span id="L636" class="ln">   636	</span>		if err == io.EOF {
+<span id="L637" class="ln">   637	</span>			err = io.ErrUnexpectedEOF
+<span id="L638" class="ln">   638	</span>		}
+<span id="L639" class="ln">   639	</span>		if e, ok := err.(net.Error); !ok || !e.Temporary() {
+<span id="L640" class="ln">   640	</span>			c.in.setErrorLocked(err)
+<span id="L641" class="ln">   641	</span>		}
+<span id="L642" class="ln">   642	</span>		return err
+<span id="L643" class="ln">   643	</span>	}
+<span id="L644" class="ln">   644	</span>
+<span id="L645" class="ln">   645	</span>	<span class="comment">// Process message.</span>
+<span id="L646" class="ln">   646	</span>	b, c.rawInput = c.in.splitBlock(b, recordHeaderLen+n)
+<span id="L647" class="ln">   647	</span>	ok, off, alertValue := c.in.decrypt(b)
+<span id="L648" class="ln">   648	</span>	if !ok {
+<span id="L649" class="ln">   649	</span>		c.in.freeBlock(b)
+<span id="L650" class="ln">   650	</span>		return c.in.setErrorLocked(c.sendAlert(alertValue))
+<span id="L651" class="ln">   651	</span>	}
+<span id="L652" class="ln">   652	</span>	b.off = off
+<span id="L653" class="ln">   653	</span>	data := b.data[b.off:]
+<span id="L654" class="ln">   654	</span>	if len(data) &gt; maxPlaintext {
+<span id="L655" class="ln">   655	</span>		err := c.sendAlert(alertRecordOverflow)
+<span id="L656" class="ln">   656	</span>		c.in.freeBlock(b)
+<span id="L657" class="ln">   657	</span>		return c.in.setErrorLocked(err)
+<span id="L658" class="ln">   658	</span>	}
+<span id="L659" class="ln">   659	</span>
+<span id="L660" class="ln">   660	</span>	switch typ {
+<span id="L661" class="ln">   661	</span>	default:
+<span id="L662" class="ln">   662	</span>		c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+<span id="L663" class="ln">   663	</span>
+<span id="L664" class="ln">   664	</span>	case recordTypeAlert:
+<span id="L665" class="ln">   665	</span>		if len(data) != 2 {
+<span id="L666" class="ln">   666	</span>			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+<span id="L667" class="ln">   667	</span>			break
+<span id="L668" class="ln">   668	</span>		}
+<span id="L669" class="ln">   669	</span>		if alert(data[1]) == alertCloseNotify {
+<span id="L670" class="ln">   670	</span>			c.in.setErrorLocked(io.EOF)
+<span id="L671" class="ln">   671	</span>			break
+<span id="L672" class="ln">   672	</span>		}
+<span id="L673" class="ln">   673	</span>		switch data[0] {
+<span id="L674" class="ln">   674	</span>		case alertLevelWarning:
+<span id="L675" class="ln">   675	</span>			<span class="comment">// drop on the floor</span>
+<span id="L676" class="ln">   676	</span>			c.in.freeBlock(b)
+<span id="L677" class="ln">   677	</span>			goto Again
+<span id="L678" class="ln">   678	</span>		case alertLevelError:
+<span id="L679" class="ln">   679	</span>			c.in.setErrorLocked(&amp;net.OpError{Op: &#34;remote error&#34;, Err: alert(data[1])})
+<span id="L680" class="ln">   680	</span>		default:
+<span id="L681" class="ln">   681	</span>			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+<span id="L682" class="ln">   682	</span>		}
+<span id="L683" class="ln">   683	</span>
+<span id="L684" class="ln">   684	</span>	case recordTypeChangeCipherSpec:
+<span id="L685" class="ln">   685	</span>		if typ != want || len(data) != 1 || data[0] != 1 {
+<span id="L686" class="ln">   686	</span>			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+<span id="L687" class="ln">   687	</span>			break
+<span id="L688" class="ln">   688	</span>		}
+<span id="L689" class="ln">   689	</span>		err := c.in.changeCipherSpec()
+<span id="L690" class="ln">   690	</span>		if err != nil {
+<span id="L691" class="ln">   691	</span>			c.in.setErrorLocked(c.sendAlert(err.(alert)))
+<span id="L692" class="ln">   692	</span>		}
+<span id="L693" class="ln">   693	</span>
+<span id="L694" class="ln">   694	</span>	case recordTypeApplicationData:
+<span id="L695" class="ln">   695	</span>		if typ != want {
+<span id="L696" class="ln">   696	</span>			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+<span id="L697" class="ln">   697	</span>			break
+<span id="L698" class="ln">   698	</span>		}
+<span id="L699" class="ln">   699	</span>		c.input = b
+<span id="L700" class="ln">   700	</span>		b = nil
+<span id="L701" class="ln">   701	</span>
+<span id="L702" class="ln">   702	</span>	case recordTypeHandshake:
+<span id="L703" class="ln">   703	</span>		<span class="comment">// TODO(rsc): Should at least pick off connection close.</span>
+<span id="L704" class="ln">   704	</span>		if typ != want &amp;&amp; !(c.isClient &amp;&amp; c.config.Renegotiation != RenegotiateNever) {
+<span id="L705" class="ln">   705	</span>			return c.in.setErrorLocked(c.sendAlert(alertNoRenegotiation))
+<span id="L706" class="ln">   706	</span>		}
+<span id="L707" class="ln">   707	</span>		c.hand.Write(data)
+<span id="L708" class="ln">   708	</span>	}
+<span id="L709" class="ln">   709	</span>
+<span id="L710" class="ln">   710	</span>	if b != nil {
+<span id="L711" class="ln">   711	</span>		c.in.freeBlock(b)
+<span id="L712" class="ln">   712	</span>	}
+<span id="L713" class="ln">   713	</span>	return c.in.err
+<span id="L714" class="ln">   714	</span>}
+<span id="L715" class="ln">   715	</span>
+<span id="L716" class="ln">   716	</span><span class="comment">// sendAlert sends a TLS alert message.</span>
+<span id="L717" class="ln">   717	</span><span class="comment">// c.out.Mutex &lt;= L.</span>
+<span id="L718" class="ln">   718	</span>func (c *Conn) sendAlertLocked(err alert) error {
+<span id="L719" class="ln">   719	</span>	switch err {
+<span id="L720" class="ln">   720	</span>	case alertNoRenegotiation, alertCloseNotify:
+<span id="L721" class="ln">   721	</span>		c.tmp[0] = alertLevelWarning
+<span id="L722" class="ln">   722	</span>	default:
+<span id="L723" class="ln">   723	</span>		c.tmp[0] = alertLevelError
+<span id="L724" class="ln">   724	</span>	}
+<span id="L725" class="ln">   725	</span>	c.tmp[1] = byte(err)
+<span id="L726" class="ln">   726	</span>
+<span id="L727" class="ln">   727	</span>	_, writeErr := c.writeRecordLocked(recordTypeAlert, c.tmp[0:2])
+<span id="L728" class="ln">   728	</span>	if err == alertCloseNotify {
+<span id="L729" class="ln">   729	</span>		<span class="comment">// closeNotify is a special case in that it isn&#39;t an error.</span>
+<span id="L730" class="ln">   730	</span>		return writeErr
+<span id="L731" class="ln">   731	</span>	}
+<span id="L732" class="ln">   732	</span>
+<span id="L733" class="ln">   733	</span>	return c.out.setErrorLocked(&amp;net.OpError{Op: &#34;local error&#34;, Err: err})
+<span id="L734" class="ln">   734	</span>}
+<span id="L735" class="ln">   735	</span>
+<span id="L736" class="ln">   736	</span><span class="comment">// sendAlert sends a TLS alert message.</span>
+<span id="L737" class="ln">   737	</span><span class="comment">// L &lt; c.out.Mutex.</span>
+<span id="L738" class="ln">   738	</span>func (c *Conn) sendAlert(err alert) error {
+<span id="L739" class="ln">   739	</span>	c.out.Lock()
+<span id="L740" class="ln">   740	</span>	defer c.out.Unlock()
+<span id="L741" class="ln">   741	</span>	return c.sendAlertLocked(err)
+<span id="L742" class="ln">   742	</span>}
+<span id="L743" class="ln">   743	</span>
+<span id="L744" class="ln">   744	</span>const (
+<span id="L745" class="ln">   745	</span>	<span class="comment">// tcpMSSEstimate is a conservative estimate of the TCP maximum segment</span>
+<span id="L746" class="ln">   746	</span>	<span class="comment">// size (MSS). A constant is used, rather than querying the kernel for</span>
+<span id="L747" class="ln">   747	</span>	<span class="comment">// the actual MSS, to avoid complexity. The value here is the IPv6</span>
+<span id="L748" class="ln">   748	</span>	<span class="comment">// minimum MTU (1280 bytes) minus the overhead of an IPv6 header (40</span>
+<span id="L749" class="ln">   749	</span>	<span class="comment">// bytes) and a TCP header with timestamps (32 bytes).</span>
+<span id="L750" class="ln">   750	</span>	tcpMSSEstimate = 1208
+<span id="L751" class="ln">   751	</span>
+<span id="L752" class="ln">   752	</span>	<span class="comment">// recordSizeBoostThreshold is the number of bytes of application data</span>
+<span id="L753" class="ln">   753	</span>	<span class="comment">// sent after which the TLS record size will be increased to the</span>
+<span id="L754" class="ln">   754	</span>	<span class="comment">// maximum.</span>
+<span id="L755" class="ln">   755	</span>	recordSizeBoostThreshold = 128 * 1024
+<span id="L756" class="ln">   756	</span>)
+<span id="L757" class="ln">   757	</span>
+<span id="L758" class="ln">   758	</span><span class="comment">// maxPayloadSizeForWrite returns the maximum TLS payload size to use for the</span>
+<span id="L759" class="ln">   759	</span><span class="comment">// next application data record. There is the following trade-off:</span>
+<span id="L760" class="ln">   760	</span><span class="comment">//</span>
+<span id="L761" class="ln">   761	</span><span class="comment">//   - For latency-sensitive applications, such as web browsing, each TLS</span>
+<span id="L762" class="ln">   762	</span><span class="comment">//     record should fit in one TCP segment.</span>
+<span id="L763" class="ln">   763	</span><span class="comment">//   - For throughput-sensitive applications, such as large file transfers,</span>
+<span id="L764" class="ln">   764	</span><span class="comment">//     larger TLS records better amortize framing and encryption overheads.</span>
+<span id="L765" class="ln">   765	</span><span class="comment">//</span>
+<span id="L766" class="ln">   766	</span><span class="comment">// A simple heuristic that works well in practice is to use small records for</span>
+<span id="L767" class="ln">   767	</span><span class="comment">// the first 1MB of data, then use larger records for subsequent data, and</span>
+<span id="L768" class="ln">   768	</span><span class="comment">// reset back to smaller records after the connection becomes idle. See &#34;High</span>
+<span id="L769" class="ln">   769	</span><span class="comment">// Performance Web Networking&#34;, Chapter 4, or:</span>
+<span id="L770" class="ln">   770	</span><span class="comment">// https://www.igvita.com/2013/10/24/optimizing-tls-record-size-and-buffering-latency/</span>
+<span id="L771" class="ln">   771	</span><span class="comment">//</span>
+<span id="L772" class="ln">   772	</span><span class="comment">// In the interests of simplicity and determinism, this code does not attempt</span>
+<span id="L773" class="ln">   773	</span><span class="comment">// to reset the record size once the connection is idle, however.</span>
+<span id="L774" class="ln">   774	</span><span class="comment">//</span>
+<span id="L775" class="ln">   775	</span><span class="comment">// c.out.Mutex &lt;= L.</span>
+<span id="L776" class="ln">   776	</span>func (c *Conn) maxPayloadSizeForWrite(typ recordType, explicitIVLen int) int {
+<span id="L777" class="ln">   777	</span>	if c.config.DynamicRecordSizingDisabled || typ != recordTypeApplicationData {
+<span id="L778" class="ln">   778	</span>		return maxPlaintext
+<span id="L779" class="ln">   779	</span>	}
+<span id="L780" class="ln">   780	</span>
+<span id="L781" class="ln">   781	</span>	if c.bytesSent &gt;= recordSizeBoostThreshold {
+<span id="L782" class="ln">   782	</span>		return maxPlaintext
+<span id="L783" class="ln">   783	</span>	}
+<span id="L784" class="ln">   784	</span>
+<span id="L785" class="ln">   785	</span>	<span class="comment">// Subtract TLS overheads to get the maximum payload size.</span>
+<span id="L786" class="ln">   786	</span>	macSize := 0
+<span id="L787" class="ln">   787	</span>	if c.out.mac != nil {
+<span id="L788" class="ln">   788	</span>		macSize = c.out.mac.Size()
+<span id="L789" class="ln">   789	</span>	}
+<span id="L790" class="ln">   790	</span>
+<span id="L791" class="ln">   791	</span>	payloadBytes := tcpMSSEstimate - recordHeaderLen - explicitIVLen
+<span id="L792" class="ln">   792	</span>	if c.out.cipher != nil {
+<span id="L793" class="ln">   793	</span>		switch ciph := c.out.cipher.(type) {
+<span id="L794" class="ln">   794	</span>		case cipher.Stream:
+<span id="L795" class="ln">   795	</span>			payloadBytes -= macSize
+<span id="L796" class="ln">   796	</span>		case cipher.AEAD:
+<span id="L797" class="ln">   797	</span>			payloadBytes -= ciph.Overhead()
+<span id="L798" class="ln">   798	</span>		case cbcMode:
+<span id="L799" class="ln">   799	</span>			blockSize := ciph.BlockSize()
+<span id="L800" class="ln">   800	</span>			<span class="comment">// The payload must fit in a multiple of blockSize, with</span>
+<span id="L801" class="ln">   801	</span>			<span class="comment">// room for at least one padding byte.</span>
+<span id="L802" class="ln">   802	</span>			payloadBytes = (payloadBytes &amp; ^(blockSize - 1)) - 1
+<span id="L803" class="ln">   803	</span>			<span class="comment">// The MAC is appended before padding so affects the</span>
+<span id="L804" class="ln">   804	</span>			<span class="comment">// payload size directly.</span>
+<span id="L805" class="ln">   805	</span>			payloadBytes -= macSize
+<span id="L806" class="ln">   806	</span>		default:
+<span id="L807" class="ln">   807	</span>			panic(&#34;unknown cipher type&#34;)
+<span id="L808" class="ln">   808	</span>		}
+<span id="L809" class="ln">   809	</span>	}
+<span id="L810" class="ln">   810	</span>
+<span id="L811" class="ln">   811	</span>	<span class="comment">// Allow packet growth in arithmetic progression up to max.</span>
+<span id="L812" class="ln">   812	</span>	pkt := c.packetsSent
+<span id="L813" class="ln">   813	</span>	c.packetsSent++
+<span id="L814" class="ln">   814	</span>	if pkt &gt; 1000 {
+<span id="L815" class="ln">   815	</span>		return maxPlaintext <span class="comment">// avoid overflow in multiply below</span>
+<span id="L816" class="ln">   816	</span>	}
+<span id="L817" class="ln">   817	</span>
+<span id="L818" class="ln">   818	</span>	n := payloadBytes * int(pkt+1)
+<span id="L819" class="ln">   819	</span>	if n &gt; maxPlaintext {
+<span id="L820" class="ln">   820	</span>		n = maxPlaintext
+<span id="L821" class="ln">   821	</span>	}
+<span id="L822" class="ln">   822	</span>	return n
+<span id="L823" class="ln">   823	</span>}
+<span id="L824" class="ln">   824	</span>
+<span id="L825" class="ln">   825	</span><span class="comment">// c.out.Mutex &lt;= L.</span>
+<span id="L826" class="ln">   826	</span>func (c *Conn) write(data []byte) (int, error) {
+<span id="L827" class="ln">   827	</span>	if c.buffering {
+<span id="L828" class="ln">   828	</span>		c.sendBuf = append(c.sendBuf, data...)
+<span id="L829" class="ln">   829	</span>		return len(data), nil
+<span id="L830" class="ln">   830	</span>	}
+<span id="L831" class="ln">   831	</span>
+<span id="L832" class="ln">   832	</span>	n, err := c.conn.Write(data)
+<span id="L833" class="ln">   833	</span>	c.bytesSent += int64(n)
+<span id="L834" class="ln">   834	</span>	return n, err
+<span id="L835" class="ln">   835	</span>}
+<span id="L836" class="ln">   836	</span>
+<span id="L837" class="ln">   837	</span>func (c *Conn) flush() (int, error) {
+<span id="L838" class="ln">   838	</span>	if len(c.sendBuf) == 0 {
+<span id="L839" class="ln">   839	</span>		return 0, nil
+<span id="L840" class="ln">   840	</span>	}
+<span id="L841" class="ln">   841	</span>
+<span id="L842" class="ln">   842	</span>	n, err := c.conn.Write(c.sendBuf)
+<span id="L843" class="ln">   843	</span>	c.bytesSent += int64(n)
+<span id="L844" class="ln">   844	</span>	c.sendBuf = nil
+<span id="L845" class="ln">   845	</span>	c.buffering = false
+<span id="L846" class="ln">   846	</span>	return n, err
+<span id="L847" class="ln">   847	</span>}
+<span id="L848" class="ln">   848	</span>
+<span id="L849" class="ln">   849	</span><span class="comment">// writeRecordLocked writes a TLS record with the given type and payload to the</span>
+<span id="L850" class="ln">   850	</span><span class="comment">// connection and updates the record layer state.</span>
+<span id="L851" class="ln">   851	</span><span class="comment">// c.out.Mutex &lt;= L.</span>
+<span id="L852" class="ln">   852	</span>func (c *Conn) writeRecordLocked(typ recordType, data []byte) (int, error) {
+<span id="L853" class="ln">   853	</span>	b := c.out.newBlock()
+<span id="L854" class="ln">   854	</span>	defer c.out.freeBlock(b)
+<span id="L855" class="ln">   855	</span>
+<span id="L856" class="ln">   856	</span>	var n int
+<span id="L857" class="ln">   857	</span>	for len(data) &gt; 0 {
+<span id="L858" class="ln">   858	</span>		explicitIVLen := 0
+<span id="L859" class="ln">   859	</span>		explicitIVIsSeq := false
+<span id="L860" class="ln">   860	</span>
+<span id="L861" class="ln">   861	</span>		var cbc cbcMode
+<span id="L862" class="ln">   862	</span>		if c.out.version &gt;= VersionTLS11 {
+<span id="L863" class="ln">   863	</span>			var ok bool
+<span id="L864" class="ln">   864	</span>			if cbc, ok = c.out.cipher.(cbcMode); ok {
+<span id="L865" class="ln">   865	</span>				explicitIVLen = cbc.BlockSize()
+<span id="L866" class="ln">   866	</span>			}
+<span id="L867" class="ln">   867	</span>		}
+<span id="L868" class="ln">   868	</span>		if explicitIVLen == 0 {
+<span id="L869" class="ln">   869	</span>			if c, ok := c.out.cipher.(aead); ok {
+<span id="L870" class="ln">   870	</span>				explicitIVLen = c.explicitNonceLen()
+<span id="L871" class="ln">   871	</span>
+<span id="L872" class="ln">   872	</span>				<span class="comment">// The AES-GCM construction in TLS has an</span>
+<span id="L873" class="ln">   873	</span>				<span class="comment">// explicit nonce so that the nonce can be</span>
+<span id="L874" class="ln">   874	</span>				<span class="comment">// random. However, the nonce is only 8 bytes</span>
+<span id="L875" class="ln">   875	</span>				<span class="comment">// which is too small for a secure, random</span>
+<span id="L876" class="ln">   876	</span>				<span class="comment">// nonce. Therefore we use the sequence number</span>
+<span id="L877" class="ln">   877	</span>				<span class="comment">// as the nonce.</span>
+<span id="L878" class="ln">   878	</span>				explicitIVIsSeq = explicitIVLen &gt; 0
+<span id="L879" class="ln">   879	</span>			}
+<span id="L880" class="ln">   880	</span>		}
+<span id="L881" class="ln">   881	</span>		m := len(data)
+<span id="L882" class="ln">   882	</span>		if maxPayload := c.maxPayloadSizeForWrite(typ, explicitIVLen); m &gt; maxPayload {
+<span id="L883" class="ln">   883	</span>			m = maxPayload
+<span id="L884" class="ln">   884	</span>		}
+<span id="L885" class="ln">   885	</span>		b.resize(recordHeaderLen + explicitIVLen + m)
+<span id="L886" class="ln">   886	</span>		b.data[0] = byte(typ)
+<span id="L887" class="ln">   887	</span>		vers := c.vers
+<span id="L888" class="ln">   888	</span>		if vers == 0 {
+<span id="L889" class="ln">   889	</span>			<span class="comment">// Some TLS servers fail if the record version is</span>
+<span id="L890" class="ln">   890	</span>			<span class="comment">// greater than TLS 1.0 for the initial ClientHello.</span>
+<span id="L891" class="ln">   891	</span>			vers = VersionTLS10
+<span id="L892" class="ln">   892	</span>		}
+<span id="L893" class="ln">   893	</span>		b.data[1] = byte(vers &gt;&gt; 8)
+<span id="L894" class="ln">   894	</span>		b.data[2] = byte(vers)
+<span id="L895" class="ln">   895	</span>		b.data[3] = byte(m &gt;&gt; 8)
+<span id="L896" class="ln">   896	</span>		b.data[4] = byte(m)
+<span id="L897" class="ln">   897	</span>		if explicitIVLen &gt; 0 {
+<span id="L898" class="ln">   898	</span>			explicitIV := b.data[recordHeaderLen : recordHeaderLen+explicitIVLen]
+<span id="L899" class="ln">   899	</span>			if explicitIVIsSeq {
+<span id="L900" class="ln">   900	</span>				copy(explicitIV, c.out.seq[:])
+<span id="L901" class="ln">   901	</span>			} else {
+<span id="L902" class="ln">   902	</span>				if _, err := io.ReadFull(c.config.rand(), explicitIV); err != nil {
+<span id="L903" class="ln">   903	</span>					return n, err
+<span id="L904" class="ln">   904	</span>				}
+<span id="L905" class="ln">   905	</span>			}
+<span id="L906" class="ln">   906	</span>		}
+<span id="L907" class="ln">   907	</span>		copy(b.data[recordHeaderLen+explicitIVLen:], data)
+<span id="L908" class="ln">   908	</span>		c.out.encrypt(b, explicitIVLen)
+<span id="L909" class="ln">   909	</span>		if _, err := c.write(b.data); err != nil {
+<span id="L910" class="ln">   910	</span>			return n, err
+<span id="L911" class="ln">   911	</span>		}
+<span id="L912" class="ln">   912	</span>		n += m
+<span id="L913" class="ln">   913	</span>		data = data[m:]
+<span id="L914" class="ln">   914	</span>	}
+<span id="L915" class="ln">   915	</span>
+<span id="L916" class="ln">   916	</span>	if typ == recordTypeChangeCipherSpec {
+<span id="L917" class="ln">   917	</span>		if err := c.out.changeCipherSpec(); err != nil {
+<span id="L918" class="ln">   918	</span>			return n, c.sendAlertLocked(err.(alert))
+<span id="L919" class="ln">   919	</span>		}
+<span id="L920" class="ln">   920	</span>	}
+<span id="L921" class="ln">   921	</span>
+<span id="L922" class="ln">   922	</span>	return n, nil
+<span id="L923" class="ln">   923	</span>}
+<span id="L924" class="ln">   924	</span>
+<span id="L925" class="ln">   925	</span><span class="comment">// writeRecord writes a TLS record with the given type and payload to the</span>
+<span id="L926" class="ln">   926	</span><span class="comment">// connection and updates the record layer state.</span>
+<span id="L927" class="ln">   927	</span><span class="comment">// L &lt; c.out.Mutex.</span>
+<span id="L928" class="ln">   928	</span>func (c *Conn) writeRecord(typ recordType, data []byte) (int, error) {
+<span id="L929" class="ln">   929	</span>	c.out.Lock()
+<span id="L930" class="ln">   930	</span>	defer c.out.Unlock()
+<span id="L931" class="ln">   931	</span>
+<span id="L932" class="ln">   932	</span>	return c.writeRecordLocked(typ, data)
+<span id="L933" class="ln">   933	</span>}
+<span id="L934" class="ln">   934	</span>
+<span id="L935" class="ln">   935	</span><span class="comment">// readHandshake reads the next handshake message from</span>
+<span id="L936" class="ln">   936	</span><span class="comment">// the record layer.</span>
+<span id="L937" class="ln">   937	</span><span class="comment">// c.in.Mutex &lt; L; c.out.Mutex &lt; L.</span>
+<span id="L938" class="ln">   938	</span>func (c *Conn) readHandshake() (interface{}, error) {
+<span id="L939" class="ln">   939	</span>	for c.hand.Len() &lt; 4 {
+<span id="L940" class="ln">   940	</span>		if err := c.in.err; err != nil {
+<span id="L941" class="ln">   941	</span>			return nil, err
+<span id="L942" class="ln">   942	</span>		}
+<span id="L943" class="ln">   943	</span>		if err := c.readRecord(recordTypeHandshake); err != nil {
+<span id="L944" class="ln">   944	</span>			return nil, err
+<span id="L945" class="ln">   945	</span>		}
+<span id="L946" class="ln">   946	</span>	}
+<span id="L947" class="ln">   947	</span>
+<span id="L948" class="ln">   948	</span>	data := c.hand.Bytes()
+<span id="L949" class="ln">   949	</span>	n := int(data[1])&lt;&lt;16 | int(data[2])&lt;&lt;8 | int(data[3])
+<span id="L950" class="ln">   950	</span>	if n &gt; maxHandshake {
+<span id="L951" class="ln">   951	</span>		c.sendAlertLocked(alertInternalError)
+<span id="L952" class="ln">   952	</span>		return nil, c.in.setErrorLocked(fmt.Errorf(&#34;tls: handshake message of length %d bytes exceeds maximum of %d bytes&#34;, n, maxHandshake))
+<span id="L953" class="ln">   953	</span>	}
+<span id="L954" class="ln">   954	</span>	for c.hand.Len() &lt; 4+n {
+<span id="L955" class="ln">   955	</span>		if err := c.in.err; err != nil {
+<span id="L956" class="ln">   956	</span>			return nil, err
+<span id="L957" class="ln">   957	</span>		}
+<span id="L958" class="ln">   958	</span>		if err := c.readRecord(recordTypeHandshake); err != nil {
+<span id="L959" class="ln">   959	</span>			return nil, err
+<span id="L960" class="ln">   960	</span>		}
+<span id="L961" class="ln">   961	</span>	}
+<span id="L962" class="ln">   962	</span>	data = c.hand.Next(4 + n)
+<span id="L963" class="ln">   963	</span>	var m handshakeMessage
+<span id="L964" class="ln">   964	</span>	switch data[0] {
+<span id="L965" class="ln">   965	</span>	case typeHelloRequest:
+<span id="L966" class="ln">   966	</span>		m = new(helloRequestMsg)
+<span id="L967" class="ln">   967	</span>	case typeClientHello:
+<span id="L968" class="ln">   968	</span>		m = new(clientHelloMsg)
+<span id="L969" class="ln">   969	</span>	case typeServerHello:
+<span id="L970" class="ln">   970	</span>		m = new(serverHelloMsg)
+<span id="L971" class="ln">   971	</span>	case typeNewSessionTicket:
+<span id="L972" class="ln">   972	</span>		m = new(newSessionTicketMsg)
+<span id="L973" class="ln">   973	</span>	case typeCertificate:
+<span id="L974" class="ln">   974	</span>		m = new(certificateMsg)
+<span id="L975" class="ln">   975	</span>	case typeCertificateRequest:
+<span id="L976" class="ln">   976	</span>		m = &amp;certificateRequestMsg{
+<span id="L977" class="ln">   977	</span>			hasSignatureAndHash: c.vers &gt;= VersionTLS12,
+<span id="L978" class="ln">   978	</span>		}
+<span id="L979" class="ln">   979	</span>	case typeCertificateStatus:
+<span id="L980" class="ln">   980	</span>		m = new(certificateStatusMsg)
+<span id="L981" class="ln">   981	</span>	case typeServerKeyExchange:
+<span id="L982" class="ln">   982	</span>		m = new(serverKeyExchangeMsg)
+<span id="L983" class="ln">   983	</span>	case typeServerHelloDone:
+<span id="L984" class="ln">   984	</span>		m = new(serverHelloDoneMsg)
+<span id="L985" class="ln">   985	</span>	case typeClientKeyExchange:
+<span id="L986" class="ln">   986	</span>		m = new(clientKeyExchangeMsg)
+<span id="L987" class="ln">   987	</span>	case typeCertificateVerify:
+<span id="L988" class="ln">   988	</span>		m = &amp;certificateVerifyMsg{
+<span id="L989" class="ln">   989	</span>			hasSignatureAndHash: c.vers &gt;= VersionTLS12,
+<span id="L990" class="ln">   990	</span>		}
+<span id="L991" class="ln">   991	</span>	case typeNextProtocol:
+<span id="L992" class="ln">   992	</span>		m = new(nextProtoMsg)
+<span id="L993" class="ln">   993	</span>	case typeFinished:
+<span id="L994" class="ln">   994	</span>		m = new(finishedMsg)
+<span id="L995" class="ln">   995	</span>	default:
+<span id="L996" class="ln">   996	</span>		return nil, c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+<span id="L997" class="ln">   997	</span>	}
+<span id="L998" class="ln">   998	</span>
+<span id="L999" class="ln">   999	</span>	<span class="comment">// The handshake message unmarshalers</span>
+<span id="L1000" class="ln">  1000	</span>	<span class="comment">// expect to be able to keep references to data,</span>
+<span id="L1001" class="ln">  1001	</span>	<span class="comment">// so pass in a fresh copy that won&#39;t be overwritten.</span>
+<span id="L1002" class="ln">  1002	</span>	data = append([]byte(nil), data...)
+<span id="L1003" class="ln">  1003	</span>
+<span id="L1004" class="ln">  1004	</span>	if !m.unmarshal(data) {
+<span id="L1005" class="ln">  1005	</span>		return nil, c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+<span id="L1006" class="ln">  1006	</span>	}
+<span id="L1007" class="ln">  1007	</span>	return m, nil
+<span id="L1008" class="ln">  1008	</span>}
+<span id="L1009" class="ln">  1009	</span>
+<span id="L1010" class="ln">  1010	</span>var (
+<span id="L1011" class="ln">  1011	</span>	errClosed   = errors.New(&#34;tls: use of closed connection&#34;)
+<span id="L1012" class="ln">  1012	</span>	errShutdown = errors.New(&#34;tls: protocol is shutdown&#34;)
+<span id="L1013" class="ln">  1013	</span>)
+<span id="L1014" class="ln">  1014	</span>
+<span id="L1015" class="ln">  1015	</span><span class="comment">// Write writes data to the connection.</span>
+<span id="L1016" class="ln">  1016	</span>func (c *Conn) Write(b []byte) (int, error) {
+<span id="L1017" class="ln">  1017	</span>	<span class="comment">// interlock with Close below</span>
+<span id="L1018" class="ln">  1018	</span>	for {
+<span id="L1019" class="ln">  1019	</span>		x := atomic.LoadInt32(&amp;c.activeCall)
+<span id="L1020" class="ln">  1020	</span>		if x&amp;1 != 0 {
+<span id="L1021" class="ln">  1021	</span>			return 0, errClosed
+<span id="L1022" class="ln">  1022	</span>		}
+<span id="L1023" class="ln">  1023	</span>		if atomic.CompareAndSwapInt32(&amp;c.activeCall, x, x+2) {
+<span id="L1024" class="ln">  1024	</span>			defer atomic.AddInt32(&amp;c.activeCall, -2)
+<span id="L1025" class="ln">  1025	</span>			break
+<span id="L1026" class="ln">  1026	</span>		}
+<span id="L1027" class="ln">  1027	</span>	}
+<span id="L1028" class="ln">  1028	</span>
+<span id="L1029" class="ln">  1029	</span>	if err := c.Handshake(); err != nil {
+<span id="L1030" class="ln">  1030	</span>		return 0, err
+<span id="L1031" class="ln">  1031	</span>	}
+<span id="L1032" class="ln">  1032	</span>
+<span id="L1033" class="ln">  1033	</span>	c.out.Lock()
+<span id="L1034" class="ln">  1034	</span>	defer c.out.Unlock()
+<span id="L1035" class="ln">  1035	</span>
+<span id="L1036" class="ln">  1036	</span>	if err := c.out.err; err != nil {
+<span id="L1037" class="ln">  1037	</span>		return 0, err
+<span id="L1038" class="ln">  1038	</span>	}
+<span id="L1039" class="ln">  1039	</span>
+<span id="L1040" class="ln">  1040	</span>	if !c.handshakeComplete {
+<span id="L1041" class="ln">  1041	</span>		return 0, alertInternalError
+<span id="L1042" class="ln">  1042	</span>	}
+<span id="L1043" class="ln">  1043	</span>
+<span id="L1044" class="ln">  1044	</span>	if c.closeNotifySent {
+<span id="L1045" class="ln">  1045	</span>		return 0, errShutdown
+<span id="L1046" class="ln">  1046	</span>	}
+<span id="L1047" class="ln">  1047	</span>
+<span id="L1048" class="ln">  1048	</span>	<span class="comment">// SSL 3.0 and TLS 1.0 are susceptible to a chosen-plaintext</span>
+<span id="L1049" class="ln">  1049	</span>	<span class="comment">// attack when using block mode ciphers due to predictable IVs.</span>
+<span id="L1050" class="ln">  1050	</span>	<span class="comment">// This can be prevented by splitting each Application Data</span>
+<span id="L1051" class="ln">  1051	</span>	<span class="comment">// record into two records, effectively randomizing the IV.</span>
+<span id="L1052" class="ln">  1052	</span>	<span class="comment">//</span>
+<span id="L1053" class="ln">  1053	</span>	<span class="comment">// http://www.openssl.org/~bodo/tls-cbc.txt</span>
+<span id="L1054" class="ln">  1054	</span>	<span class="comment">// https://bugzilla.mozilla.org/show_bug.cgi?id=665814</span>
+<span id="L1055" class="ln">  1055	</span>	<span class="comment">// http://www.imperialviolet.org/2012/01/15/beastfollowup.html</span>
+<span id="L1056" class="ln">  1056	</span>
+<span id="L1057" class="ln">  1057	</span>	var m int
+<span id="L1058" class="ln">  1058	</span>	if len(b) &gt; 1 &amp;&amp; c.vers &lt;= VersionTLS10 {
+<span id="L1059" class="ln">  1059	</span>		if _, ok := c.out.cipher.(cipher.BlockMode); ok {
+<span id="L1060" class="ln">  1060	</span>			n, err := c.writeRecordLocked(recordTypeApplicationData, b[:1])
+<span id="L1061" class="ln">  1061	</span>			if err != nil {
+<span id="L1062" class="ln">  1062	</span>				return n, c.out.setErrorLocked(err)
+<span id="L1063" class="ln">  1063	</span>			}
+<span id="L1064" class="ln">  1064	</span>			m, b = 1, b[1:]
+<span id="L1065" class="ln">  1065	</span>		}
+<span id="L1066" class="ln">  1066	</span>	}
+<span id="L1067" class="ln">  1067	</span>
+<span id="L1068" class="ln">  1068	</span>	n, err := c.writeRecordLocked(recordTypeApplicationData, b)
+<span id="L1069" class="ln">  1069	</span>	return n + m, c.out.setErrorLocked(err)
+<span id="L1070" class="ln">  1070	</span>}
+<span id="L1071" class="ln">  1071	</span>
+<span id="L1072" class="ln">  1072	</span><span class="comment">// handleRenegotiation processes a HelloRequest handshake message.</span>
+<span id="L1073" class="ln">  1073	</span><span class="comment">// c.in.Mutex &lt;= L</span>
+<span id="L1074" class="ln">  1074	</span>func (c *Conn) handleRenegotiation() error {
+<span id="L1075" class="ln">  1075	</span>	msg, err := c.readHandshake()
+<span id="L1076" class="ln">  1076	</span>	if err != nil {
+<span id="L1077" class="ln">  1077	</span>		return err
+<span id="L1078" class="ln">  1078	</span>	}
+<span id="L1079" class="ln">  1079	</span>
+<span id="L1080" class="ln">  1080	</span>	_, ok := msg.(*helloRequestMsg)
+<span id="L1081" class="ln">  1081	</span>	if !ok {
+<span id="L1082" class="ln">  1082	</span>		c.sendAlert(alertUnexpectedMessage)
+<span id="L1083" class="ln">  1083	</span>		return alertUnexpectedMessage
+<span id="L1084" class="ln">  1084	</span>	}
+<span id="L1085" class="ln">  1085	</span>
+<span id="L1086" class="ln">  1086	</span>	if !c.isClient {
+<span id="L1087" class="ln">  1087	</span>		return c.sendAlert(alertNoRenegotiation)
+<span id="L1088" class="ln">  1088	</span>	}
+<span id="L1089" class="ln">  1089	</span>
+<span id="L1090" class="ln">  1090	</span>	switch c.config.Renegotiation {
+<span id="L1091" class="ln">  1091	</span>	case RenegotiateNever:
+<span id="L1092" class="ln">  1092	</span>		return c.sendAlert(alertNoRenegotiation)
+<span id="L1093" class="ln">  1093	</span>	case RenegotiateOnceAsClient:
+<span id="L1094" class="ln">  1094	</span>		if c.handshakes &gt; 1 {
+<span id="L1095" class="ln">  1095	</span>			return c.sendAlert(alertNoRenegotiation)
+<span id="L1096" class="ln">  1096	</span>		}
+<span id="L1097" class="ln">  1097	</span>	case RenegotiateFreelyAsClient:
+<span id="L1098" class="ln">  1098	</span>		<span class="comment">// Ok.</span>
+<span id="L1099" class="ln">  1099	</span>	default:
+<span id="L1100" class="ln">  1100	</span>		c.sendAlert(alertInternalError)
+<span id="L1101" class="ln">  1101	</span>		return errors.New(&#34;tls: unknown Renegotiation value&#34;)
+<span id="L1102" class="ln">  1102	</span>	}
+<span id="L1103" class="ln">  1103	</span>
+<span id="L1104" class="ln">  1104	</span>	c.handshakeMutex.Lock()
+<span id="L1105" class="ln">  1105	</span>	defer c.handshakeMutex.Unlock()
+<span id="L1106" class="ln">  1106	</span>
+<span id="L1107" class="ln">  1107	</span>	c.handshakeComplete = false
+<span id="L1108" class="ln">  1108	</span>	if c.handshakeErr = c.clientHandshake(); c.handshakeErr == nil {
+<span id="L1109" class="ln">  1109	</span>		c.handshakes++
+<span id="L1110" class="ln">  1110	</span>	}
+<span id="L1111" class="ln">  1111	</span>	return c.handshakeErr
+<span id="L1112" class="ln">  1112	</span>}
+<span id="L1113" class="ln">  1113	</span>
+<span id="L1114" class="ln">  1114	</span><span class="comment">// Read can be made to time out and return a net.Error with Timeout() == true</span>
+<span id="L1115" class="ln">  1115	</span><span class="comment">// after a fixed time limit; see SetDeadline and SetReadDeadline.</span>
+<span id="L1116" class="ln">  1116	</span>func (c *Conn) Read(b []byte) (n int, err error) {
+<span id="L1117" class="ln">  1117	</span>	if err = c.Handshake(); err != nil {
+<span id="L1118" class="ln">  1118	</span>		return
+<span id="L1119" class="ln">  1119	</span>	}
+<span id="L1120" class="ln">  1120	</span>	if len(b) == 0 {
+<span id="L1121" class="ln">  1121	</span>		<span class="comment">// Put this after Handshake, in case people were calling</span>
+<span id="L1122" class="ln">  1122	</span>		<span class="comment">// Read(nil) for the side effect of the Handshake.</span>
+<span id="L1123" class="ln">  1123	</span>		return
+<span id="L1124" class="ln">  1124	</span>	}
+<span id="L1125" class="ln">  1125	</span>
+<span id="L1126" class="ln">  1126	</span>	c.in.Lock()
+<span id="L1127" class="ln">  1127	</span>	defer c.in.Unlock()
+<span id="L1128" class="ln">  1128	</span>
+<span id="L1129" class="ln">  1129	</span>	<span class="comment">// Some OpenSSL servers send empty records in order to randomize the</span>
+<span id="L1130" class="ln">  1130	</span>	<span class="comment">// CBC IV. So this loop ignores a limited number of empty records.</span>
+<span id="L1131" class="ln">  1131	</span>	const maxConsecutiveEmptyRecords = 100
+<span id="L1132" class="ln">  1132	</span>	for emptyRecordCount := 0; emptyRecordCount &lt;= maxConsecutiveEmptyRecords; emptyRecordCount++ {
+<span id="L1133" class="ln">  1133	</span>		for c.input == nil &amp;&amp; c.in.err == nil {
+<span id="L1134" class="ln">  1134	</span>			if err := c.readRecord(recordTypeApplicationData); err != nil {
+<span id="L1135" class="ln">  1135	</span>				<span class="comment">// Soft error, like EAGAIN</span>
+<span id="L1136" class="ln">  1136	</span>				return 0, err
+<span id="L1137" class="ln">  1137	</span>			}
+<span id="L1138" class="ln">  1138	</span>			if c.hand.Len() &gt; 0 {
+<span id="L1139" class="ln">  1139	</span>				<span class="comment">// We received handshake bytes, indicating the</span>
+<span id="L1140" class="ln">  1140	</span>				<span class="comment">// start of a renegotiation.</span>
+<span id="L1141" class="ln">  1141	</span>				if err := c.handleRenegotiation(); err != nil {
+<span id="L1142" class="ln">  1142	</span>					return 0, err
+<span id="L1143" class="ln">  1143	</span>				}
+<span id="L1144" class="ln">  1144	</span>			}
+<span id="L1145" class="ln">  1145	</span>		}
+<span id="L1146" class="ln">  1146	</span>		if err := c.in.err; err != nil {
+<span id="L1147" class="ln">  1147	</span>			return 0, err
+<span id="L1148" class="ln">  1148	</span>		}
+<span id="L1149" class="ln">  1149	</span>
+<span id="L1150" class="ln">  1150	</span>		n, err = c.input.Read(b)
+<span id="L1151" class="ln">  1151	</span>		if c.input.off &gt;= len(c.input.data) {
+<span id="L1152" class="ln">  1152	</span>			c.in.freeBlock(c.input)
+<span id="L1153" class="ln">  1153	</span>			c.input = nil
+<span id="L1154" class="ln">  1154	</span>		}
+<span id="L1155" class="ln">  1155	</span>
+<span id="L1156" class="ln">  1156	</span>		<span class="comment">// If a close-notify alert is waiting, read it so that</span>
+<span id="L1157" class="ln">  1157	</span>		<span class="comment">// we can return (n, EOF) instead of (n, nil), to signal</span>
+<span id="L1158" class="ln">  1158	</span>		<span class="comment">// to the HTTP response reading goroutine that the</span>
+<span id="L1159" class="ln">  1159	</span>		<span class="comment">// connection is now closed. This eliminates a race</span>
+<span id="L1160" class="ln">  1160	</span>		<span class="comment">// where the HTTP response reading goroutine would</span>
+<span id="L1161" class="ln">  1161	</span>		<span class="comment">// otherwise not observe the EOF until its next read,</span>
+<span id="L1162" class="ln">  1162	</span>		<span class="comment">// by which time a client goroutine might have already</span>
+<span id="L1163" class="ln">  1163	</span>		<span class="comment">// tried to reuse the HTTP connection for a new</span>
+<span id="L1164" class="ln">  1164	</span>		<span class="comment">// request.</span>
+<span id="L1165" class="ln">  1165	</span>		<span class="comment">// See https://codereview.appspot.com/76400046</span>
+<span id="L1166" class="ln">  1166	</span>		<span class="comment">// and https://golang.org/issue/3514</span>
+<span id="L1167" class="ln">  1167	</span>		if ri := c.rawInput; ri != nil &amp;&amp;
+<span id="L1168" class="ln">  1168	</span>			n != 0 &amp;&amp; err == nil &amp;&amp;
+<span id="L1169" class="ln">  1169	</span>			c.input == nil &amp;&amp; len(ri.data) &gt; 0 &amp;&amp; recordType(ri.data[0]) == recordTypeAlert {
+<span id="L1170" class="ln">  1170	</span>			if recErr := c.readRecord(recordTypeApplicationData); recErr != nil {
+<span id="L1171" class="ln">  1171	</span>				err = recErr <span class="comment">// will be io.EOF on closeNotify</span>
+<span id="L1172" class="ln">  1172	</span>			}
+<span id="L1173" class="ln">  1173	</span>		}
+<span id="L1174" class="ln">  1174	</span>
+<span id="L1175" class="ln">  1175	</span>		if n != 0 || err != nil {
+<span id="L1176" class="ln">  1176	</span>			return n, err
+<span id="L1177" class="ln">  1177	</span>		}
+<span id="L1178" class="ln">  1178	</span>	}
+<span id="L1179" class="ln">  1179	</span>
+<span id="L1180" class="ln">  1180	</span>	return 0, io.ErrNoProgress
+<span id="L1181" class="ln">  1181	</span>}
+<span id="L1182" class="ln">  1182	</span>
+<span id="L1183" class="ln">  1183	</span><span class="comment">// Close closes the connection.</span>
+<span id="L1184" class="ln">  1184	</span>func (c *Conn) Close() error {
+<span id="L1185" class="ln">  1185	</span>	<span class="comment">// Interlock with Conn.Write above.</span>
+<span id="L1186" class="ln">  1186	</span>	var x int32
+<span id="L1187" class="ln">  1187	</span>	for {
+<span id="L1188" class="ln">  1188	</span>		x = atomic.LoadInt32(&amp;c.activeCall)
+<span id="L1189" class="ln">  1189	</span>		if x&amp;1 != 0 {
+<span id="L1190" class="ln">  1190	</span>			return errClosed
+<span id="L1191" class="ln">  1191	</span>		}
+<span id="L1192" class="ln">  1192	</span>		if atomic.CompareAndSwapInt32(&amp;c.activeCall, x, x|1) {
+<span id="L1193" class="ln">  1193	</span>			break
+<span id="L1194" class="ln">  1194	</span>		}
+<span id="L1195" class="ln">  1195	</span>	}
+<span id="L1196" class="ln">  1196	</span>	if x != 0 {
+<span id="L1197" class="ln">  1197	</span>		<span class="comment">// io.Writer and io.Closer should not be used concurrently.</span>
+<span id="L1198" class="ln">  1198	</span>		<span class="comment">// If Close is called while a Write is currently in-flight,</span>
+<span id="L1199" class="ln">  1199	</span>		<span class="comment">// interpret that as a sign that this Close is really just</span>
+<span id="L1200" class="ln">  1200	</span>		<span class="comment">// being used to break the Write and/or clean up resources and</span>
+<span id="L1201" class="ln">  1201	</span>		<span class="comment">// avoid sending the alertCloseNotify, which may block</span>
+<span id="L1202" class="ln">  1202	</span>		<span class="comment">// waiting on handshakeMutex or the c.out mutex.</span>
+<span id="L1203" class="ln">  1203	</span>		return c.conn.Close()
+<span id="L1204" class="ln">  1204	</span>	}
+<span id="L1205" class="ln">  1205	</span>
+<span id="L1206" class="ln">  1206	</span>	var alertErr error
+<span id="L1207" class="ln">  1207	</span>
+<span id="L1208" class="ln">  1208	</span>	c.handshakeMutex.Lock()
+<span id="L1209" class="ln">  1209	</span>	defer c.handshakeMutex.Unlock()
+<span id="L1210" class="ln">  1210	</span>	if c.handshakeComplete {
+<span id="L1211" class="ln">  1211	</span>		alertErr = c.closeNotify()
+<span id="L1212" class="ln">  1212	</span>	}
+<span id="L1213" class="ln">  1213	</span>
+<span id="L1214" class="ln">  1214	</span>	if err := c.conn.Close(); err != nil {
+<span id="L1215" class="ln">  1215	</span>		return err
+<span id="L1216" class="ln">  1216	</span>	}
+<span id="L1217" class="ln">  1217	</span>	return alertErr
+<span id="L1218" class="ln">  1218	</span>}
+<span id="L1219" class="ln">  1219	</span>
+<span id="L1220" class="ln">  1220	</span>var errEarlyCloseWrite = errors.New(&#34;tls: CloseWrite called before handshake complete&#34;)
+<span id="L1221" class="ln">  1221	</span>
+<span id="L1222" class="ln">  1222	</span><span class="comment">// CloseWrite shuts down the writing side of the connection. It should only be</span>
+<span id="L1223" class="ln">  1223	</span><span class="comment">// called once the handshake has completed and does not call CloseWrite on the</span>
+<span id="L1224" class="ln">  1224	</span><span class="comment">// underlying connection. Most callers should just use Close.</span>
+<span id="L1225" class="ln">  1225	</span>func (c *Conn) CloseWrite() error {
+<span id="L1226" class="ln">  1226	</span>	c.handshakeMutex.Lock()
+<span id="L1227" class="ln">  1227	</span>	defer c.handshakeMutex.Unlock()
+<span id="L1228" class="ln">  1228	</span>	if !c.handshakeComplete {
+<span id="L1229" class="ln">  1229	</span>		return errEarlyCloseWrite
+<span id="L1230" class="ln">  1230	</span>	}
+<span id="L1231" class="ln">  1231	</span>
+<span id="L1232" class="ln">  1232	</span>	return c.closeNotify()
+<span id="L1233" class="ln">  1233	</span>}
+<span id="L1234" class="ln">  1234	</span>
+<span id="L1235" class="ln">  1235	</span>func (c *Conn) closeNotify() error {
+<span id="L1236" class="ln">  1236	</span>	c.out.Lock()
+<span id="L1237" class="ln">  1237	</span>	defer c.out.Unlock()
+<span id="L1238" class="ln">  1238	</span>
+<span id="L1239" class="ln">  1239	</span>	if !c.closeNotifySent {
+<span id="L1240" class="ln">  1240	</span>		c.closeNotifyErr = c.sendAlertLocked(alertCloseNotify)
+<span id="L1241" class="ln">  1241	</span>		c.closeNotifySent = true
+<span id="L1242" class="ln">  1242	</span>	}
+<span id="L1243" class="ln">  1243	</span>	return c.closeNotifyErr
+<span id="L1244" class="ln">  1244	</span>}
+<span id="L1245" class="ln">  1245	</span>
+<span id="L1246" class="ln">  1246	</span><span class="comment">// Handshake runs the client or server handshake</span>
+<span id="L1247" class="ln">  1247	</span><span class="comment">// protocol if it has not yet been run.</span>
+<span id="L1248" class="ln">  1248	</span><span class="comment">// Most uses of this package need not call Handshake</span>
+<span id="L1249" class="ln">  1249	</span><span class="comment">// explicitly: the first Read or Write will call it automatically.</span>
+<span id="L1250" class="ln">  1250	</span>func (c *Conn) Handshake() error {
+<span id="L1251" class="ln">  1251	</span>	<span class="comment">// c.handshakeErr and c.handshakeComplete are protected by</span>
+<span id="L1252" class="ln">  1252	</span>	<span class="comment">// c.handshakeMutex. In order to perform a handshake, we need to lock</span>
+<span id="L1253" class="ln">  1253	</span>	<span class="comment">// c.in also and c.handshakeMutex must be locked after c.in.</span>
+<span id="L1254" class="ln">  1254	</span>	<span class="comment">//</span>
+<span id="L1255" class="ln">  1255	</span>	<span class="comment">// However, if a Read() operation is hanging then it&#39;ll be holding the</span>
+<span id="L1256" class="ln">  1256	</span>	<span class="comment">// lock on c.in and so taking it here would cause all operations that</span>
+<span id="L1257" class="ln">  1257	</span>	<span class="comment">// need to check whether a handshake is pending (such as Write) to</span>
+<span id="L1258" class="ln">  1258	</span>	<span class="comment">// block.</span>
+<span id="L1259" class="ln">  1259	</span>	<span class="comment">//</span>
+<span id="L1260" class="ln">  1260	</span>	<span class="comment">// Thus we first take c.handshakeMutex to check whether a handshake is</span>
+<span id="L1261" class="ln">  1261	</span>	<span class="comment">// needed.</span>
+<span id="L1262" class="ln">  1262	</span>	<span class="comment">//</span>
+<span id="L1263" class="ln">  1263	</span>	<span class="comment">// If so then, previously, this code would unlock handshakeMutex and</span>
+<span id="L1264" class="ln">  1264	</span>	<span class="comment">// then lock c.in and handshakeMutex in the correct order to run the</span>
+<span id="L1265" class="ln">  1265	</span>	<span class="comment">// handshake. The problem was that it was possible for a Read to</span>
+<span id="L1266" class="ln">  1266	</span>	<span class="comment">// complete the handshake once handshakeMutex was unlocked and then</span>
+<span id="L1267" class="ln">  1267	</span>	<span class="comment">// keep c.in while waiting for network data. Thus a concurrent</span>
+<span id="L1268" class="ln">  1268	</span>	<span class="comment">// operation could be blocked on c.in.</span>
+<span id="L1269" class="ln">  1269	</span>	<span class="comment">//</span>
+<span id="L1270" class="ln">  1270	</span>	<span class="comment">// Thus handshakeCond is used to signal that a goroutine is committed</span>
+<span id="L1271" class="ln">  1271	</span>	<span class="comment">// to running the handshake and other goroutines can wait on it if they</span>
+<span id="L1272" class="ln">  1272	</span>	<span class="comment">// need. handshakeCond is protected by handshakeMutex.</span>
+<span id="L1273" class="ln">  1273	</span>	c.handshakeMutex.Lock()
+<span id="L1274" class="ln">  1274	</span>	defer c.handshakeMutex.Unlock()
+<span id="L1275" class="ln">  1275	</span>
+<span id="L1276" class="ln">  1276	</span>	for {
+<span id="L1277" class="ln">  1277	</span>		if err := c.handshakeErr; err != nil {
+<span id="L1278" class="ln">  1278	</span>			return err
+<span id="L1279" class="ln">  1279	</span>		}
+<span id="L1280" class="ln">  1280	</span>		if c.handshakeComplete {
+<span id="L1281" class="ln">  1281	</span>			return nil
+<span id="L1282" class="ln">  1282	</span>		}
+<span id="L1283" class="ln">  1283	</span>		if c.handshakeCond == nil {
+<span id="L1284" class="ln">  1284	</span>			break
+<span id="L1285" class="ln">  1285	</span>		}
+<span id="L1286" class="ln">  1286	</span>
+<span id="L1287" class="ln">  1287	</span>		c.handshakeCond.Wait()
+<span id="L1288" class="ln">  1288	</span>	}
+<span id="L1289" class="ln">  1289	</span>
+<span id="L1290" class="ln">  1290	</span>	<span class="comment">// Set handshakeCond to indicate that this goroutine is committing to</span>
+<span id="L1291" class="ln">  1291	</span>	<span class="comment">// running the handshake.</span>
+<span id="L1292" class="ln">  1292	</span>	c.handshakeCond = sync.NewCond(&amp;c.handshakeMutex)
+<span id="L1293" class="ln">  1293	</span>	c.handshakeMutex.Unlock()
+<span id="L1294" class="ln">  1294	</span>
+<span id="L1295" class="ln">  1295	</span>	c.in.Lock()
+<span id="L1296" class="ln">  1296	</span>	defer c.in.Unlock()
+<span id="L1297" class="ln">  1297	</span>
+<span id="L1298" class="ln">  1298	</span>	c.handshakeMutex.Lock()
+<span id="L1299" class="ln">  1299	</span>
+<span id="L1300" class="ln">  1300	</span>	<span class="comment">// The handshake cannot have completed when handshakeMutex was unlocked</span>
+<span id="L1301" class="ln">  1301	</span>	<span class="comment">// because this goroutine set handshakeCond.</span>
+<span id="L1302" class="ln">  1302	</span>	if c.handshakeErr != nil || c.handshakeComplete {
+<span id="L1303" class="ln">  1303	</span>		panic(&#34;handshake should not have been able to complete after handshakeCond was set&#34;)
+<span id="L1304" class="ln">  1304	</span>	}
+<span id="L1305" class="ln">  1305	</span>
+<span id="L1306" class="ln">  1306	</span>	if c.isClient {
+<span id="L1307" class="ln">  1307	</span>		c.handshakeErr = c.clientHandshake()
+<span id="L1308" class="ln">  1308	</span>	} else {
+<span id="L1309" class="ln">  1309	</span>		c.handshakeErr = c.serverHandshake()
+<span id="L1310" class="ln">  1310	</span>	}
+<span id="L1311" class="ln">  1311	</span>	if c.handshakeErr == nil {
+<span id="L1312" class="ln">  1312	</span>		c.handshakes++
+<span id="L1313" class="ln">  1313	</span>	} else {
+<span id="L1314" class="ln">  1314	</span>		<span class="comment">// If an error occurred during the hadshake try to flush the</span>
+<span id="L1315" class="ln">  1315	</span>		<span class="comment">// alert that might be left in the buffer.</span>
+<span id="L1316" class="ln">  1316	</span>		c.flush()
+<span id="L1317" class="ln">  1317	</span>	}
+<span id="L1318" class="ln">  1318	</span>
+<span id="L1319" class="ln">  1319	</span>	if c.handshakeErr == nil &amp;&amp; !c.handshakeComplete {
+<span id="L1320" class="ln">  1320	</span>		panic(&#34;handshake should have had a result.&#34;)
+<span id="L1321" class="ln">  1321	</span>	}
+<span id="L1322" class="ln">  1322	</span>
+<span id="L1323" class="ln">  1323	</span>	<span class="comment">// Wake any other goroutines that are waiting for this handshake to</span>
+<span id="L1324" class="ln">  1324	</span>	<span class="comment">// complete.</span>
+<span id="L1325" class="ln">  1325	</span>	c.handshakeCond.Broadcast()
+<span id="L1326" class="ln">  1326	</span>	c.handshakeCond = nil
+<span id="L1327" class="ln">  1327	</span>
+<span id="L1328" class="ln">  1328	</span>	return c.handshakeErr
+<span id="L1329" class="ln">  1329	</span>}
+<span id="L1330" class="ln">  1330	</span>
+<span id="L1331" class="ln">  1331	</span><span class="comment">// ConnectionState returns basic TLS details about the connection.</span>
+<span id="L1332" class="ln">  1332	</span>func (c *Conn) ConnectionState() ConnectionState {
+<span id="L1333" class="ln">  1333	</span>	c.handshakeMutex.Lock()
+<span id="L1334" class="ln">  1334	</span>	defer c.handshakeMutex.Unlock()
+<span id="L1335" class="ln">  1335	</span>
+<span id="L1336" class="ln">  1336	</span>	var state ConnectionState
+<span id="L1337" class="ln">  1337	</span>	state.HandshakeComplete = c.handshakeComplete
+<span id="L1338" class="ln">  1338	</span>	state.ServerName = c.serverName
+<span id="L1339" class="ln">  1339	</span>
+<span id="L1340" class="ln">  1340	</span>	if c.handshakeComplete {
+<span id="L1341" class="ln">  1341	</span>		state.Version = c.vers
+<span id="L1342" class="ln">  1342	</span>		state.NegotiatedProtocol = c.clientProtocol
+<span id="L1343" class="ln">  1343	</span>		state.DidResume = c.didResume
+<span id="L1344" class="ln">  1344	</span>		state.NegotiatedProtocolIsMutual = !c.clientProtocolFallback
+<span id="L1345" class="ln">  1345	</span>		state.CipherSuite = c.cipherSuite
+<span id="L1346" class="ln">  1346	</span>		state.PeerCertificates = c.peerCertificates
+<span id="L1347" class="ln">  1347	</span>		state.VerifiedChains = c.verifiedChains
+<span id="L1348" class="ln">  1348	</span>		state.SignedCertificateTimestamps = c.scts
+<span id="L1349" class="ln">  1349	</span>		state.OCSPResponse = c.ocspResponse
+<span id="L1350" class="ln">  1350	</span>		if !c.didResume {
+<span id="L1351" class="ln">  1351	</span>			if c.clientFinishedIsFirst {
+<span id="L1352" class="ln">  1352	</span>				state.TLSUnique = c.clientFinished[:]
+<span id="L1353" class="ln">  1353	</span>			} else {
+<span id="L1354" class="ln">  1354	</span>				state.TLSUnique = c.serverFinished[:]
+<span id="L1355" class="ln">  1355	</span>			}
+<span id="L1356" class="ln">  1356	</span>		}
+<span id="L1357" class="ln">  1357	</span>	}
+<span id="L1358" class="ln">  1358	</span>
+<span id="L1359" class="ln">  1359	</span>	return state
+<span id="L1360" class="ln">  1360	</span>}
+<span id="L1361" class="ln">  1361	</span>
+<span id="L1362" class="ln">  1362	</span><span class="comment">// OCSPResponse returns the stapled OCSP response from the TLS server, if</span>
+<span id="L1363" class="ln">  1363	</span><span class="comment">// any. (Only valid for client connections.)</span>
+<span id="L1364" class="ln">  1364	</span>func (c *Conn) OCSPResponse() []byte {
+<span id="L1365" class="ln">  1365	</span>	c.handshakeMutex.Lock()
+<span id="L1366" class="ln">  1366	</span>	defer c.handshakeMutex.Unlock()
+<span id="L1367" class="ln">  1367	</span>
+<span id="L1368" class="ln">  1368	</span>	return c.ocspResponse
+<span id="L1369" class="ln">  1369	</span>}
+<span id="L1370" class="ln">  1370	</span>
+<span id="L1371" class="ln">  1371	</span><span class="comment">// VerifyHostname checks that the peer certificate chain is valid for</span>
+<span id="L1372" class="ln">  1372	</span><span class="comment">// connecting to host. If so, it returns nil; if not, it returns an error</span>
+<span id="L1373" class="ln">  1373	</span><span class="comment">// describing the problem.</span>
+<span id="L1374" class="ln">  1374	</span>func (c *Conn) VerifyHostname(host string) error {
+<span id="L1375" class="ln">  1375	</span>	c.handshakeMutex.Lock()
+<span id="L1376" class="ln">  1376	</span>	defer c.handshakeMutex.Unlock()
+<span id="L1377" class="ln">  1377	</span>	if !c.isClient {
+<span id="L1378" class="ln">  1378	</span>		return errors.New(&#34;tls: VerifyHostname called on TLS server connection&#34;)
+<span id="L1379" class="ln">  1379	</span>	}
+<span id="L1380" class="ln">  1380	</span>	if !c.handshakeComplete {
+<span id="L1381" class="ln">  1381	</span>		return errors.New(&#34;tls: handshake has not yet been performed&#34;)
+<span id="L1382" class="ln">  1382	</span>	}
+<span id="L1383" class="ln">  1383	</span>	if len(c.verifiedChains) == 0 {
+<span id="L1384" class="ln">  1384	</span>		return errors.New(&#34;tls: handshake did not verify certificate chain&#34;)
+<span id="L1385" class="ln">  1385	</span>	}
+<span id="L1386" class="ln">  1386	</span>	return c.peerCertificates[0].VerifyHostname(host)
+<span id="L1387" class="ln">  1387	</span>}
+<span id="L1388" class="ln">  1388	</span>
+</pre><p><a href="conn.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

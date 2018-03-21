@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/iprawsock_posix.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="iprawsock_posix.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/net/iprawsock_posix.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// +build darwin dragonfly freebsd linux nacl netbsd openbsd solaris windows</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package net
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;context&#34;
+<span id="L11" class="ln">    11	</span>	&#34;syscall&#34;
+<span id="L12" class="ln">    12	</span>)
+<span id="L13" class="ln">    13	</span>
+<span id="L14" class="ln">    14	</span>func sockaddrToIP(sa syscall.Sockaddr) Addr {
+<span id="L15" class="ln">    15	</span>	switch sa := sa.(type) {
+<span id="L16" class="ln">    16	</span>	case *syscall.SockaddrInet4:
+<span id="L17" class="ln">    17	</span>		return &amp;IPAddr{IP: sa.Addr[0:]}
+<span id="L18" class="ln">    18	</span>	case *syscall.SockaddrInet6:
+<span id="L19" class="ln">    19	</span>		return &amp;IPAddr{IP: sa.Addr[0:], Zone: zoneToString(int(sa.ZoneId))}
+<span id="L20" class="ln">    20	</span>	}
+<span id="L21" class="ln">    21	</span>	return nil
+<span id="L22" class="ln">    22	</span>}
+<span id="L23" class="ln">    23	</span>
+<span id="L24" class="ln">    24	</span>func (a *IPAddr) family() int {
+<span id="L25" class="ln">    25	</span>	if a == nil || len(a.IP) &lt;= IPv4len {
+<span id="L26" class="ln">    26	</span>		return syscall.AF_INET
+<span id="L27" class="ln">    27	</span>	}
+<span id="L28" class="ln">    28	</span>	if a.IP.To4() != nil {
+<span id="L29" class="ln">    29	</span>		return syscall.AF_INET
+<span id="L30" class="ln">    30	</span>	}
+<span id="L31" class="ln">    31	</span>	return syscall.AF_INET6
+<span id="L32" class="ln">    32	</span>}
+<span id="L33" class="ln">    33	</span>
+<span id="L34" class="ln">    34	</span>func (a *IPAddr) sockaddr(family int) (syscall.Sockaddr, error) {
+<span id="L35" class="ln">    35	</span>	if a == nil {
+<span id="L36" class="ln">    36	</span>		return nil, nil
+<span id="L37" class="ln">    37	</span>	}
+<span id="L38" class="ln">    38	</span>	return ipToSockaddr(family, a.IP, 0, a.Zone)
+<span id="L39" class="ln">    39	</span>}
+<span id="L40" class="ln">    40	</span>
+<span id="L41" class="ln">    41	</span>func (a *IPAddr) toLocal(net string) sockaddr {
+<span id="L42" class="ln">    42	</span>	return &amp;IPAddr{loopbackIP(net), a.Zone}
+<span id="L43" class="ln">    43	</span>}
+<span id="L44" class="ln">    44	</span>
+<span id="L45" class="ln">    45	</span>func (c *IPConn) readFrom(b []byte) (int, *IPAddr, error) {
+<span id="L46" class="ln">    46	</span>	<span class="comment">// TODO(cw,rsc): consider using readv if we know the family</span>
+<span id="L47" class="ln">    47	</span>	<span class="comment">// type to avoid the header trim/copy</span>
+<span id="L48" class="ln">    48	</span>	var addr *IPAddr
+<span id="L49" class="ln">    49	</span>	n, sa, err := c.fd.readFrom(b)
+<span id="L50" class="ln">    50	</span>	switch sa := sa.(type) {
+<span id="L51" class="ln">    51	</span>	case *syscall.SockaddrInet4:
+<span id="L52" class="ln">    52	</span>		addr = &amp;IPAddr{IP: sa.Addr[0:]}
+<span id="L53" class="ln">    53	</span>		n = stripIPv4Header(n, b)
+<span id="L54" class="ln">    54	</span>	case *syscall.SockaddrInet6:
+<span id="L55" class="ln">    55	</span>		addr = &amp;IPAddr{IP: sa.Addr[0:], Zone: zoneToString(int(sa.ZoneId))}
+<span id="L56" class="ln">    56	</span>	}
+<span id="L57" class="ln">    57	</span>	return n, addr, err
+<span id="L58" class="ln">    58	</span>}
+<span id="L59" class="ln">    59	</span>
+<span id="L60" class="ln">    60	</span>func stripIPv4Header(n int, b []byte) int {
+<span id="L61" class="ln">    61	</span>	if len(b) &lt; 20 {
+<span id="L62" class="ln">    62	</span>		return n
+<span id="L63" class="ln">    63	</span>	}
+<span id="L64" class="ln">    64	</span>	l := int(b[0]&amp;0x0f) &lt;&lt; 2
+<span id="L65" class="ln">    65	</span>	if 20 &gt; l || l &gt; len(b) {
+<span id="L66" class="ln">    66	</span>		return n
+<span id="L67" class="ln">    67	</span>	}
+<span id="L68" class="ln">    68	</span>	if b[0]&gt;&gt;4 != 4 {
+<span id="L69" class="ln">    69	</span>		return n
+<span id="L70" class="ln">    70	</span>	}
+<span id="L71" class="ln">    71	</span>	copy(b, b[l:])
+<span id="L72" class="ln">    72	</span>	return n - l
+<span id="L73" class="ln">    73	</span>}
+<span id="L74" class="ln">    74	</span>
+<span id="L75" class="ln">    75	</span>func (c *IPConn) readMsg(b, oob []byte) (n, oobn, flags int, addr *IPAddr, err error) {
+<span id="L76" class="ln">    76	</span>	var sa syscall.Sockaddr
+<span id="L77" class="ln">    77	</span>	n, oobn, flags, sa, err = c.fd.readMsg(b, oob)
+<span id="L78" class="ln">    78	</span>	switch sa := sa.(type) {
+<span id="L79" class="ln">    79	</span>	case *syscall.SockaddrInet4:
+<span id="L80" class="ln">    80	</span>		addr = &amp;IPAddr{IP: sa.Addr[0:]}
+<span id="L81" class="ln">    81	</span>	case *syscall.SockaddrInet6:
+<span id="L82" class="ln">    82	</span>		addr = &amp;IPAddr{IP: sa.Addr[0:], Zone: zoneToString(int(sa.ZoneId))}
+<span id="L83" class="ln">    83	</span>	}
+<span id="L84" class="ln">    84	</span>	return
+<span id="L85" class="ln">    85	</span>}
+<span id="L86" class="ln">    86	</span>
+<span id="L87" class="ln">    87	</span>func (c *IPConn) writeTo(b []byte, addr *IPAddr) (int, error) {
+<span id="L88" class="ln">    88	</span>	if c.fd.isConnected {
+<span id="L89" class="ln">    89	</span>		return 0, ErrWriteToConnected
+<span id="L90" class="ln">    90	</span>	}
+<span id="L91" class="ln">    91	</span>	if addr == nil {
+<span id="L92" class="ln">    92	</span>		return 0, errMissingAddress
+<span id="L93" class="ln">    93	</span>	}
+<span id="L94" class="ln">    94	</span>	sa, err := addr.sockaddr(c.fd.family)
+<span id="L95" class="ln">    95	</span>	if err != nil {
+<span id="L96" class="ln">    96	</span>		return 0, err
+<span id="L97" class="ln">    97	</span>	}
+<span id="L98" class="ln">    98	</span>	return c.fd.writeTo(b, sa)
+<span id="L99" class="ln">    99	</span>}
+<span id="L100" class="ln">   100	</span>
+<span id="L101" class="ln">   101	</span>func (c *IPConn) writeMsg(b, oob []byte, addr *IPAddr) (n, oobn int, err error) {
+<span id="L102" class="ln">   102	</span>	if c.fd.isConnected {
+<span id="L103" class="ln">   103	</span>		return 0, 0, ErrWriteToConnected
+<span id="L104" class="ln">   104	</span>	}
+<span id="L105" class="ln">   105	</span>	if addr == nil {
+<span id="L106" class="ln">   106	</span>		return 0, 0, errMissingAddress
+<span id="L107" class="ln">   107	</span>	}
+<span id="L108" class="ln">   108	</span>	sa, err := addr.sockaddr(c.fd.family)
+<span id="L109" class="ln">   109	</span>	if err != nil {
+<span id="L110" class="ln">   110	</span>		return 0, 0, err
+<span id="L111" class="ln">   111	</span>	}
+<span id="L112" class="ln">   112	</span>	return c.fd.writeMsg(b, oob, sa)
+<span id="L113" class="ln">   113	</span>}
+<span id="L114" class="ln">   114	</span>
+<span id="L115" class="ln">   115	</span>func dialIP(ctx context.Context, netProto string, laddr, raddr *IPAddr) (*IPConn, error) {
+<span id="L116" class="ln">   116	</span>	network, proto, err := parseNetwork(ctx, netProto)
+<span id="L117" class="ln">   117	</span>	if err != nil {
+<span id="L118" class="ln">   118	</span>		return nil, err
+<span id="L119" class="ln">   119	</span>	}
+<span id="L120" class="ln">   120	</span>	switch network {
+<span id="L121" class="ln">   121	</span>	case &#34;ip&#34;, &#34;ip4&#34;, &#34;ip6&#34;:
+<span id="L122" class="ln">   122	</span>	default:
+<span id="L123" class="ln">   123	</span>		return nil, UnknownNetworkError(netProto)
+<span id="L124" class="ln">   124	</span>	}
+<span id="L125" class="ln">   125	</span>	if raddr == nil {
+<span id="L126" class="ln">   126	</span>		return nil, errMissingAddress
+<span id="L127" class="ln">   127	</span>	}
+<span id="L128" class="ln">   128	</span>	fd, err := internetSocket(ctx, network, laddr, raddr, syscall.SOCK_RAW, proto, &#34;dial&#34;)
+<span id="L129" class="ln">   129	</span>	if err != nil {
+<span id="L130" class="ln">   130	</span>		return nil, err
+<span id="L131" class="ln">   131	</span>	}
+<span id="L132" class="ln">   132	</span>	return newIPConn(fd), nil
+<span id="L133" class="ln">   133	</span>}
+<span id="L134" class="ln">   134	</span>
+<span id="L135" class="ln">   135	</span>func listenIP(ctx context.Context, netProto string, laddr *IPAddr) (*IPConn, error) {
+<span id="L136" class="ln">   136	</span>	network, proto, err := parseNetwork(ctx, netProto)
+<span id="L137" class="ln">   137	</span>	if err != nil {
+<span id="L138" class="ln">   138	</span>		return nil, err
+<span id="L139" class="ln">   139	</span>	}
+<span id="L140" class="ln">   140	</span>	switch network {
+<span id="L141" class="ln">   141	</span>	case &#34;ip&#34;, &#34;ip4&#34;, &#34;ip6&#34;:
+<span id="L142" class="ln">   142	</span>	default:
+<span id="L143" class="ln">   143	</span>		return nil, UnknownNetworkError(netProto)
+<span id="L144" class="ln">   144	</span>	}
+<span id="L145" class="ln">   145	</span>	fd, err := internetSocket(ctx, network, laddr, nil, syscall.SOCK_RAW, proto, &#34;listen&#34;)
+<span id="L146" class="ln">   146	</span>	if err != nil {
+<span id="L147" class="ln">   147	</span>		return nil, err
+<span id="L148" class="ln">   148	</span>	}
+<span id="L149" class="ln">   149	</span>	return newIPConn(fd), nil
+<span id="L150" class="ln">   150	</span>}
+<span id="L151" class="ln">   151	</span>
+</pre><p><a href="iprawsock_posix.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

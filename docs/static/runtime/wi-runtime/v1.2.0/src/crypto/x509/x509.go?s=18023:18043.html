@@ -1,0 +1,2330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/x509/x509.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./x509.go%3Fs=18023:18043.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/crypto/x509/x509.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// Package x509 parses X.509-encoded keys and certificates.</span>
+<span id="L6" class="ln">     6	</span>package x509
+<span id="L7" class="ln">     7	</span>
+<span id="L8" class="ln">     8	</span>import (
+<span id="L9" class="ln">     9	</span>	&#34;bytes&#34;
+<span id="L10" class="ln">    10	</span>	&#34;crypto&#34;
+<span id="L11" class="ln">    11	</span>	&#34;crypto/dsa&#34;
+<span id="L12" class="ln">    12	</span>	&#34;crypto/ecdsa&#34;
+<span id="L13" class="ln">    13	</span>	&#34;crypto/elliptic&#34;
+<span id="L14" class="ln">    14	</span>	&#34;crypto/rsa&#34;
+<span id="L15" class="ln">    15	</span>	_ &#34;crypto/sha1&#34;
+<span id="L16" class="ln">    16	</span>	_ &#34;crypto/sha256&#34;
+<span id="L17" class="ln">    17	</span>	_ &#34;crypto/sha512&#34;
+<span id="L18" class="ln">    18	</span>	&#34;crypto/x509/pkix&#34;
+<span id="L19" class="ln">    19	</span>	&#34;encoding/asn1&#34;
+<span id="L20" class="ln">    20	</span>	&#34;encoding/pem&#34;
+<span id="L21" class="ln">    21	</span>	&#34;errors&#34;
+<span id="L22" class="ln">    22	</span>	&#34;fmt&#34;
+<span id="L23" class="ln">    23	</span>	&#34;io&#34;
+<span id="L24" class="ln">    24	</span>	&#34;math/big&#34;
+<span id="L25" class="ln">    25	</span>	&#34;net&#34;
+<span id="L26" class="ln">    26	</span>	&#34;strconv&#34;
+<span id="L27" class="ln">    27	</span>	&#34;time&#34;
+<span id="L28" class="ln">    28	</span>)
+<span id="L29" class="ln">    29	</span>
+<span id="L30" class="ln">    30	</span><span class="comment">// pkixPublicKey reflects a PKIX public key structure. See SubjectPublicKeyInfo</span>
+<span id="L31" class="ln">    31	</span><span class="comment">// in RFC 3280.</span>
+<span id="L32" class="ln">    32	</span>type pkixPublicKey struct {
+<span id="L33" class="ln">    33	</span>	Algo      pkix.AlgorithmIdentifier
+<span id="L34" class="ln">    34	</span>	BitString asn1.BitString
+<span id="L35" class="ln">    35	</span>}
+<span id="L36" class="ln">    36	</span>
+<span id="L37" class="ln">    37	</span><span class="comment">// ParsePKIXPublicKey parses a DER encoded public key. These values are</span>
+<span id="L38" class="ln">    38	</span><span class="comment">// typically found in PEM blocks with &#34;BEGIN PUBLIC KEY&#34;.</span>
+<span id="L39" class="ln">    39	</span><span class="comment">//</span>
+<span id="L40" class="ln">    40	</span><span class="comment">// Supported key types include RSA, DSA, and ECDSA. Unknown key</span>
+<span id="L41" class="ln">    41	</span><span class="comment">// types result in an error.</span>
+<span id="L42" class="ln">    42	</span><span class="comment">//</span>
+<span id="L43" class="ln">    43	</span><span class="comment">// On success, pub will be of type *rsa.PublicKey, *dsa.PublicKey,</span>
+<span id="L44" class="ln">    44	</span><span class="comment">// or *ecdsa.PublicKey.</span>
+<span id="L45" class="ln">    45	</span>func ParsePKIXPublicKey(derBytes []byte) (pub interface{}, err error) {
+<span id="L46" class="ln">    46	</span>	var pki publicKeyInfo
+<span id="L47" class="ln">    47	</span>	if rest, err := asn1.Unmarshal(derBytes, &amp;pki); err != nil {
+<span id="L48" class="ln">    48	</span>		return nil, err
+<span id="L49" class="ln">    49	</span>	} else if len(rest) != 0 {
+<span id="L50" class="ln">    50	</span>		return nil, errors.New(&#34;x509: trailing data after ASN.1 of public-key&#34;)
+<span id="L51" class="ln">    51	</span>	}
+<span id="L52" class="ln">    52	</span>	algo := getPublicKeyAlgorithmFromOID(pki.Algorithm.Algorithm)
+<span id="L53" class="ln">    53	</span>	if algo == UnknownPublicKeyAlgorithm {
+<span id="L54" class="ln">    54	</span>		return nil, errors.New(&#34;x509: unknown public key algorithm&#34;)
+<span id="L55" class="ln">    55	</span>	}
+<span id="L56" class="ln">    56	</span>	return parsePublicKey(algo, &amp;pki)
+<span id="L57" class="ln">    57	</span>}
+<span id="L58" class="ln">    58	</span>
+<span id="L59" class="ln">    59	</span>func marshalPublicKey(pub interface{}) (publicKeyBytes []byte, publicKeyAlgorithm pkix.AlgorithmIdentifier, err error) {
+<span id="L60" class="ln">    60	</span>	switch pub := pub.(type) {
+<span id="L61" class="ln">    61	</span>	case *rsa.PublicKey:
+<span id="L62" class="ln">    62	</span>		publicKeyBytes, err = asn1.Marshal(rsaPublicKey{
+<span id="L63" class="ln">    63	</span>			N: pub.N,
+<span id="L64" class="ln">    64	</span>			E: pub.E,
+<span id="L65" class="ln">    65	</span>		})
+<span id="L66" class="ln">    66	</span>		if err != nil {
+<span id="L67" class="ln">    67	</span>			return nil, pkix.AlgorithmIdentifier{}, err
+<span id="L68" class="ln">    68	</span>		}
+<span id="L69" class="ln">    69	</span>		publicKeyAlgorithm.Algorithm = oidPublicKeyRSA
+<span id="L70" class="ln">    70	</span>		<span class="comment">// This is a NULL parameters value which is required by</span>
+<span id="L71" class="ln">    71	</span>		<span class="comment">// https://tools.ietf.org/html/rfc3279#section-2.3.1.</span>
+<span id="L72" class="ln">    72	</span>		publicKeyAlgorithm.Parameters = asn1.RawValue{
+<span id="L73" class="ln">    73	</span>			Tag: 5,
+<span id="L74" class="ln">    74	</span>		}
+<span id="L75" class="ln">    75	</span>	case *ecdsa.PublicKey:
+<span id="L76" class="ln">    76	</span>		publicKeyBytes = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
+<span id="L77" class="ln">    77	</span>		oid, ok := oidFromNamedCurve(pub.Curve)
+<span id="L78" class="ln">    78	</span>		if !ok {
+<span id="L79" class="ln">    79	</span>			return nil, pkix.AlgorithmIdentifier{}, errors.New(&#34;x509: unsupported elliptic curve&#34;)
+<span id="L80" class="ln">    80	</span>		}
+<span id="L81" class="ln">    81	</span>		publicKeyAlgorithm.Algorithm = oidPublicKeyECDSA
+<span id="L82" class="ln">    82	</span>		var paramBytes []byte
+<span id="L83" class="ln">    83	</span>		paramBytes, err = asn1.Marshal(oid)
+<span id="L84" class="ln">    84	</span>		if err != nil {
+<span id="L85" class="ln">    85	</span>			return
+<span id="L86" class="ln">    86	</span>		}
+<span id="L87" class="ln">    87	</span>		publicKeyAlgorithm.Parameters.FullBytes = paramBytes
+<span id="L88" class="ln">    88	</span>	default:
+<span id="L89" class="ln">    89	</span>		return nil, pkix.AlgorithmIdentifier{}, errors.New(&#34;x509: only RSA and ECDSA public keys supported&#34;)
+<span id="L90" class="ln">    90	</span>	}
+<span id="L91" class="ln">    91	</span>
+<span id="L92" class="ln">    92	</span>	return publicKeyBytes, publicKeyAlgorithm, nil
+<span id="L93" class="ln">    93	</span>}
+<span id="L94" class="ln">    94	</span>
+<span id="L95" class="ln">    95	</span><span class="comment">// MarshalPKIXPublicKey serialises a public key to DER-encoded PKIX format.</span>
+<span id="L96" class="ln">    96	</span>func MarshalPKIXPublicKey(pub interface{}) ([]byte, error) {
+<span id="L97" class="ln">    97	</span>	var publicKeyBytes []byte
+<span id="L98" class="ln">    98	</span>	var publicKeyAlgorithm pkix.AlgorithmIdentifier
+<span id="L99" class="ln">    99	</span>	var err error
+<span id="L100" class="ln">   100	</span>
+<span id="L101" class="ln">   101	</span>	if publicKeyBytes, publicKeyAlgorithm, err = marshalPublicKey(pub); err != nil {
+<span id="L102" class="ln">   102	</span>		return nil, err
+<span id="L103" class="ln">   103	</span>	}
+<span id="L104" class="ln">   104	</span>
+<span id="L105" class="ln">   105	</span>	pkix := pkixPublicKey{
+<span id="L106" class="ln">   106	</span>		Algo: publicKeyAlgorithm,
+<span id="L107" class="ln">   107	</span>		BitString: asn1.BitString{
+<span id="L108" class="ln">   108	</span>			Bytes:     publicKeyBytes,
+<span id="L109" class="ln">   109	</span>			BitLength: 8 * len(publicKeyBytes),
+<span id="L110" class="ln">   110	</span>		},
+<span id="L111" class="ln">   111	</span>	}
+<span id="L112" class="ln">   112	</span>
+<span id="L113" class="ln">   113	</span>	ret, _ := asn1.Marshal(pkix)
+<span id="L114" class="ln">   114	</span>	return ret, nil
+<span id="L115" class="ln">   115	</span>}
+<span id="L116" class="ln">   116	</span>
+<span id="L117" class="ln">   117	</span><span class="comment">// These structures reflect the ASN.1 structure of X.509 certificates.:</span>
+<span id="L118" class="ln">   118	</span>
+<span id="L119" class="ln">   119	</span>type certificate struct {
+<span id="L120" class="ln">   120	</span>	Raw                asn1.RawContent
+<span id="L121" class="ln">   121	</span>	TBSCertificate     tbsCertificate
+<span id="L122" class="ln">   122	</span>	SignatureAlgorithm pkix.AlgorithmIdentifier
+<span id="L123" class="ln">   123	</span>	SignatureValue     asn1.BitString
+<span id="L124" class="ln">   124	</span>}
+<span id="L125" class="ln">   125	</span>
+<span id="L126" class="ln">   126	</span>type tbsCertificate struct {
+<span id="L127" class="ln">   127	</span>	Raw                asn1.RawContent
+<span id="L128" class="ln">   128	</span>	Version            int `asn1:&#34;optional,explicit,default:0,tag:0&#34;`
+<span id="L129" class="ln">   129	</span>	SerialNumber       *big.Int
+<span id="L130" class="ln">   130	</span>	SignatureAlgorithm pkix.AlgorithmIdentifier
+<span id="L131" class="ln">   131	</span>	Issuer             asn1.RawValue
+<span id="L132" class="ln">   132	</span>	Validity           validity
+<span id="L133" class="ln">   133	</span>	Subject            asn1.RawValue
+<span id="L134" class="ln">   134	</span>	PublicKey          publicKeyInfo
+<span id="L135" class="ln">   135	</span>	UniqueId           asn1.BitString   `asn1:&#34;optional,tag:1&#34;`
+<span id="L136" class="ln">   136	</span>	SubjectUniqueId    asn1.BitString   `asn1:&#34;optional,tag:2&#34;`
+<span id="L137" class="ln">   137	</span>	Extensions         []pkix.Extension `asn1:&#34;optional,explicit,tag:3&#34;`
+<span id="L138" class="ln">   138	</span>}
+<span id="L139" class="ln">   139	</span>
+<span id="L140" class="ln">   140	</span>type dsaAlgorithmParameters struct {
+<span id="L141" class="ln">   141	</span>	P, Q, G *big.Int
+<span id="L142" class="ln">   142	</span>}
+<span id="L143" class="ln">   143	</span>
+<span id="L144" class="ln">   144	</span>type dsaSignature struct {
+<span id="L145" class="ln">   145	</span>	R, S *big.Int
+<span id="L146" class="ln">   146	</span>}
+<span id="L147" class="ln">   147	</span>
+<span id="L148" class="ln">   148	</span>type ecdsaSignature dsaSignature
+<span id="L149" class="ln">   149	</span>
+<span id="L150" class="ln">   150	</span>type validity struct {
+<span id="L151" class="ln">   151	</span>	NotBefore, NotAfter time.Time
+<span id="L152" class="ln">   152	</span>}
+<span id="L153" class="ln">   153	</span>
+<span id="L154" class="ln">   154	</span>type publicKeyInfo struct {
+<span id="L155" class="ln">   155	</span>	Raw       asn1.RawContent
+<span id="L156" class="ln">   156	</span>	Algorithm pkix.AlgorithmIdentifier
+<span id="L157" class="ln">   157	</span>	PublicKey asn1.BitString
+<span id="L158" class="ln">   158	</span>}
+<span id="L159" class="ln">   159	</span>
+<span id="L160" class="ln">   160	</span><span class="comment">// RFC 5280,  4.2.1.1</span>
+<span id="L161" class="ln">   161	</span>type authKeyId struct {
+<span id="L162" class="ln">   162	</span>	Id []byte `asn1:&#34;optional,tag:0&#34;`
+<span id="L163" class="ln">   163	</span>}
+<span id="L164" class="ln">   164	</span>
+<span id="L165" class="ln">   165	</span>type SignatureAlgorithm int
+<span id="L166" class="ln">   166	</span>
+<span id="L167" class="ln">   167	</span>const (
+<span id="L168" class="ln">   168	</span>	UnknownSignatureAlgorithm SignatureAlgorithm = iota
+<span id="L169" class="ln">   169	</span>	MD2WithRSA
+<span id="L170" class="ln">   170	</span>	MD5WithRSA
+<span id="L171" class="ln">   171	</span>	SHA1WithRSA
+<span id="L172" class="ln">   172	</span>	SHA256WithRSA
+<span id="L173" class="ln">   173	</span>	SHA384WithRSA
+<span id="L174" class="ln">   174	</span>	SHA512WithRSA
+<span id="L175" class="ln">   175	</span>	DSAWithSHA1
+<span id="L176" class="ln">   176	</span>	DSAWithSHA256
+<span id="L177" class="ln">   177	</span>	ECDSAWithSHA1
+<span id="L178" class="ln">   178	</span>	ECDSAWithSHA256
+<span id="L179" class="ln">   179	</span>	ECDSAWithSHA384
+<span id="L180" class="ln">   180	</span>	ECDSAWithSHA512
+<span id="L181" class="ln">   181	</span>	SHA256WithRSAPSS
+<span id="L182" class="ln">   182	</span>	SHA384WithRSAPSS
+<span id="L183" class="ln">   183	</span>	SHA512WithRSAPSS
+<span id="L184" class="ln">   184	</span>)
+<span id="L185" class="ln">   185	</span>
+<span id="L186" class="ln">   186	</span>func (algo SignatureAlgorithm) isRSAPSS() bool {
+<span id="L187" class="ln">   187	</span>	switch algo {
+<span id="L188" class="ln">   188	</span>	case SHA256WithRSAPSS, SHA384WithRSAPSS, SHA512WithRSAPSS:
+<span id="L189" class="ln">   189	</span>		return true
+<span id="L190" class="ln">   190	</span>	default:
+<span id="L191" class="ln">   191	</span>		return false
+<span id="L192" class="ln">   192	</span>	}
+<span id="L193" class="ln">   193	</span>}
+<span id="L194" class="ln">   194	</span>
+<span id="L195" class="ln">   195	</span>var algoName = [...]string{
+<span id="L196" class="ln">   196	</span>	MD2WithRSA:       &#34;MD2-RSA&#34;,
+<span id="L197" class="ln">   197	</span>	MD5WithRSA:       &#34;MD5-RSA&#34;,
+<span id="L198" class="ln">   198	</span>	SHA1WithRSA:      &#34;SHA1-RSA&#34;,
+<span id="L199" class="ln">   199	</span>	SHA256WithRSA:    &#34;SHA256-RSA&#34;,
+<span id="L200" class="ln">   200	</span>	SHA384WithRSA:    &#34;SHA384-RSA&#34;,
+<span id="L201" class="ln">   201	</span>	SHA512WithRSA:    &#34;SHA512-RSA&#34;,
+<span id="L202" class="ln">   202	</span>	SHA256WithRSAPSS: &#34;SHA256-RSAPSS&#34;,
+<span id="L203" class="ln">   203	</span>	SHA384WithRSAPSS: &#34;SHA384-RSAPSS&#34;,
+<span id="L204" class="ln">   204	</span>	SHA512WithRSAPSS: &#34;SHA512-RSAPSS&#34;,
+<span id="L205" class="ln">   205	</span>	DSAWithSHA1:      &#34;DSA-SHA1&#34;,
+<span id="L206" class="ln">   206	</span>	DSAWithSHA256:    &#34;DSA-SHA256&#34;,
+<span id="L207" class="ln">   207	</span>	ECDSAWithSHA1:    &#34;ECDSA-SHA1&#34;,
+<span id="L208" class="ln">   208	</span>	ECDSAWithSHA256:  &#34;ECDSA-SHA256&#34;,
+<span id="L209" class="ln">   209	</span>	ECDSAWithSHA384:  &#34;ECDSA-SHA384&#34;,
+<span id="L210" class="ln">   210	</span>	ECDSAWithSHA512:  &#34;ECDSA-SHA512&#34;,
+<span id="L211" class="ln">   211	</span>}
+<span id="L212" class="ln">   212	</span>
+<span id="L213" class="ln">   213	</span>func (algo SignatureAlgorithm) String() string {
+<span id="L214" class="ln">   214	</span>	if 0 &lt; algo &amp;&amp; int(algo) &lt; len(algoName) {
+<span id="L215" class="ln">   215	</span>		return algoName[algo]
+<span id="L216" class="ln">   216	</span>	}
+<span id="L217" class="ln">   217	</span>	return strconv.Itoa(int(algo))
+<span id="L218" class="ln">   218	</span>}
+<span id="L219" class="ln">   219	</span>
+<span id="L220" class="ln">   220	</span>type PublicKeyAlgorithm int
+<span id="L221" class="ln">   221	</span>
+<span id="L222" class="ln">   222	</span>const (
+<span id="L223" class="ln">   223	</span>	UnknownPublicKeyAlgorithm PublicKeyAlgorithm = iota
+<span id="L224" class="ln">   224	</span>	RSA
+<span id="L225" class="ln">   225	</span>	DSA
+<span id="L226" class="ln">   226	</span>	ECDSA
+<span id="L227" class="ln">   227	</span>)
+<span id="L228" class="ln">   228	</span>
+<span id="L229" class="ln">   229	</span><span class="comment">// OIDs for signature algorithms</span>
+<span id="L230" class="ln">   230	</span><span class="comment">//</span>
+<span id="L231" class="ln">   231	</span><span class="comment">// pkcs-1 OBJECT IDENTIFIER ::= {</span>
+<span id="L232" class="ln">   232	</span><span class="comment">//    iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) 1 }</span>
+<span id="L233" class="ln">   233	</span><span class="comment">//</span>
+<span id="L234" class="ln">   234	</span><span class="comment">//</span>
+<span id="L235" class="ln">   235	</span><span class="comment">// RFC 3279 2.2.1 RSA Signature Algorithms</span>
+<span id="L236" class="ln">   236	</span><span class="comment">//</span>
+<span id="L237" class="ln">   237	</span><span class="comment">// md2WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 2 }</span>
+<span id="L238" class="ln">   238	</span><span class="comment">//</span>
+<span id="L239" class="ln">   239	</span><span class="comment">// md5WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 4 }</span>
+<span id="L240" class="ln">   240	</span><span class="comment">//</span>
+<span id="L241" class="ln">   241	</span><span class="comment">// sha-1WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 5 }</span>
+<span id="L242" class="ln">   242	</span><span class="comment">//</span>
+<span id="L243" class="ln">   243	</span><span class="comment">// dsaWithSha1 OBJECT IDENTIFIER ::= {</span>
+<span id="L244" class="ln">   244	</span><span class="comment">//    iso(1) member-body(2) us(840) x9-57(10040) x9cm(4) 3 }</span>
+<span id="L245" class="ln">   245	</span><span class="comment">//</span>
+<span id="L246" class="ln">   246	</span><span class="comment">// RFC 3279 2.2.3 ECDSA Signature Algorithm</span>
+<span id="L247" class="ln">   247	</span><span class="comment">//</span>
+<span id="L248" class="ln">   248	</span><span class="comment">// ecdsa-with-SHA1 OBJECT IDENTIFIER ::= {</span>
+<span id="L249" class="ln">   249	</span><span class="comment">// 	  iso(1) member-body(2) us(840) ansi-x962(10045)</span>
+<span id="L250" class="ln">   250	</span><span class="comment">//    signatures(4) ecdsa-with-SHA1(1)}</span>
+<span id="L251" class="ln">   251	</span><span class="comment">//</span>
+<span id="L252" class="ln">   252	</span><span class="comment">//</span>
+<span id="L253" class="ln">   253	</span><span class="comment">// RFC 4055 5 PKCS #1 Version 1.5</span>
+<span id="L254" class="ln">   254	</span><span class="comment">//</span>
+<span id="L255" class="ln">   255	</span><span class="comment">// sha256WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 11 }</span>
+<span id="L256" class="ln">   256	</span><span class="comment">//</span>
+<span id="L257" class="ln">   257	</span><span class="comment">// sha384WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 12 }</span>
+<span id="L258" class="ln">   258	</span><span class="comment">//</span>
+<span id="L259" class="ln">   259	</span><span class="comment">// sha512WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 13 }</span>
+<span id="L260" class="ln">   260	</span><span class="comment">//</span>
+<span id="L261" class="ln">   261	</span><span class="comment">//</span>
+<span id="L262" class="ln">   262	</span><span class="comment">// RFC 5758 3.1 DSA Signature Algorithms</span>
+<span id="L263" class="ln">   263	</span><span class="comment">//</span>
+<span id="L264" class="ln">   264	</span><span class="comment">// dsaWithSha256 OBJECT IDENTIFIER ::= {</span>
+<span id="L265" class="ln">   265	</span><span class="comment">//    joint-iso-ccitt(2) country(16) us(840) organization(1) gov(101)</span>
+<span id="L266" class="ln">   266	</span><span class="comment">//    csor(3) algorithms(4) id-dsa-with-sha2(3) 2}</span>
+<span id="L267" class="ln">   267	</span><span class="comment">//</span>
+<span id="L268" class="ln">   268	</span><span class="comment">// RFC 5758 3.2 ECDSA Signature Algorithm</span>
+<span id="L269" class="ln">   269	</span><span class="comment">//</span>
+<span id="L270" class="ln">   270	</span><span class="comment">// ecdsa-with-SHA256 OBJECT IDENTIFIER ::= { iso(1) member-body(2)</span>
+<span id="L271" class="ln">   271	</span><span class="comment">//    us(840) ansi-X9-62(10045) signatures(4) ecdsa-with-SHA2(3) 2 }</span>
+<span id="L272" class="ln">   272	</span><span class="comment">//</span>
+<span id="L273" class="ln">   273	</span><span class="comment">// ecdsa-with-SHA384 OBJECT IDENTIFIER ::= { iso(1) member-body(2)</span>
+<span id="L274" class="ln">   274	</span><span class="comment">//    us(840) ansi-X9-62(10045) signatures(4) ecdsa-with-SHA2(3) 3 }</span>
+<span id="L275" class="ln">   275	</span><span class="comment">//</span>
+<span id="L276" class="ln">   276	</span><span class="comment">// ecdsa-with-SHA512 OBJECT IDENTIFIER ::= { iso(1) member-body(2)</span>
+<span id="L277" class="ln">   277	</span><span class="comment">//    us(840) ansi-X9-62(10045) signatures(4) ecdsa-with-SHA2(3) 4 }</span>
+<span id="L278" class="ln">   278	</span>
+<span id="L279" class="ln">   279	</span>var (
+<span id="L280" class="ln">   280	</span>	oidSignatureMD2WithRSA      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 2}
+<span id="L281" class="ln">   281	</span>	oidSignatureMD5WithRSA      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 4}
+<span id="L282" class="ln">   282	</span>	oidSignatureSHA1WithRSA     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 5}
+<span id="L283" class="ln">   283	</span>	oidSignatureSHA256WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}
+<span id="L284" class="ln">   284	</span>	oidSignatureSHA384WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 12}
+<span id="L285" class="ln">   285	</span>	oidSignatureSHA512WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 13}
+<span id="L286" class="ln">   286	</span>	oidSignatureRSAPSS          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 10}
+<span id="L287" class="ln">   287	</span>	oidSignatureDSAWithSHA1     = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 3}
+<span id="L288" class="ln">   288	</span>	oidSignatureDSAWithSHA256   = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 2}
+<span id="L289" class="ln">   289	</span>	oidSignatureECDSAWithSHA1   = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 1}
+<span id="L290" class="ln">   290	</span>	oidSignatureECDSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
+<span id="L291" class="ln">   291	</span>	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
+<span id="L292" class="ln">   292	</span>	oidSignatureECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
+<span id="L293" class="ln">   293	</span>
+<span id="L294" class="ln">   294	</span>	oidSHA256 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
+<span id="L295" class="ln">   295	</span>	oidSHA384 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}
+<span id="L296" class="ln">   296	</span>	oidSHA512 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3}
+<span id="L297" class="ln">   297	</span>
+<span id="L298" class="ln">   298	</span>	oidMGF1 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 8}
+<span id="L299" class="ln">   299	</span>
+<span id="L300" class="ln">   300	</span>	<span class="comment">// oidISOSignatureSHA1WithRSA means the same as oidSignatureSHA1WithRSA</span>
+<span id="L301" class="ln">   301	</span>	<span class="comment">// but it&#39;s specified by ISO. Microsoft&#39;s makecert.exe has been known</span>
+<span id="L302" class="ln">   302	</span>	<span class="comment">// to produce certificates with this OID.</span>
+<span id="L303" class="ln">   303	</span>	oidISOSignatureSHA1WithRSA = asn1.ObjectIdentifier{1, 3, 14, 3, 2, 29}
+<span id="L304" class="ln">   304	</span>)
+<span id="L305" class="ln">   305	</span>
+<span id="L306" class="ln">   306	</span>var signatureAlgorithmDetails = []struct {
+<span id="L307" class="ln">   307	</span>	algo       SignatureAlgorithm
+<span id="L308" class="ln">   308	</span>	oid        asn1.ObjectIdentifier
+<span id="L309" class="ln">   309	</span>	pubKeyAlgo PublicKeyAlgorithm
+<span id="L310" class="ln">   310	</span>	hash       crypto.Hash
+<span id="L311" class="ln">   311	</span>}{
+<span id="L312" class="ln">   312	</span>	{MD2WithRSA, oidSignatureMD2WithRSA, RSA, crypto.Hash(0) <span class="comment">/* no value for MD2 */</span>},
+<span id="L313" class="ln">   313	</span>	{MD5WithRSA, oidSignatureMD5WithRSA, RSA, crypto.MD5},
+<span id="L314" class="ln">   314	</span>	{SHA1WithRSA, oidSignatureSHA1WithRSA, RSA, crypto.SHA1},
+<span id="L315" class="ln">   315	</span>	{SHA1WithRSA, oidISOSignatureSHA1WithRSA, RSA, crypto.SHA1},
+<span id="L316" class="ln">   316	</span>	{SHA256WithRSA, oidSignatureSHA256WithRSA, RSA, crypto.SHA256},
+<span id="L317" class="ln">   317	</span>	{SHA384WithRSA, oidSignatureSHA384WithRSA, RSA, crypto.SHA384},
+<span id="L318" class="ln">   318	</span>	{SHA512WithRSA, oidSignatureSHA512WithRSA, RSA, crypto.SHA512},
+<span id="L319" class="ln">   319	</span>	{SHA256WithRSAPSS, oidSignatureRSAPSS, RSA, crypto.SHA256},
+<span id="L320" class="ln">   320	</span>	{SHA384WithRSAPSS, oidSignatureRSAPSS, RSA, crypto.SHA384},
+<span id="L321" class="ln">   321	</span>	{SHA512WithRSAPSS, oidSignatureRSAPSS, RSA, crypto.SHA512},
+<span id="L322" class="ln">   322	</span>	{DSAWithSHA1, oidSignatureDSAWithSHA1, DSA, crypto.SHA1},
+<span id="L323" class="ln">   323	</span>	{DSAWithSHA256, oidSignatureDSAWithSHA256, DSA, crypto.SHA256},
+<span id="L324" class="ln">   324	</span>	{ECDSAWithSHA1, oidSignatureECDSAWithSHA1, ECDSA, crypto.SHA1},
+<span id="L325" class="ln">   325	</span>	{ECDSAWithSHA256, oidSignatureECDSAWithSHA256, ECDSA, crypto.SHA256},
+<span id="L326" class="ln">   326	</span>	{ECDSAWithSHA384, oidSignatureECDSAWithSHA384, ECDSA, crypto.SHA384},
+<span id="L327" class="ln">   327	</span>	{ECDSAWithSHA512, oidSignatureECDSAWithSHA512, ECDSA, crypto.SHA512},
+<span id="L328" class="ln">   328	</span>}
+<span id="L329" class="ln">   329	</span>
+<span id="L330" class="ln">   330	</span><span class="comment">// pssParameters reflects the parameters in an AlgorithmIdentifier that</span>
+<span id="L331" class="ln">   331	</span><span class="comment">// specifies RSA PSS. See https://tools.ietf.org/html/rfc3447#appendix-A.2.3</span>
+<span id="L332" class="ln">   332	</span>type pssParameters struct {
+<span id="L333" class="ln">   333	</span>	<span class="comment">// The following three fields are not marked as</span>
+<span id="L334" class="ln">   334	</span>	<span class="comment">// optional because the default values specify SHA-1,</span>
+<span id="L335" class="ln">   335	</span>	<span class="comment">// which is no longer suitable for use in signatures.</span>
+<span id="L336" class="ln">   336	</span>	Hash         pkix.AlgorithmIdentifier `asn1:&#34;explicit,tag:0&#34;`
+<span id="L337" class="ln">   337	</span>	MGF          pkix.AlgorithmIdentifier `asn1:&#34;explicit,tag:1&#34;`
+<span id="L338" class="ln">   338	</span>	SaltLength   int                      `asn1:&#34;explicit,tag:2&#34;`
+<span id="L339" class="ln">   339	</span>	TrailerField int                      `asn1:&#34;optional,explicit,tag:3,default:1&#34;`
+<span id="L340" class="ln">   340	</span>}
+<span id="L341" class="ln">   341	</span>
+<span id="L342" class="ln">   342	</span><span class="comment">// rsaPSSParameters returns an asn1.RawValue suitable for use as the Parameters</span>
+<span id="L343" class="ln">   343	</span><span class="comment">// in an AlgorithmIdentifier that specifies RSA PSS.</span>
+<span id="L344" class="ln">   344	</span>func rsaPSSParameters(hashFunc crypto.Hash) asn1.RawValue {
+<span id="L345" class="ln">   345	</span>	var hashOID asn1.ObjectIdentifier
+<span id="L346" class="ln">   346	</span>
+<span id="L347" class="ln">   347	</span>	switch hashFunc {
+<span id="L348" class="ln">   348	</span>	case crypto.SHA256:
+<span id="L349" class="ln">   349	</span>		hashOID = oidSHA256
+<span id="L350" class="ln">   350	</span>	case crypto.SHA384:
+<span id="L351" class="ln">   351	</span>		hashOID = oidSHA384
+<span id="L352" class="ln">   352	</span>	case crypto.SHA512:
+<span id="L353" class="ln">   353	</span>		hashOID = oidSHA512
+<span id="L354" class="ln">   354	</span>	}
+<span id="L355" class="ln">   355	</span>
+<span id="L356" class="ln">   356	</span>	params := pssParameters{
+<span id="L357" class="ln">   357	</span>		Hash: pkix.AlgorithmIdentifier{
+<span id="L358" class="ln">   358	</span>			Algorithm: hashOID,
+<span id="L359" class="ln">   359	</span>			Parameters: asn1.RawValue{
+<span id="L360" class="ln">   360	</span>				Tag: 5, <span class="comment">/* ASN.1 NULL */</span>
+<span id="L361" class="ln">   361	</span>			},
+<span id="L362" class="ln">   362	</span>		},
+<span id="L363" class="ln">   363	</span>		MGF: pkix.AlgorithmIdentifier{
+<span id="L364" class="ln">   364	</span>			Algorithm: oidMGF1,
+<span id="L365" class="ln">   365	</span>		},
+<span id="L366" class="ln">   366	</span>		SaltLength:   hashFunc.Size(),
+<span id="L367" class="ln">   367	</span>		TrailerField: 1,
+<span id="L368" class="ln">   368	</span>	}
+<span id="L369" class="ln">   369	</span>
+<span id="L370" class="ln">   370	</span>	mgf1Params := pkix.AlgorithmIdentifier{
+<span id="L371" class="ln">   371	</span>		Algorithm: hashOID,
+<span id="L372" class="ln">   372	</span>		Parameters: asn1.RawValue{
+<span id="L373" class="ln">   373	</span>			Tag: 5, <span class="comment">/* ASN.1 NULL */</span>
+<span id="L374" class="ln">   374	</span>		},
+<span id="L375" class="ln">   375	</span>	}
+<span id="L376" class="ln">   376	</span>
+<span id="L377" class="ln">   377	</span>	var err error
+<span id="L378" class="ln">   378	</span>	params.MGF.Parameters.FullBytes, err = asn1.Marshal(mgf1Params)
+<span id="L379" class="ln">   379	</span>	if err != nil {
+<span id="L380" class="ln">   380	</span>		panic(err)
+<span id="L381" class="ln">   381	</span>	}
+<span id="L382" class="ln">   382	</span>
+<span id="L383" class="ln">   383	</span>	serialized, err := asn1.Marshal(params)
+<span id="L384" class="ln">   384	</span>	if err != nil {
+<span id="L385" class="ln">   385	</span>		panic(err)
+<span id="L386" class="ln">   386	</span>	}
+<span id="L387" class="ln">   387	</span>
+<span id="L388" class="ln">   388	</span>	return asn1.RawValue{FullBytes: serialized}
+<span id="L389" class="ln">   389	</span>}
+<span id="L390" class="ln">   390	</span>
+<span id="L391" class="ln">   391	</span>func getSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) SignatureAlgorithm {
+<span id="L392" class="ln">   392	</span>	if !ai.Algorithm.Equal(oidSignatureRSAPSS) {
+<span id="L393" class="ln">   393	</span>		for _, details := range signatureAlgorithmDetails {
+<span id="L394" class="ln">   394	</span>			if ai.Algorithm.Equal(details.oid) {
+<span id="L395" class="ln">   395	</span>				return details.algo
+<span id="L396" class="ln">   396	</span>			}
+<span id="L397" class="ln">   397	</span>		}
+<span id="L398" class="ln">   398	</span>		return UnknownSignatureAlgorithm
+<span id="L399" class="ln">   399	</span>	}
+<span id="L400" class="ln">   400	</span>
+<span id="L401" class="ln">   401	</span>	<span class="comment">// RSA PSS is special because it encodes important parameters</span>
+<span id="L402" class="ln">   402	</span>	<span class="comment">// in the Parameters.</span>
+<span id="L403" class="ln">   403	</span>
+<span id="L404" class="ln">   404	</span>	var params pssParameters
+<span id="L405" class="ln">   405	</span>	if _, err := asn1.Unmarshal(ai.Parameters.FullBytes, &amp;params); err != nil {
+<span id="L406" class="ln">   406	</span>		return UnknownSignatureAlgorithm
+<span id="L407" class="ln">   407	</span>	}
+<span id="L408" class="ln">   408	</span>
+<span id="L409" class="ln">   409	</span>	var mgf1HashFunc pkix.AlgorithmIdentifier
+<span id="L410" class="ln">   410	</span>	if _, err := asn1.Unmarshal(params.MGF.Parameters.FullBytes, &amp;mgf1HashFunc); err != nil {
+<span id="L411" class="ln">   411	</span>		return UnknownSignatureAlgorithm
+<span id="L412" class="ln">   412	</span>	}
+<span id="L413" class="ln">   413	</span>
+<span id="L414" class="ln">   414	</span>	<span class="comment">// PSS is greatly overburdened with options. This code forces</span>
+<span id="L415" class="ln">   415	</span>	<span class="comment">// them into three buckets by requiring that the MGF1 hash</span>
+<span id="L416" class="ln">   416	</span>	<span class="comment">// function always match the message hash function (as</span>
+<span id="L417" class="ln">   417	</span>	<span class="comment">// recommended in</span>
+<span id="L418" class="ln">   418	</span>	<span class="comment">// https://tools.ietf.org/html/rfc3447#section-8.1), that the</span>
+<span id="L419" class="ln">   419	</span>	<span class="comment">// salt length matches the hash length, and that the trailer</span>
+<span id="L420" class="ln">   420	</span>	<span class="comment">// field has the default value.</span>
+<span id="L421" class="ln">   421	</span>	asn1NULL := []byte{0x05, 0x00}
+<span id="L422" class="ln">   422	</span>	if !bytes.Equal(params.Hash.Parameters.FullBytes, asn1NULL) ||
+<span id="L423" class="ln">   423	</span>		!params.MGF.Algorithm.Equal(oidMGF1) ||
+<span id="L424" class="ln">   424	</span>		!mgf1HashFunc.Algorithm.Equal(params.Hash.Algorithm) ||
+<span id="L425" class="ln">   425	</span>		!bytes.Equal(mgf1HashFunc.Parameters.FullBytes, asn1NULL) ||
+<span id="L426" class="ln">   426	</span>		params.TrailerField != 1 {
+<span id="L427" class="ln">   427	</span>		return UnknownSignatureAlgorithm
+<span id="L428" class="ln">   428	</span>	}
+<span id="L429" class="ln">   429	</span>
+<span id="L430" class="ln">   430	</span>	switch {
+<span id="L431" class="ln">   431	</span>	case params.Hash.Algorithm.Equal(oidSHA256) &amp;&amp; params.SaltLength == 32:
+<span id="L432" class="ln">   432	</span>		return SHA256WithRSAPSS
+<span id="L433" class="ln">   433	</span>	case params.Hash.Algorithm.Equal(oidSHA384) &amp;&amp; params.SaltLength == 48:
+<span id="L434" class="ln">   434	</span>		return SHA384WithRSAPSS
+<span id="L435" class="ln">   435	</span>	case params.Hash.Algorithm.Equal(oidSHA512) &amp;&amp; params.SaltLength == 64:
+<span id="L436" class="ln">   436	</span>		return SHA512WithRSAPSS
+<span id="L437" class="ln">   437	</span>	}
+<span id="L438" class="ln">   438	</span>
+<span id="L439" class="ln">   439	</span>	return UnknownSignatureAlgorithm
+<span id="L440" class="ln">   440	</span>}
+<span id="L441" class="ln">   441	</span>
+<span id="L442" class="ln">   442	</span><span class="comment">// RFC 3279, 2.3 Public Key Algorithms</span>
+<span id="L443" class="ln">   443	</span><span class="comment">//</span>
+<span id="L444" class="ln">   444	</span><span class="comment">// pkcs-1 OBJECT IDENTIFIER ::== { iso(1) member-body(2) us(840)</span>
+<span id="L445" class="ln">   445	</span><span class="comment">//    rsadsi(113549) pkcs(1) 1 }</span>
+<span id="L446" class="ln">   446	</span><span class="comment">//</span>
+<span id="L447" class="ln">   447	</span><span class="comment">// rsaEncryption OBJECT IDENTIFIER ::== { pkcs1-1 1 }</span>
+<span id="L448" class="ln">   448	</span><span class="comment">//</span>
+<span id="L449" class="ln">   449	</span><span class="comment">// id-dsa OBJECT IDENTIFIER ::== { iso(1) member-body(2) us(840)</span>
+<span id="L450" class="ln">   450	</span><span class="comment">//    x9-57(10040) x9cm(4) 1 }</span>
+<span id="L451" class="ln">   451	</span><span class="comment">//</span>
+<span id="L452" class="ln">   452	</span><span class="comment">// RFC 5480, 2.1.1 Unrestricted Algorithm Identifier and Parameters</span>
+<span id="L453" class="ln">   453	</span><span class="comment">//</span>
+<span id="L454" class="ln">   454	</span><span class="comment">// id-ecPublicKey OBJECT IDENTIFIER ::= {</span>
+<span id="L455" class="ln">   455	</span><span class="comment">//       iso(1) member-body(2) us(840) ansi-X9-62(10045) keyType(2) 1 }</span>
+<span id="L456" class="ln">   456	</span>var (
+<span id="L457" class="ln">   457	</span>	oidPublicKeyRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+<span id="L458" class="ln">   458	</span>	oidPublicKeyDSA   = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
+<span id="L459" class="ln">   459	</span>	oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+<span id="L460" class="ln">   460	</span>)
+<span id="L461" class="ln">   461	</span>
+<span id="L462" class="ln">   462	</span>func getPublicKeyAlgorithmFromOID(oid asn1.ObjectIdentifier) PublicKeyAlgorithm {
+<span id="L463" class="ln">   463	</span>	switch {
+<span id="L464" class="ln">   464	</span>	case oid.Equal(oidPublicKeyRSA):
+<span id="L465" class="ln">   465	</span>		return RSA
+<span id="L466" class="ln">   466	</span>	case oid.Equal(oidPublicKeyDSA):
+<span id="L467" class="ln">   467	</span>		return DSA
+<span id="L468" class="ln">   468	</span>	case oid.Equal(oidPublicKeyECDSA):
+<span id="L469" class="ln">   469	</span>		return ECDSA
+<span id="L470" class="ln">   470	</span>	}
+<span id="L471" class="ln">   471	</span>	return UnknownPublicKeyAlgorithm
+<span id="L472" class="ln">   472	</span>}
+<span id="L473" class="ln">   473	</span>
+<span id="L474" class="ln">   474	</span><span class="comment">// RFC 5480, 2.1.1.1. Named Curve</span>
+<span id="L475" class="ln">   475	</span><span class="comment">//</span>
+<span id="L476" class="ln">   476	</span><span class="comment">// secp224r1 OBJECT IDENTIFIER ::= {</span>
+<span id="L477" class="ln">   477	</span><span class="comment">//   iso(1) identified-organization(3) certicom(132) curve(0) 33 }</span>
+<span id="L478" class="ln">   478	</span><span class="comment">//</span>
+<span id="L479" class="ln">   479	</span><span class="comment">// secp256r1 OBJECT IDENTIFIER ::= {</span>
+<span id="L480" class="ln">   480	</span><span class="comment">//   iso(1) member-body(2) us(840) ansi-X9-62(10045) curves(3)</span>
+<span id="L481" class="ln">   481	</span><span class="comment">//   prime(1) 7 }</span>
+<span id="L482" class="ln">   482	</span><span class="comment">//</span>
+<span id="L483" class="ln">   483	</span><span class="comment">// secp384r1 OBJECT IDENTIFIER ::= {</span>
+<span id="L484" class="ln">   484	</span><span class="comment">//   iso(1) identified-organization(3) certicom(132) curve(0) 34 }</span>
+<span id="L485" class="ln">   485	</span><span class="comment">//</span>
+<span id="L486" class="ln">   486	</span><span class="comment">// secp521r1 OBJECT IDENTIFIER ::= {</span>
+<span id="L487" class="ln">   487	</span><span class="comment">//   iso(1) identified-organization(3) certicom(132) curve(0) 35 }</span>
+<span id="L488" class="ln">   488	</span><span class="comment">//</span>
+<span id="L489" class="ln">   489	</span><span class="comment">// NB: secp256r1 is equivalent to prime256v1</span>
+<span id="L490" class="ln">   490	</span>var (
+<span id="L491" class="ln">   491	</span>	oidNamedCurveP224 = asn1.ObjectIdentifier{1, 3, 132, 0, 33}
+<span id="L492" class="ln">   492	</span>	oidNamedCurveP256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7}
+<span id="L493" class="ln">   493	</span>	oidNamedCurveP384 = asn1.ObjectIdentifier{1, 3, 132, 0, 34}
+<span id="L494" class="ln">   494	</span>	oidNamedCurveP521 = asn1.ObjectIdentifier{1, 3, 132, 0, 35}
+<span id="L495" class="ln">   495	</span>)
+<span id="L496" class="ln">   496	</span>
+<span id="L497" class="ln">   497	</span>func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
+<span id="L498" class="ln">   498	</span>	switch {
+<span id="L499" class="ln">   499	</span>	case oid.Equal(oidNamedCurveP224):
+<span id="L500" class="ln">   500	</span>		return elliptic.P224()
+<span id="L501" class="ln">   501	</span>	case oid.Equal(oidNamedCurveP256):
+<span id="L502" class="ln">   502	</span>		return elliptic.P256()
+<span id="L503" class="ln">   503	</span>	case oid.Equal(oidNamedCurveP384):
+<span id="L504" class="ln">   504	</span>		return elliptic.P384()
+<span id="L505" class="ln">   505	</span>	case oid.Equal(oidNamedCurveP521):
+<span id="L506" class="ln">   506	</span>		return elliptic.P521()
+<span id="L507" class="ln">   507	</span>	}
+<span id="L508" class="ln">   508	</span>	return nil
+<span id="L509" class="ln">   509	</span>}
+<span id="L510" class="ln">   510	</span>
+<span id="L511" class="ln">   511	</span>func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
+<span id="L512" class="ln">   512	</span>	switch curve {
+<span id="L513" class="ln">   513	</span>	case elliptic.P224():
+<span id="L514" class="ln">   514	</span>		return oidNamedCurveP224, true
+<span id="L515" class="ln">   515	</span>	case elliptic.P256():
+<span id="L516" class="ln">   516	</span>		return oidNamedCurveP256, true
+<span id="L517" class="ln">   517	</span>	case elliptic.P384():
+<span id="L518" class="ln">   518	</span>		return oidNamedCurveP384, true
+<span id="L519" class="ln">   519	</span>	case elliptic.P521():
+<span id="L520" class="ln">   520	</span>		return oidNamedCurveP521, true
+<span id="L521" class="ln">   521	</span>	}
+<span id="L522" class="ln">   522	</span>
+<span id="L523" class="ln">   523	</span>	return nil, false
+<span id="L524" class="ln">   524	</span>}
+<span id="L525" class="ln">   525	</span>
+<span id="L526" class="ln">   526	</span><span class="comment">// KeyUsage represents the set of actions that are valid for a given key. It&#39;s</span>
+<span id="L527" class="ln">   527	</span><span class="comment">// a bitmap of the KeyUsage* constants.</span>
+<span id="L528" class="ln">   528	</span>type KeyUsage int
+<span id="L529" class="ln">   529	</span>
+<span id="L530" class="ln">   530	</span>const (
+<span id="L531" class="ln">   531	</span>	KeyUsageDigitalSignature KeyUsage = 1 &lt;&lt; iota
+<span id="L532" class="ln">   532	</span>	KeyUsageContentCommitment
+<span id="L533" class="ln">   533	</span>	KeyUsageKeyEncipherment
+<span id="L534" class="ln">   534	</span>	KeyUsageDataEncipherment
+<span id="L535" class="ln">   535	</span>	KeyUsageKeyAgreement
+<span id="L536" class="ln">   536	</span>	KeyUsageCertSign
+<span id="L537" class="ln">   537	</span>	KeyUsageCRLSign
+<span id="L538" class="ln">   538	</span>	KeyUsageEncipherOnly
+<span id="L539" class="ln">   539	</span>	KeyUsageDecipherOnly
+<span id="L540" class="ln">   540	</span>)
+<span id="L541" class="ln">   541	</span>
+<span id="L542" class="ln">   542	</span><span class="comment">// RFC 5280, 4.2.1.12  Extended Key Usage</span>
+<span id="L543" class="ln">   543	</span><span class="comment">//</span>
+<span id="L544" class="ln">   544	</span><span class="comment">// anyExtendedKeyUsage OBJECT IDENTIFIER ::= { id-ce-extKeyUsage 0 }</span>
+<span id="L545" class="ln">   545	</span><span class="comment">//</span>
+<span id="L546" class="ln">   546	</span><span class="comment">// id-kp OBJECT IDENTIFIER ::= { id-pkix 3 }</span>
+<span id="L547" class="ln">   547	</span><span class="comment">//</span>
+<span id="L548" class="ln">   548	</span><span class="comment">// id-kp-serverAuth             OBJECT IDENTIFIER ::= { id-kp 1 }</span>
+<span id="L549" class="ln">   549	</span><span class="comment">// id-kp-clientAuth             OBJECT IDENTIFIER ::= { id-kp 2 }</span>
+<span id="L550" class="ln">   550	</span><span class="comment">// id-kp-codeSigning            OBJECT IDENTIFIER ::= { id-kp 3 }</span>
+<span id="L551" class="ln">   551	</span><span class="comment">// id-kp-emailProtection        OBJECT IDENTIFIER ::= { id-kp 4 }</span>
+<span id="L552" class="ln">   552	</span><span class="comment">// id-kp-timeStamping           OBJECT IDENTIFIER ::= { id-kp 8 }</span>
+<span id="L553" class="ln">   553	</span><span class="comment">// id-kp-OCSPSigning            OBJECT IDENTIFIER ::= { id-kp 9 }</span>
+<span id="L554" class="ln">   554	</span>var (
+<span id="L555" class="ln">   555	</span>	oidExtKeyUsageAny                        = asn1.ObjectIdentifier{2, 5, 29, 37, 0}
+<span id="L556" class="ln">   556	</span>	oidExtKeyUsageServerAuth                 = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
+<span id="L557" class="ln">   557	</span>	oidExtKeyUsageClientAuth                 = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 2}
+<span id="L558" class="ln">   558	</span>	oidExtKeyUsageCodeSigning                = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 3}
+<span id="L559" class="ln">   559	</span>	oidExtKeyUsageEmailProtection            = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 4}
+<span id="L560" class="ln">   560	</span>	oidExtKeyUsageIPSECEndSystem             = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 5}
+<span id="L561" class="ln">   561	</span>	oidExtKeyUsageIPSECTunnel                = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 6}
+<span id="L562" class="ln">   562	</span>	oidExtKeyUsageIPSECUser                  = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 7}
+<span id="L563" class="ln">   563	</span>	oidExtKeyUsageTimeStamping               = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 8}
+<span id="L564" class="ln">   564	</span>	oidExtKeyUsageOCSPSigning                = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 9}
+<span id="L565" class="ln">   565	</span>	oidExtKeyUsageMicrosoftServerGatedCrypto = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 10, 3, 3}
+<span id="L566" class="ln">   566	</span>	oidExtKeyUsageNetscapeServerGatedCrypto  = asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 4, 1}
+<span id="L567" class="ln">   567	</span>)
+<span id="L568" class="ln">   568	</span>
+<span id="L569" class="ln">   569	</span><span class="comment">// ExtKeyUsage represents an extended set of actions that are valid for a given key.</span>
+<span id="L570" class="ln">   570	</span><span class="comment">// Each of the ExtKeyUsage* constants define a unique action.</span>
+<span id="L571" class="ln">   571	</span><span class="selection">type ExtKeyUsage int</span>
+<span id="L572" class="ln">   572	</span>
+<span id="L573" class="ln">   573	</span>const (
+<span id="L574" class="ln">   574	</span>	ExtKeyUsageAny ExtKeyUsage = iota
+<span id="L575" class="ln">   575	</span>	ExtKeyUsageServerAuth
+<span id="L576" class="ln">   576	</span>	ExtKeyUsageClientAuth
+<span id="L577" class="ln">   577	</span>	ExtKeyUsageCodeSigning
+<span id="L578" class="ln">   578	</span>	ExtKeyUsageEmailProtection
+<span id="L579" class="ln">   579	</span>	ExtKeyUsageIPSECEndSystem
+<span id="L580" class="ln">   580	</span>	ExtKeyUsageIPSECTunnel
+<span id="L581" class="ln">   581	</span>	ExtKeyUsageIPSECUser
+<span id="L582" class="ln">   582	</span>	ExtKeyUsageTimeStamping
+<span id="L583" class="ln">   583	</span>	ExtKeyUsageOCSPSigning
+<span id="L584" class="ln">   584	</span>	ExtKeyUsageMicrosoftServerGatedCrypto
+<span id="L585" class="ln">   585	</span>	ExtKeyUsageNetscapeServerGatedCrypto
+<span id="L586" class="ln">   586	</span>)
+<span id="L587" class="ln">   587	</span>
+<span id="L588" class="ln">   588	</span><span class="comment">// extKeyUsageOIDs contains the mapping between an ExtKeyUsage and its OID.</span>
+<span id="L589" class="ln">   589	</span>var extKeyUsageOIDs = []struct {
+<span id="L590" class="ln">   590	</span>	extKeyUsage ExtKeyUsage
+<span id="L591" class="ln">   591	</span>	oid         asn1.ObjectIdentifier
+<span id="L592" class="ln">   592	</span>}{
+<span id="L593" class="ln">   593	</span>	{ExtKeyUsageAny, oidExtKeyUsageAny},
+<span id="L594" class="ln">   594	</span>	{ExtKeyUsageServerAuth, oidExtKeyUsageServerAuth},
+<span id="L595" class="ln">   595	</span>	{ExtKeyUsageClientAuth, oidExtKeyUsageClientAuth},
+<span id="L596" class="ln">   596	</span>	{ExtKeyUsageCodeSigning, oidExtKeyUsageCodeSigning},
+<span id="L597" class="ln">   597	</span>	{ExtKeyUsageEmailProtection, oidExtKeyUsageEmailProtection},
+<span id="L598" class="ln">   598	</span>	{ExtKeyUsageIPSECEndSystem, oidExtKeyUsageIPSECEndSystem},
+<span id="L599" class="ln">   599	</span>	{ExtKeyUsageIPSECTunnel, oidExtKeyUsageIPSECTunnel},
+<span id="L600" class="ln">   600	</span>	{ExtKeyUsageIPSECUser, oidExtKeyUsageIPSECUser},
+<span id="L601" class="ln">   601	</span>	{ExtKeyUsageTimeStamping, oidExtKeyUsageTimeStamping},
+<span id="L602" class="ln">   602	</span>	{ExtKeyUsageOCSPSigning, oidExtKeyUsageOCSPSigning},
+<span id="L603" class="ln">   603	</span>	{ExtKeyUsageMicrosoftServerGatedCrypto, oidExtKeyUsageMicrosoftServerGatedCrypto},
+<span id="L604" class="ln">   604	</span>	{ExtKeyUsageNetscapeServerGatedCrypto, oidExtKeyUsageNetscapeServerGatedCrypto},
+<span id="L605" class="ln">   605	</span>}
+<span id="L606" class="ln">   606	</span>
+<span id="L607" class="ln">   607	</span>func extKeyUsageFromOID(oid asn1.ObjectIdentifier) (eku ExtKeyUsage, ok bool) {
+<span id="L608" class="ln">   608	</span>	for _, pair := range extKeyUsageOIDs {
+<span id="L609" class="ln">   609	</span>		if oid.Equal(pair.oid) {
+<span id="L610" class="ln">   610	</span>			return pair.extKeyUsage, true
+<span id="L611" class="ln">   611	</span>		}
+<span id="L612" class="ln">   612	</span>	}
+<span id="L613" class="ln">   613	</span>	return
+<span id="L614" class="ln">   614	</span>}
+<span id="L615" class="ln">   615	</span>
+<span id="L616" class="ln">   616	</span>func oidFromExtKeyUsage(eku ExtKeyUsage) (oid asn1.ObjectIdentifier, ok bool) {
+<span id="L617" class="ln">   617	</span>	for _, pair := range extKeyUsageOIDs {
+<span id="L618" class="ln">   618	</span>		if eku == pair.extKeyUsage {
+<span id="L619" class="ln">   619	</span>			return pair.oid, true
+<span id="L620" class="ln">   620	</span>		}
+<span id="L621" class="ln">   621	</span>	}
+<span id="L622" class="ln">   622	</span>	return
+<span id="L623" class="ln">   623	</span>}
+<span id="L624" class="ln">   624	</span>
+<span id="L625" class="ln">   625	</span><span class="comment">// A Certificate represents an X.509 certificate.</span>
+<span id="L626" class="ln">   626	</span>type Certificate struct {
+<span id="L627" class="ln">   627	</span>	Raw                     []byte <span class="comment">// Complete ASN.1 DER content (certificate, signature algorithm and signature).</span>
+<span id="L628" class="ln">   628	</span>	RawTBSCertificate       []byte <span class="comment">// Certificate part of raw ASN.1 DER content.</span>
+<span id="L629" class="ln">   629	</span>	RawSubjectPublicKeyInfo []byte <span class="comment">// DER encoded SubjectPublicKeyInfo.</span>
+<span id="L630" class="ln">   630	</span>	RawSubject              []byte <span class="comment">// DER encoded Subject</span>
+<span id="L631" class="ln">   631	</span>	RawIssuer               []byte <span class="comment">// DER encoded Issuer</span>
+<span id="L632" class="ln">   632	</span>
+<span id="L633" class="ln">   633	</span>	Signature          []byte
+<span id="L634" class="ln">   634	</span>	SignatureAlgorithm SignatureAlgorithm
+<span id="L635" class="ln">   635	</span>
+<span id="L636" class="ln">   636	</span>	PublicKeyAlgorithm PublicKeyAlgorithm
+<span id="L637" class="ln">   637	</span>	PublicKey          interface{}
+<span id="L638" class="ln">   638	</span>
+<span id="L639" class="ln">   639	</span>	Version             int
+<span id="L640" class="ln">   640	</span>	SerialNumber        *big.Int
+<span id="L641" class="ln">   641	</span>	Issuer              pkix.Name
+<span id="L642" class="ln">   642	</span>	Subject             pkix.Name
+<span id="L643" class="ln">   643	</span>	NotBefore, NotAfter time.Time <span class="comment">// Validity bounds.</span>
+<span id="L644" class="ln">   644	</span>	KeyUsage            KeyUsage
+<span id="L645" class="ln">   645	</span>
+<span id="L646" class="ln">   646	</span>	<span class="comment">// Extensions contains raw X.509 extensions. When parsing certificates,</span>
+<span id="L647" class="ln">   647	</span>	<span class="comment">// this can be used to extract non-critical extensions that are not</span>
+<span id="L648" class="ln">   648	</span>	<span class="comment">// parsed by this package. When marshaling certificates, the Extensions</span>
+<span id="L649" class="ln">   649	</span>	<span class="comment">// field is ignored, see ExtraExtensions.</span>
+<span id="L650" class="ln">   650	</span>	Extensions []pkix.Extension
+<span id="L651" class="ln">   651	</span>
+<span id="L652" class="ln">   652	</span>	<span class="comment">// ExtraExtensions contains extensions to be copied, raw, into any</span>
+<span id="L653" class="ln">   653	</span>	<span class="comment">// marshaled certificates. Values override any extensions that would</span>
+<span id="L654" class="ln">   654	</span>	<span class="comment">// otherwise be produced based on the other fields. The ExtraExtensions</span>
+<span id="L655" class="ln">   655	</span>	<span class="comment">// field is not populated when parsing certificates, see Extensions.</span>
+<span id="L656" class="ln">   656	</span>	ExtraExtensions []pkix.Extension
+<span id="L657" class="ln">   657	</span>
+<span id="L658" class="ln">   658	</span>	<span class="comment">// UnhandledCriticalExtensions contains a list of extension IDs that</span>
+<span id="L659" class="ln">   659	</span>	<span class="comment">// were not (fully) processed when parsing. Verify will fail if this</span>
+<span id="L660" class="ln">   660	</span>	<span class="comment">// slice is non-empty, unless verification is delegated to an OS</span>
+<span id="L661" class="ln">   661	</span>	<span class="comment">// library which understands all the critical extensions.</span>
+<span id="L662" class="ln">   662	</span>	<span class="comment">//</span>
+<span id="L663" class="ln">   663	</span>	<span class="comment">// Users can access these extensions using Extensions and can remove</span>
+<span id="L664" class="ln">   664	</span>	<span class="comment">// elements from this slice if they believe that they have been</span>
+<span id="L665" class="ln">   665	</span>	<span class="comment">// handled.</span>
+<span id="L666" class="ln">   666	</span>	UnhandledCriticalExtensions []asn1.ObjectIdentifier
+<span id="L667" class="ln">   667	</span>
+<span id="L668" class="ln">   668	</span>	ExtKeyUsage        []ExtKeyUsage           <span class="comment">// Sequence of extended key usages.</span>
+<span id="L669" class="ln">   669	</span>	UnknownExtKeyUsage []asn1.ObjectIdentifier <span class="comment">// Encountered extended key usages unknown to this package.</span>
+<span id="L670" class="ln">   670	</span>
+<span id="L671" class="ln">   671	</span>	BasicConstraintsValid bool <span class="comment">// if true then the next two fields are valid.</span>
+<span id="L672" class="ln">   672	</span>	IsCA                  bool
+<span id="L673" class="ln">   673	</span>	MaxPathLen            int
+<span id="L674" class="ln">   674	</span>	<span class="comment">// MaxPathLenZero indicates that BasicConstraintsValid==true and</span>
+<span id="L675" class="ln">   675	</span>	<span class="comment">// MaxPathLen==0 should be interpreted as an actual maximum path length</span>
+<span id="L676" class="ln">   676	</span>	<span class="comment">// of zero. Otherwise, that combination is interpreted as MaxPathLen</span>
+<span id="L677" class="ln">   677	</span>	<span class="comment">// not being set.</span>
+<span id="L678" class="ln">   678	</span>	MaxPathLenZero bool
+<span id="L679" class="ln">   679	</span>
+<span id="L680" class="ln">   680	</span>	SubjectKeyId   []byte
+<span id="L681" class="ln">   681	</span>	AuthorityKeyId []byte
+<span id="L682" class="ln">   682	</span>
+<span id="L683" class="ln">   683	</span>	<span class="comment">// RFC 5280, 4.2.2.1 (Authority Information Access)</span>
+<span id="L684" class="ln">   684	</span>	OCSPServer            []string
+<span id="L685" class="ln">   685	</span>	IssuingCertificateURL []string
+<span id="L686" class="ln">   686	</span>
+<span id="L687" class="ln">   687	</span>	<span class="comment">// Subject Alternate Name values</span>
+<span id="L688" class="ln">   688	</span>	DNSNames       []string
+<span id="L689" class="ln">   689	</span>	EmailAddresses []string
+<span id="L690" class="ln">   690	</span>	IPAddresses    []net.IP
+<span id="L691" class="ln">   691	</span>
+<span id="L692" class="ln">   692	</span>	<span class="comment">// Name constraints</span>
+<span id="L693" class="ln">   693	</span>	PermittedDNSDomainsCritical bool <span class="comment">// if true then the name constraints are marked critical.</span>
+<span id="L694" class="ln">   694	</span>	PermittedDNSDomains         []string
+<span id="L695" class="ln">   695	</span>
+<span id="L696" class="ln">   696	</span>	<span class="comment">// CRL Distribution Points</span>
+<span id="L697" class="ln">   697	</span>	CRLDistributionPoints []string
+<span id="L698" class="ln">   698	</span>
+<span id="L699" class="ln">   699	</span>	PolicyIdentifiers []asn1.ObjectIdentifier
+<span id="L700" class="ln">   700	</span>}
+<span id="L701" class="ln">   701	</span>
+<span id="L702" class="ln">   702	</span><span class="comment">// ErrUnsupportedAlgorithm results from attempting to perform an operation that</span>
+<span id="L703" class="ln">   703	</span><span class="comment">// involves algorithms that are not currently implemented.</span>
+<span id="L704" class="ln">   704	</span>var ErrUnsupportedAlgorithm = errors.New(&#34;x509: cannot verify signature: algorithm unimplemented&#34;)
+<span id="L705" class="ln">   705	</span>
+<span id="L706" class="ln">   706	</span><span class="comment">// An InsecureAlgorithmError</span>
+<span id="L707" class="ln">   707	</span>type InsecureAlgorithmError SignatureAlgorithm
+<span id="L708" class="ln">   708	</span>
+<span id="L709" class="ln">   709	</span>func (e InsecureAlgorithmError) Error() string {
+<span id="L710" class="ln">   710	</span>	return fmt.Sprintf(&#34;x509: cannot verify signature: insecure algorithm %v&#34;, SignatureAlgorithm(e))
+<span id="L711" class="ln">   711	</span>}
+<span id="L712" class="ln">   712	</span>
+<span id="L713" class="ln">   713	</span><span class="comment">// ConstraintViolationError results when a requested usage is not permitted by</span>
+<span id="L714" class="ln">   714	</span><span class="comment">// a certificate. For example: checking a signature when the public key isn&#39;t a</span>
+<span id="L715" class="ln">   715	</span><span class="comment">// certificate signing key.</span>
+<span id="L716" class="ln">   716	</span>type ConstraintViolationError struct{}
+<span id="L717" class="ln">   717	</span>
+<span id="L718" class="ln">   718	</span>func (ConstraintViolationError) Error() string {
+<span id="L719" class="ln">   719	</span>	return &#34;x509: invalid signature: parent certificate cannot sign this kind of certificate&#34;
+<span id="L720" class="ln">   720	</span>}
+<span id="L721" class="ln">   721	</span>
+<span id="L722" class="ln">   722	</span>func (c *Certificate) Equal(other *Certificate) bool {
+<span id="L723" class="ln">   723	</span>	return bytes.Equal(c.Raw, other.Raw)
+<span id="L724" class="ln">   724	</span>}
+<span id="L725" class="ln">   725	</span>
+<span id="L726" class="ln">   726	</span><span class="comment">// Entrust have a broken root certificate (CN=Entrust.net Certification</span>
+<span id="L727" class="ln">   727	</span><span class="comment">// Authority (2048)) which isn&#39;t marked as a CA certificate and is thus invalid</span>
+<span id="L728" class="ln">   728	</span><span class="comment">// according to PKIX.</span>
+<span id="L729" class="ln">   729	</span><span class="comment">// We recognise this certificate by its SubjectPublicKeyInfo and exempt it</span>
+<span id="L730" class="ln">   730	</span><span class="comment">// from the Basic Constraints requirement.</span>
+<span id="L731" class="ln">   731	</span><span class="comment">// See http://www.entrust.net/knowledge-base/technote.cfm?tn=7869</span>
+<span id="L732" class="ln">   732	</span><span class="comment">//</span>
+<span id="L733" class="ln">   733	</span><span class="comment">// TODO(agl): remove this hack once their reissued root is sufficiently</span>
+<span id="L734" class="ln">   734	</span><span class="comment">// widespread.</span>
+<span id="L735" class="ln">   735	</span>var entrustBrokenSPKI = []byte{
+<span id="L736" class="ln">   736	</span>	0x30, 0x82, 0x01, 0x22, 0x30, 0x0d, 0x06, 0x09,
+<span id="L737" class="ln">   737	</span>	0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01,
+<span id="L738" class="ln">   738	</span>	0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0f, 0x00,
+<span id="L739" class="ln">   739	</span>	0x30, 0x82, 0x01, 0x0a, 0x02, 0x82, 0x01, 0x01,
+<span id="L740" class="ln">   740	</span>	0x00, 0x97, 0xa3, 0x2d, 0x3c, 0x9e, 0xde, 0x05,
+<span id="L741" class="ln">   741	</span>	0xda, 0x13, 0xc2, 0x11, 0x8d, 0x9d, 0x8e, 0xe3,
+<span id="L742" class="ln">   742	</span>	0x7f, 0xc7, 0x4b, 0x7e, 0x5a, 0x9f, 0xb3, 0xff,
+<span id="L743" class="ln">   743	</span>	0x62, 0xab, 0x73, 0xc8, 0x28, 0x6b, 0xba, 0x10,
+<span id="L744" class="ln">   744	</span>	0x64, 0x82, 0x87, 0x13, 0xcd, 0x57, 0x18, 0xff,
+<span id="L745" class="ln">   745	</span>	0x28, 0xce, 0xc0, 0xe6, 0x0e, 0x06, 0x91, 0x50,
+<span id="L746" class="ln">   746	</span>	0x29, 0x83, 0xd1, 0xf2, 0xc3, 0x2a, 0xdb, 0xd8,
+<span id="L747" class="ln">   747	</span>	0xdb, 0x4e, 0x04, 0xcc, 0x00, 0xeb, 0x8b, 0xb6,
+<span id="L748" class="ln">   748	</span>	0x96, 0xdc, 0xbc, 0xaa, 0xfa, 0x52, 0x77, 0x04,
+<span id="L749" class="ln">   749	</span>	0xc1, 0xdb, 0x19, 0xe4, 0xae, 0x9c, 0xfd, 0x3c,
+<span id="L750" class="ln">   750	</span>	0x8b, 0x03, 0xef, 0x4d, 0xbc, 0x1a, 0x03, 0x65,
+<span id="L751" class="ln">   751	</span>	0xf9, 0xc1, 0xb1, 0x3f, 0x72, 0x86, 0xf2, 0x38,
+<span id="L752" class="ln">   752	</span>	0xaa, 0x19, 0xae, 0x10, 0x88, 0x78, 0x28, 0xda,
+<span id="L753" class="ln">   753	</span>	0x75, 0xc3, 0x3d, 0x02, 0x82, 0x02, 0x9c, 0xb9,
+<span id="L754" class="ln">   754	</span>	0xc1, 0x65, 0x77, 0x76, 0x24, 0x4c, 0x98, 0xf7,
+<span id="L755" class="ln">   755	</span>	0x6d, 0x31, 0x38, 0xfb, 0xdb, 0xfe, 0xdb, 0x37,
+<span id="L756" class="ln">   756	</span>	0x02, 0x76, 0xa1, 0x18, 0x97, 0xa6, 0xcc, 0xde,
+<span id="L757" class="ln">   757	</span>	0x20, 0x09, 0x49, 0x36, 0x24, 0x69, 0x42, 0xf6,
+<span id="L758" class="ln">   758	</span>	0xe4, 0x37, 0x62, 0xf1, 0x59, 0x6d, 0xa9, 0x3c,
+<span id="L759" class="ln">   759	</span>	0xed, 0x34, 0x9c, 0xa3, 0x8e, 0xdb, 0xdc, 0x3a,
+<span id="L760" class="ln">   760	</span>	0xd7, 0xf7, 0x0a, 0x6f, 0xef, 0x2e, 0xd8, 0xd5,
+<span id="L761" class="ln">   761	</span>	0x93, 0x5a, 0x7a, 0xed, 0x08, 0x49, 0x68, 0xe2,
+<span id="L762" class="ln">   762	</span>	0x41, 0xe3, 0x5a, 0x90, 0xc1, 0x86, 0x55, 0xfc,
+<span id="L763" class="ln">   763	</span>	0x51, 0x43, 0x9d, 0xe0, 0xb2, 0xc4, 0x67, 0xb4,
+<span id="L764" class="ln">   764	</span>	0xcb, 0x32, 0x31, 0x25, 0xf0, 0x54, 0x9f, 0x4b,
+<span id="L765" class="ln">   765	</span>	0xd1, 0x6f, 0xdb, 0xd4, 0xdd, 0xfc, 0xaf, 0x5e,
+<span id="L766" class="ln">   766	</span>	0x6c, 0x78, 0x90, 0x95, 0xde, 0xca, 0x3a, 0x48,
+<span id="L767" class="ln">   767	</span>	0xb9, 0x79, 0x3c, 0x9b, 0x19, 0xd6, 0x75, 0x05,
+<span id="L768" class="ln">   768	</span>	0xa0, 0xf9, 0x88, 0xd7, 0xc1, 0xe8, 0xa5, 0x09,
+<span id="L769" class="ln">   769	</span>	0xe4, 0x1a, 0x15, 0xdc, 0x87, 0x23, 0xaa, 0xb2,
+<span id="L770" class="ln">   770	</span>	0x75, 0x8c, 0x63, 0x25, 0x87, 0xd8, 0xf8, 0x3d,
+<span id="L771" class="ln">   771	</span>	0xa6, 0xc2, 0xcc, 0x66, 0xff, 0xa5, 0x66, 0x68,
+<span id="L772" class="ln">   772	</span>	0x55, 0x02, 0x03, 0x01, 0x00, 0x01,
+<span id="L773" class="ln">   773	</span>}
+<span id="L774" class="ln">   774	</span>
+<span id="L775" class="ln">   775	</span><span class="comment">// CheckSignatureFrom verifies that the signature on c is a valid signature</span>
+<span id="L776" class="ln">   776	</span><span class="comment">// from parent.</span>
+<span id="L777" class="ln">   777	</span>func (c *Certificate) CheckSignatureFrom(parent *Certificate) error {
+<span id="L778" class="ln">   778	</span>	<span class="comment">// RFC 5280, 4.2.1.9:</span>
+<span id="L779" class="ln">   779	</span>	<span class="comment">// &#34;If the basic constraints extension is not present in a version 3</span>
+<span id="L780" class="ln">   780	</span>	<span class="comment">// certificate, or the extension is present but the cA boolean is not</span>
+<span id="L781" class="ln">   781	</span>	<span class="comment">// asserted, then the certified public key MUST NOT be used to verify</span>
+<span id="L782" class="ln">   782	</span>	<span class="comment">// certificate signatures.&#34;</span>
+<span id="L783" class="ln">   783	</span>	<span class="comment">// (except for Entrust, see comment above entrustBrokenSPKI)</span>
+<span id="L784" class="ln">   784	</span>	if (parent.Version == 3 &amp;&amp; !parent.BasicConstraintsValid ||
+<span id="L785" class="ln">   785	</span>		parent.BasicConstraintsValid &amp;&amp; !parent.IsCA) &amp;&amp;
+<span id="L786" class="ln">   786	</span>		!bytes.Equal(c.RawSubjectPublicKeyInfo, entrustBrokenSPKI) {
+<span id="L787" class="ln">   787	</span>		return ConstraintViolationError{}
+<span id="L788" class="ln">   788	</span>	}
+<span id="L789" class="ln">   789	</span>
+<span id="L790" class="ln">   790	</span>	if parent.KeyUsage != 0 &amp;&amp; parent.KeyUsage&amp;KeyUsageCertSign == 0 {
+<span id="L791" class="ln">   791	</span>		return ConstraintViolationError{}
+<span id="L792" class="ln">   792	</span>	}
+<span id="L793" class="ln">   793	</span>
+<span id="L794" class="ln">   794	</span>	if parent.PublicKeyAlgorithm == UnknownPublicKeyAlgorithm {
+<span id="L795" class="ln">   795	</span>		return ErrUnsupportedAlgorithm
+<span id="L796" class="ln">   796	</span>	}
+<span id="L797" class="ln">   797	</span>
+<span id="L798" class="ln">   798	</span>	<span class="comment">// TODO(agl): don&#39;t ignore the path length constraint.</span>
+<span id="L799" class="ln">   799	</span>
+<span id="L800" class="ln">   800	</span>	return parent.CheckSignature(c.SignatureAlgorithm, c.RawTBSCertificate, c.Signature)
+<span id="L801" class="ln">   801	</span>}
+<span id="L802" class="ln">   802	</span>
+<span id="L803" class="ln">   803	</span><span class="comment">// CheckSignature verifies that signature is a valid signature over signed from</span>
+<span id="L804" class="ln">   804	</span><span class="comment">// c&#39;s public key.</span>
+<span id="L805" class="ln">   805	</span>func (c *Certificate) CheckSignature(algo SignatureAlgorithm, signed, signature []byte) error {
+<span id="L806" class="ln">   806	</span>	return checkSignature(algo, signed, signature, c.PublicKey)
+<span id="L807" class="ln">   807	</span>}
+<span id="L808" class="ln">   808	</span>
+<span id="L809" class="ln">   809	</span><span class="comment">// CheckSignature verifies that signature is a valid signature over signed from</span>
+<span id="L810" class="ln">   810	</span><span class="comment">// a crypto.PublicKey.</span>
+<span id="L811" class="ln">   811	</span>func checkSignature(algo SignatureAlgorithm, signed, signature []byte, publicKey crypto.PublicKey) (err error) {
+<span id="L812" class="ln">   812	</span>	var hashType crypto.Hash
+<span id="L813" class="ln">   813	</span>
+<span id="L814" class="ln">   814	</span>	switch algo {
+<span id="L815" class="ln">   815	</span>	case SHA1WithRSA, DSAWithSHA1, ECDSAWithSHA1:
+<span id="L816" class="ln">   816	</span>		hashType = crypto.SHA1
+<span id="L817" class="ln">   817	</span>	case SHA256WithRSA, SHA256WithRSAPSS, DSAWithSHA256, ECDSAWithSHA256:
+<span id="L818" class="ln">   818	</span>		hashType = crypto.SHA256
+<span id="L819" class="ln">   819	</span>	case SHA384WithRSA, SHA384WithRSAPSS, ECDSAWithSHA384:
+<span id="L820" class="ln">   820	</span>		hashType = crypto.SHA384
+<span id="L821" class="ln">   821	</span>	case SHA512WithRSA, SHA512WithRSAPSS, ECDSAWithSHA512:
+<span id="L822" class="ln">   822	</span>		hashType = crypto.SHA512
+<span id="L823" class="ln">   823	</span>	case MD2WithRSA, MD5WithRSA:
+<span id="L824" class="ln">   824	</span>		return InsecureAlgorithmError(algo)
+<span id="L825" class="ln">   825	</span>	default:
+<span id="L826" class="ln">   826	</span>		return ErrUnsupportedAlgorithm
+<span id="L827" class="ln">   827	</span>	}
+<span id="L828" class="ln">   828	</span>
+<span id="L829" class="ln">   829	</span>	if !hashType.Available() {
+<span id="L830" class="ln">   830	</span>		return ErrUnsupportedAlgorithm
+<span id="L831" class="ln">   831	</span>	}
+<span id="L832" class="ln">   832	</span>	h := hashType.New()
+<span id="L833" class="ln">   833	</span>
+<span id="L834" class="ln">   834	</span>	h.Write(signed)
+<span id="L835" class="ln">   835	</span>	digest := h.Sum(nil)
+<span id="L836" class="ln">   836	</span>
+<span id="L837" class="ln">   837	</span>	switch pub := publicKey.(type) {
+<span id="L838" class="ln">   838	</span>	case *rsa.PublicKey:
+<span id="L839" class="ln">   839	</span>		if algo.isRSAPSS() {
+<span id="L840" class="ln">   840	</span>			return rsa.VerifyPSS(pub, hashType, digest, signature, &amp;rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
+<span id="L841" class="ln">   841	</span>		} else {
+<span id="L842" class="ln">   842	</span>			return rsa.VerifyPKCS1v15(pub, hashType, digest, signature)
+<span id="L843" class="ln">   843	</span>		}
+<span id="L844" class="ln">   844	</span>	case *dsa.PublicKey:
+<span id="L845" class="ln">   845	</span>		dsaSig := new(dsaSignature)
+<span id="L846" class="ln">   846	</span>		if rest, err := asn1.Unmarshal(signature, dsaSig); err != nil {
+<span id="L847" class="ln">   847	</span>			return err
+<span id="L848" class="ln">   848	</span>		} else if len(rest) != 0 {
+<span id="L849" class="ln">   849	</span>			return errors.New(&#34;x509: trailing data after DSA signature&#34;)
+<span id="L850" class="ln">   850	</span>		}
+<span id="L851" class="ln">   851	</span>		if dsaSig.R.Sign() &lt;= 0 || dsaSig.S.Sign() &lt;= 0 {
+<span id="L852" class="ln">   852	</span>			return errors.New(&#34;x509: DSA signature contained zero or negative values&#34;)
+<span id="L853" class="ln">   853	</span>		}
+<span id="L854" class="ln">   854	</span>		if !dsa.Verify(pub, digest, dsaSig.R, dsaSig.S) {
+<span id="L855" class="ln">   855	</span>			return errors.New(&#34;x509: DSA verification failure&#34;)
+<span id="L856" class="ln">   856	</span>		}
+<span id="L857" class="ln">   857	</span>		return
+<span id="L858" class="ln">   858	</span>	case *ecdsa.PublicKey:
+<span id="L859" class="ln">   859	</span>		ecdsaSig := new(ecdsaSignature)
+<span id="L860" class="ln">   860	</span>		if rest, err := asn1.Unmarshal(signature, ecdsaSig); err != nil {
+<span id="L861" class="ln">   861	</span>			return err
+<span id="L862" class="ln">   862	</span>		} else if len(rest) != 0 {
+<span id="L863" class="ln">   863	</span>			return errors.New(&#34;x509: trailing data after ECDSA signature&#34;)
+<span id="L864" class="ln">   864	</span>		}
+<span id="L865" class="ln">   865	</span>		if ecdsaSig.R.Sign() &lt;= 0 || ecdsaSig.S.Sign() &lt;= 0 {
+<span id="L866" class="ln">   866	</span>			return errors.New(&#34;x509: ECDSA signature contained zero or negative values&#34;)
+<span id="L867" class="ln">   867	</span>		}
+<span id="L868" class="ln">   868	</span>		if !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
+<span id="L869" class="ln">   869	</span>			return errors.New(&#34;x509: ECDSA verification failure&#34;)
+<span id="L870" class="ln">   870	</span>		}
+<span id="L871" class="ln">   871	</span>		return
+<span id="L872" class="ln">   872	</span>	}
+<span id="L873" class="ln">   873	</span>	return ErrUnsupportedAlgorithm
+<span id="L874" class="ln">   874	</span>}
+<span id="L875" class="ln">   875	</span>
+<span id="L876" class="ln">   876	</span><span class="comment">// CheckCRLSignature checks that the signature in crl is from c.</span>
+<span id="L877" class="ln">   877	</span>func (c *Certificate) CheckCRLSignature(crl *pkix.CertificateList) error {
+<span id="L878" class="ln">   878	</span>	algo := getSignatureAlgorithmFromAI(crl.SignatureAlgorithm)
+<span id="L879" class="ln">   879	</span>	return c.CheckSignature(algo, crl.TBSCertList.Raw, crl.SignatureValue.RightAlign())
+<span id="L880" class="ln">   880	</span>}
+<span id="L881" class="ln">   881	</span>
+<span id="L882" class="ln">   882	</span>type UnhandledCriticalExtension struct{}
+<span id="L883" class="ln">   883	</span>
+<span id="L884" class="ln">   884	</span>func (h UnhandledCriticalExtension) Error() string {
+<span id="L885" class="ln">   885	</span>	return &#34;x509: unhandled critical extension&#34;
+<span id="L886" class="ln">   886	</span>}
+<span id="L887" class="ln">   887	</span>
+<span id="L888" class="ln">   888	</span>type basicConstraints struct {
+<span id="L889" class="ln">   889	</span>	IsCA       bool `asn1:&#34;optional&#34;`
+<span id="L890" class="ln">   890	</span>	MaxPathLen int  `asn1:&#34;optional,default:-1&#34;`
+<span id="L891" class="ln">   891	</span>}
+<span id="L892" class="ln">   892	</span>
+<span id="L893" class="ln">   893	</span><span class="comment">// RFC 5280 4.2.1.4</span>
+<span id="L894" class="ln">   894	</span>type policyInformation struct {
+<span id="L895" class="ln">   895	</span>	Policy asn1.ObjectIdentifier
+<span id="L896" class="ln">   896	</span>	<span class="comment">// policyQualifiers omitted</span>
+<span id="L897" class="ln">   897	</span>}
+<span id="L898" class="ln">   898	</span>
+<span id="L899" class="ln">   899	</span><span class="comment">// RFC 5280, 4.2.1.10</span>
+<span id="L900" class="ln">   900	</span>type nameConstraints struct {
+<span id="L901" class="ln">   901	</span>	Permitted []generalSubtree `asn1:&#34;optional,tag:0&#34;`
+<span id="L902" class="ln">   902	</span>	Excluded  []generalSubtree `asn1:&#34;optional,tag:1&#34;`
+<span id="L903" class="ln">   903	</span>}
+<span id="L904" class="ln">   904	</span>
+<span id="L905" class="ln">   905	</span>type generalSubtree struct {
+<span id="L906" class="ln">   906	</span>	Name string `asn1:&#34;tag:2,optional,ia5&#34;`
+<span id="L907" class="ln">   907	</span>}
+<span id="L908" class="ln">   908	</span>
+<span id="L909" class="ln">   909	</span><span class="comment">// RFC 5280, 4.2.2.1</span>
+<span id="L910" class="ln">   910	</span>type authorityInfoAccess struct {
+<span id="L911" class="ln">   911	</span>	Method   asn1.ObjectIdentifier
+<span id="L912" class="ln">   912	</span>	Location asn1.RawValue
+<span id="L913" class="ln">   913	</span>}
+<span id="L914" class="ln">   914	</span>
+<span id="L915" class="ln">   915	</span><span class="comment">// RFC 5280, 4.2.1.14</span>
+<span id="L916" class="ln">   916	</span>type distributionPoint struct {
+<span id="L917" class="ln">   917	</span>	DistributionPoint distributionPointName `asn1:&#34;optional,tag:0&#34;`
+<span id="L918" class="ln">   918	</span>	Reason            asn1.BitString        `asn1:&#34;optional,tag:1&#34;`
+<span id="L919" class="ln">   919	</span>	CRLIssuer         asn1.RawValue         `asn1:&#34;optional,tag:2&#34;`
+<span id="L920" class="ln">   920	</span>}
+<span id="L921" class="ln">   921	</span>
+<span id="L922" class="ln">   922	</span>type distributionPointName struct {
+<span id="L923" class="ln">   923	</span>	FullName     asn1.RawValue    `asn1:&#34;optional,tag:0&#34;`
+<span id="L924" class="ln">   924	</span>	RelativeName pkix.RDNSequence `asn1:&#34;optional,tag:1&#34;`
+<span id="L925" class="ln">   925	</span>}
+<span id="L926" class="ln">   926	</span>
+<span id="L927" class="ln">   927	</span><span class="comment">// asn1Null is the ASN.1 encoding of a NULL value.</span>
+<span id="L928" class="ln">   928	</span>var asn1Null = []byte{5, 0}
+<span id="L929" class="ln">   929	</span>
+<span id="L930" class="ln">   930	</span>func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{}, error) {
+<span id="L931" class="ln">   931	</span>	asn1Data := keyData.PublicKey.RightAlign()
+<span id="L932" class="ln">   932	</span>	switch algo {
+<span id="L933" class="ln">   933	</span>	case RSA:
+<span id="L934" class="ln">   934	</span>		<span class="comment">// RSA public keys must have a NULL in the parameters</span>
+<span id="L935" class="ln">   935	</span>		<span class="comment">// (https://tools.ietf.org/html/rfc3279#section-2.3.1).</span>
+<span id="L936" class="ln">   936	</span>		if !bytes.Equal(keyData.Algorithm.Parameters.FullBytes, asn1Null) {
+<span id="L937" class="ln">   937	</span>			return nil, errors.New(&#34;x509: RSA key missing NULL parameters&#34;)
+<span id="L938" class="ln">   938	</span>		}
+<span id="L939" class="ln">   939	</span>
+<span id="L940" class="ln">   940	</span>		p := new(rsaPublicKey)
+<span id="L941" class="ln">   941	</span>		rest, err := asn1.Unmarshal(asn1Data, p)
+<span id="L942" class="ln">   942	</span>		if err != nil {
+<span id="L943" class="ln">   943	</span>			return nil, err
+<span id="L944" class="ln">   944	</span>		}
+<span id="L945" class="ln">   945	</span>		if len(rest) != 0 {
+<span id="L946" class="ln">   946	</span>			return nil, errors.New(&#34;x509: trailing data after RSA public key&#34;)
+<span id="L947" class="ln">   947	</span>		}
+<span id="L948" class="ln">   948	</span>
+<span id="L949" class="ln">   949	</span>		if p.N.Sign() &lt;= 0 {
+<span id="L950" class="ln">   950	</span>			return nil, errors.New(&#34;x509: RSA modulus is not a positive number&#34;)
+<span id="L951" class="ln">   951	</span>		}
+<span id="L952" class="ln">   952	</span>		if p.E &lt;= 0 {
+<span id="L953" class="ln">   953	</span>			return nil, errors.New(&#34;x509: RSA public exponent is not a positive number&#34;)
+<span id="L954" class="ln">   954	</span>		}
+<span id="L955" class="ln">   955	</span>
+<span id="L956" class="ln">   956	</span>		pub := &amp;rsa.PublicKey{
+<span id="L957" class="ln">   957	</span>			E: p.E,
+<span id="L958" class="ln">   958	</span>			N: p.N,
+<span id="L959" class="ln">   959	</span>		}
+<span id="L960" class="ln">   960	</span>		return pub, nil
+<span id="L961" class="ln">   961	</span>	case DSA:
+<span id="L962" class="ln">   962	</span>		var p *big.Int
+<span id="L963" class="ln">   963	</span>		rest, err := asn1.Unmarshal(asn1Data, &amp;p)
+<span id="L964" class="ln">   964	</span>		if err != nil {
+<span id="L965" class="ln">   965	</span>			return nil, err
+<span id="L966" class="ln">   966	</span>		}
+<span id="L967" class="ln">   967	</span>		if len(rest) != 0 {
+<span id="L968" class="ln">   968	</span>			return nil, errors.New(&#34;x509: trailing data after DSA public key&#34;)
+<span id="L969" class="ln">   969	</span>		}
+<span id="L970" class="ln">   970	</span>		paramsData := keyData.Algorithm.Parameters.FullBytes
+<span id="L971" class="ln">   971	</span>		params := new(dsaAlgorithmParameters)
+<span id="L972" class="ln">   972	</span>		rest, err = asn1.Unmarshal(paramsData, params)
+<span id="L973" class="ln">   973	</span>		if err != nil {
+<span id="L974" class="ln">   974	</span>			return nil, err
+<span id="L975" class="ln">   975	</span>		}
+<span id="L976" class="ln">   976	</span>		if len(rest) != 0 {
+<span id="L977" class="ln">   977	</span>			return nil, errors.New(&#34;x509: trailing data after DSA parameters&#34;)
+<span id="L978" class="ln">   978	</span>		}
+<span id="L979" class="ln">   979	</span>		if p.Sign() &lt;= 0 || params.P.Sign() &lt;= 0 || params.Q.Sign() &lt;= 0 || params.G.Sign() &lt;= 0 {
+<span id="L980" class="ln">   980	</span>			return nil, errors.New(&#34;x509: zero or negative DSA parameter&#34;)
+<span id="L981" class="ln">   981	</span>		}
+<span id="L982" class="ln">   982	</span>		pub := &amp;dsa.PublicKey{
+<span id="L983" class="ln">   983	</span>			Parameters: dsa.Parameters{
+<span id="L984" class="ln">   984	</span>				P: params.P,
+<span id="L985" class="ln">   985	</span>				Q: params.Q,
+<span id="L986" class="ln">   986	</span>				G: params.G,
+<span id="L987" class="ln">   987	</span>			},
+<span id="L988" class="ln">   988	</span>			Y: p,
+<span id="L989" class="ln">   989	</span>		}
+<span id="L990" class="ln">   990	</span>		return pub, nil
+<span id="L991" class="ln">   991	</span>	case ECDSA:
+<span id="L992" class="ln">   992	</span>		paramsData := keyData.Algorithm.Parameters.FullBytes
+<span id="L993" class="ln">   993	</span>		namedCurveOID := new(asn1.ObjectIdentifier)
+<span id="L994" class="ln">   994	</span>		rest, err := asn1.Unmarshal(paramsData, namedCurveOID)
+<span id="L995" class="ln">   995	</span>		if err != nil {
+<span id="L996" class="ln">   996	</span>			return nil, err
+<span id="L997" class="ln">   997	</span>		}
+<span id="L998" class="ln">   998	</span>		if len(rest) != 0 {
+<span id="L999" class="ln">   999	</span>			return nil, errors.New(&#34;x509: trailing data after ECDSA parameters&#34;)
+<span id="L1000" class="ln">  1000	</span>		}
+<span id="L1001" class="ln">  1001	</span>		namedCurve := namedCurveFromOID(*namedCurveOID)
+<span id="L1002" class="ln">  1002	</span>		if namedCurve == nil {
+<span id="L1003" class="ln">  1003	</span>			return nil, errors.New(&#34;x509: unsupported elliptic curve&#34;)
+<span id="L1004" class="ln">  1004	</span>		}
+<span id="L1005" class="ln">  1005	</span>		x, y := elliptic.Unmarshal(namedCurve, asn1Data)
+<span id="L1006" class="ln">  1006	</span>		if x == nil {
+<span id="L1007" class="ln">  1007	</span>			return nil, errors.New(&#34;x509: failed to unmarshal elliptic curve point&#34;)
+<span id="L1008" class="ln">  1008	</span>		}
+<span id="L1009" class="ln">  1009	</span>		pub := &amp;ecdsa.PublicKey{
+<span id="L1010" class="ln">  1010	</span>			Curve: namedCurve,
+<span id="L1011" class="ln">  1011	</span>			X:     x,
+<span id="L1012" class="ln">  1012	</span>			Y:     y,
+<span id="L1013" class="ln">  1013	</span>		}
+<span id="L1014" class="ln">  1014	</span>		return pub, nil
+<span id="L1015" class="ln">  1015	</span>	default:
+<span id="L1016" class="ln">  1016	</span>		return nil, nil
+<span id="L1017" class="ln">  1017	</span>	}
+<span id="L1018" class="ln">  1018	</span>}
+<span id="L1019" class="ln">  1019	</span>
+<span id="L1020" class="ln">  1020	</span>func parseSANExtension(value []byte) (dnsNames, emailAddresses []string, ipAddresses []net.IP, err error) {
+<span id="L1021" class="ln">  1021	</span>	<span class="comment">// RFC 5280, 4.2.1.6</span>
+<span id="L1022" class="ln">  1022	</span>
+<span id="L1023" class="ln">  1023	</span>	<span class="comment">// SubjectAltName ::= GeneralNames</span>
+<span id="L1024" class="ln">  1024	</span>	<span class="comment">//</span>
+<span id="L1025" class="ln">  1025	</span>	<span class="comment">// GeneralNames ::= SEQUENCE SIZE (1..MAX) OF GeneralName</span>
+<span id="L1026" class="ln">  1026	</span>	<span class="comment">//</span>
+<span id="L1027" class="ln">  1027	</span>	<span class="comment">// GeneralName ::= CHOICE {</span>
+<span id="L1028" class="ln">  1028	</span>	<span class="comment">//      otherName                       [0]     OtherName,</span>
+<span id="L1029" class="ln">  1029	</span>	<span class="comment">//      rfc822Name                      [1]     IA5String,</span>
+<span id="L1030" class="ln">  1030	</span>	<span class="comment">//      dNSName                         [2]     IA5String,</span>
+<span id="L1031" class="ln">  1031	</span>	<span class="comment">//      x400Address                     [3]     ORAddress,</span>
+<span id="L1032" class="ln">  1032	</span>	<span class="comment">//      directoryName                   [4]     Name,</span>
+<span id="L1033" class="ln">  1033	</span>	<span class="comment">//      ediPartyName                    [5]     EDIPartyName,</span>
+<span id="L1034" class="ln">  1034	</span>	<span class="comment">//      uniformResourceIdentifier       [6]     IA5String,</span>
+<span id="L1035" class="ln">  1035	</span>	<span class="comment">//      iPAddress                       [7]     OCTET STRING,</span>
+<span id="L1036" class="ln">  1036	</span>	<span class="comment">//      registeredID                    [8]     OBJECT IDENTIFIER }</span>
+<span id="L1037" class="ln">  1037	</span>	var seq asn1.RawValue
+<span id="L1038" class="ln">  1038	</span>	var rest []byte
+<span id="L1039" class="ln">  1039	</span>	if rest, err = asn1.Unmarshal(value, &amp;seq); err != nil {
+<span id="L1040" class="ln">  1040	</span>		return
+<span id="L1041" class="ln">  1041	</span>	} else if len(rest) != 0 {
+<span id="L1042" class="ln">  1042	</span>		err = errors.New(&#34;x509: trailing data after X.509 extension&#34;)
+<span id="L1043" class="ln">  1043	</span>		return
+<span id="L1044" class="ln">  1044	</span>	}
+<span id="L1045" class="ln">  1045	</span>	if !seq.IsCompound || seq.Tag != 16 || seq.Class != 0 {
+<span id="L1046" class="ln">  1046	</span>		err = asn1.StructuralError{Msg: &#34;bad SAN sequence&#34;}
+<span id="L1047" class="ln">  1047	</span>		return
+<span id="L1048" class="ln">  1048	</span>	}
+<span id="L1049" class="ln">  1049	</span>
+<span id="L1050" class="ln">  1050	</span>	rest = seq.Bytes
+<span id="L1051" class="ln">  1051	</span>	for len(rest) &gt; 0 {
+<span id="L1052" class="ln">  1052	</span>		var v asn1.RawValue
+<span id="L1053" class="ln">  1053	</span>		rest, err = asn1.Unmarshal(rest, &amp;v)
+<span id="L1054" class="ln">  1054	</span>		if err != nil {
+<span id="L1055" class="ln">  1055	</span>			return
+<span id="L1056" class="ln">  1056	</span>		}
+<span id="L1057" class="ln">  1057	</span>		switch v.Tag {
+<span id="L1058" class="ln">  1058	</span>		case 1:
+<span id="L1059" class="ln">  1059	</span>			emailAddresses = append(emailAddresses, string(v.Bytes))
+<span id="L1060" class="ln">  1060	</span>		case 2:
+<span id="L1061" class="ln">  1061	</span>			dnsNames = append(dnsNames, string(v.Bytes))
+<span id="L1062" class="ln">  1062	</span>		case 7:
+<span id="L1063" class="ln">  1063	</span>			switch len(v.Bytes) {
+<span id="L1064" class="ln">  1064	</span>			case net.IPv4len, net.IPv6len:
+<span id="L1065" class="ln">  1065	</span>				ipAddresses = append(ipAddresses, v.Bytes)
+<span id="L1066" class="ln">  1066	</span>			default:
+<span id="L1067" class="ln">  1067	</span>				err = errors.New(&#34;x509: certificate contained IP address of length &#34; + strconv.Itoa(len(v.Bytes)))
+<span id="L1068" class="ln">  1068	</span>				return
+<span id="L1069" class="ln">  1069	</span>			}
+<span id="L1070" class="ln">  1070	</span>		}
+<span id="L1071" class="ln">  1071	</span>	}
+<span id="L1072" class="ln">  1072	</span>
+<span id="L1073" class="ln">  1073	</span>	return
+<span id="L1074" class="ln">  1074	</span>}
+<span id="L1075" class="ln">  1075	</span>
+<span id="L1076" class="ln">  1076	</span>func parseCertificate(in *certificate) (*Certificate, error) {
+<span id="L1077" class="ln">  1077	</span>	out := new(Certificate)
+<span id="L1078" class="ln">  1078	</span>	out.Raw = in.Raw
+<span id="L1079" class="ln">  1079	</span>	out.RawTBSCertificate = in.TBSCertificate.Raw
+<span id="L1080" class="ln">  1080	</span>	out.RawSubjectPublicKeyInfo = in.TBSCertificate.PublicKey.Raw
+<span id="L1081" class="ln">  1081	</span>	out.RawSubject = in.TBSCertificate.Subject.FullBytes
+<span id="L1082" class="ln">  1082	</span>	out.RawIssuer = in.TBSCertificate.Issuer.FullBytes
+<span id="L1083" class="ln">  1083	</span>
+<span id="L1084" class="ln">  1084	</span>	out.Signature = in.SignatureValue.RightAlign()
+<span id="L1085" class="ln">  1085	</span>	out.SignatureAlgorithm =
+<span id="L1086" class="ln">  1086	</span>		getSignatureAlgorithmFromAI(in.TBSCertificate.SignatureAlgorithm)
+<span id="L1087" class="ln">  1087	</span>
+<span id="L1088" class="ln">  1088	</span>	out.PublicKeyAlgorithm =
+<span id="L1089" class="ln">  1089	</span>		getPublicKeyAlgorithmFromOID(in.TBSCertificate.PublicKey.Algorithm.Algorithm)
+<span id="L1090" class="ln">  1090	</span>	var err error
+<span id="L1091" class="ln">  1091	</span>	out.PublicKey, err = parsePublicKey(out.PublicKeyAlgorithm, &amp;in.TBSCertificate.PublicKey)
+<span id="L1092" class="ln">  1092	</span>	if err != nil {
+<span id="L1093" class="ln">  1093	</span>		return nil, err
+<span id="L1094" class="ln">  1094	</span>	}
+<span id="L1095" class="ln">  1095	</span>
+<span id="L1096" class="ln">  1096	</span>	out.Version = in.TBSCertificate.Version + 1
+<span id="L1097" class="ln">  1097	</span>	out.SerialNumber = in.TBSCertificate.SerialNumber
+<span id="L1098" class="ln">  1098	</span>
+<span id="L1099" class="ln">  1099	</span>	var issuer, subject pkix.RDNSequence
+<span id="L1100" class="ln">  1100	</span>	if rest, err := asn1.Unmarshal(in.TBSCertificate.Subject.FullBytes, &amp;subject); err != nil {
+<span id="L1101" class="ln">  1101	</span>		return nil, err
+<span id="L1102" class="ln">  1102	</span>	} else if len(rest) != 0 {
+<span id="L1103" class="ln">  1103	</span>		return nil, errors.New(&#34;x509: trailing data after X.509 subject&#34;)
+<span id="L1104" class="ln">  1104	</span>	}
+<span id="L1105" class="ln">  1105	</span>	if rest, err := asn1.Unmarshal(in.TBSCertificate.Issuer.FullBytes, &amp;issuer); err != nil {
+<span id="L1106" class="ln">  1106	</span>		return nil, err
+<span id="L1107" class="ln">  1107	</span>	} else if len(rest) != 0 {
+<span id="L1108" class="ln">  1108	</span>		return nil, errors.New(&#34;x509: trailing data after X.509 subject&#34;)
+<span id="L1109" class="ln">  1109	</span>	}
+<span id="L1110" class="ln">  1110	</span>
+<span id="L1111" class="ln">  1111	</span>	out.Issuer.FillFromRDNSequence(&amp;issuer)
+<span id="L1112" class="ln">  1112	</span>	out.Subject.FillFromRDNSequence(&amp;subject)
+<span id="L1113" class="ln">  1113	</span>
+<span id="L1114" class="ln">  1114	</span>	out.NotBefore = in.TBSCertificate.Validity.NotBefore
+<span id="L1115" class="ln">  1115	</span>	out.NotAfter = in.TBSCertificate.Validity.NotAfter
+<span id="L1116" class="ln">  1116	</span>
+<span id="L1117" class="ln">  1117	</span>	for _, e := range in.TBSCertificate.Extensions {
+<span id="L1118" class="ln">  1118	</span>		out.Extensions = append(out.Extensions, e)
+<span id="L1119" class="ln">  1119	</span>		unhandled := false
+<span id="L1120" class="ln">  1120	</span>
+<span id="L1121" class="ln">  1121	</span>		if len(e.Id) == 4 &amp;&amp; e.Id[0] == 2 &amp;&amp; e.Id[1] == 5 &amp;&amp; e.Id[2] == 29 {
+<span id="L1122" class="ln">  1122	</span>			switch e.Id[3] {
+<span id="L1123" class="ln">  1123	</span>			case 15:
+<span id="L1124" class="ln">  1124	</span>				<span class="comment">// RFC 5280, 4.2.1.3</span>
+<span id="L1125" class="ln">  1125	</span>				var usageBits asn1.BitString
+<span id="L1126" class="ln">  1126	</span>				if rest, err := asn1.Unmarshal(e.Value, &amp;usageBits); err != nil {
+<span id="L1127" class="ln">  1127	</span>					return nil, err
+<span id="L1128" class="ln">  1128	</span>				} else if len(rest) != 0 {
+<span id="L1129" class="ln">  1129	</span>					return nil, errors.New(&#34;x509: trailing data after X.509 KeyUsage&#34;)
+<span id="L1130" class="ln">  1130	</span>				}
+<span id="L1131" class="ln">  1131	</span>
+<span id="L1132" class="ln">  1132	</span>				var usage int
+<span id="L1133" class="ln">  1133	</span>				for i := 0; i &lt; 9; i++ {
+<span id="L1134" class="ln">  1134	</span>					if usageBits.At(i) != 0 {
+<span id="L1135" class="ln">  1135	</span>						usage |= 1 &lt;&lt; uint(i)
+<span id="L1136" class="ln">  1136	</span>					}
+<span id="L1137" class="ln">  1137	</span>				}
+<span id="L1138" class="ln">  1138	</span>				out.KeyUsage = KeyUsage(usage)
+<span id="L1139" class="ln">  1139	</span>
+<span id="L1140" class="ln">  1140	</span>			case 19:
+<span id="L1141" class="ln">  1141	</span>				<span class="comment">// RFC 5280, 4.2.1.9</span>
+<span id="L1142" class="ln">  1142	</span>				var constraints basicConstraints
+<span id="L1143" class="ln">  1143	</span>				if rest, err := asn1.Unmarshal(e.Value, &amp;constraints); err != nil {
+<span id="L1144" class="ln">  1144	</span>					return nil, err
+<span id="L1145" class="ln">  1145	</span>				} else if len(rest) != 0 {
+<span id="L1146" class="ln">  1146	</span>					return nil, errors.New(&#34;x509: trailing data after X.509 BasicConstraints&#34;)
+<span id="L1147" class="ln">  1147	</span>				}
+<span id="L1148" class="ln">  1148	</span>
+<span id="L1149" class="ln">  1149	</span>				out.BasicConstraintsValid = true
+<span id="L1150" class="ln">  1150	</span>				out.IsCA = constraints.IsCA
+<span id="L1151" class="ln">  1151	</span>				out.MaxPathLen = constraints.MaxPathLen
+<span id="L1152" class="ln">  1152	</span>				out.MaxPathLenZero = out.MaxPathLen == 0
+<span id="L1153" class="ln">  1153	</span>
+<span id="L1154" class="ln">  1154	</span>			case 17:
+<span id="L1155" class="ln">  1155	</span>				out.DNSNames, out.EmailAddresses, out.IPAddresses, err = parseSANExtension(e.Value)
+<span id="L1156" class="ln">  1156	</span>				if err != nil {
+<span id="L1157" class="ln">  1157	</span>					return nil, err
+<span id="L1158" class="ln">  1158	</span>				}
+<span id="L1159" class="ln">  1159	</span>
+<span id="L1160" class="ln">  1160	</span>				if len(out.DNSNames) == 0 &amp;&amp; len(out.EmailAddresses) == 0 &amp;&amp; len(out.IPAddresses) == 0 {
+<span id="L1161" class="ln">  1161	</span>					<span class="comment">// If we didn&#39;t parse anything then we do the critical check, below.</span>
+<span id="L1162" class="ln">  1162	</span>					unhandled = true
+<span id="L1163" class="ln">  1163	</span>				}
+<span id="L1164" class="ln">  1164	</span>
+<span id="L1165" class="ln">  1165	</span>			case 30:
+<span id="L1166" class="ln">  1166	</span>				<span class="comment">// RFC 5280, 4.2.1.10</span>
+<span id="L1167" class="ln">  1167	</span>
+<span id="L1168" class="ln">  1168	</span>				<span class="comment">// NameConstraints ::= SEQUENCE {</span>
+<span id="L1169" class="ln">  1169	</span>				<span class="comment">//      permittedSubtrees       [0]     GeneralSubtrees OPTIONAL,</span>
+<span id="L1170" class="ln">  1170	</span>				<span class="comment">//      excludedSubtrees        [1]     GeneralSubtrees OPTIONAL }</span>
+<span id="L1171" class="ln">  1171	</span>				<span class="comment">//</span>
+<span id="L1172" class="ln">  1172	</span>				<span class="comment">// GeneralSubtrees ::= SEQUENCE SIZE (1..MAX) OF GeneralSubtree</span>
+<span id="L1173" class="ln">  1173	</span>				<span class="comment">//</span>
+<span id="L1174" class="ln">  1174	</span>				<span class="comment">// GeneralSubtree ::= SEQUENCE {</span>
+<span id="L1175" class="ln">  1175	</span>				<span class="comment">//      base                    GeneralName,</span>
+<span id="L1176" class="ln">  1176	</span>				<span class="comment">//      minimum         [0]     BaseDistance DEFAULT 0,</span>
+<span id="L1177" class="ln">  1177	</span>				<span class="comment">//      maximum         [1]     BaseDistance OPTIONAL }</span>
+<span id="L1178" class="ln">  1178	</span>				<span class="comment">//</span>
+<span id="L1179" class="ln">  1179	</span>				<span class="comment">// BaseDistance ::= INTEGER (0..MAX)</span>
+<span id="L1180" class="ln">  1180	</span>
+<span id="L1181" class="ln">  1181	</span>				var constraints nameConstraints
+<span id="L1182" class="ln">  1182	</span>				if rest, err := asn1.Unmarshal(e.Value, &amp;constraints); err != nil {
+<span id="L1183" class="ln">  1183	</span>					return nil, err
+<span id="L1184" class="ln">  1184	</span>				} else if len(rest) != 0 {
+<span id="L1185" class="ln">  1185	</span>					return nil, errors.New(&#34;x509: trailing data after X.509 NameConstraints&#34;)
+<span id="L1186" class="ln">  1186	</span>				}
+<span id="L1187" class="ln">  1187	</span>
+<span id="L1188" class="ln">  1188	</span>				if len(constraints.Excluded) &gt; 0 &amp;&amp; e.Critical {
+<span id="L1189" class="ln">  1189	</span>					return out, UnhandledCriticalExtension{}
+<span id="L1190" class="ln">  1190	</span>				}
+<span id="L1191" class="ln">  1191	</span>
+<span id="L1192" class="ln">  1192	</span>				for _, subtree := range constraints.Permitted {
+<span id="L1193" class="ln">  1193	</span>					if len(subtree.Name) == 0 {
+<span id="L1194" class="ln">  1194	</span>						if e.Critical {
+<span id="L1195" class="ln">  1195	</span>							return out, UnhandledCriticalExtension{}
+<span id="L1196" class="ln">  1196	</span>						}
+<span id="L1197" class="ln">  1197	</span>						continue
+<span id="L1198" class="ln">  1198	</span>					}
+<span id="L1199" class="ln">  1199	</span>					out.PermittedDNSDomains = append(out.PermittedDNSDomains, subtree.Name)
+<span id="L1200" class="ln">  1200	</span>				}
+<span id="L1201" class="ln">  1201	</span>
+<span id="L1202" class="ln">  1202	</span>			case 31:
+<span id="L1203" class="ln">  1203	</span>				<span class="comment">// RFC 5280, 4.2.1.13</span>
+<span id="L1204" class="ln">  1204	</span>
+<span id="L1205" class="ln">  1205	</span>				<span class="comment">// CRLDistributionPoints ::= SEQUENCE SIZE (1..MAX) OF DistributionPoint</span>
+<span id="L1206" class="ln">  1206	</span>				<span class="comment">//</span>
+<span id="L1207" class="ln">  1207	</span>				<span class="comment">// DistributionPoint ::= SEQUENCE {</span>
+<span id="L1208" class="ln">  1208	</span>				<span class="comment">//     distributionPoint       [0]     DistributionPointName OPTIONAL,</span>
+<span id="L1209" class="ln">  1209	</span>				<span class="comment">//     reasons                 [1]     ReasonFlags OPTIONAL,</span>
+<span id="L1210" class="ln">  1210	</span>				<span class="comment">//     cRLIssuer               [2]     GeneralNames OPTIONAL }</span>
+<span id="L1211" class="ln">  1211	</span>				<span class="comment">//</span>
+<span id="L1212" class="ln">  1212	</span>				<span class="comment">// DistributionPointName ::= CHOICE {</span>
+<span id="L1213" class="ln">  1213	</span>				<span class="comment">//     fullName                [0]     GeneralNames,</span>
+<span id="L1214" class="ln">  1214	</span>				<span class="comment">//     nameRelativeToCRLIssuer [1]     RelativeDistinguishedName }</span>
+<span id="L1215" class="ln">  1215	</span>
+<span id="L1216" class="ln">  1216	</span>				var cdp []distributionPoint
+<span id="L1217" class="ln">  1217	</span>				if rest, err := asn1.Unmarshal(e.Value, &amp;cdp); err != nil {
+<span id="L1218" class="ln">  1218	</span>					return nil, err
+<span id="L1219" class="ln">  1219	</span>				} else if len(rest) != 0 {
+<span id="L1220" class="ln">  1220	</span>					return nil, errors.New(&#34;x509: trailing data after X.509 CRL distribution point&#34;)
+<span id="L1221" class="ln">  1221	</span>				}
+<span id="L1222" class="ln">  1222	</span>
+<span id="L1223" class="ln">  1223	</span>				for _, dp := range cdp {
+<span id="L1224" class="ln">  1224	</span>					<span class="comment">// Per RFC 5280, 4.2.1.13, one of distributionPoint or cRLIssuer may be empty.</span>
+<span id="L1225" class="ln">  1225	</span>					if len(dp.DistributionPoint.FullName.Bytes) == 0 {
+<span id="L1226" class="ln">  1226	</span>						continue
+<span id="L1227" class="ln">  1227	</span>					}
+<span id="L1228" class="ln">  1228	</span>
+<span id="L1229" class="ln">  1229	</span>					var n asn1.RawValue
+<span id="L1230" class="ln">  1230	</span>					if _, err := asn1.Unmarshal(dp.DistributionPoint.FullName.Bytes, &amp;n); err != nil {
+<span id="L1231" class="ln">  1231	</span>						return nil, err
+<span id="L1232" class="ln">  1232	</span>					}
+<span id="L1233" class="ln">  1233	</span>					<span class="comment">// Trailing data after the fullName is</span>
+<span id="L1234" class="ln">  1234	</span>					<span class="comment">// allowed because other elements of</span>
+<span id="L1235" class="ln">  1235	</span>					<span class="comment">// the SEQUENCE can appear.</span>
+<span id="L1236" class="ln">  1236	</span>
+<span id="L1237" class="ln">  1237	</span>					if n.Tag == 6 {
+<span id="L1238" class="ln">  1238	</span>						out.CRLDistributionPoints = append(out.CRLDistributionPoints, string(n.Bytes))
+<span id="L1239" class="ln">  1239	</span>					}
+<span id="L1240" class="ln">  1240	</span>				}
+<span id="L1241" class="ln">  1241	</span>
+<span id="L1242" class="ln">  1242	</span>			case 35:
+<span id="L1243" class="ln">  1243	</span>				<span class="comment">// RFC 5280, 4.2.1.1</span>
+<span id="L1244" class="ln">  1244	</span>				var a authKeyId
+<span id="L1245" class="ln">  1245	</span>				if rest, err := asn1.Unmarshal(e.Value, &amp;a); err != nil {
+<span id="L1246" class="ln">  1246	</span>					return nil, err
+<span id="L1247" class="ln">  1247	</span>				} else if len(rest) != 0 {
+<span id="L1248" class="ln">  1248	</span>					return nil, errors.New(&#34;x509: trailing data after X.509 authority key-id&#34;)
+<span id="L1249" class="ln">  1249	</span>				}
+<span id="L1250" class="ln">  1250	</span>				out.AuthorityKeyId = a.Id
+<span id="L1251" class="ln">  1251	</span>
+<span id="L1252" class="ln">  1252	</span>			case 37:
+<span id="L1253" class="ln">  1253	</span>				<span class="comment">// RFC 5280, 4.2.1.12.  Extended Key Usage</span>
+<span id="L1254" class="ln">  1254	</span>
+<span id="L1255" class="ln">  1255	</span>				<span class="comment">// id-ce-extKeyUsage OBJECT IDENTIFIER ::= { id-ce 37 }</span>
+<span id="L1256" class="ln">  1256	</span>				<span class="comment">//</span>
+<span id="L1257" class="ln">  1257	</span>				<span class="comment">// ExtKeyUsageSyntax ::= SEQUENCE SIZE (1..MAX) OF KeyPurposeId</span>
+<span id="L1258" class="ln">  1258	</span>				<span class="comment">//</span>
+<span id="L1259" class="ln">  1259	</span>				<span class="comment">// KeyPurposeId ::= OBJECT IDENTIFIER</span>
+<span id="L1260" class="ln">  1260	</span>
+<span id="L1261" class="ln">  1261	</span>				var keyUsage []asn1.ObjectIdentifier
+<span id="L1262" class="ln">  1262	</span>				if rest, err := asn1.Unmarshal(e.Value, &amp;keyUsage); err != nil {
+<span id="L1263" class="ln">  1263	</span>					return nil, err
+<span id="L1264" class="ln">  1264	</span>				} else if len(rest) != 0 {
+<span id="L1265" class="ln">  1265	</span>					return nil, errors.New(&#34;x509: trailing data after X.509 ExtendedKeyUsage&#34;)
+<span id="L1266" class="ln">  1266	</span>				}
+<span id="L1267" class="ln">  1267	</span>
+<span id="L1268" class="ln">  1268	</span>				for _, u := range keyUsage {
+<span id="L1269" class="ln">  1269	</span>					if extKeyUsage, ok := extKeyUsageFromOID(u); ok {
+<span id="L1270" class="ln">  1270	</span>						out.ExtKeyUsage = append(out.ExtKeyUsage, extKeyUsage)
+<span id="L1271" class="ln">  1271	</span>					} else {
+<span id="L1272" class="ln">  1272	</span>						out.UnknownExtKeyUsage = append(out.UnknownExtKeyUsage, u)
+<span id="L1273" class="ln">  1273	</span>					}
+<span id="L1274" class="ln">  1274	</span>				}
+<span id="L1275" class="ln">  1275	</span>
+<span id="L1276" class="ln">  1276	</span>			case 14:
+<span id="L1277" class="ln">  1277	</span>				<span class="comment">// RFC 5280, 4.2.1.2</span>
+<span id="L1278" class="ln">  1278	</span>				var keyid []byte
+<span id="L1279" class="ln">  1279	</span>				if rest, err := asn1.Unmarshal(e.Value, &amp;keyid); err != nil {
+<span id="L1280" class="ln">  1280	</span>					return nil, err
+<span id="L1281" class="ln">  1281	</span>				} else if len(rest) != 0 {
+<span id="L1282" class="ln">  1282	</span>					return nil, errors.New(&#34;x509: trailing data after X.509 key-id&#34;)
+<span id="L1283" class="ln">  1283	</span>				}
+<span id="L1284" class="ln">  1284	</span>				out.SubjectKeyId = keyid
+<span id="L1285" class="ln">  1285	</span>
+<span id="L1286" class="ln">  1286	</span>			case 32:
+<span id="L1287" class="ln">  1287	</span>				<span class="comment">// RFC 5280 4.2.1.4: Certificate Policies</span>
+<span id="L1288" class="ln">  1288	</span>				var policies []policyInformation
+<span id="L1289" class="ln">  1289	</span>				if rest, err := asn1.Unmarshal(e.Value, &amp;policies); err != nil {
+<span id="L1290" class="ln">  1290	</span>					return nil, err
+<span id="L1291" class="ln">  1291	</span>				} else if len(rest) != 0 {
+<span id="L1292" class="ln">  1292	</span>					return nil, errors.New(&#34;x509: trailing data after X.509 certificate policies&#34;)
+<span id="L1293" class="ln">  1293	</span>				}
+<span id="L1294" class="ln">  1294	</span>				out.PolicyIdentifiers = make([]asn1.ObjectIdentifier, len(policies))
+<span id="L1295" class="ln">  1295	</span>				for i, policy := range policies {
+<span id="L1296" class="ln">  1296	</span>					out.PolicyIdentifiers[i] = policy.Policy
+<span id="L1297" class="ln">  1297	</span>				}
+<span id="L1298" class="ln">  1298	</span>
+<span id="L1299" class="ln">  1299	</span>			default:
+<span id="L1300" class="ln">  1300	</span>				<span class="comment">// Unknown extensions are recorded if critical.</span>
+<span id="L1301" class="ln">  1301	</span>				unhandled = true
+<span id="L1302" class="ln">  1302	</span>			}
+<span id="L1303" class="ln">  1303	</span>		} else if e.Id.Equal(oidExtensionAuthorityInfoAccess) {
+<span id="L1304" class="ln">  1304	</span>			<span class="comment">// RFC 5280 4.2.2.1: Authority Information Access</span>
+<span id="L1305" class="ln">  1305	</span>			var aia []authorityInfoAccess
+<span id="L1306" class="ln">  1306	</span>			if rest, err := asn1.Unmarshal(e.Value, &amp;aia); err != nil {
+<span id="L1307" class="ln">  1307	</span>				return nil, err
+<span id="L1308" class="ln">  1308	</span>			} else if len(rest) != 0 {
+<span id="L1309" class="ln">  1309	</span>				return nil, errors.New(&#34;x509: trailing data after X.509 authority information&#34;)
+<span id="L1310" class="ln">  1310	</span>			}
+<span id="L1311" class="ln">  1311	</span>
+<span id="L1312" class="ln">  1312	</span>			for _, v := range aia {
+<span id="L1313" class="ln">  1313	</span>				<span class="comment">// GeneralName: uniformResourceIdentifier [6] IA5String</span>
+<span id="L1314" class="ln">  1314	</span>				if v.Location.Tag != 6 {
+<span id="L1315" class="ln">  1315	</span>					continue
+<span id="L1316" class="ln">  1316	</span>				}
+<span id="L1317" class="ln">  1317	</span>				if v.Method.Equal(oidAuthorityInfoAccessOcsp) {
+<span id="L1318" class="ln">  1318	</span>					out.OCSPServer = append(out.OCSPServer, string(v.Location.Bytes))
+<span id="L1319" class="ln">  1319	</span>				} else if v.Method.Equal(oidAuthorityInfoAccessIssuers) {
+<span id="L1320" class="ln">  1320	</span>					out.IssuingCertificateURL = append(out.IssuingCertificateURL, string(v.Location.Bytes))
+<span id="L1321" class="ln">  1321	</span>				}
+<span id="L1322" class="ln">  1322	</span>			}
+<span id="L1323" class="ln">  1323	</span>		} else {
+<span id="L1324" class="ln">  1324	</span>			<span class="comment">// Unknown extensions are recorded if critical.</span>
+<span id="L1325" class="ln">  1325	</span>			unhandled = true
+<span id="L1326" class="ln">  1326	</span>		}
+<span id="L1327" class="ln">  1327	</span>
+<span id="L1328" class="ln">  1328	</span>		if e.Critical &amp;&amp; unhandled {
+<span id="L1329" class="ln">  1329	</span>			out.UnhandledCriticalExtensions = append(out.UnhandledCriticalExtensions, e.Id)
+<span id="L1330" class="ln">  1330	</span>		}
+<span id="L1331" class="ln">  1331	</span>	}
+<span id="L1332" class="ln">  1332	</span>
+<span id="L1333" class="ln">  1333	</span>	return out, nil
+<span id="L1334" class="ln">  1334	</span>}
+<span id="L1335" class="ln">  1335	</span>
+<span id="L1336" class="ln">  1336	</span><span class="comment">// ParseCertificate parses a single certificate from the given ASN.1 DER data.</span>
+<span id="L1337" class="ln">  1337	</span>func ParseCertificate(asn1Data []byte) (*Certificate, error) {
+<span id="L1338" class="ln">  1338	</span>	var cert certificate
+<span id="L1339" class="ln">  1339	</span>	rest, err := asn1.Unmarshal(asn1Data, &amp;cert)
+<span id="L1340" class="ln">  1340	</span>	if err != nil {
+<span id="L1341" class="ln">  1341	</span>		return nil, err
+<span id="L1342" class="ln">  1342	</span>	}
+<span id="L1343" class="ln">  1343	</span>	if len(rest) &gt; 0 {
+<span id="L1344" class="ln">  1344	</span>		return nil, asn1.SyntaxError{Msg: &#34;trailing data&#34;}
+<span id="L1345" class="ln">  1345	</span>	}
+<span id="L1346" class="ln">  1346	</span>
+<span id="L1347" class="ln">  1347	</span>	return parseCertificate(&amp;cert)
+<span id="L1348" class="ln">  1348	</span>}
+<span id="L1349" class="ln">  1349	</span>
+<span id="L1350" class="ln">  1350	</span><span class="comment">// ParseCertificates parses one or more certificates from the given ASN.1 DER</span>
+<span id="L1351" class="ln">  1351	</span><span class="comment">// data. The certificates must be concatenated with no intermediate padding.</span>
+<span id="L1352" class="ln">  1352	</span>func ParseCertificates(asn1Data []byte) ([]*Certificate, error) {
+<span id="L1353" class="ln">  1353	</span>	var v []*certificate
+<span id="L1354" class="ln">  1354	</span>
+<span id="L1355" class="ln">  1355	</span>	for len(asn1Data) &gt; 0 {
+<span id="L1356" class="ln">  1356	</span>		cert := new(certificate)
+<span id="L1357" class="ln">  1357	</span>		var err error
+<span id="L1358" class="ln">  1358	</span>		asn1Data, err = asn1.Unmarshal(asn1Data, cert)
+<span id="L1359" class="ln">  1359	</span>		if err != nil {
+<span id="L1360" class="ln">  1360	</span>			return nil, err
+<span id="L1361" class="ln">  1361	</span>		}
+<span id="L1362" class="ln">  1362	</span>		v = append(v, cert)
+<span id="L1363" class="ln">  1363	</span>	}
+<span id="L1364" class="ln">  1364	</span>
+<span id="L1365" class="ln">  1365	</span>	ret := make([]*Certificate, len(v))
+<span id="L1366" class="ln">  1366	</span>	for i, ci := range v {
+<span id="L1367" class="ln">  1367	</span>		cert, err := parseCertificate(ci)
+<span id="L1368" class="ln">  1368	</span>		if err != nil {
+<span id="L1369" class="ln">  1369	</span>			return nil, err
+<span id="L1370" class="ln">  1370	</span>		}
+<span id="L1371" class="ln">  1371	</span>		ret[i] = cert
+<span id="L1372" class="ln">  1372	</span>	}
+<span id="L1373" class="ln">  1373	</span>
+<span id="L1374" class="ln">  1374	</span>	return ret, nil
+<span id="L1375" class="ln">  1375	</span>}
+<span id="L1376" class="ln">  1376	</span>
+<span id="L1377" class="ln">  1377	</span>func reverseBitsInAByte(in byte) byte {
+<span id="L1378" class="ln">  1378	</span>	b1 := in&gt;&gt;4 | in&lt;&lt;4
+<span id="L1379" class="ln">  1379	</span>	b2 := b1&gt;&gt;2&amp;0x33 | b1&lt;&lt;2&amp;0xcc
+<span id="L1380" class="ln">  1380	</span>	b3 := b2&gt;&gt;1&amp;0x55 | b2&lt;&lt;1&amp;0xaa
+<span id="L1381" class="ln">  1381	</span>	return b3
+<span id="L1382" class="ln">  1382	</span>}
+<span id="L1383" class="ln">  1383	</span>
+<span id="L1384" class="ln">  1384	</span><span class="comment">// asn1BitLength returns the bit-length of bitString by considering the</span>
+<span id="L1385" class="ln">  1385	</span><span class="comment">// most-significant bit in a byte to be the &#34;first&#34; bit. This convention</span>
+<span id="L1386" class="ln">  1386	</span><span class="comment">// matches ASN.1, but differs from almost everything else.</span>
+<span id="L1387" class="ln">  1387	</span>func asn1BitLength(bitString []byte) int {
+<span id="L1388" class="ln">  1388	</span>	bitLen := len(bitString) * 8
+<span id="L1389" class="ln">  1389	</span>
+<span id="L1390" class="ln">  1390	</span>	for i := range bitString {
+<span id="L1391" class="ln">  1391	</span>		b := bitString[len(bitString)-i-1]
+<span id="L1392" class="ln">  1392	</span>
+<span id="L1393" class="ln">  1393	</span>		for bit := uint(0); bit &lt; 8; bit++ {
+<span id="L1394" class="ln">  1394	</span>			if (b&gt;&gt;bit)&amp;1 == 1 {
+<span id="L1395" class="ln">  1395	</span>				return bitLen
+<span id="L1396" class="ln">  1396	</span>			}
+<span id="L1397" class="ln">  1397	</span>			bitLen--
+<span id="L1398" class="ln">  1398	</span>		}
+<span id="L1399" class="ln">  1399	</span>	}
+<span id="L1400" class="ln">  1400	</span>
+<span id="L1401" class="ln">  1401	</span>	return 0
+<span id="L1402" class="ln">  1402	</span>}
+<span id="L1403" class="ln">  1403	</span>
+<span id="L1404" class="ln">  1404	</span>var (
+<span id="L1405" class="ln">  1405	</span>	oidExtensionSubjectKeyId          = []int{2, 5, 29, 14}
+<span id="L1406" class="ln">  1406	</span>	oidExtensionKeyUsage              = []int{2, 5, 29, 15}
+<span id="L1407" class="ln">  1407	</span>	oidExtensionExtendedKeyUsage      = []int{2, 5, 29, 37}
+<span id="L1408" class="ln">  1408	</span>	oidExtensionAuthorityKeyId        = []int{2, 5, 29, 35}
+<span id="L1409" class="ln">  1409	</span>	oidExtensionBasicConstraints      = []int{2, 5, 29, 19}
+<span id="L1410" class="ln">  1410	</span>	oidExtensionSubjectAltName        = []int{2, 5, 29, 17}
+<span id="L1411" class="ln">  1411	</span>	oidExtensionCertificatePolicies   = []int{2, 5, 29, 32}
+<span id="L1412" class="ln">  1412	</span>	oidExtensionNameConstraints       = []int{2, 5, 29, 30}
+<span id="L1413" class="ln">  1413	</span>	oidExtensionCRLDistributionPoints = []int{2, 5, 29, 31}
+<span id="L1414" class="ln">  1414	</span>	oidExtensionAuthorityInfoAccess   = []int{1, 3, 6, 1, 5, 5, 7, 1, 1}
+<span id="L1415" class="ln">  1415	</span>)
+<span id="L1416" class="ln">  1416	</span>
+<span id="L1417" class="ln">  1417	</span>var (
+<span id="L1418" class="ln">  1418	</span>	oidAuthorityInfoAccessOcsp    = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1}
+<span id="L1419" class="ln">  1419	</span>	oidAuthorityInfoAccessIssuers = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 2}
+<span id="L1420" class="ln">  1420	</span>)
+<span id="L1421" class="ln">  1421	</span>
+<span id="L1422" class="ln">  1422	</span><span class="comment">// oidNotInExtensions returns whether an extension with the given oid exists in</span>
+<span id="L1423" class="ln">  1423	</span><span class="comment">// extensions.</span>
+<span id="L1424" class="ln">  1424	</span>func oidInExtensions(oid asn1.ObjectIdentifier, extensions []pkix.Extension) bool {
+<span id="L1425" class="ln">  1425	</span>	for _, e := range extensions {
+<span id="L1426" class="ln">  1426	</span>		if e.Id.Equal(oid) {
+<span id="L1427" class="ln">  1427	</span>			return true
+<span id="L1428" class="ln">  1428	</span>		}
+<span id="L1429" class="ln">  1429	</span>	}
+<span id="L1430" class="ln">  1430	</span>	return false
+<span id="L1431" class="ln">  1431	</span>}
+<span id="L1432" class="ln">  1432	</span>
+<span id="L1433" class="ln">  1433	</span><span class="comment">// marshalSANs marshals a list of addresses into a the contents of an X.509</span>
+<span id="L1434" class="ln">  1434	</span><span class="comment">// SubjectAlternativeName extension.</span>
+<span id="L1435" class="ln">  1435	</span>func marshalSANs(dnsNames, emailAddresses []string, ipAddresses []net.IP) (derBytes []byte, err error) {
+<span id="L1436" class="ln">  1436	</span>	var rawValues []asn1.RawValue
+<span id="L1437" class="ln">  1437	</span>	for _, name := range dnsNames {
+<span id="L1438" class="ln">  1438	</span>		rawValues = append(rawValues, asn1.RawValue{Tag: 2, Class: 2, Bytes: []byte(name)})
+<span id="L1439" class="ln">  1439	</span>	}
+<span id="L1440" class="ln">  1440	</span>	for _, email := range emailAddresses {
+<span id="L1441" class="ln">  1441	</span>		rawValues = append(rawValues, asn1.RawValue{Tag: 1, Class: 2, Bytes: []byte(email)})
+<span id="L1442" class="ln">  1442	</span>	}
+<span id="L1443" class="ln">  1443	</span>	for _, rawIP := range ipAddresses {
+<span id="L1444" class="ln">  1444	</span>		<span class="comment">// If possible, we always want to encode IPv4 addresses in 4 bytes.</span>
+<span id="L1445" class="ln">  1445	</span>		ip := rawIP.To4()
+<span id="L1446" class="ln">  1446	</span>		if ip == nil {
+<span id="L1447" class="ln">  1447	</span>			ip = rawIP
+<span id="L1448" class="ln">  1448	</span>		}
+<span id="L1449" class="ln">  1449	</span>		rawValues = append(rawValues, asn1.RawValue{Tag: 7, Class: 2, Bytes: ip})
+<span id="L1450" class="ln">  1450	</span>	}
+<span id="L1451" class="ln">  1451	</span>	return asn1.Marshal(rawValues)
+<span id="L1452" class="ln">  1452	</span>}
+<span id="L1453" class="ln">  1453	</span>
+<span id="L1454" class="ln">  1454	</span>func buildExtensions(template *Certificate) (ret []pkix.Extension, err error) {
+<span id="L1455" class="ln">  1455	</span>	ret = make([]pkix.Extension, 10 <span class="comment">/* maximum number of elements. */</span>)
+<span id="L1456" class="ln">  1456	</span>	n := 0
+<span id="L1457" class="ln">  1457	</span>
+<span id="L1458" class="ln">  1458	</span>	if template.KeyUsage != 0 &amp;&amp;
+<span id="L1459" class="ln">  1459	</span>		!oidInExtensions(oidExtensionKeyUsage, template.ExtraExtensions) {
+<span id="L1460" class="ln">  1460	</span>		ret[n].Id = oidExtensionKeyUsage
+<span id="L1461" class="ln">  1461	</span>		ret[n].Critical = true
+<span id="L1462" class="ln">  1462	</span>
+<span id="L1463" class="ln">  1463	</span>		var a [2]byte
+<span id="L1464" class="ln">  1464	</span>		a[0] = reverseBitsInAByte(byte(template.KeyUsage))
+<span id="L1465" class="ln">  1465	</span>		a[1] = reverseBitsInAByte(byte(template.KeyUsage &gt;&gt; 8))
+<span id="L1466" class="ln">  1466	</span>
+<span id="L1467" class="ln">  1467	</span>		l := 1
+<span id="L1468" class="ln">  1468	</span>		if a[1] != 0 {
+<span id="L1469" class="ln">  1469	</span>			l = 2
+<span id="L1470" class="ln">  1470	</span>		}
+<span id="L1471" class="ln">  1471	</span>
+<span id="L1472" class="ln">  1472	</span>		bitString := a[:l]
+<span id="L1473" class="ln">  1473	</span>		ret[n].Value, err = asn1.Marshal(asn1.BitString{Bytes: bitString, BitLength: asn1BitLength(bitString)})
+<span id="L1474" class="ln">  1474	</span>		if err != nil {
+<span id="L1475" class="ln">  1475	</span>			return
+<span id="L1476" class="ln">  1476	</span>		}
+<span id="L1477" class="ln">  1477	</span>		n++
+<span id="L1478" class="ln">  1478	</span>	}
+<span id="L1479" class="ln">  1479	</span>
+<span id="L1480" class="ln">  1480	</span>	if (len(template.ExtKeyUsage) &gt; 0 || len(template.UnknownExtKeyUsage) &gt; 0) &amp;&amp;
+<span id="L1481" class="ln">  1481	</span>		!oidInExtensions(oidExtensionExtendedKeyUsage, template.ExtraExtensions) {
+<span id="L1482" class="ln">  1482	</span>		ret[n].Id = oidExtensionExtendedKeyUsage
+<span id="L1483" class="ln">  1483	</span>
+<span id="L1484" class="ln">  1484	</span>		var oids []asn1.ObjectIdentifier
+<span id="L1485" class="ln">  1485	</span>		for _, u := range template.ExtKeyUsage {
+<span id="L1486" class="ln">  1486	</span>			if oid, ok := oidFromExtKeyUsage(u); ok {
+<span id="L1487" class="ln">  1487	</span>				oids = append(oids, oid)
+<span id="L1488" class="ln">  1488	</span>			} else {
+<span id="L1489" class="ln">  1489	</span>				panic(&#34;internal error&#34;)
+<span id="L1490" class="ln">  1490	</span>			}
+<span id="L1491" class="ln">  1491	</span>		}
+<span id="L1492" class="ln">  1492	</span>
+<span id="L1493" class="ln">  1493	</span>		oids = append(oids, template.UnknownExtKeyUsage...)
+<span id="L1494" class="ln">  1494	</span>
+<span id="L1495" class="ln">  1495	</span>		ret[n].Value, err = asn1.Marshal(oids)
+<span id="L1496" class="ln">  1496	</span>		if err != nil {
+<span id="L1497" class="ln">  1497	</span>			return
+<span id="L1498" class="ln">  1498	</span>		}
+<span id="L1499" class="ln">  1499	</span>		n++
+<span id="L1500" class="ln">  1500	</span>	}
+<span id="L1501" class="ln">  1501	</span>
+<span id="L1502" class="ln">  1502	</span>	if template.BasicConstraintsValid &amp;&amp; !oidInExtensions(oidExtensionBasicConstraints, template.ExtraExtensions) {
+<span id="L1503" class="ln">  1503	</span>		<span class="comment">// Leaving MaxPathLen as zero indicates that no maximum path</span>
+<span id="L1504" class="ln">  1504	</span>		<span class="comment">// length is desired, unless MaxPathLenZero is set. A value of</span>
+<span id="L1505" class="ln">  1505	</span>		<span class="comment">// -1 causes encoding/asn1 to omit the value as desired.</span>
+<span id="L1506" class="ln">  1506	</span>		maxPathLen := template.MaxPathLen
+<span id="L1507" class="ln">  1507	</span>		if maxPathLen == 0 &amp;&amp; !template.MaxPathLenZero {
+<span id="L1508" class="ln">  1508	</span>			maxPathLen = -1
+<span id="L1509" class="ln">  1509	</span>		}
+<span id="L1510" class="ln">  1510	</span>		ret[n].Id = oidExtensionBasicConstraints
+<span id="L1511" class="ln">  1511	</span>		ret[n].Value, err = asn1.Marshal(basicConstraints{template.IsCA, maxPathLen})
+<span id="L1512" class="ln">  1512	</span>		ret[n].Critical = true
+<span id="L1513" class="ln">  1513	</span>		if err != nil {
+<span id="L1514" class="ln">  1514	</span>			return
+<span id="L1515" class="ln">  1515	</span>		}
+<span id="L1516" class="ln">  1516	</span>		n++
+<span id="L1517" class="ln">  1517	</span>	}
+<span id="L1518" class="ln">  1518	</span>
+<span id="L1519" class="ln">  1519	</span>	if len(template.SubjectKeyId) &gt; 0 &amp;&amp; !oidInExtensions(oidExtensionSubjectKeyId, template.ExtraExtensions) {
+<span id="L1520" class="ln">  1520	</span>		ret[n].Id = oidExtensionSubjectKeyId
+<span id="L1521" class="ln">  1521	</span>		ret[n].Value, err = asn1.Marshal(template.SubjectKeyId)
+<span id="L1522" class="ln">  1522	</span>		if err != nil {
+<span id="L1523" class="ln">  1523	</span>			return
+<span id="L1524" class="ln">  1524	</span>		}
+<span id="L1525" class="ln">  1525	</span>		n++
+<span id="L1526" class="ln">  1526	</span>	}
+<span id="L1527" class="ln">  1527	</span>
+<span id="L1528" class="ln">  1528	</span>	if len(template.AuthorityKeyId) &gt; 0 &amp;&amp; !oidInExtensions(oidExtensionAuthorityKeyId, template.ExtraExtensions) {
+<span id="L1529" class="ln">  1529	</span>		ret[n].Id = oidExtensionAuthorityKeyId
+<span id="L1530" class="ln">  1530	</span>		ret[n].Value, err = asn1.Marshal(authKeyId{template.AuthorityKeyId})
+<span id="L1531" class="ln">  1531	</span>		if err != nil {
+<span id="L1532" class="ln">  1532	</span>			return
+<span id="L1533" class="ln">  1533	</span>		}
+<span id="L1534" class="ln">  1534	</span>		n++
+<span id="L1535" class="ln">  1535	</span>	}
+<span id="L1536" class="ln">  1536	</span>
+<span id="L1537" class="ln">  1537	</span>	if (len(template.OCSPServer) &gt; 0 || len(template.IssuingCertificateURL) &gt; 0) &amp;&amp;
+<span id="L1538" class="ln">  1538	</span>		!oidInExtensions(oidExtensionAuthorityInfoAccess, template.ExtraExtensions) {
+<span id="L1539" class="ln">  1539	</span>		ret[n].Id = oidExtensionAuthorityInfoAccess
+<span id="L1540" class="ln">  1540	</span>		var aiaValues []authorityInfoAccess
+<span id="L1541" class="ln">  1541	</span>		for _, name := range template.OCSPServer {
+<span id="L1542" class="ln">  1542	</span>			aiaValues = append(aiaValues, authorityInfoAccess{
+<span id="L1543" class="ln">  1543	</span>				Method:   oidAuthorityInfoAccessOcsp,
+<span id="L1544" class="ln">  1544	</span>				Location: asn1.RawValue{Tag: 6, Class: 2, Bytes: []byte(name)},
+<span id="L1545" class="ln">  1545	</span>			})
+<span id="L1546" class="ln">  1546	</span>		}
+<span id="L1547" class="ln">  1547	</span>		for _, name := range template.IssuingCertificateURL {
+<span id="L1548" class="ln">  1548	</span>			aiaValues = append(aiaValues, authorityInfoAccess{
+<span id="L1549" class="ln">  1549	</span>				Method:   oidAuthorityInfoAccessIssuers,
+<span id="L1550" class="ln">  1550	</span>				Location: asn1.RawValue{Tag: 6, Class: 2, Bytes: []byte(name)},
+<span id="L1551" class="ln">  1551	</span>			})
+<span id="L1552" class="ln">  1552	</span>		}
+<span id="L1553" class="ln">  1553	</span>		ret[n].Value, err = asn1.Marshal(aiaValues)
+<span id="L1554" class="ln">  1554	</span>		if err != nil {
+<span id="L1555" class="ln">  1555	</span>			return
+<span id="L1556" class="ln">  1556	</span>		}
+<span id="L1557" class="ln">  1557	</span>		n++
+<span id="L1558" class="ln">  1558	</span>	}
+<span id="L1559" class="ln">  1559	</span>
+<span id="L1560" class="ln">  1560	</span>	if (len(template.DNSNames) &gt; 0 || len(template.EmailAddresses) &gt; 0 || len(template.IPAddresses) &gt; 0) &amp;&amp;
+<span id="L1561" class="ln">  1561	</span>		!oidInExtensions(oidExtensionSubjectAltName, template.ExtraExtensions) {
+<span id="L1562" class="ln">  1562	</span>		ret[n].Id = oidExtensionSubjectAltName
+<span id="L1563" class="ln">  1563	</span>		ret[n].Value, err = marshalSANs(template.DNSNames, template.EmailAddresses, template.IPAddresses)
+<span id="L1564" class="ln">  1564	</span>		if err != nil {
+<span id="L1565" class="ln">  1565	</span>			return
+<span id="L1566" class="ln">  1566	</span>		}
+<span id="L1567" class="ln">  1567	</span>		n++
+<span id="L1568" class="ln">  1568	</span>	}
+<span id="L1569" class="ln">  1569	</span>
+<span id="L1570" class="ln">  1570	</span>	if len(template.PolicyIdentifiers) &gt; 0 &amp;&amp;
+<span id="L1571" class="ln">  1571	</span>		!oidInExtensions(oidExtensionCertificatePolicies, template.ExtraExtensions) {
+<span id="L1572" class="ln">  1572	</span>		ret[n].Id = oidExtensionCertificatePolicies
+<span id="L1573" class="ln">  1573	</span>		policies := make([]policyInformation, len(template.PolicyIdentifiers))
+<span id="L1574" class="ln">  1574	</span>		for i, policy := range template.PolicyIdentifiers {
+<span id="L1575" class="ln">  1575	</span>			policies[i].Policy = policy
+<span id="L1576" class="ln">  1576	</span>		}
+<span id="L1577" class="ln">  1577	</span>		ret[n].Value, err = asn1.Marshal(policies)
+<span id="L1578" class="ln">  1578	</span>		if err != nil {
+<span id="L1579" class="ln">  1579	</span>			return
+<span id="L1580" class="ln">  1580	</span>		}
+<span id="L1581" class="ln">  1581	</span>		n++
+<span id="L1582" class="ln">  1582	</span>	}
+<span id="L1583" class="ln">  1583	</span>
+<span id="L1584" class="ln">  1584	</span>	if len(template.PermittedDNSDomains) &gt; 0 &amp;&amp;
+<span id="L1585" class="ln">  1585	</span>		!oidInExtensions(oidExtensionNameConstraints, template.ExtraExtensions) {
+<span id="L1586" class="ln">  1586	</span>		ret[n].Id = oidExtensionNameConstraints
+<span id="L1587" class="ln">  1587	</span>		ret[n].Critical = template.PermittedDNSDomainsCritical
+<span id="L1588" class="ln">  1588	</span>
+<span id="L1589" class="ln">  1589	</span>		var out nameConstraints
+<span id="L1590" class="ln">  1590	</span>		out.Permitted = make([]generalSubtree, len(template.PermittedDNSDomains))
+<span id="L1591" class="ln">  1591	</span>		for i, permitted := range template.PermittedDNSDomains {
+<span id="L1592" class="ln">  1592	</span>			out.Permitted[i] = generalSubtree{Name: permitted}
+<span id="L1593" class="ln">  1593	</span>		}
+<span id="L1594" class="ln">  1594	</span>		ret[n].Value, err = asn1.Marshal(out)
+<span id="L1595" class="ln">  1595	</span>		if err != nil {
+<span id="L1596" class="ln">  1596	</span>			return
+<span id="L1597" class="ln">  1597	</span>		}
+<span id="L1598" class="ln">  1598	</span>		n++
+<span id="L1599" class="ln">  1599	</span>	}
+<span id="L1600" class="ln">  1600	</span>
+<span id="L1601" class="ln">  1601	</span>	if len(template.CRLDistributionPoints) &gt; 0 &amp;&amp;
+<span id="L1602" class="ln">  1602	</span>		!oidInExtensions(oidExtensionCRLDistributionPoints, template.ExtraExtensions) {
+<span id="L1603" class="ln">  1603	</span>		ret[n].Id = oidExtensionCRLDistributionPoints
+<span id="L1604" class="ln">  1604	</span>
+<span id="L1605" class="ln">  1605	</span>		var crlDp []distributionPoint
+<span id="L1606" class="ln">  1606	</span>		for _, name := range template.CRLDistributionPoints {
+<span id="L1607" class="ln">  1607	</span>			rawFullName, _ := asn1.Marshal(asn1.RawValue{Tag: 6, Class: 2, Bytes: []byte(name)})
+<span id="L1608" class="ln">  1608	</span>
+<span id="L1609" class="ln">  1609	</span>			dp := distributionPoint{
+<span id="L1610" class="ln">  1610	</span>				DistributionPoint: distributionPointName{
+<span id="L1611" class="ln">  1611	</span>					FullName: asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, Bytes: rawFullName},
+<span id="L1612" class="ln">  1612	</span>				},
+<span id="L1613" class="ln">  1613	</span>			}
+<span id="L1614" class="ln">  1614	</span>			crlDp = append(crlDp, dp)
+<span id="L1615" class="ln">  1615	</span>		}
+<span id="L1616" class="ln">  1616	</span>
+<span id="L1617" class="ln">  1617	</span>		ret[n].Value, err = asn1.Marshal(crlDp)
+<span id="L1618" class="ln">  1618	</span>		if err != nil {
+<span id="L1619" class="ln">  1619	</span>			return
+<span id="L1620" class="ln">  1620	</span>		}
+<span id="L1621" class="ln">  1621	</span>		n++
+<span id="L1622" class="ln">  1622	</span>	}
+<span id="L1623" class="ln">  1623	</span>
+<span id="L1624" class="ln">  1624	</span>	<span class="comment">// Adding another extension here? Remember to update the maximum number</span>
+<span id="L1625" class="ln">  1625	</span>	<span class="comment">// of elements in the make() at the top of the function.</span>
+<span id="L1626" class="ln">  1626	</span>
+<span id="L1627" class="ln">  1627	</span>	return append(ret[:n], template.ExtraExtensions...), nil
+<span id="L1628" class="ln">  1628	</span>}
+<span id="L1629" class="ln">  1629	</span>
+<span id="L1630" class="ln">  1630	</span>func subjectBytes(cert *Certificate) ([]byte, error) {
+<span id="L1631" class="ln">  1631	</span>	if len(cert.RawSubject) &gt; 0 {
+<span id="L1632" class="ln">  1632	</span>		return cert.RawSubject, nil
+<span id="L1633" class="ln">  1633	</span>	}
+<span id="L1634" class="ln">  1634	</span>
+<span id="L1635" class="ln">  1635	</span>	return asn1.Marshal(cert.Subject.ToRDNSequence())
+<span id="L1636" class="ln">  1636	</span>}
+<span id="L1637" class="ln">  1637	</span>
+<span id="L1638" class="ln">  1638	</span><span class="comment">// signingParamsForPublicKey returns the parameters to use for signing with</span>
+<span id="L1639" class="ln">  1639	</span><span class="comment">// priv. If requestedSigAlgo is not zero then it overrides the default</span>
+<span id="L1640" class="ln">  1640	</span><span class="comment">// signature algorithm.</span>
+<span id="L1641" class="ln">  1641	</span>func signingParamsForPublicKey(pub interface{}, requestedSigAlgo SignatureAlgorithm) (hashFunc crypto.Hash, sigAlgo pkix.AlgorithmIdentifier, err error) {
+<span id="L1642" class="ln">  1642	</span>	var pubType PublicKeyAlgorithm
+<span id="L1643" class="ln">  1643	</span>
+<span id="L1644" class="ln">  1644	</span>	switch pub := pub.(type) {
+<span id="L1645" class="ln">  1645	</span>	case *rsa.PublicKey:
+<span id="L1646" class="ln">  1646	</span>		pubType = RSA
+<span id="L1647" class="ln">  1647	</span>		hashFunc = crypto.SHA256
+<span id="L1648" class="ln">  1648	</span>		sigAlgo.Algorithm = oidSignatureSHA256WithRSA
+<span id="L1649" class="ln">  1649	</span>		sigAlgo.Parameters = asn1.RawValue{
+<span id="L1650" class="ln">  1650	</span>			Tag: 5,
+<span id="L1651" class="ln">  1651	</span>		}
+<span id="L1652" class="ln">  1652	</span>
+<span id="L1653" class="ln">  1653	</span>	case *ecdsa.PublicKey:
+<span id="L1654" class="ln">  1654	</span>		pubType = ECDSA
+<span id="L1655" class="ln">  1655	</span>
+<span id="L1656" class="ln">  1656	</span>		switch pub.Curve {
+<span id="L1657" class="ln">  1657	</span>		case elliptic.P224(), elliptic.P256():
+<span id="L1658" class="ln">  1658	</span>			hashFunc = crypto.SHA256
+<span id="L1659" class="ln">  1659	</span>			sigAlgo.Algorithm = oidSignatureECDSAWithSHA256
+<span id="L1660" class="ln">  1660	</span>		case elliptic.P384():
+<span id="L1661" class="ln">  1661	</span>			hashFunc = crypto.SHA384
+<span id="L1662" class="ln">  1662	</span>			sigAlgo.Algorithm = oidSignatureECDSAWithSHA384
+<span id="L1663" class="ln">  1663	</span>		case elliptic.P521():
+<span id="L1664" class="ln">  1664	</span>			hashFunc = crypto.SHA512
+<span id="L1665" class="ln">  1665	</span>			sigAlgo.Algorithm = oidSignatureECDSAWithSHA512
+<span id="L1666" class="ln">  1666	</span>		default:
+<span id="L1667" class="ln">  1667	</span>			err = errors.New(&#34;x509: unknown elliptic curve&#34;)
+<span id="L1668" class="ln">  1668	</span>		}
+<span id="L1669" class="ln">  1669	</span>
+<span id="L1670" class="ln">  1670	</span>	default:
+<span id="L1671" class="ln">  1671	</span>		err = errors.New(&#34;x509: only RSA and ECDSA keys supported&#34;)
+<span id="L1672" class="ln">  1672	</span>	}
+<span id="L1673" class="ln">  1673	</span>
+<span id="L1674" class="ln">  1674	</span>	if err != nil {
+<span id="L1675" class="ln">  1675	</span>		return
+<span id="L1676" class="ln">  1676	</span>	}
+<span id="L1677" class="ln">  1677	</span>
+<span id="L1678" class="ln">  1678	</span>	if requestedSigAlgo == 0 {
+<span id="L1679" class="ln">  1679	</span>		return
+<span id="L1680" class="ln">  1680	</span>	}
+<span id="L1681" class="ln">  1681	</span>
+<span id="L1682" class="ln">  1682	</span>	found := false
+<span id="L1683" class="ln">  1683	</span>	for _, details := range signatureAlgorithmDetails {
+<span id="L1684" class="ln">  1684	</span>		if details.algo == requestedSigAlgo {
+<span id="L1685" class="ln">  1685	</span>			if details.pubKeyAlgo != pubType {
+<span id="L1686" class="ln">  1686	</span>				err = errors.New(&#34;x509: requested SignatureAlgorithm does not match private key type&#34;)
+<span id="L1687" class="ln">  1687	</span>				return
+<span id="L1688" class="ln">  1688	</span>			}
+<span id="L1689" class="ln">  1689	</span>			sigAlgo.Algorithm, hashFunc = details.oid, details.hash
+<span id="L1690" class="ln">  1690	</span>			if hashFunc == 0 {
+<span id="L1691" class="ln">  1691	</span>				err = errors.New(&#34;x509: cannot sign with hash function requested&#34;)
+<span id="L1692" class="ln">  1692	</span>				return
+<span id="L1693" class="ln">  1693	</span>			}
+<span id="L1694" class="ln">  1694	</span>			if requestedSigAlgo.isRSAPSS() {
+<span id="L1695" class="ln">  1695	</span>				sigAlgo.Parameters = rsaPSSParameters(hashFunc)
+<span id="L1696" class="ln">  1696	</span>			}
+<span id="L1697" class="ln">  1697	</span>			found = true
+<span id="L1698" class="ln">  1698	</span>			break
+<span id="L1699" class="ln">  1699	</span>		}
+<span id="L1700" class="ln">  1700	</span>	}
+<span id="L1701" class="ln">  1701	</span>
+<span id="L1702" class="ln">  1702	</span>	if !found {
+<span id="L1703" class="ln">  1703	</span>		err = errors.New(&#34;x509: unknown SignatureAlgorithm&#34;)
+<span id="L1704" class="ln">  1704	</span>	}
+<span id="L1705" class="ln">  1705	</span>
+<span id="L1706" class="ln">  1706	</span>	return
+<span id="L1707" class="ln">  1707	</span>}
+<span id="L1708" class="ln">  1708	</span>
+<span id="L1709" class="ln">  1709	</span><span class="comment">// CreateCertificate creates a new certificate based on a template. The</span>
+<span id="L1710" class="ln">  1710	</span><span class="comment">// following members of template are used: SerialNumber, Subject, NotBefore,</span>
+<span id="L1711" class="ln">  1711	</span><span class="comment">// NotAfter, KeyUsage, ExtKeyUsage, UnknownExtKeyUsage, BasicConstraintsValid,</span>
+<span id="L1712" class="ln">  1712	</span><span class="comment">// IsCA, MaxPathLen, SubjectKeyId, DNSNames, PermittedDNSDomainsCritical,</span>
+<span id="L1713" class="ln">  1713	</span><span class="comment">// PermittedDNSDomains, SignatureAlgorithm.</span>
+<span id="L1714" class="ln">  1714	</span><span class="comment">//</span>
+<span id="L1715" class="ln">  1715	</span><span class="comment">// The certificate is signed by parent. If parent is equal to template then the</span>
+<span id="L1716" class="ln">  1716	</span><span class="comment">// certificate is self-signed. The parameter pub is the public key of the</span>
+<span id="L1717" class="ln">  1717	</span><span class="comment">// signee and priv is the private key of the signer.</span>
+<span id="L1718" class="ln">  1718	</span><span class="comment">//</span>
+<span id="L1719" class="ln">  1719	</span><span class="comment">// The returned slice is the certificate in DER encoding.</span>
+<span id="L1720" class="ln">  1720	</span><span class="comment">//</span>
+<span id="L1721" class="ln">  1721	</span><span class="comment">// All keys types that are implemented via crypto.Signer are supported (This</span>
+<span id="L1722" class="ln">  1722	</span><span class="comment">// includes *rsa.PublicKey and *ecdsa.PublicKey.)</span>
+<span id="L1723" class="ln">  1723	</span>func CreateCertificate(rand io.Reader, template, parent *Certificate, pub, priv interface{}) (cert []byte, err error) {
+<span id="L1724" class="ln">  1724	</span>	key, ok := priv.(crypto.Signer)
+<span id="L1725" class="ln">  1725	</span>	if !ok {
+<span id="L1726" class="ln">  1726	</span>		return nil, errors.New(&#34;x509: certificate private key does not implement crypto.Signer&#34;)
+<span id="L1727" class="ln">  1727	</span>	}
+<span id="L1728" class="ln">  1728	</span>
+<span id="L1729" class="ln">  1729	</span>	if template.SerialNumber == nil {
+<span id="L1730" class="ln">  1730	</span>		return nil, errors.New(&#34;x509: no SerialNumber given&#34;)
+<span id="L1731" class="ln">  1731	</span>	}
+<span id="L1732" class="ln">  1732	</span>
+<span id="L1733" class="ln">  1733	</span>	hashFunc, signatureAlgorithm, err := signingParamsForPublicKey(key.Public(), template.SignatureAlgorithm)
+<span id="L1734" class="ln">  1734	</span>	if err != nil {
+<span id="L1735" class="ln">  1735	</span>		return nil, err
+<span id="L1736" class="ln">  1736	</span>	}
+<span id="L1737" class="ln">  1737	</span>
+<span id="L1738" class="ln">  1738	</span>	publicKeyBytes, publicKeyAlgorithm, err := marshalPublicKey(pub)
+<span id="L1739" class="ln">  1739	</span>	if err != nil {
+<span id="L1740" class="ln">  1740	</span>		return nil, err
+<span id="L1741" class="ln">  1741	</span>	}
+<span id="L1742" class="ln">  1742	</span>
+<span id="L1743" class="ln">  1743	</span>	asn1Issuer, err := subjectBytes(parent)
+<span id="L1744" class="ln">  1744	</span>	if err != nil {
+<span id="L1745" class="ln">  1745	</span>		return
+<span id="L1746" class="ln">  1746	</span>	}
+<span id="L1747" class="ln">  1747	</span>
+<span id="L1748" class="ln">  1748	</span>	asn1Subject, err := subjectBytes(template)
+<span id="L1749" class="ln">  1749	</span>	if err != nil {
+<span id="L1750" class="ln">  1750	</span>		return
+<span id="L1751" class="ln">  1751	</span>	}
+<span id="L1752" class="ln">  1752	</span>
+<span id="L1753" class="ln">  1753	</span>	if !bytes.Equal(asn1Issuer, asn1Subject) &amp;&amp; len(parent.SubjectKeyId) &gt; 0 {
+<span id="L1754" class="ln">  1754	</span>		template.AuthorityKeyId = parent.SubjectKeyId
+<span id="L1755" class="ln">  1755	</span>	}
+<span id="L1756" class="ln">  1756	</span>
+<span id="L1757" class="ln">  1757	</span>	extensions, err := buildExtensions(template)
+<span id="L1758" class="ln">  1758	</span>	if err != nil {
+<span id="L1759" class="ln">  1759	</span>		return
+<span id="L1760" class="ln">  1760	</span>	}
+<span id="L1761" class="ln">  1761	</span>
+<span id="L1762" class="ln">  1762	</span>	encodedPublicKey := asn1.BitString{BitLength: len(publicKeyBytes) * 8, Bytes: publicKeyBytes}
+<span id="L1763" class="ln">  1763	</span>	c := tbsCertificate{
+<span id="L1764" class="ln">  1764	</span>		Version:            2,
+<span id="L1765" class="ln">  1765	</span>		SerialNumber:       template.SerialNumber,
+<span id="L1766" class="ln">  1766	</span>		SignatureAlgorithm: signatureAlgorithm,
+<span id="L1767" class="ln">  1767	</span>		Issuer:             asn1.RawValue{FullBytes: asn1Issuer},
+<span id="L1768" class="ln">  1768	</span>		Validity:           validity{template.NotBefore.UTC(), template.NotAfter.UTC()},
+<span id="L1769" class="ln">  1769	</span>		Subject:            asn1.RawValue{FullBytes: asn1Subject},
+<span id="L1770" class="ln">  1770	</span>		PublicKey:          publicKeyInfo{nil, publicKeyAlgorithm, encodedPublicKey},
+<span id="L1771" class="ln">  1771	</span>		Extensions:         extensions,
+<span id="L1772" class="ln">  1772	</span>	}
+<span id="L1773" class="ln">  1773	</span>
+<span id="L1774" class="ln">  1774	</span>	tbsCertContents, err := asn1.Marshal(c)
+<span id="L1775" class="ln">  1775	</span>	if err != nil {
+<span id="L1776" class="ln">  1776	</span>		return
+<span id="L1777" class="ln">  1777	</span>	}
+<span id="L1778" class="ln">  1778	</span>
+<span id="L1779" class="ln">  1779	</span>	c.Raw = tbsCertContents
+<span id="L1780" class="ln">  1780	</span>
+<span id="L1781" class="ln">  1781	</span>	h := hashFunc.New()
+<span id="L1782" class="ln">  1782	</span>	h.Write(tbsCertContents)
+<span id="L1783" class="ln">  1783	</span>	digest := h.Sum(nil)
+<span id="L1784" class="ln">  1784	</span>
+<span id="L1785" class="ln">  1785	</span>	var signerOpts crypto.SignerOpts
+<span id="L1786" class="ln">  1786	</span>	signerOpts = hashFunc
+<span id="L1787" class="ln">  1787	</span>	if template.SignatureAlgorithm != 0 &amp;&amp; template.SignatureAlgorithm.isRSAPSS() {
+<span id="L1788" class="ln">  1788	</span>		signerOpts = &amp;rsa.PSSOptions{
+<span id="L1789" class="ln">  1789	</span>			SaltLength: rsa.PSSSaltLengthEqualsHash,
+<span id="L1790" class="ln">  1790	</span>			Hash:       hashFunc,
+<span id="L1791" class="ln">  1791	</span>		}
+<span id="L1792" class="ln">  1792	</span>	}
+<span id="L1793" class="ln">  1793	</span>
+<span id="L1794" class="ln">  1794	</span>	var signature []byte
+<span id="L1795" class="ln">  1795	</span>	signature, err = key.Sign(rand, digest, signerOpts)
+<span id="L1796" class="ln">  1796	</span>	if err != nil {
+<span id="L1797" class="ln">  1797	</span>		return
+<span id="L1798" class="ln">  1798	</span>	}
+<span id="L1799" class="ln">  1799	</span>
+<span id="L1800" class="ln">  1800	</span>	return asn1.Marshal(certificate{
+<span id="L1801" class="ln">  1801	</span>		nil,
+<span id="L1802" class="ln">  1802	</span>		c,
+<span id="L1803" class="ln">  1803	</span>		signatureAlgorithm,
+<span id="L1804" class="ln">  1804	</span>		asn1.BitString{Bytes: signature, BitLength: len(signature) * 8},
+<span id="L1805" class="ln">  1805	</span>	})
+<span id="L1806" class="ln">  1806	</span>}
+<span id="L1807" class="ln">  1807	</span>
+<span id="L1808" class="ln">  1808	</span><span class="comment">// pemCRLPrefix is the magic string that indicates that we have a PEM encoded</span>
+<span id="L1809" class="ln">  1809	</span><span class="comment">// CRL.</span>
+<span id="L1810" class="ln">  1810	</span>var pemCRLPrefix = []byte(&#34;-----BEGIN X509 CRL&#34;)
+<span id="L1811" class="ln">  1811	</span>
+<span id="L1812" class="ln">  1812	</span><span class="comment">// pemType is the type of a PEM encoded CRL.</span>
+<span id="L1813" class="ln">  1813	</span>var pemType = &#34;X509 CRL&#34;
+<span id="L1814" class="ln">  1814	</span>
+<span id="L1815" class="ln">  1815	</span><span class="comment">// ParseCRL parses a CRL from the given bytes. It&#39;s often the case that PEM</span>
+<span id="L1816" class="ln">  1816	</span><span class="comment">// encoded CRLs will appear where they should be DER encoded, so this function</span>
+<span id="L1817" class="ln">  1817	</span><span class="comment">// will transparently handle PEM encoding as long as there isn&#39;t any leading</span>
+<span id="L1818" class="ln">  1818	</span><span class="comment">// garbage.</span>
+<span id="L1819" class="ln">  1819	</span>func ParseCRL(crlBytes []byte) (*pkix.CertificateList, error) {
+<span id="L1820" class="ln">  1820	</span>	if bytes.HasPrefix(crlBytes, pemCRLPrefix) {
+<span id="L1821" class="ln">  1821	</span>		block, _ := pem.Decode(crlBytes)
+<span id="L1822" class="ln">  1822	</span>		if block != nil &amp;&amp; block.Type == pemType {
+<span id="L1823" class="ln">  1823	</span>			crlBytes = block.Bytes
+<span id="L1824" class="ln">  1824	</span>		}
+<span id="L1825" class="ln">  1825	</span>	}
+<span id="L1826" class="ln">  1826	</span>	return ParseDERCRL(crlBytes)
+<span id="L1827" class="ln">  1827	</span>}
+<span id="L1828" class="ln">  1828	</span>
+<span id="L1829" class="ln">  1829	</span><span class="comment">// ParseDERCRL parses a DER encoded CRL from the given bytes.</span>
+<span id="L1830" class="ln">  1830	</span>func ParseDERCRL(derBytes []byte) (*pkix.CertificateList, error) {
+<span id="L1831" class="ln">  1831	</span>	certList := new(pkix.CertificateList)
+<span id="L1832" class="ln">  1832	</span>	if rest, err := asn1.Unmarshal(derBytes, certList); err != nil {
+<span id="L1833" class="ln">  1833	</span>		return nil, err
+<span id="L1834" class="ln">  1834	</span>	} else if len(rest) != 0 {
+<span id="L1835" class="ln">  1835	</span>		return nil, errors.New(&#34;x509: trailing data after CRL&#34;)
+<span id="L1836" class="ln">  1836	</span>	}
+<span id="L1837" class="ln">  1837	</span>	return certList, nil
+<span id="L1838" class="ln">  1838	</span>}
+<span id="L1839" class="ln">  1839	</span>
+<span id="L1840" class="ln">  1840	</span><span class="comment">// CreateCRL returns a DER encoded CRL, signed by this Certificate, that</span>
+<span id="L1841" class="ln">  1841	</span><span class="comment">// contains the given list of revoked certificates.</span>
+<span id="L1842" class="ln">  1842	</span>func (c *Certificate) CreateCRL(rand io.Reader, priv interface{}, revokedCerts []pkix.RevokedCertificate, now, expiry time.Time) (crlBytes []byte, err error) {
+<span id="L1843" class="ln">  1843	</span>	key, ok := priv.(crypto.Signer)
+<span id="L1844" class="ln">  1844	</span>	if !ok {
+<span id="L1845" class="ln">  1845	</span>		return nil, errors.New(&#34;x509: certificate private key does not implement crypto.Signer&#34;)
+<span id="L1846" class="ln">  1846	</span>	}
+<span id="L1847" class="ln">  1847	</span>
+<span id="L1848" class="ln">  1848	</span>	hashFunc, signatureAlgorithm, err := signingParamsForPublicKey(key.Public(), 0)
+<span id="L1849" class="ln">  1849	</span>	if err != nil {
+<span id="L1850" class="ln">  1850	</span>		return nil, err
+<span id="L1851" class="ln">  1851	</span>	}
+<span id="L1852" class="ln">  1852	</span>
+<span id="L1853" class="ln">  1853	</span>	<span class="comment">// Force revocation times to UTC per RFC 5280.</span>
+<span id="L1854" class="ln">  1854	</span>	revokedCertsUTC := make([]pkix.RevokedCertificate, len(revokedCerts))
+<span id="L1855" class="ln">  1855	</span>	for i, rc := range revokedCerts {
+<span id="L1856" class="ln">  1856	</span>		rc.RevocationTime = rc.RevocationTime.UTC()
+<span id="L1857" class="ln">  1857	</span>		revokedCertsUTC[i] = rc
+<span id="L1858" class="ln">  1858	</span>	}
+<span id="L1859" class="ln">  1859	</span>
+<span id="L1860" class="ln">  1860	</span>	tbsCertList := pkix.TBSCertificateList{
+<span id="L1861" class="ln">  1861	</span>		Version:             1,
+<span id="L1862" class="ln">  1862	</span>		Signature:           signatureAlgorithm,
+<span id="L1863" class="ln">  1863	</span>		Issuer:              c.Subject.ToRDNSequence(),
+<span id="L1864" class="ln">  1864	</span>		ThisUpdate:          now.UTC(),
+<span id="L1865" class="ln">  1865	</span>		NextUpdate:          expiry.UTC(),
+<span id="L1866" class="ln">  1866	</span>		RevokedCertificates: revokedCertsUTC,
+<span id="L1867" class="ln">  1867	</span>	}
+<span id="L1868" class="ln">  1868	</span>
+<span id="L1869" class="ln">  1869	</span>	<span class="comment">// Authority Key Id</span>
+<span id="L1870" class="ln">  1870	</span>	if len(c.SubjectKeyId) &gt; 0 {
+<span id="L1871" class="ln">  1871	</span>		var aki pkix.Extension
+<span id="L1872" class="ln">  1872	</span>		aki.Id = oidExtensionAuthorityKeyId
+<span id="L1873" class="ln">  1873	</span>		aki.Value, err = asn1.Marshal(authKeyId{Id: c.SubjectKeyId})
+<span id="L1874" class="ln">  1874	</span>		if err != nil {
+<span id="L1875" class="ln">  1875	</span>			return
+<span id="L1876" class="ln">  1876	</span>		}
+<span id="L1877" class="ln">  1877	</span>		tbsCertList.Extensions = append(tbsCertList.Extensions, aki)
+<span id="L1878" class="ln">  1878	</span>	}
+<span id="L1879" class="ln">  1879	</span>
+<span id="L1880" class="ln">  1880	</span>	tbsCertListContents, err := asn1.Marshal(tbsCertList)
+<span id="L1881" class="ln">  1881	</span>	if err != nil {
+<span id="L1882" class="ln">  1882	</span>		return
+<span id="L1883" class="ln">  1883	</span>	}
+<span id="L1884" class="ln">  1884	</span>
+<span id="L1885" class="ln">  1885	</span>	h := hashFunc.New()
+<span id="L1886" class="ln">  1886	</span>	h.Write(tbsCertListContents)
+<span id="L1887" class="ln">  1887	</span>	digest := h.Sum(nil)
+<span id="L1888" class="ln">  1888	</span>
+<span id="L1889" class="ln">  1889	</span>	var signature []byte
+<span id="L1890" class="ln">  1890	</span>	signature, err = key.Sign(rand, digest, hashFunc)
+<span id="L1891" class="ln">  1891	</span>	if err != nil {
+<span id="L1892" class="ln">  1892	</span>		return
+<span id="L1893" class="ln">  1893	</span>	}
+<span id="L1894" class="ln">  1894	</span>
+<span id="L1895" class="ln">  1895	</span>	return asn1.Marshal(pkix.CertificateList{
+<span id="L1896" class="ln">  1896	</span>		TBSCertList:        tbsCertList,
+<span id="L1897" class="ln">  1897	</span>		SignatureAlgorithm: signatureAlgorithm,
+<span id="L1898" class="ln">  1898	</span>		SignatureValue:     asn1.BitString{Bytes: signature, BitLength: len(signature) * 8},
+<span id="L1899" class="ln">  1899	</span>	})
+<span id="L1900" class="ln">  1900	</span>}
+<span id="L1901" class="ln">  1901	</span>
+<span id="L1902" class="ln">  1902	</span><span class="comment">// CertificateRequest represents a PKCS #10, certificate signature request.</span>
+<span id="L1903" class="ln">  1903	</span>type CertificateRequest struct {
+<span id="L1904" class="ln">  1904	</span>	Raw                      []byte <span class="comment">// Complete ASN.1 DER content (CSR, signature algorithm and signature).</span>
+<span id="L1905" class="ln">  1905	</span>	RawTBSCertificateRequest []byte <span class="comment">// Certificate request info part of raw ASN.1 DER content.</span>
+<span id="L1906" class="ln">  1906	</span>	RawSubjectPublicKeyInfo  []byte <span class="comment">// DER encoded SubjectPublicKeyInfo.</span>
+<span id="L1907" class="ln">  1907	</span>	RawSubject               []byte <span class="comment">// DER encoded Subject.</span>
+<span id="L1908" class="ln">  1908	</span>
+<span id="L1909" class="ln">  1909	</span>	Version            int
+<span id="L1910" class="ln">  1910	</span>	Signature          []byte
+<span id="L1911" class="ln">  1911	</span>	SignatureAlgorithm SignatureAlgorithm
+<span id="L1912" class="ln">  1912	</span>
+<span id="L1913" class="ln">  1913	</span>	PublicKeyAlgorithm PublicKeyAlgorithm
+<span id="L1914" class="ln">  1914	</span>	PublicKey          interface{}
+<span id="L1915" class="ln">  1915	</span>
+<span id="L1916" class="ln">  1916	</span>	Subject pkix.Name
+<span id="L1917" class="ln">  1917	</span>
+<span id="L1918" class="ln">  1918	</span>	<span class="comment">// Attributes is the dried husk of a bug and shouldn&#39;t be used.</span>
+<span id="L1919" class="ln">  1919	</span>	Attributes []pkix.AttributeTypeAndValueSET
+<span id="L1920" class="ln">  1920	</span>
+<span id="L1921" class="ln">  1921	</span>	<span class="comment">// Extensions contains raw X.509 extensions. When parsing CSRs, this</span>
+<span id="L1922" class="ln">  1922	</span>	<span class="comment">// can be used to extract extensions that are not parsed by this</span>
+<span id="L1923" class="ln">  1923	</span>	<span class="comment">// package.</span>
+<span id="L1924" class="ln">  1924	</span>	Extensions []pkix.Extension
+<span id="L1925" class="ln">  1925	</span>
+<span id="L1926" class="ln">  1926	</span>	<span class="comment">// ExtraExtensions contains extensions to be copied, raw, into any</span>
+<span id="L1927" class="ln">  1927	</span>	<span class="comment">// marshaled CSR. Values override any extensions that would otherwise</span>
+<span id="L1928" class="ln">  1928	</span>	<span class="comment">// be produced based on the other fields but are overridden by any</span>
+<span id="L1929" class="ln">  1929	</span>	<span class="comment">// extensions specified in Attributes.</span>
+<span id="L1930" class="ln">  1930	</span>	<span class="comment">//</span>
+<span id="L1931" class="ln">  1931	</span>	<span class="comment">// The ExtraExtensions field is not populated when parsing CSRs, see</span>
+<span id="L1932" class="ln">  1932	</span>	<span class="comment">// Extensions.</span>
+<span id="L1933" class="ln">  1933	</span>	ExtraExtensions []pkix.Extension
+<span id="L1934" class="ln">  1934	</span>
+<span id="L1935" class="ln">  1935	</span>	<span class="comment">// Subject Alternate Name values.</span>
+<span id="L1936" class="ln">  1936	</span>	DNSNames       []string
+<span id="L1937" class="ln">  1937	</span>	EmailAddresses []string
+<span id="L1938" class="ln">  1938	</span>	IPAddresses    []net.IP
+<span id="L1939" class="ln">  1939	</span>}
+<span id="L1940" class="ln">  1940	</span>
+<span id="L1941" class="ln">  1941	</span><span class="comment">// These structures reflect the ASN.1 structure of X.509 certificate</span>
+<span id="L1942" class="ln">  1942	</span><span class="comment">// signature requests (see RFC 2986):</span>
+<span id="L1943" class="ln">  1943	</span>
+<span id="L1944" class="ln">  1944	</span>type tbsCertificateRequest struct {
+<span id="L1945" class="ln">  1945	</span>	Raw           asn1.RawContent
+<span id="L1946" class="ln">  1946	</span>	Version       int
+<span id="L1947" class="ln">  1947	</span>	Subject       asn1.RawValue
+<span id="L1948" class="ln">  1948	</span>	PublicKey     publicKeyInfo
+<span id="L1949" class="ln">  1949	</span>	RawAttributes []asn1.RawValue `asn1:&#34;tag:0&#34;`
+<span id="L1950" class="ln">  1950	</span>}
+<span id="L1951" class="ln">  1951	</span>
+<span id="L1952" class="ln">  1952	</span>type certificateRequest struct {
+<span id="L1953" class="ln">  1953	</span>	Raw                asn1.RawContent
+<span id="L1954" class="ln">  1954	</span>	TBSCSR             tbsCertificateRequest
+<span id="L1955" class="ln">  1955	</span>	SignatureAlgorithm pkix.AlgorithmIdentifier
+<span id="L1956" class="ln">  1956	</span>	SignatureValue     asn1.BitString
+<span id="L1957" class="ln">  1957	</span>}
+<span id="L1958" class="ln">  1958	</span>
+<span id="L1959" class="ln">  1959	</span><span class="comment">// oidExtensionRequest is a PKCS#9 OBJECT IDENTIFIER that indicates requested</span>
+<span id="L1960" class="ln">  1960	</span><span class="comment">// extensions in a CSR.</span>
+<span id="L1961" class="ln">  1961	</span>var oidExtensionRequest = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 14}
+<span id="L1962" class="ln">  1962	</span>
+<span id="L1963" class="ln">  1963	</span><span class="comment">// newRawAttributes converts AttributeTypeAndValueSETs from a template</span>
+<span id="L1964" class="ln">  1964	</span><span class="comment">// CertificateRequest&#39;s Attributes into tbsCertificateRequest RawAttributes.</span>
+<span id="L1965" class="ln">  1965	</span>func newRawAttributes(attributes []pkix.AttributeTypeAndValueSET) ([]asn1.RawValue, error) {
+<span id="L1966" class="ln">  1966	</span>	var rawAttributes []asn1.RawValue
+<span id="L1967" class="ln">  1967	</span>	b, err := asn1.Marshal(attributes)
+<span id="L1968" class="ln">  1968	</span>	if err != nil {
+<span id="L1969" class="ln">  1969	</span>		return nil, err
+<span id="L1970" class="ln">  1970	</span>	}
+<span id="L1971" class="ln">  1971	</span>	rest, err := asn1.Unmarshal(b, &amp;rawAttributes)
+<span id="L1972" class="ln">  1972	</span>	if err != nil {
+<span id="L1973" class="ln">  1973	</span>		return nil, err
+<span id="L1974" class="ln">  1974	</span>	}
+<span id="L1975" class="ln">  1975	</span>	if len(rest) != 0 {
+<span id="L1976" class="ln">  1976	</span>		return nil, errors.New(&#34;x509: failed to unmarshal raw CSR Attributes&#34;)
+<span id="L1977" class="ln">  1977	</span>	}
+<span id="L1978" class="ln">  1978	</span>	return rawAttributes, nil
+<span id="L1979" class="ln">  1979	</span>}
+<span id="L1980" class="ln">  1980	</span>
+<span id="L1981" class="ln">  1981	</span><span class="comment">// parseRawAttributes Unmarshals RawAttributes intos AttributeTypeAndValueSETs.</span>
+<span id="L1982" class="ln">  1982	</span>func parseRawAttributes(rawAttributes []asn1.RawValue) []pkix.AttributeTypeAndValueSET {
+<span id="L1983" class="ln">  1983	</span>	var attributes []pkix.AttributeTypeAndValueSET
+<span id="L1984" class="ln">  1984	</span>	for _, rawAttr := range rawAttributes {
+<span id="L1985" class="ln">  1985	</span>		var attr pkix.AttributeTypeAndValueSET
+<span id="L1986" class="ln">  1986	</span>		rest, err := asn1.Unmarshal(rawAttr.FullBytes, &amp;attr)
+<span id="L1987" class="ln">  1987	</span>		<span class="comment">// Ignore attributes that don&#39;t parse into pkix.AttributeTypeAndValueSET</span>
+<span id="L1988" class="ln">  1988	</span>		<span class="comment">// (i.e.: challengePassword or unstructuredName).</span>
+<span id="L1989" class="ln">  1989	</span>		if err == nil &amp;&amp; len(rest) == 0 {
+<span id="L1990" class="ln">  1990	</span>			attributes = append(attributes, attr)
+<span id="L1991" class="ln">  1991	</span>		}
+<span id="L1992" class="ln">  1992	</span>	}
+<span id="L1993" class="ln">  1993	</span>	return attributes
+<span id="L1994" class="ln">  1994	</span>}
+<span id="L1995" class="ln">  1995	</span>
+<span id="L1996" class="ln">  1996	</span><span class="comment">// parseCSRExtensions parses the attributes from a CSR and extracts any</span>
+<span id="L1997" class="ln">  1997	</span><span class="comment">// requested extensions.</span>
+<span id="L1998" class="ln">  1998	</span>func parseCSRExtensions(rawAttributes []asn1.RawValue) ([]pkix.Extension, error) {
+<span id="L1999" class="ln">  1999	</span>	<span class="comment">// pkcs10Attribute reflects the Attribute structure from section 4.1 of</span>
+<span id="L2000" class="ln">  2000	</span>	<span class="comment">// https://tools.ietf.org/html/rfc2986.</span>
+<span id="L2001" class="ln">  2001	</span>	type pkcs10Attribute struct {
+<span id="L2002" class="ln">  2002	</span>		Id     asn1.ObjectIdentifier
+<span id="L2003" class="ln">  2003	</span>		Values []asn1.RawValue `asn1:&#34;set&#34;`
+<span id="L2004" class="ln">  2004	</span>	}
+<span id="L2005" class="ln">  2005	</span>
+<span id="L2006" class="ln">  2006	</span>	var ret []pkix.Extension
+<span id="L2007" class="ln">  2007	</span>	for _, rawAttr := range rawAttributes {
+<span id="L2008" class="ln">  2008	</span>		var attr pkcs10Attribute
+<span id="L2009" class="ln">  2009	</span>		if rest, err := asn1.Unmarshal(rawAttr.FullBytes, &amp;attr); err != nil || len(rest) != 0 || len(attr.Values) == 0 {
+<span id="L2010" class="ln">  2010	</span>			<span class="comment">// Ignore attributes that don&#39;t parse.</span>
+<span id="L2011" class="ln">  2011	</span>			continue
+<span id="L2012" class="ln">  2012	</span>		}
+<span id="L2013" class="ln">  2013	</span>
+<span id="L2014" class="ln">  2014	</span>		if !attr.Id.Equal(oidExtensionRequest) {
+<span id="L2015" class="ln">  2015	</span>			continue
+<span id="L2016" class="ln">  2016	</span>		}
+<span id="L2017" class="ln">  2017	</span>
+<span id="L2018" class="ln">  2018	</span>		var extensions []pkix.Extension
+<span id="L2019" class="ln">  2019	</span>		if _, err := asn1.Unmarshal(attr.Values[0].FullBytes, &amp;extensions); err != nil {
+<span id="L2020" class="ln">  2020	</span>			return nil, err
+<span id="L2021" class="ln">  2021	</span>		}
+<span id="L2022" class="ln">  2022	</span>		ret = append(ret, extensions...)
+<span id="L2023" class="ln">  2023	</span>	}
+<span id="L2024" class="ln">  2024	</span>
+<span id="L2025" class="ln">  2025	</span>	return ret, nil
+<span id="L2026" class="ln">  2026	</span>}
+<span id="L2027" class="ln">  2027	</span>
+<span id="L2028" class="ln">  2028	</span><span class="comment">// CreateCertificateRequest creates a new certificate request based on a template.</span>
+<span id="L2029" class="ln">  2029	</span><span class="comment">// The following members of template are used: Subject, Attributes,</span>
+<span id="L2030" class="ln">  2030	</span><span class="comment">// SignatureAlgorithm, Extensions, DNSNames, EmailAddresses, and IPAddresses.</span>
+<span id="L2031" class="ln">  2031	</span><span class="comment">// The private key is the private key of the signer.</span>
+<span id="L2032" class="ln">  2032	</span><span class="comment">//</span>
+<span id="L2033" class="ln">  2033	</span><span class="comment">// The returned slice is the certificate request in DER encoding.</span>
+<span id="L2034" class="ln">  2034	</span><span class="comment">//</span>
+<span id="L2035" class="ln">  2035	</span><span class="comment">// All keys types that are implemented via crypto.Signer are supported (This</span>
+<span id="L2036" class="ln">  2036	</span><span class="comment">// includes *rsa.PublicKey and *ecdsa.PublicKey.)</span>
+<span id="L2037" class="ln">  2037	</span>func CreateCertificateRequest(rand io.Reader, template *CertificateRequest, priv interface{}) (csr []byte, err error) {
+<span id="L2038" class="ln">  2038	</span>	key, ok := priv.(crypto.Signer)
+<span id="L2039" class="ln">  2039	</span>	if !ok {
+<span id="L2040" class="ln">  2040	</span>		return nil, errors.New(&#34;x509: certificate private key does not implement crypto.Signer&#34;)
+<span id="L2041" class="ln">  2041	</span>	}
+<span id="L2042" class="ln">  2042	</span>
+<span id="L2043" class="ln">  2043	</span>	var hashFunc crypto.Hash
+<span id="L2044" class="ln">  2044	</span>	var sigAlgo pkix.AlgorithmIdentifier
+<span id="L2045" class="ln">  2045	</span>	hashFunc, sigAlgo, err = signingParamsForPublicKey(key.Public(), template.SignatureAlgorithm)
+<span id="L2046" class="ln">  2046	</span>	if err != nil {
+<span id="L2047" class="ln">  2047	</span>		return nil, err
+<span id="L2048" class="ln">  2048	</span>	}
+<span id="L2049" class="ln">  2049	</span>
+<span id="L2050" class="ln">  2050	</span>	var publicKeyBytes []byte
+<span id="L2051" class="ln">  2051	</span>	var publicKeyAlgorithm pkix.AlgorithmIdentifier
+<span id="L2052" class="ln">  2052	</span>	publicKeyBytes, publicKeyAlgorithm, err = marshalPublicKey(key.Public())
+<span id="L2053" class="ln">  2053	</span>	if err != nil {
+<span id="L2054" class="ln">  2054	</span>		return nil, err
+<span id="L2055" class="ln">  2055	</span>	}
+<span id="L2056" class="ln">  2056	</span>
+<span id="L2057" class="ln">  2057	</span>	var extensions []pkix.Extension
+<span id="L2058" class="ln">  2058	</span>
+<span id="L2059" class="ln">  2059	</span>	if (len(template.DNSNames) &gt; 0 || len(template.EmailAddresses) &gt; 0 || len(template.IPAddresses) &gt; 0) &amp;&amp;
+<span id="L2060" class="ln">  2060	</span>		!oidInExtensions(oidExtensionSubjectAltName, template.ExtraExtensions) {
+<span id="L2061" class="ln">  2061	</span>		sanBytes, err := marshalSANs(template.DNSNames, template.EmailAddresses, template.IPAddresses)
+<span id="L2062" class="ln">  2062	</span>		if err != nil {
+<span id="L2063" class="ln">  2063	</span>			return nil, err
+<span id="L2064" class="ln">  2064	</span>		}
+<span id="L2065" class="ln">  2065	</span>
+<span id="L2066" class="ln">  2066	</span>		extensions = append(extensions, pkix.Extension{
+<span id="L2067" class="ln">  2067	</span>			Id:    oidExtensionSubjectAltName,
+<span id="L2068" class="ln">  2068	</span>			Value: sanBytes,
+<span id="L2069" class="ln">  2069	</span>		})
+<span id="L2070" class="ln">  2070	</span>	}
+<span id="L2071" class="ln">  2071	</span>
+<span id="L2072" class="ln">  2072	</span>	extensions = append(extensions, template.ExtraExtensions...)
+<span id="L2073" class="ln">  2073	</span>
+<span id="L2074" class="ln">  2074	</span>	var attributes []pkix.AttributeTypeAndValueSET
+<span id="L2075" class="ln">  2075	</span>	attributes = append(attributes, template.Attributes...)
+<span id="L2076" class="ln">  2076	</span>
+<span id="L2077" class="ln">  2077	</span>	if len(extensions) &gt; 0 {
+<span id="L2078" class="ln">  2078	</span>		<span class="comment">// specifiedExtensions contains all the extensions that we</span>
+<span id="L2079" class="ln">  2079	</span>		<span class="comment">// found specified via template.Attributes.</span>
+<span id="L2080" class="ln">  2080	</span>		specifiedExtensions := make(map[string]bool)
+<span id="L2081" class="ln">  2081	</span>
+<span id="L2082" class="ln">  2082	</span>		for _, atvSet := range template.Attributes {
+<span id="L2083" class="ln">  2083	</span>			if !atvSet.Type.Equal(oidExtensionRequest) {
+<span id="L2084" class="ln">  2084	</span>				continue
+<span id="L2085" class="ln">  2085	</span>			}
+<span id="L2086" class="ln">  2086	</span>
+<span id="L2087" class="ln">  2087	</span>			for _, atvs := range atvSet.Value {
+<span id="L2088" class="ln">  2088	</span>				for _, atv := range atvs {
+<span id="L2089" class="ln">  2089	</span>					specifiedExtensions[atv.Type.String()] = true
+<span id="L2090" class="ln">  2090	</span>				}
+<span id="L2091" class="ln">  2091	</span>			}
+<span id="L2092" class="ln">  2092	</span>		}
+<span id="L2093" class="ln">  2093	</span>
+<span id="L2094" class="ln">  2094	</span>		atvs := make([]pkix.AttributeTypeAndValue, 0, len(extensions))
+<span id="L2095" class="ln">  2095	</span>		for _, e := range extensions {
+<span id="L2096" class="ln">  2096	</span>			if specifiedExtensions[e.Id.String()] {
+<span id="L2097" class="ln">  2097	</span>				<span class="comment">// Attributes already contained a value for</span>
+<span id="L2098" class="ln">  2098	</span>				<span class="comment">// this extension and it takes priority.</span>
+<span id="L2099" class="ln">  2099	</span>				continue
+<span id="L2100" class="ln">  2100	</span>			}
+<span id="L2101" class="ln">  2101	</span>
+<span id="L2102" class="ln">  2102	</span>			atvs = append(atvs, pkix.AttributeTypeAndValue{
+<span id="L2103" class="ln">  2103	</span>				<span class="comment">// There is no place for the critical flag in a CSR.</span>
+<span id="L2104" class="ln">  2104	</span>				Type:  e.Id,
+<span id="L2105" class="ln">  2105	</span>				Value: e.Value,
+<span id="L2106" class="ln">  2106	</span>			})
+<span id="L2107" class="ln">  2107	</span>		}
+<span id="L2108" class="ln">  2108	</span>
+<span id="L2109" class="ln">  2109	</span>		<span class="comment">// Append the extensions to an existing attribute if possible.</span>
+<span id="L2110" class="ln">  2110	</span>		appended := false
+<span id="L2111" class="ln">  2111	</span>		for _, atvSet := range attributes {
+<span id="L2112" class="ln">  2112	</span>			if !atvSet.Type.Equal(oidExtensionRequest) || len(atvSet.Value) == 0 {
+<span id="L2113" class="ln">  2113	</span>				continue
+<span id="L2114" class="ln">  2114	</span>			}
+<span id="L2115" class="ln">  2115	</span>
+<span id="L2116" class="ln">  2116	</span>			atvSet.Value[0] = append(atvSet.Value[0], atvs...)
+<span id="L2117" class="ln">  2117	</span>			appended = true
+<span id="L2118" class="ln">  2118	</span>			break
+<span id="L2119" class="ln">  2119	</span>		}
+<span id="L2120" class="ln">  2120	</span>
+<span id="L2121" class="ln">  2121	</span>		<span class="comment">// Otherwise, add a new attribute for the extensions.</span>
+<span id="L2122" class="ln">  2122	</span>		if !appended {
+<span id="L2123" class="ln">  2123	</span>			attributes = append(attributes, pkix.AttributeTypeAndValueSET{
+<span id="L2124" class="ln">  2124	</span>				Type: oidExtensionRequest,
+<span id="L2125" class="ln">  2125	</span>				Value: [][]pkix.AttributeTypeAndValue{
+<span id="L2126" class="ln">  2126	</span>					atvs,
+<span id="L2127" class="ln">  2127	</span>				},
+<span id="L2128" class="ln">  2128	</span>			})
+<span id="L2129" class="ln">  2129	</span>		}
+<span id="L2130" class="ln">  2130	</span>	}
+<span id="L2131" class="ln">  2131	</span>
+<span id="L2132" class="ln">  2132	</span>	asn1Subject := template.RawSubject
+<span id="L2133" class="ln">  2133	</span>	if len(asn1Subject) == 0 {
+<span id="L2134" class="ln">  2134	</span>		asn1Subject, err = asn1.Marshal(template.Subject.ToRDNSequence())
+<span id="L2135" class="ln">  2135	</span>		if err != nil {
+<span id="L2136" class="ln">  2136	</span>			return
+<span id="L2137" class="ln">  2137	</span>		}
+<span id="L2138" class="ln">  2138	</span>	}
+<span id="L2139" class="ln">  2139	</span>
+<span id="L2140" class="ln">  2140	</span>	rawAttributes, err := newRawAttributes(attributes)
+<span id="L2141" class="ln">  2141	</span>	if err != nil {
+<span id="L2142" class="ln">  2142	</span>		return
+<span id="L2143" class="ln">  2143	</span>	}
+<span id="L2144" class="ln">  2144	</span>
+<span id="L2145" class="ln">  2145	</span>	tbsCSR := tbsCertificateRequest{
+<span id="L2146" class="ln">  2146	</span>		Version: 0, <span class="comment">// PKCS #10, RFC 2986</span>
+<span id="L2147" class="ln">  2147	</span>		Subject: asn1.RawValue{FullBytes: asn1Subject},
+<span id="L2148" class="ln">  2148	</span>		PublicKey: publicKeyInfo{
+<span id="L2149" class="ln">  2149	</span>			Algorithm: publicKeyAlgorithm,
+<span id="L2150" class="ln">  2150	</span>			PublicKey: asn1.BitString{
+<span id="L2151" class="ln">  2151	</span>				Bytes:     publicKeyBytes,
+<span id="L2152" class="ln">  2152	</span>				BitLength: len(publicKeyBytes) * 8,
+<span id="L2153" class="ln">  2153	</span>			},
+<span id="L2154" class="ln">  2154	</span>		},
+<span id="L2155" class="ln">  2155	</span>		RawAttributes: rawAttributes,
+<span id="L2156" class="ln">  2156	</span>	}
+<span id="L2157" class="ln">  2157	</span>
+<span id="L2158" class="ln">  2158	</span>	tbsCSRContents, err := asn1.Marshal(tbsCSR)
+<span id="L2159" class="ln">  2159	</span>	if err != nil {
+<span id="L2160" class="ln">  2160	</span>		return
+<span id="L2161" class="ln">  2161	</span>	}
+<span id="L2162" class="ln">  2162	</span>	tbsCSR.Raw = tbsCSRContents
+<span id="L2163" class="ln">  2163	</span>
+<span id="L2164" class="ln">  2164	</span>	h := hashFunc.New()
+<span id="L2165" class="ln">  2165	</span>	h.Write(tbsCSRContents)
+<span id="L2166" class="ln">  2166	</span>	digest := h.Sum(nil)
+<span id="L2167" class="ln">  2167	</span>
+<span id="L2168" class="ln">  2168	</span>	var signature []byte
+<span id="L2169" class="ln">  2169	</span>	signature, err = key.Sign(rand, digest, hashFunc)
+<span id="L2170" class="ln">  2170	</span>	if err != nil {
+<span id="L2171" class="ln">  2171	</span>		return
+<span id="L2172" class="ln">  2172	</span>	}
+<span id="L2173" class="ln">  2173	</span>
+<span id="L2174" class="ln">  2174	</span>	return asn1.Marshal(certificateRequest{
+<span id="L2175" class="ln">  2175	</span>		TBSCSR:             tbsCSR,
+<span id="L2176" class="ln">  2176	</span>		SignatureAlgorithm: sigAlgo,
+<span id="L2177" class="ln">  2177	</span>		SignatureValue: asn1.BitString{
+<span id="L2178" class="ln">  2178	</span>			Bytes:     signature,
+<span id="L2179" class="ln">  2179	</span>			BitLength: len(signature) * 8,
+<span id="L2180" class="ln">  2180	</span>		},
+<span id="L2181" class="ln">  2181	</span>	})
+<span id="L2182" class="ln">  2182	</span>}
+<span id="L2183" class="ln">  2183	</span>
+<span id="L2184" class="ln">  2184	</span><span class="comment">// ParseCertificateRequest parses a single certificate request from the</span>
+<span id="L2185" class="ln">  2185	</span><span class="comment">// given ASN.1 DER data.</span>
+<span id="L2186" class="ln">  2186	</span>func ParseCertificateRequest(asn1Data []byte) (*CertificateRequest, error) {
+<span id="L2187" class="ln">  2187	</span>	var csr certificateRequest
+<span id="L2188" class="ln">  2188	</span>
+<span id="L2189" class="ln">  2189	</span>	rest, err := asn1.Unmarshal(asn1Data, &amp;csr)
+<span id="L2190" class="ln">  2190	</span>	if err != nil {
+<span id="L2191" class="ln">  2191	</span>		return nil, err
+<span id="L2192" class="ln">  2192	</span>	} else if len(rest) != 0 {
+<span id="L2193" class="ln">  2193	</span>		return nil, asn1.SyntaxError{Msg: &#34;trailing data&#34;}
+<span id="L2194" class="ln">  2194	</span>	}
+<span id="L2195" class="ln">  2195	</span>
+<span id="L2196" class="ln">  2196	</span>	return parseCertificateRequest(&amp;csr)
+<span id="L2197" class="ln">  2197	</span>}
+<span id="L2198" class="ln">  2198	</span>
+<span id="L2199" class="ln">  2199	</span>func parseCertificateRequest(in *certificateRequest) (*CertificateRequest, error) {
+<span id="L2200" class="ln">  2200	</span>	out := &amp;CertificateRequest{
+<span id="L2201" class="ln">  2201	</span>		Raw: in.Raw,
+<span id="L2202" class="ln">  2202	</span>		RawTBSCertificateRequest: in.TBSCSR.Raw,
+<span id="L2203" class="ln">  2203	</span>		RawSubjectPublicKeyInfo:  in.TBSCSR.PublicKey.Raw,
+<span id="L2204" class="ln">  2204	</span>		RawSubject:               in.TBSCSR.Subject.FullBytes,
+<span id="L2205" class="ln">  2205	</span>
+<span id="L2206" class="ln">  2206	</span>		Signature:          in.SignatureValue.RightAlign(),
+<span id="L2207" class="ln">  2207	</span>		SignatureAlgorithm: getSignatureAlgorithmFromAI(in.SignatureAlgorithm),
+<span id="L2208" class="ln">  2208	</span>
+<span id="L2209" class="ln">  2209	</span>		PublicKeyAlgorithm: getPublicKeyAlgorithmFromOID(in.TBSCSR.PublicKey.Algorithm.Algorithm),
+<span id="L2210" class="ln">  2210	</span>
+<span id="L2211" class="ln">  2211	</span>		Version:    in.TBSCSR.Version,
+<span id="L2212" class="ln">  2212	</span>		Attributes: parseRawAttributes(in.TBSCSR.RawAttributes),
+<span id="L2213" class="ln">  2213	</span>	}
+<span id="L2214" class="ln">  2214	</span>
+<span id="L2215" class="ln">  2215	</span>	var err error
+<span id="L2216" class="ln">  2216	</span>	out.PublicKey, err = parsePublicKey(out.PublicKeyAlgorithm, &amp;in.TBSCSR.PublicKey)
+<span id="L2217" class="ln">  2217	</span>	if err != nil {
+<span id="L2218" class="ln">  2218	</span>		return nil, err
+<span id="L2219" class="ln">  2219	</span>	}
+<span id="L2220" class="ln">  2220	</span>
+<span id="L2221" class="ln">  2221	</span>	var subject pkix.RDNSequence
+<span id="L2222" class="ln">  2222	</span>	if rest, err := asn1.Unmarshal(in.TBSCSR.Subject.FullBytes, &amp;subject); err != nil {
+<span id="L2223" class="ln">  2223	</span>		return nil, err
+<span id="L2224" class="ln">  2224	</span>	} else if len(rest) != 0 {
+<span id="L2225" class="ln">  2225	</span>		return nil, errors.New(&#34;x509: trailing data after X.509 Subject&#34;)
+<span id="L2226" class="ln">  2226	</span>	}
+<span id="L2227" class="ln">  2227	</span>
+<span id="L2228" class="ln">  2228	</span>	out.Subject.FillFromRDNSequence(&amp;subject)
+<span id="L2229" class="ln">  2229	</span>
+<span id="L2230" class="ln">  2230	</span>	if out.Extensions, err = parseCSRExtensions(in.TBSCSR.RawAttributes); err != nil {
+<span id="L2231" class="ln">  2231	</span>		return nil, err
+<span id="L2232" class="ln">  2232	</span>	}
+<span id="L2233" class="ln">  2233	</span>
+<span id="L2234" class="ln">  2234	</span>	for _, extension := range out.Extensions {
+<span id="L2235" class="ln">  2235	</span>		if extension.Id.Equal(oidExtensionSubjectAltName) {
+<span id="L2236" class="ln">  2236	</span>			out.DNSNames, out.EmailAddresses, out.IPAddresses, err = parseSANExtension(extension.Value)
+<span id="L2237" class="ln">  2237	</span>			if err != nil {
+<span id="L2238" class="ln">  2238	</span>				return nil, err
+<span id="L2239" class="ln">  2239	</span>			}
+<span id="L2240" class="ln">  2240	</span>		}
+<span id="L2241" class="ln">  2241	</span>	}
+<span id="L2242" class="ln">  2242	</span>
+<span id="L2243" class="ln">  2243	</span>	return out, nil
+<span id="L2244" class="ln">  2244	</span>}
+<span id="L2245" class="ln">  2245	</span>
+<span id="L2246" class="ln">  2246	</span><span class="comment">// CheckSignature reports whether the signature on c is valid.</span>
+<span id="L2247" class="ln">  2247	</span>func (c *CertificateRequest) CheckSignature() error {
+<span id="L2248" class="ln">  2248	</span>	return checkSignature(c.SignatureAlgorithm, c.RawTBSCertificateRequest, c.Signature, c.PublicKey)
+<span id="L2249" class="ln">  2249	</span>}
+<span id="L2250" class="ln">  2250	</span>
+</pre><p><a href="x509.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

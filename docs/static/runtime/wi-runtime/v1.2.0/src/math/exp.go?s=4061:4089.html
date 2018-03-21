@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/exp.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./exp.go%3Fs=4061:4089.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/math/exp.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package math
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span><span class="comment">// Exp returns e**x, the base-e exponential of x.</span>
+<span id="L8" class="ln">     8	</span><span class="comment">//</span>
+<span id="L9" class="ln">     9	</span><span class="comment">// Special cases are:</span>
+<span id="L10" class="ln">    10	</span><span class="comment">//	Exp(+Inf) = +Inf</span>
+<span id="L11" class="ln">    11	</span><span class="comment">//	Exp(NaN) = NaN</span>
+<span id="L12" class="ln">    12	</span><span class="comment">// Very large values overflow to 0 or +Inf.</span>
+<span id="L13" class="ln">    13	</span><span class="comment">// Very small values underflow to 1.</span>
+<span id="L14" class="ln">    14	</span>func Exp(x float64) float64
+<span id="L15" class="ln">    15	</span>
+<span id="L16" class="ln">    16	</span><span class="comment">// The original C code, the long comment, and the constants</span>
+<span id="L17" class="ln">    17	</span><span class="comment">// below are from FreeBSD&#39;s /usr/src/lib/msun/src/e_exp.c</span>
+<span id="L18" class="ln">    18	</span><span class="comment">// and came with this notice. The go code is a simplified</span>
+<span id="L19" class="ln">    19	</span><span class="comment">// version of the original C.</span>
+<span id="L20" class="ln">    20	</span><span class="comment">//</span>
+<span id="L21" class="ln">    21	</span><span class="comment">// ====================================================</span>
+<span id="L22" class="ln">    22	</span><span class="comment">// Copyright (C) 2004 by Sun Microsystems, Inc. All rights reserved.</span>
+<span id="L23" class="ln">    23	</span><span class="comment">//</span>
+<span id="L24" class="ln">    24	</span><span class="comment">// Permission to use, copy, modify, and distribute this</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// software is freely granted, provided that this notice</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// is preserved.</span>
+<span id="L27" class="ln">    27	</span><span class="comment">// ====================================================</span>
+<span id="L28" class="ln">    28	</span><span class="comment">//</span>
+<span id="L29" class="ln">    29	</span><span class="comment">//</span>
+<span id="L30" class="ln">    30	</span><span class="comment">// exp(x)</span>
+<span id="L31" class="ln">    31	</span><span class="comment">// Returns the exponential of x.</span>
+<span id="L32" class="ln">    32	</span><span class="comment">//</span>
+<span id="L33" class="ln">    33	</span><span class="comment">// Method</span>
+<span id="L34" class="ln">    34	</span><span class="comment">//   1. Argument reduction:</span>
+<span id="L35" class="ln">    35	</span><span class="comment">//      Reduce x to an r so that |r| &lt;= 0.5*ln2 ~ 0.34658.</span>
+<span id="L36" class="ln">    36	</span><span class="comment">//      Given x, find r and integer k such that</span>
+<span id="L37" class="ln">    37	</span><span class="comment">//</span>
+<span id="L38" class="ln">    38	</span><span class="comment">//               x = k*ln2 + r,  |r| &lt;= 0.5*ln2.</span>
+<span id="L39" class="ln">    39	</span><span class="comment">//</span>
+<span id="L40" class="ln">    40	</span><span class="comment">//      Here r will be represented as r = hi-lo for better</span>
+<span id="L41" class="ln">    41	</span><span class="comment">//      accuracy.</span>
+<span id="L42" class="ln">    42	</span><span class="comment">//</span>
+<span id="L43" class="ln">    43	</span><span class="comment">//   2. Approximation of exp(r) by a special rational function on</span>
+<span id="L44" class="ln">    44	</span><span class="comment">//      the interval [0,0.34658]:</span>
+<span id="L45" class="ln">    45	</span><span class="comment">//      Write</span>
+<span id="L46" class="ln">    46	</span><span class="comment">//          R(r**2) = r*(exp(r)+1)/(exp(r)-1) = 2 + r*r/6 - r**4/360 + ...</span>
+<span id="L47" class="ln">    47	</span><span class="comment">//      We use a special Remes algorithm on [0,0.34658] to generate</span>
+<span id="L48" class="ln">    48	</span><span class="comment">//      a polynomial of degree 5 to approximate R. The maximum error</span>
+<span id="L49" class="ln">    49	</span><span class="comment">//      of this polynomial approximation is bounded by 2**-59. In</span>
+<span id="L50" class="ln">    50	</span><span class="comment">//      other words,</span>
+<span id="L51" class="ln">    51	</span><span class="comment">//          R(z) ~ 2.0 + P1*z + P2*z**2 + P3*z**3 + P4*z**4 + P5*z**5</span>
+<span id="L52" class="ln">    52	</span><span class="comment">//      (where z=r*r, and the values of P1 to P5 are listed below)</span>
+<span id="L53" class="ln">    53	</span><span class="comment">//      and</span>
+<span id="L54" class="ln">    54	</span><span class="comment">//          |                  5          |     -59</span>
+<span id="L55" class="ln">    55	</span><span class="comment">//          | 2.0+P1*z+...+P5*z   -  R(z) | &lt;= 2</span>
+<span id="L56" class="ln">    56	</span><span class="comment">//          |                             |</span>
+<span id="L57" class="ln">    57	</span><span class="comment">//      The computation of exp(r) thus becomes</span>
+<span id="L58" class="ln">    58	</span><span class="comment">//                             2*r</span>
+<span id="L59" class="ln">    59	</span><span class="comment">//              exp(r) = 1 + -------</span>
+<span id="L60" class="ln">    60	</span><span class="comment">//                            R - r</span>
+<span id="L61" class="ln">    61	</span><span class="comment">//                                 r*R1(r)</span>
+<span id="L62" class="ln">    62	</span><span class="comment">//                     = 1 + r + ----------- (for better accuracy)</span>
+<span id="L63" class="ln">    63	</span><span class="comment">//                                2 - R1(r)</span>
+<span id="L64" class="ln">    64	</span><span class="comment">//      where</span>
+<span id="L65" class="ln">    65	</span><span class="comment">//                               2       4             10</span>
+<span id="L66" class="ln">    66	</span><span class="comment">//              R1(r) = r - (P1*r  + P2*r  + ... + P5*r   ).</span>
+<span id="L67" class="ln">    67	</span><span class="comment">//</span>
+<span id="L68" class="ln">    68	</span><span class="comment">//   3. Scale back to obtain exp(x):</span>
+<span id="L69" class="ln">    69	</span><span class="comment">//      From step 1, we have</span>
+<span id="L70" class="ln">    70	</span><span class="comment">//         exp(x) = 2**k * exp(r)</span>
+<span id="L71" class="ln">    71	</span><span class="comment">//</span>
+<span id="L72" class="ln">    72	</span><span class="comment">// Special cases:</span>
+<span id="L73" class="ln">    73	</span><span class="comment">//      exp(INF) is INF, exp(NaN) is NaN;</span>
+<span id="L74" class="ln">    74	</span><span class="comment">//      exp(-INF) is 0, and</span>
+<span id="L75" class="ln">    75	</span><span class="comment">//      for finite argument, only exp(0)=1 is exact.</span>
+<span id="L76" class="ln">    76	</span><span class="comment">//</span>
+<span id="L77" class="ln">    77	</span><span class="comment">// Accuracy:</span>
+<span id="L78" class="ln">    78	</span><span class="comment">//      according to an error analysis, the error is always less than</span>
+<span id="L79" class="ln">    79	</span><span class="comment">//      1 ulp (unit in the last place).</span>
+<span id="L80" class="ln">    80	</span><span class="comment">//</span>
+<span id="L81" class="ln">    81	</span><span class="comment">// Misc. info.</span>
+<span id="L82" class="ln">    82	</span><span class="comment">//      For IEEE double</span>
+<span id="L83" class="ln">    83	</span><span class="comment">//          if x &gt;  7.09782712893383973096e+02 then exp(x) overflow</span>
+<span id="L84" class="ln">    84	</span><span class="comment">//          if x &lt; -7.45133219101941108420e+02 then exp(x) underflow</span>
+<span id="L85" class="ln">    85	</span><span class="comment">//</span>
+<span id="L86" class="ln">    86	</span><span class="comment">// Constants:</span>
+<span id="L87" class="ln">    87	</span><span class="comment">// The hexadecimal values are the intended ones for the following</span>
+<span id="L88" class="ln">    88	</span><span class="comment">// constants. The decimal values may be used, provided that the</span>
+<span id="L89" class="ln">    89	</span><span class="comment">// compiler will convert from decimal to binary accurately enough</span>
+<span id="L90" class="ln">    90	</span><span class="comment">// to produce the hexadecimal values shown.</span>
+<span id="L91" class="ln">    91	</span>
+<span id="L92" class="ln">    92	</span>func exp(x float64) float64 {
+<span id="L93" class="ln">    93	</span>	const (
+<span id="L94" class="ln">    94	</span>		Ln2Hi = 6.93147180369123816490e-01
+<span id="L95" class="ln">    95	</span>		Ln2Lo = 1.90821492927058770002e-10
+<span id="L96" class="ln">    96	</span>		Log2e = 1.44269504088896338700e+00
+<span id="L97" class="ln">    97	</span>
+<span id="L98" class="ln">    98	</span>		Overflow  = 7.09782712893383973096e+02
+<span id="L99" class="ln">    99	</span>		Underflow = -7.45133219101941108420e+02
+<span id="L100" class="ln">   100	</span>		NearZero  = 1.0 / (1 &lt;&lt; 28) <span class="comment">// 2**-28</span>
+<span id="L101" class="ln">   101	</span>	)
+<span id="L102" class="ln">   102	</span>
+<span id="L103" class="ln">   103	</span>	<span class="comment">// special cases</span>
+<span id="L104" class="ln">   104	</span>	switch {
+<span id="L105" class="ln">   105	</span>	case IsNaN(x) || IsInf(x, 1):
+<span id="L106" class="ln">   106	</span>		return x
+<span id="L107" class="ln">   107	</span>	case IsInf(x, -1):
+<span id="L108" class="ln">   108	</span>		return 0
+<span id="L109" class="ln">   109	</span>	case x &gt; Overflow:
+<span id="L110" class="ln">   110	</span>		return Inf(1)
+<span id="L111" class="ln">   111	</span>	case x &lt; Underflow:
+<span id="L112" class="ln">   112	</span>		return 0
+<span id="L113" class="ln">   113	</span>	case -NearZero &lt; x &amp;&amp; x &lt; NearZero:
+<span id="L114" class="ln">   114	</span>		return 1 + x
+<span id="L115" class="ln">   115	</span>	}
+<span id="L116" class="ln">   116	</span>
+<span id="L117" class="ln">   117	</span>	<span class="comment">// reduce; computed as r = hi - lo for extra precision.</span>
+<span id="L118" class="ln">   118	</span>	var k int
+<span id="L119" class="ln">   119	</span>	switch {
+<span id="L120" class="ln">   120	</span>	case x &lt; 0:
+<span id="L121" class="ln">   121	</span>		k = int(Log2e*x - 0.5)
+<span id="L122" class="ln">   122	</span>	case x &gt; 0:
+<span id="L123" class="ln">   123	</span>		k = int(Log2e*x + 0.5)
+<span id="L124" class="ln">   124	</span>	}
+<span id="L125" class="ln">   125	</span>	hi := x - float64(k)*Ln2Hi
+<span id="L126" class="ln">   126	</span>	lo := float64(k) * Ln2Lo
+<span id="L127" class="ln">   127	</span>
+<span id="L128" class="ln">   128	</span>	<span class="comment">// compute</span>
+<span id="L129" class="ln">   129	</span>	return expmulti(hi, lo, k)
+<span id="L130" class="ln">   130	</span>}
+<span id="L131" class="ln">   131	</span>
+<span id="L132" class="ln">   132	</span><span class="comment">// Exp2 returns 2**x, the base-2 exponential of x.</span>
+<span id="L133" class="ln">   133	</span><span class="comment">//</span>
+<span id="L134" class="ln">   134	</span><span class="comment">// Special cases are the same as Exp.</span>
+<span id="L135" class="ln">   135	</span><span class="selection">func Exp2(x float64) float64</span>
+<span id="L136" class="ln">   136	</span>
+<span id="L137" class="ln">   137	</span>func exp2(x float64) float64 {
+<span id="L138" class="ln">   138	</span>	const (
+<span id="L139" class="ln">   139	</span>		Ln2Hi = 6.93147180369123816490e-01
+<span id="L140" class="ln">   140	</span>		Ln2Lo = 1.90821492927058770002e-10
+<span id="L141" class="ln">   141	</span>
+<span id="L142" class="ln">   142	</span>		Overflow  = 1.0239999999999999e+03
+<span id="L143" class="ln">   143	</span>		Underflow = -1.0740e+03
+<span id="L144" class="ln">   144	</span>	)
+<span id="L145" class="ln">   145	</span>
+<span id="L146" class="ln">   146	</span>	<span class="comment">// special cases</span>
+<span id="L147" class="ln">   147	</span>	switch {
+<span id="L148" class="ln">   148	</span>	case IsNaN(x) || IsInf(x, 1):
+<span id="L149" class="ln">   149	</span>		return x
+<span id="L150" class="ln">   150	</span>	case IsInf(x, -1):
+<span id="L151" class="ln">   151	</span>		return 0
+<span id="L152" class="ln">   152	</span>	case x &gt; Overflow:
+<span id="L153" class="ln">   153	</span>		return Inf(1)
+<span id="L154" class="ln">   154	</span>	case x &lt; Underflow:
+<span id="L155" class="ln">   155	</span>		return 0
+<span id="L156" class="ln">   156	</span>	}
+<span id="L157" class="ln">   157	</span>
+<span id="L158" class="ln">   158	</span>	<span class="comment">// argument reduction; x = r×lg(e) + k with |r| ≤ ln(2)/2.</span>
+<span id="L159" class="ln">   159	</span>	<span class="comment">// computed as r = hi - lo for extra precision.</span>
+<span id="L160" class="ln">   160	</span>	var k int
+<span id="L161" class="ln">   161	</span>	switch {
+<span id="L162" class="ln">   162	</span>	case x &gt; 0:
+<span id="L163" class="ln">   163	</span>		k = int(x + 0.5)
+<span id="L164" class="ln">   164	</span>	case x &lt; 0:
+<span id="L165" class="ln">   165	</span>		k = int(x - 0.5)
+<span id="L166" class="ln">   166	</span>	}
+<span id="L167" class="ln">   167	</span>	t := x - float64(k)
+<span id="L168" class="ln">   168	</span>	hi := t * Ln2Hi
+<span id="L169" class="ln">   169	</span>	lo := -t * Ln2Lo
+<span id="L170" class="ln">   170	</span>
+<span id="L171" class="ln">   171	</span>	<span class="comment">// compute</span>
+<span id="L172" class="ln">   172	</span>	return expmulti(hi, lo, k)
+<span id="L173" class="ln">   173	</span>}
+<span id="L174" class="ln">   174	</span>
+<span id="L175" class="ln">   175	</span><span class="comment">// exp1 returns e**r × 2**k where r = hi - lo and |r| ≤ ln(2)/2.</span>
+<span id="L176" class="ln">   176	</span>func expmulti(hi, lo float64, k int) float64 {
+<span id="L177" class="ln">   177	</span>	const (
+<span id="L178" class="ln">   178	</span>		P1 = 1.66666666666666019037e-01  <span class="comment">/* 0x3FC55555; 0x5555553E */</span>
+<span id="L179" class="ln">   179	</span>		P2 = -2.77777777770155933842e-03 <span class="comment">/* 0xBF66C16C; 0x16BEBD93 */</span>
+<span id="L180" class="ln">   180	</span>		P3 = 6.61375632143793436117e-05  <span class="comment">/* 0x3F11566A; 0xAF25DE2C */</span>
+<span id="L181" class="ln">   181	</span>		P4 = -1.65339022054652515390e-06 <span class="comment">/* 0xBEBBBD41; 0xC5D26BF1 */</span>
+<span id="L182" class="ln">   182	</span>		P5 = 4.13813679705723846039e-08  <span class="comment">/* 0x3E663769; 0x72BEA4D0 */</span>
+<span id="L183" class="ln">   183	</span>	)
+<span id="L184" class="ln">   184	</span>
+<span id="L185" class="ln">   185	</span>	r := hi - lo
+<span id="L186" class="ln">   186	</span>	t := r * r
+<span id="L187" class="ln">   187	</span>	c := r - t*(P1+t*(P2+t*(P3+t*(P4+t*P5))))
+<span id="L188" class="ln">   188	</span>	y := 1 - ((lo - (r*c)/(2-c)) - hi)
+<span id="L189" class="ln">   189	</span>	<span class="comment">// TODO(rsc): make sure Ldexp can handle boundary k</span>
+<span id="L190" class="ln">   190	</span>	return Ldexp(y, k)
+<span id="L191" class="ln">   191	</span>}
+<span id="L192" class="ln">   192	</span>
+</pre><p><a href="exp.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/rand/exp.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./exp.go%3Fs=765:800.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/math/rand/exp.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package rand
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>import (
+<span id="L8" class="ln">     8	</span>	&#34;math&#34;
+<span id="L9" class="ln">     9	</span>)
+<span id="L10" class="ln">    10	</span>
+<span id="L11" class="ln">    11	</span><span class="comment">/*
+<span id="L12" class="ln">    12	</span> * Exponential distribution
+<span id="L13" class="ln">    13	</span> *
+<span id="L14" class="ln">    14	</span> * See &#34;The Ziggurat Method for Generating Random Variables&#34;
+<span id="L15" class="ln">    15	</span> * (Marsaglia &amp; Tsang, 2000)
+<span id="L16" class="ln">    16	</span> * http://www.jstatsoft.org/v05/i08/paper [pdf]
+<span id="L17" class="ln">    17	</span> */</span>
+<span id="L18" class="ln">    18	</span>
+<span id="L19" class="ln">    19	</span>const (
+<span id="L20" class="ln">    20	</span>	re = 7.69711747013104972
+<span id="L21" class="ln">    21	</span>)
+<span id="L22" class="ln">    22	</span>
+<span id="L23" class="ln">    23	</span><span class="comment">// ExpFloat64 returns an exponentially distributed float64 in the range</span>
+<span id="L24" class="ln">    24	</span><span class="comment">// (0, +math.MaxFloat64] with an exponential distribution whose rate parameter</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// (lambda) is 1 and whose mean is 1/lambda (1).</span>
+<span id="L26" class="ln">    26	</span><span class="comment">// To produce a distribution with a different rate parameter,</span>
+<span id="L27" class="ln">    27	</span><span class="comment">// callers can adjust the output using:</span>
+<span id="L28" class="ln">    28	</span><span class="comment">//</span>
+<span id="L29" class="ln">    29	</span><span class="comment">//  sample = ExpFloat64() / desiredRateParameter</span>
+<span id="L30" class="ln">    30	</span><span class="comment">//</span>
+<span id="L31" class="ln">    31	</span><span class="selection">func (r *Rand) ExpFloat64() float64</span> {
+<span id="L32" class="ln">    32	</span>	for {
+<span id="L33" class="ln">    33	</span>		j := r.Uint32()
+<span id="L34" class="ln">    34	</span>		i := j &amp; 0xFF
+<span id="L35" class="ln">    35	</span>		x := float64(j) * float64(we[i])
+<span id="L36" class="ln">    36	</span>		if j &lt; ke[i] {
+<span id="L37" class="ln">    37	</span>			return x
+<span id="L38" class="ln">    38	</span>		}
+<span id="L39" class="ln">    39	</span>		if i == 0 {
+<span id="L40" class="ln">    40	</span>			return re - math.Log(r.Float64())
+<span id="L41" class="ln">    41	</span>		}
+<span id="L42" class="ln">    42	</span>		if fe[i]+float32(r.Float64())*(fe[i-1]-fe[i]) &lt; float32(math.Exp(-x)) {
+<span id="L43" class="ln">    43	</span>			return x
+<span id="L44" class="ln">    44	</span>		}
+<span id="L45" class="ln">    45	</span>	}
+<span id="L46" class="ln">    46	</span>}
+<span id="L47" class="ln">    47	</span>
+<span id="L48" class="ln">    48	</span>var ke = [256]uint32{
+<span id="L49" class="ln">    49	</span>	0xe290a139, 0x0, 0x9beadebc, 0xc377ac71, 0xd4ddb990,
+<span id="L50" class="ln">    50	</span>	0xde893fb8, 0xe4a8e87c, 0xe8dff16a, 0xebf2deab, 0xee49a6e8,
+<span id="L51" class="ln">    51	</span>	0xf0204efd, 0xf19bdb8e, 0xf2d458bb, 0xf3da104b, 0xf4b86d78,
+<span id="L52" class="ln">    52	</span>	0xf577ad8a, 0xf61de83d, 0xf6afb784, 0xf730a573, 0xf7a37651,
+<span id="L53" class="ln">    53	</span>	0xf80a5bb6, 0xf867189d, 0xf8bb1b4f, 0xf9079062, 0xf94d70ca,
+<span id="L54" class="ln">    54	</span>	0xf98d8c7d, 0xf9c8928a, 0xf9ff175b, 0xfa319996, 0xfa6085f8,
+<span id="L55" class="ln">    55	</span>	0xfa8c3a62, 0xfab5084e, 0xfadb36c8, 0xfaff0410, 0xfb20a6ea,
+<span id="L56" class="ln">    56	</span>	0xfb404fb4, 0xfb5e2951, 0xfb7a59e9, 0xfb95038c, 0xfbae44ba,
+<span id="L57" class="ln">    57	</span>	0xfbc638d8, 0xfbdcf892, 0xfbf29a30, 0xfc0731df, 0xfc1ad1ed,
+<span id="L58" class="ln">    58	</span>	0xfc2d8b02, 0xfc3f6c4d, 0xfc5083ac, 0xfc60ddd1, 0xfc708662,
+<span id="L59" class="ln">    59	</span>	0xfc7f8810, 0xfc8decb4, 0xfc9bbd62, 0xfca9027c, 0xfcb5c3c3,
+<span id="L60" class="ln">    60	</span>	0xfcc20864, 0xfccdd70a, 0xfcd935e3, 0xfce42ab0, 0xfceebace,
+<span id="L61" class="ln">    61	</span>	0xfcf8eb3b, 0xfd02c0a0, 0xfd0c3f59, 0xfd156b7b, 0xfd1e48d6,
+<span id="L62" class="ln">    62	</span>	0xfd26daff, 0xfd2f2552, 0xfd372af7, 0xfd3eeee5, 0xfd4673e7,
+<span id="L63" class="ln">    63	</span>	0xfd4dbc9e, 0xfd54cb85, 0xfd5ba2f2, 0xfd62451b, 0xfd68b415,
+<span id="L64" class="ln">    64	</span>	0xfd6ef1da, 0xfd750047, 0xfd7ae120, 0xfd809612, 0xfd8620b4,
+<span id="L65" class="ln">    65	</span>	0xfd8b8285, 0xfd90bcf5, 0xfd95d15e, 0xfd9ac10b, 0xfd9f8d36,
+<span id="L66" class="ln">    66	</span>	0xfda43708, 0xfda8bf9e, 0xfdad2806, 0xfdb17141, 0xfdb59c46,
+<span id="L67" class="ln">    67	</span>	0xfdb9a9fd, 0xfdbd9b46, 0xfdc170f6, 0xfdc52bd8, 0xfdc8ccac,
+<span id="L68" class="ln">    68	</span>	0xfdcc542d, 0xfdcfc30b, 0xfdd319ef, 0xfdd6597a, 0xfdd98245,
+<span id="L69" class="ln">    69	</span>	0xfddc94e5, 0xfddf91e6, 0xfde279ce, 0xfde54d1f, 0xfde80c52,
+<span id="L70" class="ln">    70	</span>	0xfdeab7de, 0xfded5034, 0xfdefd5be, 0xfdf248e3, 0xfdf4aa06,
+<span id="L71" class="ln">    71	</span>	0xfdf6f984, 0xfdf937b6, 0xfdfb64f4, 0xfdfd818d, 0xfdff8dd0,
+<span id="L72" class="ln">    72	</span>	0xfe018a08, 0xfe03767a, 0xfe05536c, 0xfe07211c, 0xfe08dfc9,
+<span id="L73" class="ln">    73	</span>	0xfe0a8fab, 0xfe0c30fb, 0xfe0dc3ec, 0xfe0f48b1, 0xfe10bf76,
+<span id="L74" class="ln">    74	</span>	0xfe122869, 0xfe1383b4, 0xfe14d17c, 0xfe1611e7, 0xfe174516,
+<span id="L75" class="ln">    75	</span>	0xfe186b2a, 0xfe19843e, 0xfe1a9070, 0xfe1b8fd6, 0xfe1c8289,
+<span id="L76" class="ln">    76	</span>	0xfe1d689b, 0xfe1e4220, 0xfe1f0f26, 0xfe1fcfbc, 0xfe2083ed,
+<span id="L77" class="ln">    77	</span>	0xfe212bc3, 0xfe21c745, 0xfe225678, 0xfe22d95f, 0xfe234ffb,
+<span id="L78" class="ln">    78	</span>	0xfe23ba4a, 0xfe241849, 0xfe2469f2, 0xfe24af3c, 0xfe24e81e,
+<span id="L79" class="ln">    79	</span>	0xfe25148b, 0xfe253474, 0xfe2547c7, 0xfe254e70, 0xfe25485a,
+<span id="L80" class="ln">    80	</span>	0xfe25356a, 0xfe251586, 0xfe24e88f, 0xfe24ae64, 0xfe2466e1,
+<span id="L81" class="ln">    81	</span>	0xfe2411df, 0xfe23af34, 0xfe233eb4, 0xfe22c02c, 0xfe22336b,
+<span id="L82" class="ln">    82	</span>	0xfe219838, 0xfe20ee58, 0xfe20358c, 0xfe1f6d92, 0xfe1e9621,
+<span id="L83" class="ln">    83	</span>	0xfe1daef0, 0xfe1cb7ac, 0xfe1bb002, 0xfe1a9798, 0xfe196e0d,
+<span id="L84" class="ln">    84	</span>	0xfe1832fd, 0xfe16e5fe, 0xfe15869d, 0xfe141464, 0xfe128ed3,
+<span id="L85" class="ln">    85	</span>	0xfe10f565, 0xfe0f478c, 0xfe0d84b1, 0xfe0bac36, 0xfe09bd73,
+<span id="L86" class="ln">    86	</span>	0xfe07b7b5, 0xfe059a40, 0xfe03644c, 0xfe011504, 0xfdfeab88,
+<span id="L87" class="ln">    87	</span>	0xfdfc26e9, 0xfdf98629, 0xfdf6c83b, 0xfdf3ec01, 0xfdf0f04a,
+<span id="L88" class="ln">    88	</span>	0xfdedd3d1, 0xfdea953d, 0xfde7331e, 0xfde3abe9, 0xfddffdfb,
+<span id="L89" class="ln">    89	</span>	0xfddc2791, 0xfdd826cd, 0xfdd3f9a8, 0xfdcf9dfc, 0xfdcb1176,
+<span id="L90" class="ln">    90	</span>	0xfdc65198, 0xfdc15bb3, 0xfdbc2ce2, 0xfdb6c206, 0xfdb117be,
+<span id="L91" class="ln">    91	</span>	0xfdab2a63, 0xfda4f5fd, 0xfd9e7640, 0xfd97a67a, 0xfd908192,
+<span id="L92" class="ln">    92	</span>	0xfd8901f2, 0xfd812182, 0xfd78d98e, 0xfd7022bb, 0xfd66f4ed,
+<span id="L93" class="ln">    93	</span>	0xfd5d4732, 0xfd530f9c, 0xfd48432b, 0xfd3cd59a, 0xfd30b936,
+<span id="L94" class="ln">    94	</span>	0xfd23dea4, 0xfd16349e, 0xfd07a7a3, 0xfcf8219b, 0xfce7895b,
+<span id="L95" class="ln">    95	</span>	0xfcd5c220, 0xfcc2aadb, 0xfcae1d5e, 0xfc97ed4e, 0xfc7fe6d4,
+<span id="L96" class="ln">    96	</span>	0xfc65ccf3, 0xfc495762, 0xfc2a2fc8, 0xfc07ee19, 0xfbe213c1,
+<span id="L97" class="ln">    97	</span>	0xfbb8051a, 0xfb890078, 0xfb5411a5, 0xfb180005, 0xfad33482,
+<span id="L98" class="ln">    98	</span>	0xfa839276, 0xfa263b32, 0xf9b72d1c, 0xf930a1a2, 0xf889f023,
+<span id="L99" class="ln">    99	</span>	0xf7b577d2, 0xf69c650c, 0xf51530f0, 0xf2cb0e3c, 0xeeefb15d,
+<span id="L100" class="ln">   100	</span>	0xe6da6ecf,
+<span id="L101" class="ln">   101	</span>}
+<span id="L102" class="ln">   102	</span>var we = [256]float32{
+<span id="L103" class="ln">   103	</span>	2.0249555e-09, 1.486674e-11, 2.4409617e-11, 3.1968806e-11,
+<span id="L104" class="ln">   104	</span>	3.844677e-11, 4.4228204e-11, 4.9516443e-11, 5.443359e-11,
+<span id="L105" class="ln">   105	</span>	5.905944e-11, 6.344942e-11, 6.7643814e-11, 7.1672945e-11,
+<span id="L106" class="ln">   106	</span>	7.556032e-11, 7.932458e-11, 8.298079e-11, 8.654132e-11,
+<span id="L107" class="ln">   107	</span>	9.0016515e-11, 9.3415074e-11, 9.674443e-11, 1.0001099e-10,
+<span id="L108" class="ln">   108	</span>	1.03220314e-10, 1.06377254e-10, 1.09486115e-10, 1.1255068e-10,
+<span id="L109" class="ln">   109	</span>	1.1557435e-10, 1.1856015e-10, 1.2151083e-10, 1.2442886e-10,
+<span id="L110" class="ln">   110	</span>	1.2731648e-10, 1.3017575e-10, 1.3300853e-10, 1.3581657e-10,
+<span id="L111" class="ln">   111	</span>	1.3860142e-10, 1.4136457e-10, 1.4410738e-10, 1.4683108e-10,
+<span id="L112" class="ln">   112	</span>	1.4953687e-10, 1.5222583e-10, 1.54899e-10, 1.5755733e-10,
+<span id="L113" class="ln">   113	</span>	1.6020171e-10, 1.6283301e-10, 1.6545203e-10, 1.6805951e-10,
+<span id="L114" class="ln">   114	</span>	1.7065617e-10, 1.732427e-10, 1.7581973e-10, 1.7838787e-10,
+<span id="L115" class="ln">   115	</span>	1.8094774e-10, 1.8349985e-10, 1.8604476e-10, 1.8858298e-10,
+<span id="L116" class="ln">   116	</span>	1.9111498e-10, 1.9364126e-10, 1.9616223e-10, 1.9867835e-10,
+<span id="L117" class="ln">   117	</span>	2.0119004e-10, 2.0369768e-10, 2.0620168e-10, 2.087024e-10,
+<span id="L118" class="ln">   118	</span>	2.1120022e-10, 2.136955e-10, 2.1618855e-10, 2.1867974e-10,
+<span id="L119" class="ln">   119	</span>	2.2116936e-10, 2.2365775e-10, 2.261452e-10, 2.2863202e-10,
+<span id="L120" class="ln">   120	</span>	2.311185e-10, 2.3360494e-10, 2.360916e-10, 2.3857874e-10,
+<span id="L121" class="ln">   121	</span>	2.4106667e-10, 2.4355562e-10, 2.4604588e-10, 2.485377e-10,
+<span id="L122" class="ln">   122	</span>	2.5103128e-10, 2.5352695e-10, 2.560249e-10, 2.585254e-10,
+<span id="L123" class="ln">   123	</span>	2.6102867e-10, 2.6353494e-10, 2.6604446e-10, 2.6855745e-10,
+<span id="L124" class="ln">   124	</span>	2.7107416e-10, 2.7359479e-10, 2.761196e-10, 2.7864877e-10,
+<span id="L125" class="ln">   125	</span>	2.8118255e-10, 2.8372119e-10, 2.8626485e-10, 2.888138e-10,
+<span id="L126" class="ln">   126	</span>	2.9136826e-10, 2.939284e-10, 2.9649452e-10, 2.9906677e-10,
+<span id="L127" class="ln">   127	</span>	3.016454e-10, 3.0423064e-10, 3.0682268e-10, 3.0942177e-10,
+<span id="L128" class="ln">   128	</span>	3.1202813e-10, 3.1464195e-10, 3.1726352e-10, 3.19893e-10,
+<span id="L129" class="ln">   129	</span>	3.2253064e-10, 3.251767e-10, 3.2783135e-10, 3.3049485e-10,
+<span id="L130" class="ln">   130	</span>	3.3316744e-10, 3.3584938e-10, 3.3854083e-10, 3.4124212e-10,
+<span id="L131" class="ln">   131	</span>	3.4395342e-10, 3.46675e-10, 3.4940711e-10, 3.5215003e-10,
+<span id="L132" class="ln">   132	</span>	3.5490397e-10, 3.5766917e-10, 3.6044595e-10, 3.6323455e-10,
+<span id="L133" class="ln">   133	</span>	3.660352e-10, 3.6884823e-10, 3.7167386e-10, 3.745124e-10,
+<span id="L134" class="ln">   134	</span>	3.773641e-10, 3.802293e-10, 3.8310827e-10, 3.860013e-10,
+<span id="L135" class="ln">   135	</span>	3.8890866e-10, 3.918307e-10, 3.9476775e-10, 3.9772008e-10,
+<span id="L136" class="ln">   136	</span>	4.0068804e-10, 4.0367196e-10, 4.0667217e-10, 4.09689e-10,
+<span id="L137" class="ln">   137	</span>	4.1272286e-10, 4.1577405e-10, 4.1884296e-10, 4.2192994e-10,
+<span id="L138" class="ln">   138	</span>	4.250354e-10, 4.281597e-10, 4.313033e-10, 4.3446652e-10,
+<span id="L139" class="ln">   139	</span>	4.3764986e-10, 4.408537e-10, 4.4407847e-10, 4.4732465e-10,
+<span id="L140" class="ln">   140	</span>	4.5059267e-10, 4.5388301e-10, 4.571962e-10, 4.6053267e-10,
+<span id="L141" class="ln">   141	</span>	4.6389292e-10, 4.6727755e-10, 4.70687e-10, 4.741219e-10,
+<span id="L142" class="ln">   142	</span>	4.7758275e-10, 4.810702e-10, 4.845848e-10, 4.8812715e-10,
+<span id="L143" class="ln">   143	</span>	4.9169796e-10, 4.9529775e-10, 4.989273e-10, 5.0258725e-10,
+<span id="L144" class="ln">   144	</span>	5.0627835e-10, 5.100013e-10, 5.1375687e-10, 5.1754584e-10,
+<span id="L145" class="ln">   145	</span>	5.21369e-10, 5.2522725e-10, 5.2912136e-10, 5.330522e-10,
+<span id="L146" class="ln">   146	</span>	5.370208e-10, 5.4102806e-10, 5.45075e-10, 5.491625e-10,
+<span id="L147" class="ln">   147	</span>	5.532918e-10, 5.5746385e-10, 5.616799e-10, 5.6594107e-10,
+<span id="L148" class="ln">   148	</span>	5.7024857e-10, 5.746037e-10, 5.7900773e-10, 5.834621e-10,
+<span id="L149" class="ln">   149	</span>	5.8796823e-10, 5.925276e-10, 5.971417e-10, 6.018122e-10,
+<span id="L150" class="ln">   150	</span>	6.065408e-10, 6.113292e-10, 6.1617933e-10, 6.2109295e-10,
+<span id="L151" class="ln">   151	</span>	6.260722e-10, 6.3111916e-10, 6.3623595e-10, 6.4142497e-10,
+<span id="L152" class="ln">   152	</span>	6.4668854e-10, 6.5202926e-10, 6.5744976e-10, 6.6295286e-10,
+<span id="L153" class="ln">   153	</span>	6.6854156e-10, 6.742188e-10, 6.79988e-10, 6.858526e-10,
+<span id="L154" class="ln">   154	</span>	6.9181616e-10, 6.978826e-10, 7.04056e-10, 7.103407e-10,
+<span id="L155" class="ln">   155	</span>	7.167412e-10, 7.2326256e-10, 7.2990985e-10, 7.366886e-10,
+<span id="L156" class="ln">   156	</span>	7.4360473e-10, 7.5066453e-10, 7.5787476e-10, 7.6524265e-10,
+<span id="L157" class="ln">   157	</span>	7.7277595e-10, 7.80483e-10, 7.883728e-10, 7.9645507e-10,
+<span id="L158" class="ln">   158	</span>	8.047402e-10, 8.1323964e-10, 8.219657e-10, 8.309319e-10,
+<span id="L159" class="ln">   159	</span>	8.401528e-10, 8.496445e-10, 8.594247e-10, 8.6951274e-10,
+<span id="L160" class="ln">   160	</span>	8.799301e-10, 8.9070046e-10, 9.018503e-10, 9.134092e-10,
+<span id="L161" class="ln">   161	</span>	9.254101e-10, 9.378904e-10, 9.508923e-10, 9.644638e-10,
+<span id="L162" class="ln">   162	</span>	9.786603e-10, 9.935448e-10, 1.0091913e-09, 1.025686e-09,
+<span id="L163" class="ln">   163	</span>	1.0431306e-09, 1.0616465e-09, 1.08138e-09, 1.1025096e-09,
+<span id="L164" class="ln">   164	</span>	1.1252564e-09, 1.1498986e-09, 1.1767932e-09, 1.206409e-09,
+<span id="L165" class="ln">   165	</span>	1.2393786e-09, 1.276585e-09, 1.3193139e-09, 1.3695435e-09,
+<span id="L166" class="ln">   166	</span>	1.4305498e-09, 1.508365e-09, 1.6160854e-09, 1.7921248e-09,
+<span id="L167" class="ln">   167	</span>}
+<span id="L168" class="ln">   168	</span>var fe = [256]float32{
+<span id="L169" class="ln">   169	</span>	1, 0.9381437, 0.90046996, 0.87170434, 0.8477855, 0.8269933,
+<span id="L170" class="ln">   170	</span>	0.8084217, 0.7915276, 0.77595687, 0.7614634, 0.7478686,
+<span id="L171" class="ln">   171	</span>	0.7350381, 0.72286767, 0.71127474, 0.70019263, 0.6895665,
+<span id="L172" class="ln">   172	</span>	0.67935055, 0.6695063, 0.66000086, 0.65080583, 0.6418967,
+<span id="L173" class="ln">   173	</span>	0.63325197, 0.6248527, 0.6166822, 0.60872537, 0.60096896,
+<span id="L174" class="ln">   174	</span>	0.5934009, 0.58601034, 0.5787874, 0.57172304, 0.5648092,
+<span id="L175" class="ln">   175	</span>	0.5580383, 0.5514034, 0.5448982, 0.5385169, 0.53225386,
+<span id="L176" class="ln">   176	</span>	0.5261042, 0.52006316, 0.5141264, 0.50828975, 0.5025495,
+<span id="L177" class="ln">   177	</span>	0.496902, 0.49134386, 0.485872, 0.48048335, 0.4751752,
+<span id="L178" class="ln">   178	</span>	0.46994483, 0.46478975, 0.45970762, 0.45469615, 0.44975325,
+<span id="L179" class="ln">   179	</span>	0.44487688, 0.44006512, 0.43531612, 0.43062815, 0.42599955,
+<span id="L180" class="ln">   180	</span>	0.42142874, 0.4169142, 0.41245446, 0.40804818, 0.403694,
+<span id="L181" class="ln">   181	</span>	0.3993907, 0.39513698, 0.39093173, 0.38677382, 0.38266218,
+<span id="L182" class="ln">   182	</span>	0.37859577, 0.37457356, 0.37059465, 0.3666581, 0.362763,
+<span id="L183" class="ln">   183	</span>	0.35890847, 0.35509375, 0.351318, 0.3475805, 0.34388044,
+<span id="L184" class="ln">   184	</span>	0.34021714, 0.3365899, 0.33299807, 0.32944095, 0.32591796,
+<span id="L185" class="ln">   185	</span>	0.3224285, 0.3189719, 0.31554767, 0.31215525, 0.30879408,
+<span id="L186" class="ln">   186	</span>	0.3054636, 0.3021634, 0.29889292, 0.2956517, 0.29243928,
+<span id="L187" class="ln">   187	</span>	0.28925523, 0.28609908, 0.28297043, 0.27986884, 0.27679393,
+<span id="L188" class="ln">   188	</span>	0.2737453, 0.2707226, 0.2677254, 0.26475343, 0.26180625,
+<span id="L189" class="ln">   189	</span>	0.25888354, 0.25598502, 0.2531103, 0.25025907, 0.24743107,
+<span id="L190" class="ln">   190	</span>	0.24462597, 0.24184346, 0.23908329, 0.23634516, 0.23362878,
+<span id="L191" class="ln">   191	</span>	0.23093392, 0.2282603, 0.22560766, 0.22297576, 0.22036438,
+<span id="L192" class="ln">   192	</span>	0.21777324, 0.21520215, 0.21265087, 0.21011916, 0.20760682,
+<span id="L193" class="ln">   193	</span>	0.20511365, 0.20263945, 0.20018397, 0.19774707, 0.19532852,
+<span id="L194" class="ln">   194	</span>	0.19292815, 0.19054577, 0.1881812, 0.18583426, 0.18350479,
+<span id="L195" class="ln">   195	</span>	0.1811926, 0.17889754, 0.17661946, 0.17435817, 0.17211354,
+<span id="L196" class="ln">   196	</span>	0.1698854, 0.16767362, 0.16547804, 0.16329853, 0.16113494,
+<span id="L197" class="ln">   197	</span>	0.15898713, 0.15685499, 0.15473837, 0.15263714, 0.15055119,
+<span id="L198" class="ln">   198	</span>	0.14848037, 0.14642459, 0.14438373, 0.14235765, 0.14034624,
+<span id="L199" class="ln">   199	</span>	0.13834943, 0.13636707, 0.13439907, 0.13244532, 0.13050574,
+<span id="L200" class="ln">   200	</span>	0.1285802, 0.12666863, 0.12477092, 0.12288698, 0.12101672,
+<span id="L201" class="ln">   201	</span>	0.119160056, 0.1173169, 0.115487166, 0.11367077, 0.11186763,
+<span id="L202" class="ln">   202	</span>	0.11007768, 0.10830083, 0.10653701, 0.10478614, 0.10304816,
+<span id="L203" class="ln">   203	</span>	0.101323, 0.09961058, 0.09791085, 0.09622374, 0.09454919,
+<span id="L204" class="ln">   204	</span>	0.09288713, 0.091237515, 0.08960028, 0.087975375, 0.08636274,
+<span id="L205" class="ln">   205	</span>	0.08476233, 0.083174095, 0.081597984, 0.08003395, 0.07848195,
+<span id="L206" class="ln">   206	</span>	0.076941945, 0.07541389, 0.07389775, 0.072393484, 0.07090106,
+<span id="L207" class="ln">   207	</span>	0.069420435, 0.06795159, 0.066494495, 0.06504912, 0.063615434,
+<span id="L208" class="ln">   208	</span>	0.062193416, 0.060783047, 0.059384305, 0.057997175,
+<span id="L209" class="ln">   209	</span>	0.05662164, 0.05525769, 0.053905312, 0.052564494, 0.051235236,
+<span id="L210" class="ln">   210	</span>	0.049917534, 0.048611384, 0.047316793, 0.046033762, 0.0447623,
+<span id="L211" class="ln">   211	</span>	0.043502413, 0.042254124, 0.041017443, 0.039792392,
+<span id="L212" class="ln">   212	</span>	0.038578995, 0.037377283, 0.036187284, 0.035009038,
+<span id="L213" class="ln">   213	</span>	0.033842582, 0.032687962, 0.031545233, 0.030414443, 0.02929566,
+<span id="L214" class="ln">   214	</span>	0.02818895, 0.027094385, 0.026012046, 0.024942026, 0.023884421,
+<span id="L215" class="ln">   215	</span>	0.022839336, 0.021806888, 0.020787204, 0.019780423, 0.0187867,
+<span id="L216" class="ln">   216	</span>	0.0178062, 0.016839107, 0.015885621, 0.014945968, 0.014020392,
+<span id="L217" class="ln">   217	</span>	0.013109165, 0.012212592, 0.011331013, 0.01046481, 0.009614414,
+<span id="L218" class="ln">   218	</span>	0.008780315, 0.007963077, 0.0071633533, 0.006381906,
+<span id="L219" class="ln">   219	</span>	0.0056196423, 0.0048776558, 0.004157295, 0.0034602648,
+<span id="L220" class="ln">   220	</span>	0.0027887989, 0.0021459677, 0.0015362998, 0.0009672693,
+<span id="L221" class="ln">   221	</span>	0.00045413437,
+<span id="L222" class="ln">   222	</span>}
+<span id="L223" class="ln">   223	</span>
+</pre><p><a href="exp.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

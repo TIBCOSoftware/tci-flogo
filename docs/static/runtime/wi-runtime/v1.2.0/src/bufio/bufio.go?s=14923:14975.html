@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/bufio/bufio.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./bufio.go%3Fs=14923:14975.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/bufio/bufio.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// Package bufio implements buffered I/O.  It wraps an io.Reader or io.Writer</span>
+<span id="L6" class="ln">     6	</span><span class="comment">// object, creating another object (Reader or Writer) that also implements</span>
+<span id="L7" class="ln">     7	</span><span class="comment">// the interface but provides buffering and some help for textual I/O.</span>
+<span id="L8" class="ln">     8	</span>package bufio
+<span id="L9" class="ln">     9	</span>
+<span id="L10" class="ln">    10	</span>import (
+<span id="L11" class="ln">    11	</span>	&#34;bytes&#34;
+<span id="L12" class="ln">    12	</span>	&#34;errors&#34;
+<span id="L13" class="ln">    13	</span>	&#34;io&#34;
+<span id="L14" class="ln">    14	</span>	&#34;unicode/utf8&#34;
+<span id="L15" class="ln">    15	</span>)
+<span id="L16" class="ln">    16	</span>
+<span id="L17" class="ln">    17	</span>const (
+<span id="L18" class="ln">    18	</span>	defaultBufSize = 4096
+<span id="L19" class="ln">    19	</span>)
+<span id="L20" class="ln">    20	</span>
+<span id="L21" class="ln">    21	</span>var (
+<span id="L22" class="ln">    22	</span>	ErrInvalidUnreadByte = errors.New(&#34;bufio: invalid use of UnreadByte&#34;)
+<span id="L23" class="ln">    23	</span>	ErrInvalidUnreadRune = errors.New(&#34;bufio: invalid use of UnreadRune&#34;)
+<span id="L24" class="ln">    24	</span>	ErrBufferFull        = errors.New(&#34;bufio: buffer full&#34;)
+<span id="L25" class="ln">    25	</span>	ErrNegativeCount     = errors.New(&#34;bufio: negative count&#34;)
+<span id="L26" class="ln">    26	</span>)
+<span id="L27" class="ln">    27	</span>
+<span id="L28" class="ln">    28	</span><span class="comment">// Buffered input.</span>
+<span id="L29" class="ln">    29	</span>
+<span id="L30" class="ln">    30	</span><span class="comment">// Reader implements buffering for an io.Reader object.</span>
+<span id="L31" class="ln">    31	</span>type Reader struct {
+<span id="L32" class="ln">    32	</span>	buf          []byte
+<span id="L33" class="ln">    33	</span>	rd           io.Reader <span class="comment">// reader provided by the client</span>
+<span id="L34" class="ln">    34	</span>	r, w         int       <span class="comment">// buf read and write positions</span>
+<span id="L35" class="ln">    35	</span>	err          error
+<span id="L36" class="ln">    36	</span>	lastByte     int
+<span id="L37" class="ln">    37	</span>	lastRuneSize int
+<span id="L38" class="ln">    38	</span>}
+<span id="L39" class="ln">    39	</span>
+<span id="L40" class="ln">    40	</span>const minReadBufferSize = 16
+<span id="L41" class="ln">    41	</span>const maxConsecutiveEmptyReads = 100
+<span id="L42" class="ln">    42	</span>
+<span id="L43" class="ln">    43	</span><span class="comment">// NewReaderSize returns a new Reader whose buffer has at least the specified</span>
+<span id="L44" class="ln">    44	</span><span class="comment">// size. If the argument io.Reader is already a Reader with large enough</span>
+<span id="L45" class="ln">    45	</span><span class="comment">// size, it returns the underlying Reader.</span>
+<span id="L46" class="ln">    46	</span>func NewReaderSize(rd io.Reader, size int) *Reader {
+<span id="L47" class="ln">    47	</span>	<span class="comment">// Is it already a Reader?</span>
+<span id="L48" class="ln">    48	</span>	b, ok := rd.(*Reader)
+<span id="L49" class="ln">    49	</span>	if ok &amp;&amp; len(b.buf) &gt;= size {
+<span id="L50" class="ln">    50	</span>		return b
+<span id="L51" class="ln">    51	</span>	}
+<span id="L52" class="ln">    52	</span>	if size &lt; minReadBufferSize {
+<span id="L53" class="ln">    53	</span>		size = minReadBufferSize
+<span id="L54" class="ln">    54	</span>	}
+<span id="L55" class="ln">    55	</span>	r := new(Reader)
+<span id="L56" class="ln">    56	</span>	r.reset(make([]byte, size), rd)
+<span id="L57" class="ln">    57	</span>	return r
+<span id="L58" class="ln">    58	</span>}
+<span id="L59" class="ln">    59	</span>
+<span id="L60" class="ln">    60	</span><span class="comment">// NewReader returns a new Reader whose buffer has the default size.</span>
+<span id="L61" class="ln">    61	</span>func NewReader(rd io.Reader) *Reader {
+<span id="L62" class="ln">    62	</span>	return NewReaderSize(rd, defaultBufSize)
+<span id="L63" class="ln">    63	</span>}
+<span id="L64" class="ln">    64	</span>
+<span id="L65" class="ln">    65	</span><span class="comment">// Reset discards any buffered data, resets all state, and switches</span>
+<span id="L66" class="ln">    66	</span><span class="comment">// the buffered reader to read from r.</span>
+<span id="L67" class="ln">    67	</span>func (b *Reader) Reset(r io.Reader) {
+<span id="L68" class="ln">    68	</span>	b.reset(b.buf, r)
+<span id="L69" class="ln">    69	</span>}
+<span id="L70" class="ln">    70	</span>
+<span id="L71" class="ln">    71	</span>func (b *Reader) reset(buf []byte, r io.Reader) {
+<span id="L72" class="ln">    72	</span>	*b = Reader{
+<span id="L73" class="ln">    73	</span>		buf:          buf,
+<span id="L74" class="ln">    74	</span>		rd:           r,
+<span id="L75" class="ln">    75	</span>		lastByte:     -1,
+<span id="L76" class="ln">    76	</span>		lastRuneSize: -1,
+<span id="L77" class="ln">    77	</span>	}
+<span id="L78" class="ln">    78	</span>}
+<span id="L79" class="ln">    79	</span>
+<span id="L80" class="ln">    80	</span>var errNegativeRead = errors.New(&#34;bufio: reader returned negative count from Read&#34;)
+<span id="L81" class="ln">    81	</span>
+<span id="L82" class="ln">    82	</span><span class="comment">// fill reads a new chunk into the buffer.</span>
+<span id="L83" class="ln">    83	</span>func (b *Reader) fill() {
+<span id="L84" class="ln">    84	</span>	<span class="comment">// Slide existing data to beginning.</span>
+<span id="L85" class="ln">    85	</span>	if b.r &gt; 0 {
+<span id="L86" class="ln">    86	</span>		copy(b.buf, b.buf[b.r:b.w])
+<span id="L87" class="ln">    87	</span>		b.w -= b.r
+<span id="L88" class="ln">    88	</span>		b.r = 0
+<span id="L89" class="ln">    89	</span>	}
+<span id="L90" class="ln">    90	</span>
+<span id="L91" class="ln">    91	</span>	if b.w &gt;= len(b.buf) {
+<span id="L92" class="ln">    92	</span>		panic(&#34;bufio: tried to fill full buffer&#34;)
+<span id="L93" class="ln">    93	</span>	}
+<span id="L94" class="ln">    94	</span>
+<span id="L95" class="ln">    95	</span>	<span class="comment">// Read new data: try a limited number of times.</span>
+<span id="L96" class="ln">    96	</span>	for i := maxConsecutiveEmptyReads; i &gt; 0; i-- {
+<span id="L97" class="ln">    97	</span>		n, err := b.rd.Read(b.buf[b.w:])
+<span id="L98" class="ln">    98	</span>		if n &lt; 0 {
+<span id="L99" class="ln">    99	</span>			panic(errNegativeRead)
+<span id="L100" class="ln">   100	</span>		}
+<span id="L101" class="ln">   101	</span>		b.w += n
+<span id="L102" class="ln">   102	</span>		if err != nil {
+<span id="L103" class="ln">   103	</span>			b.err = err
+<span id="L104" class="ln">   104	</span>			return
+<span id="L105" class="ln">   105	</span>		}
+<span id="L106" class="ln">   106	</span>		if n &gt; 0 {
+<span id="L107" class="ln">   107	</span>			return
+<span id="L108" class="ln">   108	</span>		}
+<span id="L109" class="ln">   109	</span>	}
+<span id="L110" class="ln">   110	</span>	b.err = io.ErrNoProgress
+<span id="L111" class="ln">   111	</span>}
+<span id="L112" class="ln">   112	</span>
+<span id="L113" class="ln">   113	</span>func (b *Reader) readErr() error {
+<span id="L114" class="ln">   114	</span>	err := b.err
+<span id="L115" class="ln">   115	</span>	b.err = nil
+<span id="L116" class="ln">   116	</span>	return err
+<span id="L117" class="ln">   117	</span>}
+<span id="L118" class="ln">   118	</span>
+<span id="L119" class="ln">   119	</span><span class="comment">// Peek returns the next n bytes without advancing the reader. The bytes stop</span>
+<span id="L120" class="ln">   120	</span><span class="comment">// being valid at the next read call. If Peek returns fewer than n bytes, it</span>
+<span id="L121" class="ln">   121	</span><span class="comment">// also returns an error explaining why the read is short. The error is</span>
+<span id="L122" class="ln">   122	</span><span class="comment">// ErrBufferFull if n is larger than b&#39;s buffer size.</span>
+<span id="L123" class="ln">   123	</span>func (b *Reader) Peek(n int) ([]byte, error) {
+<span id="L124" class="ln">   124	</span>	if n &lt; 0 {
+<span id="L125" class="ln">   125	</span>		return nil, ErrNegativeCount
+<span id="L126" class="ln">   126	</span>	}
+<span id="L127" class="ln">   127	</span>
+<span id="L128" class="ln">   128	</span>	for b.w-b.r &lt; n &amp;&amp; b.w-b.r &lt; len(b.buf) &amp;&amp; b.err == nil {
+<span id="L129" class="ln">   129	</span>		b.fill() <span class="comment">// b.w-b.r &lt; len(b.buf) =&gt; buffer is not full</span>
+<span id="L130" class="ln">   130	</span>	}
+<span id="L131" class="ln">   131	</span>
+<span id="L132" class="ln">   132	</span>	if n &gt; len(b.buf) {
+<span id="L133" class="ln">   133	</span>		return b.buf[b.r:b.w], ErrBufferFull
+<span id="L134" class="ln">   134	</span>	}
+<span id="L135" class="ln">   135	</span>
+<span id="L136" class="ln">   136	</span>	<span class="comment">// 0 &lt;= n &lt;= len(b.buf)</span>
+<span id="L137" class="ln">   137	</span>	var err error
+<span id="L138" class="ln">   138	</span>	if avail := b.w - b.r; avail &lt; n {
+<span id="L139" class="ln">   139	</span>		<span class="comment">// not enough data in buffer</span>
+<span id="L140" class="ln">   140	</span>		n = avail
+<span id="L141" class="ln">   141	</span>		err = b.readErr()
+<span id="L142" class="ln">   142	</span>		if err == nil {
+<span id="L143" class="ln">   143	</span>			err = ErrBufferFull
+<span id="L144" class="ln">   144	</span>		}
+<span id="L145" class="ln">   145	</span>	}
+<span id="L146" class="ln">   146	</span>	return b.buf[b.r : b.r+n], err
+<span id="L147" class="ln">   147	</span>}
+<span id="L148" class="ln">   148	</span>
+<span id="L149" class="ln">   149	</span><span class="comment">// Discard skips the next n bytes, returning the number of bytes discarded.</span>
+<span id="L150" class="ln">   150	</span><span class="comment">//</span>
+<span id="L151" class="ln">   151	</span><span class="comment">// If Discard skips fewer than n bytes, it also returns an error.</span>
+<span id="L152" class="ln">   152	</span><span class="comment">// If 0 &lt;= n &lt;= b.Buffered(), Discard is guaranteed to succeed without</span>
+<span id="L153" class="ln">   153	</span><span class="comment">// reading from the underlying io.Reader.</span>
+<span id="L154" class="ln">   154	</span>func (b *Reader) Discard(n int) (discarded int, err error) {
+<span id="L155" class="ln">   155	</span>	if n &lt; 0 {
+<span id="L156" class="ln">   156	</span>		return 0, ErrNegativeCount
+<span id="L157" class="ln">   157	</span>	}
+<span id="L158" class="ln">   158	</span>	if n == 0 {
+<span id="L159" class="ln">   159	</span>		return
+<span id="L160" class="ln">   160	</span>	}
+<span id="L161" class="ln">   161	</span>	remain := n
+<span id="L162" class="ln">   162	</span>	for {
+<span id="L163" class="ln">   163	</span>		skip := b.Buffered()
+<span id="L164" class="ln">   164	</span>		if skip == 0 {
+<span id="L165" class="ln">   165	</span>			b.fill()
+<span id="L166" class="ln">   166	</span>			skip = b.Buffered()
+<span id="L167" class="ln">   167	</span>		}
+<span id="L168" class="ln">   168	</span>		if skip &gt; remain {
+<span id="L169" class="ln">   169	</span>			skip = remain
+<span id="L170" class="ln">   170	</span>		}
+<span id="L171" class="ln">   171	</span>		b.r += skip
+<span id="L172" class="ln">   172	</span>		remain -= skip
+<span id="L173" class="ln">   173	</span>		if remain == 0 {
+<span id="L174" class="ln">   174	</span>			return n, nil
+<span id="L175" class="ln">   175	</span>		}
+<span id="L176" class="ln">   176	</span>		if b.err != nil {
+<span id="L177" class="ln">   177	</span>			return n - remain, b.readErr()
+<span id="L178" class="ln">   178	</span>		}
+<span id="L179" class="ln">   179	</span>	}
+<span id="L180" class="ln">   180	</span>}
+<span id="L181" class="ln">   181	</span>
+<span id="L182" class="ln">   182	</span><span class="comment">// Read reads data into p.</span>
+<span id="L183" class="ln">   183	</span><span class="comment">// It returns the number of bytes read into p.</span>
+<span id="L184" class="ln">   184	</span><span class="comment">// The bytes are taken from at most one Read on the underlying Reader,</span>
+<span id="L185" class="ln">   185	</span><span class="comment">// hence n may be less than len(p).</span>
+<span id="L186" class="ln">   186	</span><span class="comment">// At EOF, the count will be zero and err will be io.EOF.</span>
+<span id="L187" class="ln">   187	</span>func (b *Reader) Read(p []byte) (n int, err error) {
+<span id="L188" class="ln">   188	</span>	n = len(p)
+<span id="L189" class="ln">   189	</span>	if n == 0 {
+<span id="L190" class="ln">   190	</span>		return 0, b.readErr()
+<span id="L191" class="ln">   191	</span>	}
+<span id="L192" class="ln">   192	</span>	if b.r == b.w {
+<span id="L193" class="ln">   193	</span>		if b.err != nil {
+<span id="L194" class="ln">   194	</span>			return 0, b.readErr()
+<span id="L195" class="ln">   195	</span>		}
+<span id="L196" class="ln">   196	</span>		if len(p) &gt;= len(b.buf) {
+<span id="L197" class="ln">   197	</span>			<span class="comment">// Large read, empty buffer.</span>
+<span id="L198" class="ln">   198	</span>			<span class="comment">// Read directly into p to avoid copy.</span>
+<span id="L199" class="ln">   199	</span>			n, b.err = b.rd.Read(p)
+<span id="L200" class="ln">   200	</span>			if n &lt; 0 {
+<span id="L201" class="ln">   201	</span>				panic(errNegativeRead)
+<span id="L202" class="ln">   202	</span>			}
+<span id="L203" class="ln">   203	</span>			if n &gt; 0 {
+<span id="L204" class="ln">   204	</span>				b.lastByte = int(p[n-1])
+<span id="L205" class="ln">   205	</span>				b.lastRuneSize = -1
+<span id="L206" class="ln">   206	</span>			}
+<span id="L207" class="ln">   207	</span>			return n, b.readErr()
+<span id="L208" class="ln">   208	</span>		}
+<span id="L209" class="ln">   209	</span>		<span class="comment">// One read.</span>
+<span id="L210" class="ln">   210	</span>		<span class="comment">// Do not use b.fill, which will loop.</span>
+<span id="L211" class="ln">   211	</span>		b.r = 0
+<span id="L212" class="ln">   212	</span>		b.w = 0
+<span id="L213" class="ln">   213	</span>		n, b.err = b.rd.Read(b.buf)
+<span id="L214" class="ln">   214	</span>		if n &lt; 0 {
+<span id="L215" class="ln">   215	</span>			panic(errNegativeRead)
+<span id="L216" class="ln">   216	</span>		}
+<span id="L217" class="ln">   217	</span>		if n == 0 {
+<span id="L218" class="ln">   218	</span>			return 0, b.readErr()
+<span id="L219" class="ln">   219	</span>		}
+<span id="L220" class="ln">   220	</span>		b.w += n
+<span id="L221" class="ln">   221	</span>	}
+<span id="L222" class="ln">   222	</span>
+<span id="L223" class="ln">   223	</span>	<span class="comment">// copy as much as we can</span>
+<span id="L224" class="ln">   224	</span>	n = copy(p, b.buf[b.r:b.w])
+<span id="L225" class="ln">   225	</span>	b.r += n
+<span id="L226" class="ln">   226	</span>	b.lastByte = int(b.buf[b.r-1])
+<span id="L227" class="ln">   227	</span>	b.lastRuneSize = -1
+<span id="L228" class="ln">   228	</span>	return n, nil
+<span id="L229" class="ln">   229	</span>}
+<span id="L230" class="ln">   230	</span>
+<span id="L231" class="ln">   231	</span><span class="comment">// ReadByte reads and returns a single byte.</span>
+<span id="L232" class="ln">   232	</span><span class="comment">// If no byte is available, returns an error.</span>
+<span id="L233" class="ln">   233	</span>func (b *Reader) ReadByte() (byte, error) {
+<span id="L234" class="ln">   234	</span>	b.lastRuneSize = -1
+<span id="L235" class="ln">   235	</span>	for b.r == b.w {
+<span id="L236" class="ln">   236	</span>		if b.err != nil {
+<span id="L237" class="ln">   237	</span>			return 0, b.readErr()
+<span id="L238" class="ln">   238	</span>		}
+<span id="L239" class="ln">   239	</span>		b.fill() <span class="comment">// buffer is empty</span>
+<span id="L240" class="ln">   240	</span>	}
+<span id="L241" class="ln">   241	</span>	c := b.buf[b.r]
+<span id="L242" class="ln">   242	</span>	b.r++
+<span id="L243" class="ln">   243	</span>	b.lastByte = int(c)
+<span id="L244" class="ln">   244	</span>	return c, nil
+<span id="L245" class="ln">   245	</span>}
+<span id="L246" class="ln">   246	</span>
+<span id="L247" class="ln">   247	</span><span class="comment">// UnreadByte unreads the last byte. Only the most recently read byte can be unread.</span>
+<span id="L248" class="ln">   248	</span>func (b *Reader) UnreadByte() error {
+<span id="L249" class="ln">   249	</span>	if b.lastByte &lt; 0 || b.r == 0 &amp;&amp; b.w &gt; 0 {
+<span id="L250" class="ln">   250	</span>		return ErrInvalidUnreadByte
+<span id="L251" class="ln">   251	</span>	}
+<span id="L252" class="ln">   252	</span>	<span class="comment">// b.r &gt; 0 || b.w == 0</span>
+<span id="L253" class="ln">   253	</span>	if b.r &gt; 0 {
+<span id="L254" class="ln">   254	</span>		b.r--
+<span id="L255" class="ln">   255	</span>	} else {
+<span id="L256" class="ln">   256	</span>		<span class="comment">// b.r == 0 &amp;&amp; b.w == 0</span>
+<span id="L257" class="ln">   257	</span>		b.w = 1
+<span id="L258" class="ln">   258	</span>	}
+<span id="L259" class="ln">   259	</span>	b.buf[b.r] = byte(b.lastByte)
+<span id="L260" class="ln">   260	</span>	b.lastByte = -1
+<span id="L261" class="ln">   261	</span>	b.lastRuneSize = -1
+<span id="L262" class="ln">   262	</span>	return nil
+<span id="L263" class="ln">   263	</span>}
+<span id="L264" class="ln">   264	</span>
+<span id="L265" class="ln">   265	</span><span class="comment">// ReadRune reads a single UTF-8 encoded Unicode character and returns the</span>
+<span id="L266" class="ln">   266	</span><span class="comment">// rune and its size in bytes. If the encoded rune is invalid, it consumes one byte</span>
+<span id="L267" class="ln">   267	</span><span class="comment">// and returns unicode.ReplacementChar (U+FFFD) with a size of 1.</span>
+<span id="L268" class="ln">   268	</span>func (b *Reader) ReadRune() (r rune, size int, err error) {
+<span id="L269" class="ln">   269	</span>	for b.r+utf8.UTFMax &gt; b.w &amp;&amp; !utf8.FullRune(b.buf[b.r:b.w]) &amp;&amp; b.err == nil &amp;&amp; b.w-b.r &lt; len(b.buf) {
+<span id="L270" class="ln">   270	</span>		b.fill() <span class="comment">// b.w-b.r &lt; len(buf) =&gt; buffer is not full</span>
+<span id="L271" class="ln">   271	</span>	}
+<span id="L272" class="ln">   272	</span>	b.lastRuneSize = -1
+<span id="L273" class="ln">   273	</span>	if b.r == b.w {
+<span id="L274" class="ln">   274	</span>		return 0, 0, b.readErr()
+<span id="L275" class="ln">   275	</span>	}
+<span id="L276" class="ln">   276	</span>	r, size = rune(b.buf[b.r]), 1
+<span id="L277" class="ln">   277	</span>	if r &gt;= utf8.RuneSelf {
+<span id="L278" class="ln">   278	</span>		r, size = utf8.DecodeRune(b.buf[b.r:b.w])
+<span id="L279" class="ln">   279	</span>	}
+<span id="L280" class="ln">   280	</span>	b.r += size
+<span id="L281" class="ln">   281	</span>	b.lastByte = int(b.buf[b.r-1])
+<span id="L282" class="ln">   282	</span>	b.lastRuneSize = size
+<span id="L283" class="ln">   283	</span>	return r, size, nil
+<span id="L284" class="ln">   284	</span>}
+<span id="L285" class="ln">   285	</span>
+<span id="L286" class="ln">   286	</span><span class="comment">// UnreadRune unreads the last rune. If the most recent read operation on</span>
+<span id="L287" class="ln">   287	</span><span class="comment">// the buffer was not a ReadRune, UnreadRune returns an error.  (In this</span>
+<span id="L288" class="ln">   288	</span><span class="comment">// regard it is stricter than UnreadByte, which will unread the last byte</span>
+<span id="L289" class="ln">   289	</span><span class="comment">// from any read operation.)</span>
+<span id="L290" class="ln">   290	</span>func (b *Reader) UnreadRune() error {
+<span id="L291" class="ln">   291	</span>	if b.lastRuneSize &lt; 0 || b.r &lt; b.lastRuneSize {
+<span id="L292" class="ln">   292	</span>		return ErrInvalidUnreadRune
+<span id="L293" class="ln">   293	</span>	}
+<span id="L294" class="ln">   294	</span>	b.r -= b.lastRuneSize
+<span id="L295" class="ln">   295	</span>	b.lastByte = -1
+<span id="L296" class="ln">   296	</span>	b.lastRuneSize = -1
+<span id="L297" class="ln">   297	</span>	return nil
+<span id="L298" class="ln">   298	</span>}
+<span id="L299" class="ln">   299	</span>
+<span id="L300" class="ln">   300	</span><span class="comment">// Buffered returns the number of bytes that can be read from the current buffer.</span>
+<span id="L301" class="ln">   301	</span>func (b *Reader) Buffered() int { return b.w - b.r }
+<span id="L302" class="ln">   302	</span>
+<span id="L303" class="ln">   303	</span><span class="comment">// ReadSlice reads until the first occurrence of delim in the input,</span>
+<span id="L304" class="ln">   304	</span><span class="comment">// returning a slice pointing at the bytes in the buffer.</span>
+<span id="L305" class="ln">   305	</span><span class="comment">// The bytes stop being valid at the next read.</span>
+<span id="L306" class="ln">   306	</span><span class="comment">// If ReadSlice encounters an error before finding a delimiter,</span>
+<span id="L307" class="ln">   307	</span><span class="comment">// it returns all the data in the buffer and the error itself (often io.EOF).</span>
+<span id="L308" class="ln">   308	</span><span class="comment">// ReadSlice fails with error ErrBufferFull if the buffer fills without a delim.</span>
+<span id="L309" class="ln">   309	</span><span class="comment">// Because the data returned from ReadSlice will be overwritten</span>
+<span id="L310" class="ln">   310	</span><span class="comment">// by the next I/O operation, most clients should use</span>
+<span id="L311" class="ln">   311	</span><span class="comment">// ReadBytes or ReadString instead.</span>
+<span id="L312" class="ln">   312	</span><span class="comment">// ReadSlice returns err != nil if and only if line does not end in delim.</span>
+<span id="L313" class="ln">   313	</span>func (b *Reader) ReadSlice(delim byte) (line []byte, err error) {
+<span id="L314" class="ln">   314	</span>	for {
+<span id="L315" class="ln">   315	</span>		<span class="comment">// Search buffer.</span>
+<span id="L316" class="ln">   316	</span>		if i := bytes.IndexByte(b.buf[b.r:b.w], delim); i &gt;= 0 {
+<span id="L317" class="ln">   317	</span>			line = b.buf[b.r : b.r+i+1]
+<span id="L318" class="ln">   318	</span>			b.r += i + 1
+<span id="L319" class="ln">   319	</span>			break
+<span id="L320" class="ln">   320	</span>		}
+<span id="L321" class="ln">   321	</span>
+<span id="L322" class="ln">   322	</span>		<span class="comment">// Pending error?</span>
+<span id="L323" class="ln">   323	</span>		if b.err != nil {
+<span id="L324" class="ln">   324	</span>			line = b.buf[b.r:b.w]
+<span id="L325" class="ln">   325	</span>			b.r = b.w
+<span id="L326" class="ln">   326	</span>			err = b.readErr()
+<span id="L327" class="ln">   327	</span>			break
+<span id="L328" class="ln">   328	</span>		}
+<span id="L329" class="ln">   329	</span>
+<span id="L330" class="ln">   330	</span>		<span class="comment">// Buffer full?</span>
+<span id="L331" class="ln">   331	</span>		if b.Buffered() &gt;= len(b.buf) {
+<span id="L332" class="ln">   332	</span>			b.r = b.w
+<span id="L333" class="ln">   333	</span>			line = b.buf
+<span id="L334" class="ln">   334	</span>			err = ErrBufferFull
+<span id="L335" class="ln">   335	</span>			break
+<span id="L336" class="ln">   336	</span>		}
+<span id="L337" class="ln">   337	</span>
+<span id="L338" class="ln">   338	</span>		b.fill() <span class="comment">// buffer is not full</span>
+<span id="L339" class="ln">   339	</span>	}
+<span id="L340" class="ln">   340	</span>
+<span id="L341" class="ln">   341	</span>	<span class="comment">// Handle last byte, if any.</span>
+<span id="L342" class="ln">   342	</span>	if i := len(line) - 1; i &gt;= 0 {
+<span id="L343" class="ln">   343	</span>		b.lastByte = int(line[i])
+<span id="L344" class="ln">   344	</span>		b.lastRuneSize = -1
+<span id="L345" class="ln">   345	</span>	}
+<span id="L346" class="ln">   346	</span>
+<span id="L347" class="ln">   347	</span>	return
+<span id="L348" class="ln">   348	</span>}
+<span id="L349" class="ln">   349	</span>
+<span id="L350" class="ln">   350	</span><span class="comment">// ReadLine is a low-level line-reading primitive. Most callers should use</span>
+<span id="L351" class="ln">   351	</span><span class="comment">// ReadBytes(&#39;\n&#39;) or ReadString(&#39;\n&#39;) instead or use a Scanner.</span>
+<span id="L352" class="ln">   352	</span><span class="comment">//</span>
+<span id="L353" class="ln">   353	</span><span class="comment">// ReadLine tries to return a single line, not including the end-of-line bytes.</span>
+<span id="L354" class="ln">   354	</span><span class="comment">// If the line was too long for the buffer then isPrefix is set and the</span>
+<span id="L355" class="ln">   355	</span><span class="comment">// beginning of the line is returned. The rest of the line will be returned</span>
+<span id="L356" class="ln">   356	</span><span class="comment">// from future calls. isPrefix will be false when returning the last fragment</span>
+<span id="L357" class="ln">   357	</span><span class="comment">// of the line. The returned buffer is only valid until the next call to</span>
+<span id="L358" class="ln">   358	</span><span class="comment">// ReadLine. ReadLine either returns a non-nil line or it returns an error,</span>
+<span id="L359" class="ln">   359	</span><span class="comment">// never both.</span>
+<span id="L360" class="ln">   360	</span><span class="comment">//</span>
+<span id="L361" class="ln">   361	</span><span class="comment">// The text returned from ReadLine does not include the line end (&#34;\r\n&#34; or &#34;\n&#34;).</span>
+<span id="L362" class="ln">   362	</span><span class="comment">// No indication or error is given if the input ends without a final line end.</span>
+<span id="L363" class="ln">   363	</span><span class="comment">// Calling UnreadByte after ReadLine will always unread the last byte read</span>
+<span id="L364" class="ln">   364	</span><span class="comment">// (possibly a character belonging to the line end) even if that byte is not</span>
+<span id="L365" class="ln">   365	</span><span class="comment">// part of the line returned by ReadLine.</span>
+<span id="L366" class="ln">   366	</span>func (b *Reader) ReadLine() (line []byte, isPrefix bool, err error) {
+<span id="L367" class="ln">   367	</span>	line, err = b.ReadSlice(&#39;\n&#39;)
+<span id="L368" class="ln">   368	</span>	if err == ErrBufferFull {
+<span id="L369" class="ln">   369	</span>		<span class="comment">// Handle the case where &#34;\r\n&#34; straddles the buffer.</span>
+<span id="L370" class="ln">   370	</span>		if len(line) &gt; 0 &amp;&amp; line[len(line)-1] == &#39;\r&#39; {
+<span id="L371" class="ln">   371	</span>			<span class="comment">// Put the &#39;\r&#39; back on buf and drop it from line.</span>
+<span id="L372" class="ln">   372	</span>			<span class="comment">// Let the next call to ReadLine check for &#34;\r\n&#34;.</span>
+<span id="L373" class="ln">   373	</span>			if b.r == 0 {
+<span id="L374" class="ln">   374	</span>				<span class="comment">// should be unreachable</span>
+<span id="L375" class="ln">   375	</span>				panic(&#34;bufio: tried to rewind past start of buffer&#34;)
+<span id="L376" class="ln">   376	</span>			}
+<span id="L377" class="ln">   377	</span>			b.r--
+<span id="L378" class="ln">   378	</span>			line = line[:len(line)-1]
+<span id="L379" class="ln">   379	</span>		}
+<span id="L380" class="ln">   380	</span>		return line, true, nil
+<span id="L381" class="ln">   381	</span>	}
+<span id="L382" class="ln">   382	</span>
+<span id="L383" class="ln">   383	</span>	if len(line) == 0 {
+<span id="L384" class="ln">   384	</span>		if err != nil {
+<span id="L385" class="ln">   385	</span>			line = nil
+<span id="L386" class="ln">   386	</span>		}
+<span id="L387" class="ln">   387	</span>		return
+<span id="L388" class="ln">   388	</span>	}
+<span id="L389" class="ln">   389	</span>	err = nil
+<span id="L390" class="ln">   390	</span>
+<span id="L391" class="ln">   391	</span>	if line[len(line)-1] == &#39;\n&#39; {
+<span id="L392" class="ln">   392	</span>		drop := 1
+<span id="L393" class="ln">   393	</span>		if len(line) &gt; 1 &amp;&amp; line[len(line)-2] == &#39;\r&#39; {
+<span id="L394" class="ln">   394	</span>			drop = 2
+<span id="L395" class="ln">   395	</span>		}
+<span id="L396" class="ln">   396	</span>		line = line[:len(line)-drop]
+<span id="L397" class="ln">   397	</span>	}
+<span id="L398" class="ln">   398	</span>	return
+<span id="L399" class="ln">   399	</span>}
+<span id="L400" class="ln">   400	</span>
+<span id="L401" class="ln">   401	</span><span class="comment">// ReadBytes reads until the first occurrence of delim in the input,</span>
+<span id="L402" class="ln">   402	</span><span class="comment">// returning a slice containing the data up to and including the delimiter.</span>
+<span id="L403" class="ln">   403	</span><span class="comment">// If ReadBytes encounters an error before finding a delimiter,</span>
+<span id="L404" class="ln">   404	</span><span class="comment">// it returns the data read before the error and the error itself (often io.EOF).</span>
+<span id="L405" class="ln">   405	</span><span class="comment">// ReadBytes returns err != nil if and only if the returned data does not end in</span>
+<span id="L406" class="ln">   406	</span><span class="comment">// delim.</span>
+<span id="L407" class="ln">   407	</span><span class="comment">// For simple uses, a Scanner may be more convenient.</span>
+<span id="L408" class="ln">   408	</span>func (b *Reader) ReadBytes(delim byte) ([]byte, error) {
+<span id="L409" class="ln">   409	</span>	<span class="comment">// Use ReadSlice to look for array,</span>
+<span id="L410" class="ln">   410	</span>	<span class="comment">// accumulating full buffers.</span>
+<span id="L411" class="ln">   411	</span>	var frag []byte
+<span id="L412" class="ln">   412	</span>	var full [][]byte
+<span id="L413" class="ln">   413	</span>	var err error
+<span id="L414" class="ln">   414	</span>	for {
+<span id="L415" class="ln">   415	</span>		var e error
+<span id="L416" class="ln">   416	</span>		frag, e = b.ReadSlice(delim)
+<span id="L417" class="ln">   417	</span>		if e == nil { <span class="comment">// got final fragment</span>
+<span id="L418" class="ln">   418	</span>			break
+<span id="L419" class="ln">   419	</span>		}
+<span id="L420" class="ln">   420	</span>		if e != ErrBufferFull { <span class="comment">// unexpected error</span>
+<span id="L421" class="ln">   421	</span>			err = e
+<span id="L422" class="ln">   422	</span>			break
+<span id="L423" class="ln">   423	</span>		}
+<span id="L424" class="ln">   424	</span>
+<span id="L425" class="ln">   425	</span>		<span class="comment">// Make a copy of the buffer.</span>
+<span id="L426" class="ln">   426	</span>		buf := make([]byte, len(frag))
+<span id="L427" class="ln">   427	</span>		copy(buf, frag)
+<span id="L428" class="ln">   428	</span>		full = append(full, buf)
+<span id="L429" class="ln">   429	</span>	}
+<span id="L430" class="ln">   430	</span>
+<span id="L431" class="ln">   431	</span>	<span class="comment">// Allocate new buffer to hold the full pieces and the fragment.</span>
+<span id="L432" class="ln">   432	</span>	n := 0
+<span id="L433" class="ln">   433	</span>	for i := range full {
+<span id="L434" class="ln">   434	</span>		n += len(full[i])
+<span id="L435" class="ln">   435	</span>	}
+<span id="L436" class="ln">   436	</span>	n += len(frag)
+<span id="L437" class="ln">   437	</span>
+<span id="L438" class="ln">   438	</span>	<span class="comment">// Copy full pieces and fragment in.</span>
+<span id="L439" class="ln">   439	</span>	buf := make([]byte, n)
+<span id="L440" class="ln">   440	</span>	n = 0
+<span id="L441" class="ln">   441	</span>	for i := range full {
+<span id="L442" class="ln">   442	</span>		n += copy(buf[n:], full[i])
+<span id="L443" class="ln">   443	</span>	}
+<span id="L444" class="ln">   444	</span>	copy(buf[n:], frag)
+<span id="L445" class="ln">   445	</span>	return buf, err
+<span id="L446" class="ln">   446	</span>}
+<span id="L447" class="ln">   447	</span>
+<span id="L448" class="ln">   448	</span><span class="comment">// ReadString reads until the first occurrence of delim in the input,</span>
+<span id="L449" class="ln">   449	</span><span class="comment">// returning a string containing the data up to and including the delimiter.</span>
+<span id="L450" class="ln">   450	</span><span class="comment">// If ReadString encounters an error before finding a delimiter,</span>
+<span id="L451" class="ln">   451	</span><span class="comment">// it returns the data read before the error and the error itself (often io.EOF).</span>
+<span id="L452" class="ln">   452	</span><span class="comment">// ReadString returns err != nil if and only if the returned data does not end in</span>
+<span id="L453" class="ln">   453	</span><span class="comment">// delim.</span>
+<span id="L454" class="ln">   454	</span><span class="comment">// For simple uses, a Scanner may be more convenient.</span>
+<span id="L455" class="ln">   455	</span>func (b *Reader) ReadString(delim byte) (string, error) {
+<span id="L456" class="ln">   456	</span>	bytes, err := b.ReadBytes(delim)
+<span id="L457" class="ln">   457	</span>	return string(bytes), err
+<span id="L458" class="ln">   458	</span>}
+<span id="L459" class="ln">   459	</span>
+<span id="L460" class="ln">   460	</span><span class="comment">// WriteTo implements io.WriterTo.</span>
+<span id="L461" class="ln">   461	</span>func (b *Reader) WriteTo(w io.Writer) (n int64, err error) {
+<span id="L462" class="ln">   462	</span>	n, err = b.writeBuf(w)
+<span id="L463" class="ln">   463	</span>	if err != nil {
+<span id="L464" class="ln">   464	</span>		return
+<span id="L465" class="ln">   465	</span>	}
+<span id="L466" class="ln">   466	</span>
+<span id="L467" class="ln">   467	</span>	if r, ok := b.rd.(io.WriterTo); ok {
+<span id="L468" class="ln">   468	</span>		m, err := r.WriteTo(w)
+<span id="L469" class="ln">   469	</span>		n += m
+<span id="L470" class="ln">   470	</span>		return n, err
+<span id="L471" class="ln">   471	</span>	}
+<span id="L472" class="ln">   472	</span>
+<span id="L473" class="ln">   473	</span>	if w, ok := w.(io.ReaderFrom); ok {
+<span id="L474" class="ln">   474	</span>		m, err := w.ReadFrom(b.rd)
+<span id="L475" class="ln">   475	</span>		n += m
+<span id="L476" class="ln">   476	</span>		return n, err
+<span id="L477" class="ln">   477	</span>	}
+<span id="L478" class="ln">   478	</span>
+<span id="L479" class="ln">   479	</span>	if b.w-b.r &lt; len(b.buf) {
+<span id="L480" class="ln">   480	</span>		b.fill() <span class="comment">// buffer not full</span>
+<span id="L481" class="ln">   481	</span>	}
+<span id="L482" class="ln">   482	</span>
+<span id="L483" class="ln">   483	</span>	for b.r &lt; b.w {
+<span id="L484" class="ln">   484	</span>		<span class="comment">// b.r &lt; b.w =&gt; buffer is not empty</span>
+<span id="L485" class="ln">   485	</span>		m, err := b.writeBuf(w)
+<span id="L486" class="ln">   486	</span>		n += m
+<span id="L487" class="ln">   487	</span>		if err != nil {
+<span id="L488" class="ln">   488	</span>			return n, err
+<span id="L489" class="ln">   489	</span>		}
+<span id="L490" class="ln">   490	</span>		b.fill() <span class="comment">// buffer is empty</span>
+<span id="L491" class="ln">   491	</span>	}
+<span id="L492" class="ln">   492	</span>
+<span id="L493" class="ln">   493	</span>	if b.err == io.EOF {
+<span id="L494" class="ln">   494	</span>		b.err = nil
+<span id="L495" class="ln">   495	</span>	}
+<span id="L496" class="ln">   496	</span>
+<span id="L497" class="ln">   497	</span>	return n, b.readErr()
+<span id="L498" class="ln">   498	</span>}
+<span id="L499" class="ln">   499	</span>
+<span id="L500" class="ln">   500	</span>var errNegativeWrite = errors.New(&#34;bufio: writer returned negative count from Write&#34;)
+<span id="L501" class="ln">   501	</span>
+<span id="L502" class="ln">   502	</span><span class="comment">// writeBuf writes the Reader&#39;s buffer to the writer.</span>
+<span id="L503" class="ln">   503	</span>func (b *Reader) writeBuf(w io.Writer) (int64, error) {
+<span id="L504" class="ln">   504	</span>	n, err := w.Write(b.buf[b.r:b.w])
+<span id="L505" class="ln">   505	</span>	if n &lt; 0 {
+<span id="L506" class="ln">   506	</span>		panic(errNegativeWrite)
+<span id="L507" class="ln">   507	</span>	}
+<span id="L508" class="ln">   508	</span>	b.r += n
+<span id="L509" class="ln">   509	</span>	return int64(n), err
+<span id="L510" class="ln">   510	</span>}
+<span id="L511" class="ln">   511	</span>
+<span id="L512" class="ln">   512	</span><span class="comment">// buffered output</span>
+<span id="L513" class="ln">   513	</span>
+<span id="L514" class="ln">   514	</span><span class="comment">// Writer implements buffering for an io.Writer object.</span>
+<span id="L515" class="ln">   515	</span><span class="comment">// If an error occurs writing to a Writer, no more data will be</span>
+<span id="L516" class="ln">   516	</span><span class="comment">// accepted and all subsequent writes will return the error.</span>
+<span id="L517" class="ln">   517	</span><span class="comment">// After all data has been written, the client should call the</span>
+<span id="L518" class="ln">   518	</span><span class="comment">// Flush method to guarantee all data has been forwarded to</span>
+<span id="L519" class="ln">   519	</span><span class="comment">// the underlying io.Writer.</span>
+<span id="L520" class="ln">   520	</span>type Writer struct {
+<span id="L521" class="ln">   521	</span>	err error
+<span id="L522" class="ln">   522	</span>	buf []byte
+<span id="L523" class="ln">   523	</span>	n   int
+<span id="L524" class="ln">   524	</span>	wr  io.Writer
+<span id="L525" class="ln">   525	</span>}
+<span id="L526" class="ln">   526	</span>
+<span id="L527" class="ln">   527	</span><span class="comment">// NewWriterSize returns a new Writer whose buffer has at least the specified</span>
+<span id="L528" class="ln">   528	</span><span class="comment">// size. If the argument io.Writer is already a Writer with large enough</span>
+<span id="L529" class="ln">   529	</span><span class="comment">// size, it returns the underlying Writer.</span>
+<span id="L530" class="ln">   530	</span>func NewWriterSize(w io.Writer, size int) *Writer {
+<span id="L531" class="ln">   531	</span>	<span class="comment">// Is it already a Writer?</span>
+<span id="L532" class="ln">   532	</span>	b, ok := w.(*Writer)
+<span id="L533" class="ln">   533	</span>	if ok &amp;&amp; len(b.buf) &gt;= size {
+<span id="L534" class="ln">   534	</span>		return b
+<span id="L535" class="ln">   535	</span>	}
+<span id="L536" class="ln">   536	</span>	if size &lt;= 0 {
+<span id="L537" class="ln">   537	</span>		size = defaultBufSize
+<span id="L538" class="ln">   538	</span>	}
+<span id="L539" class="ln">   539	</span>	return &amp;Writer{
+<span id="L540" class="ln">   540	</span>		buf: make([]byte, size),
+<span id="L541" class="ln">   541	</span>		wr:  w,
+<span id="L542" class="ln">   542	</span>	}
+<span id="L543" class="ln">   543	</span>}
+<span id="L544" class="ln">   544	</span>
+<span id="L545" class="ln">   545	</span><span class="comment">// NewWriter returns a new Writer whose buffer has the default size.</span>
+<span id="L546" class="ln">   546	</span>func NewWriter(w io.Writer) *Writer {
+<span id="L547" class="ln">   547	</span>	return NewWriterSize(w, defaultBufSize)
+<span id="L548" class="ln">   548	</span>}
+<span id="L549" class="ln">   549	</span>
+<span id="L550" class="ln">   550	</span><span class="comment">// Reset discards any unflushed buffered data, clears any error, and</span>
+<span id="L551" class="ln">   551	</span><span class="comment">// resets b to write its output to w.</span>
+<span id="L552" class="ln">   552	</span>func (b *Writer) Reset(w io.Writer) {
+<span id="L553" class="ln">   553	</span>	b.err = nil
+<span id="L554" class="ln">   554	</span>	b.n = 0
+<span id="L555" class="ln">   555	</span>	b.wr = w
+<span id="L556" class="ln">   556	</span>}
+<span id="L557" class="ln">   557	</span>
+<span id="L558" class="ln">   558	</span><span class="comment">// Flush writes any buffered data to the underlying io.Writer.</span>
+<span id="L559" class="ln">   559	</span>func (b *Writer) Flush() error {
+<span id="L560" class="ln">   560	</span>	if b.err != nil {
+<span id="L561" class="ln">   561	</span>		return b.err
+<span id="L562" class="ln">   562	</span>	}
+<span id="L563" class="ln">   563	</span>	if b.n == 0 {
+<span id="L564" class="ln">   564	</span>		return nil
+<span id="L565" class="ln">   565	</span>	}
+<span id="L566" class="ln">   566	</span>	n, err := b.wr.Write(b.buf[0:b.n])
+<span id="L567" class="ln">   567	</span>	if n &lt; b.n &amp;&amp; err == nil {
+<span id="L568" class="ln">   568	</span>		err = io.ErrShortWrite
+<span id="L569" class="ln">   569	</span>	}
+<span id="L570" class="ln">   570	</span>	if err != nil {
+<span id="L571" class="ln">   571	</span>		if n &gt; 0 &amp;&amp; n &lt; b.n {
+<span id="L572" class="ln">   572	</span>			copy(b.buf[0:b.n-n], b.buf[n:b.n])
+<span id="L573" class="ln">   573	</span>		}
+<span id="L574" class="ln">   574	</span>		b.n -= n
+<span id="L575" class="ln">   575	</span>		b.err = err
+<span id="L576" class="ln">   576	</span>		return err
+<span id="L577" class="ln">   577	</span>	}
+<span id="L578" class="ln">   578	</span>	b.n = 0
+<span id="L579" class="ln">   579	</span>	return nil
+<span id="L580" class="ln">   580	</span>}
+<span id="L581" class="ln">   581	</span>
+<span id="L582" class="ln">   582	</span><span class="comment">// Available returns how many bytes are unused in the buffer.</span>
+<span id="L583" class="ln">   583	</span>func (b *Writer) Available() int { return len(b.buf) - b.n }
+<span id="L584" class="ln">   584	</span>
+<span id="L585" class="ln">   585	</span><span class="comment">// Buffered returns the number of bytes that have been written into the current buffer.</span>
+<span id="L586" class="ln">   586	</span>func (b *Writer) Buffered() int { return b.n }
+<span id="L587" class="ln">   587	</span>
+<span id="L588" class="ln">   588	</span><span class="comment">// Write writes the contents of p into the buffer.</span>
+<span id="L589" class="ln">   589	</span><span class="comment">// It returns the number of bytes written.</span>
+<span id="L590" class="ln">   590	</span><span class="comment">// If nn &lt; len(p), it also returns an error explaining</span>
+<span id="L591" class="ln">   591	</span><span class="comment">// why the write is short.</span>
+<span id="L592" class="ln">   592	</span><span class="selection">func (b *Writer) Write(p []byte) (nn int, err error)</span> {
+<span id="L593" class="ln">   593	</span>	for len(p) &gt; b.Available() &amp;&amp; b.err == nil {
+<span id="L594" class="ln">   594	</span>		var n int
+<span id="L595" class="ln">   595	</span>		if b.Buffered() == 0 {
+<span id="L596" class="ln">   596	</span>			<span class="comment">// Large write, empty buffer.</span>
+<span id="L597" class="ln">   597	</span>			<span class="comment">// Write directly from p to avoid copy.</span>
+<span id="L598" class="ln">   598	</span>			n, b.err = b.wr.Write(p)
+<span id="L599" class="ln">   599	</span>		} else {
+<span id="L600" class="ln">   600	</span>			n = copy(b.buf[b.n:], p)
+<span id="L601" class="ln">   601	</span>			b.n += n
+<span id="L602" class="ln">   602	</span>			b.Flush()
+<span id="L603" class="ln">   603	</span>		}
+<span id="L604" class="ln">   604	</span>		nn += n
+<span id="L605" class="ln">   605	</span>		p = p[n:]
+<span id="L606" class="ln">   606	</span>	}
+<span id="L607" class="ln">   607	</span>	if b.err != nil {
+<span id="L608" class="ln">   608	</span>		return nn, b.err
+<span id="L609" class="ln">   609	</span>	}
+<span id="L610" class="ln">   610	</span>	n := copy(b.buf[b.n:], p)
+<span id="L611" class="ln">   611	</span>	b.n += n
+<span id="L612" class="ln">   612	</span>	nn += n
+<span id="L613" class="ln">   613	</span>	return nn, nil
+<span id="L614" class="ln">   614	</span>}
+<span id="L615" class="ln">   615	</span>
+<span id="L616" class="ln">   616	</span><span class="comment">// WriteByte writes a single byte.</span>
+<span id="L617" class="ln">   617	</span>func (b *Writer) WriteByte(c byte) error {
+<span id="L618" class="ln">   618	</span>	if b.err != nil {
+<span id="L619" class="ln">   619	</span>		return b.err
+<span id="L620" class="ln">   620	</span>	}
+<span id="L621" class="ln">   621	</span>	if b.Available() &lt;= 0 &amp;&amp; b.Flush() != nil {
+<span id="L622" class="ln">   622	</span>		return b.err
+<span id="L623" class="ln">   623	</span>	}
+<span id="L624" class="ln">   624	</span>	b.buf[b.n] = c
+<span id="L625" class="ln">   625	</span>	b.n++
+<span id="L626" class="ln">   626	</span>	return nil
+<span id="L627" class="ln">   627	</span>}
+<span id="L628" class="ln">   628	</span>
+<span id="L629" class="ln">   629	</span><span class="comment">// WriteRune writes a single Unicode code point, returning</span>
+<span id="L630" class="ln">   630	</span><span class="comment">// the number of bytes written and any error.</span>
+<span id="L631" class="ln">   631	</span>func (b *Writer) WriteRune(r rune) (size int, err error) {
+<span id="L632" class="ln">   632	</span>	if r &lt; utf8.RuneSelf {
+<span id="L633" class="ln">   633	</span>		err = b.WriteByte(byte(r))
+<span id="L634" class="ln">   634	</span>		if err != nil {
+<span id="L635" class="ln">   635	</span>			return 0, err
+<span id="L636" class="ln">   636	</span>		}
+<span id="L637" class="ln">   637	</span>		return 1, nil
+<span id="L638" class="ln">   638	</span>	}
+<span id="L639" class="ln">   639	</span>	if b.err != nil {
+<span id="L640" class="ln">   640	</span>		return 0, b.err
+<span id="L641" class="ln">   641	</span>	}
+<span id="L642" class="ln">   642	</span>	n := b.Available()
+<span id="L643" class="ln">   643	</span>	if n &lt; utf8.UTFMax {
+<span id="L644" class="ln">   644	</span>		if b.Flush(); b.err != nil {
+<span id="L645" class="ln">   645	</span>			return 0, b.err
+<span id="L646" class="ln">   646	</span>		}
+<span id="L647" class="ln">   647	</span>		n = b.Available()
+<span id="L648" class="ln">   648	</span>		if n &lt; utf8.UTFMax {
+<span id="L649" class="ln">   649	</span>			<span class="comment">// Can only happen if buffer is silly small.</span>
+<span id="L650" class="ln">   650	</span>			return b.WriteString(string(r))
+<span id="L651" class="ln">   651	</span>		}
+<span id="L652" class="ln">   652	</span>	}
+<span id="L653" class="ln">   653	</span>	size = utf8.EncodeRune(b.buf[b.n:], r)
+<span id="L654" class="ln">   654	</span>	b.n += size
+<span id="L655" class="ln">   655	</span>	return size, nil
+<span id="L656" class="ln">   656	</span>}
+<span id="L657" class="ln">   657	</span>
+<span id="L658" class="ln">   658	</span><span class="comment">// WriteString writes a string.</span>
+<span id="L659" class="ln">   659	</span><span class="comment">// It returns the number of bytes written.</span>
+<span id="L660" class="ln">   660	</span><span class="comment">// If the count is less than len(s), it also returns an error explaining</span>
+<span id="L661" class="ln">   661	</span><span class="comment">// why the write is short.</span>
+<span id="L662" class="ln">   662	</span>func (b *Writer) WriteString(s string) (int, error) {
+<span id="L663" class="ln">   663	</span>	nn := 0
+<span id="L664" class="ln">   664	</span>	for len(s) &gt; b.Available() &amp;&amp; b.err == nil {
+<span id="L665" class="ln">   665	</span>		n := copy(b.buf[b.n:], s)
+<span id="L666" class="ln">   666	</span>		b.n += n
+<span id="L667" class="ln">   667	</span>		nn += n
+<span id="L668" class="ln">   668	</span>		s = s[n:]
+<span id="L669" class="ln">   669	</span>		b.Flush()
+<span id="L670" class="ln">   670	</span>	}
+<span id="L671" class="ln">   671	</span>	if b.err != nil {
+<span id="L672" class="ln">   672	</span>		return nn, b.err
+<span id="L673" class="ln">   673	</span>	}
+<span id="L674" class="ln">   674	</span>	n := copy(b.buf[b.n:], s)
+<span id="L675" class="ln">   675	</span>	b.n += n
+<span id="L676" class="ln">   676	</span>	nn += n
+<span id="L677" class="ln">   677	</span>	return nn, nil
+<span id="L678" class="ln">   678	</span>}
+<span id="L679" class="ln">   679	</span>
+<span id="L680" class="ln">   680	</span><span class="comment">// ReadFrom implements io.ReaderFrom.</span>
+<span id="L681" class="ln">   681	</span>func (b *Writer) ReadFrom(r io.Reader) (n int64, err error) {
+<span id="L682" class="ln">   682	</span>	if b.Buffered() == 0 {
+<span id="L683" class="ln">   683	</span>		if w, ok := b.wr.(io.ReaderFrom); ok {
+<span id="L684" class="ln">   684	</span>			return w.ReadFrom(r)
+<span id="L685" class="ln">   685	</span>		}
+<span id="L686" class="ln">   686	</span>	}
+<span id="L687" class="ln">   687	</span>	var m int
+<span id="L688" class="ln">   688	</span>	for {
+<span id="L689" class="ln">   689	</span>		if b.Available() == 0 {
+<span id="L690" class="ln">   690	</span>			if err1 := b.Flush(); err1 != nil {
+<span id="L691" class="ln">   691	</span>				return n, err1
+<span id="L692" class="ln">   692	</span>			}
+<span id="L693" class="ln">   693	</span>		}
+<span id="L694" class="ln">   694	</span>		nr := 0
+<span id="L695" class="ln">   695	</span>		for nr &lt; maxConsecutiveEmptyReads {
+<span id="L696" class="ln">   696	</span>			m, err = r.Read(b.buf[b.n:])
+<span id="L697" class="ln">   697	</span>			if m != 0 || err != nil {
+<span id="L698" class="ln">   698	</span>				break
+<span id="L699" class="ln">   699	</span>			}
+<span id="L700" class="ln">   700	</span>			nr++
+<span id="L701" class="ln">   701	</span>		}
+<span id="L702" class="ln">   702	</span>		if nr == maxConsecutiveEmptyReads {
+<span id="L703" class="ln">   703	</span>			return n, io.ErrNoProgress
+<span id="L704" class="ln">   704	</span>		}
+<span id="L705" class="ln">   705	</span>		b.n += m
+<span id="L706" class="ln">   706	</span>		n += int64(m)
+<span id="L707" class="ln">   707	</span>		if err != nil {
+<span id="L708" class="ln">   708	</span>			break
+<span id="L709" class="ln">   709	</span>		}
+<span id="L710" class="ln">   710	</span>	}
+<span id="L711" class="ln">   711	</span>	if err == io.EOF {
+<span id="L712" class="ln">   712	</span>		<span class="comment">// If we filled the buffer exactly, flush preemptively.</span>
+<span id="L713" class="ln">   713	</span>		if b.Available() == 0 {
+<span id="L714" class="ln">   714	</span>			err = b.Flush()
+<span id="L715" class="ln">   715	</span>		} else {
+<span id="L716" class="ln">   716	</span>			err = nil
+<span id="L717" class="ln">   717	</span>		}
+<span id="L718" class="ln">   718	</span>	}
+<span id="L719" class="ln">   719	</span>	return n, err
+<span id="L720" class="ln">   720	</span>}
+<span id="L721" class="ln">   721	</span>
+<span id="L722" class="ln">   722	</span><span class="comment">// buffered input and output</span>
+<span id="L723" class="ln">   723	</span>
+<span id="L724" class="ln">   724	</span><span class="comment">// ReadWriter stores pointers to a Reader and a Writer.</span>
+<span id="L725" class="ln">   725	</span><span class="comment">// It implements io.ReadWriter.</span>
+<span id="L726" class="ln">   726	</span>type ReadWriter struct {
+<span id="L727" class="ln">   727	</span>	*Reader
+<span id="L728" class="ln">   728	</span>	*Writer
+<span id="L729" class="ln">   729	</span>}
+<span id="L730" class="ln">   730	</span>
+<span id="L731" class="ln">   731	</span><span class="comment">// NewReadWriter allocates a new ReadWriter that dispatches to r and w.</span>
+<span id="L732" class="ln">   732	</span>func NewReadWriter(r *Reader, w *Writer) *ReadWriter {
+<span id="L733" class="ln">   733	</span>	return &amp;ReadWriter{r, w}
+<span id="L734" class="ln">   734	</span>}
+<span id="L735" class="ln">   735	</span>
+</pre><p><a href="bufio.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

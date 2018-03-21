@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/url/url.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./url.go%3Fs=22469:22500.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/net/url/url.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// Package url parses URLs and implements query escaping.</span>
+<span id="L6" class="ln">     6	</span>package url
+<span id="L7" class="ln">     7	</span>
+<span id="L8" class="ln">     8	</span><span class="comment">// See RFC 3986. This package generally follows RFC 3986, except where</span>
+<span id="L9" class="ln">     9	</span><span class="comment">// it deviates for compatibility reasons. When sending changes, first</span>
+<span id="L10" class="ln">    10	</span><span class="comment">// search old issues for history on decisions. Unit tests should also</span>
+<span id="L11" class="ln">    11	</span><span class="comment">// contain references to issue numbers with details.</span>
+<span id="L12" class="ln">    12	</span>
+<span id="L13" class="ln">    13	</span>import (
+<span id="L14" class="ln">    14	</span>	&#34;bytes&#34;
+<span id="L15" class="ln">    15	</span>	&#34;errors&#34;
+<span id="L16" class="ln">    16	</span>	&#34;fmt&#34;
+<span id="L17" class="ln">    17	</span>	&#34;sort&#34;
+<span id="L18" class="ln">    18	</span>	&#34;strconv&#34;
+<span id="L19" class="ln">    19	</span>	&#34;strings&#34;
+<span id="L20" class="ln">    20	</span>)
+<span id="L21" class="ln">    21	</span>
+<span id="L22" class="ln">    22	</span><span class="comment">// Error reports an error and the operation and URL that caused it.</span>
+<span id="L23" class="ln">    23	</span>type Error struct {
+<span id="L24" class="ln">    24	</span>	Op  string
+<span id="L25" class="ln">    25	</span>	URL string
+<span id="L26" class="ln">    26	</span>	Err error
+<span id="L27" class="ln">    27	</span>}
+<span id="L28" class="ln">    28	</span>
+<span id="L29" class="ln">    29	</span>func (e *Error) Error() string { return e.Op + &#34; &#34; + e.URL + &#34;: &#34; + e.Err.Error() }
+<span id="L30" class="ln">    30	</span>
+<span id="L31" class="ln">    31	</span>type timeout interface {
+<span id="L32" class="ln">    32	</span>	Timeout() bool
+<span id="L33" class="ln">    33	</span>}
+<span id="L34" class="ln">    34	</span>
+<span id="L35" class="ln">    35	</span>func (e *Error) Timeout() bool {
+<span id="L36" class="ln">    36	</span>	t, ok := e.Err.(timeout)
+<span id="L37" class="ln">    37	</span>	return ok &amp;&amp; t.Timeout()
+<span id="L38" class="ln">    38	</span>}
+<span id="L39" class="ln">    39	</span>
+<span id="L40" class="ln">    40	</span>type temporary interface {
+<span id="L41" class="ln">    41	</span>	Temporary() bool
+<span id="L42" class="ln">    42	</span>}
+<span id="L43" class="ln">    43	</span>
+<span id="L44" class="ln">    44	</span>func (e *Error) Temporary() bool {
+<span id="L45" class="ln">    45	</span>	t, ok := e.Err.(temporary)
+<span id="L46" class="ln">    46	</span>	return ok &amp;&amp; t.Temporary()
+<span id="L47" class="ln">    47	</span>}
+<span id="L48" class="ln">    48	</span>
+<span id="L49" class="ln">    49	</span>func ishex(c byte) bool {
+<span id="L50" class="ln">    50	</span>	switch {
+<span id="L51" class="ln">    51	</span>	case &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39;:
+<span id="L52" class="ln">    52	</span>		return true
+<span id="L53" class="ln">    53	</span>	case &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;f&#39;:
+<span id="L54" class="ln">    54	</span>		return true
+<span id="L55" class="ln">    55	</span>	case &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;F&#39;:
+<span id="L56" class="ln">    56	</span>		return true
+<span id="L57" class="ln">    57	</span>	}
+<span id="L58" class="ln">    58	</span>	return false
+<span id="L59" class="ln">    59	</span>}
+<span id="L60" class="ln">    60	</span>
+<span id="L61" class="ln">    61	</span>func unhex(c byte) byte {
+<span id="L62" class="ln">    62	</span>	switch {
+<span id="L63" class="ln">    63	</span>	case &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39;:
+<span id="L64" class="ln">    64	</span>		return c - &#39;0&#39;
+<span id="L65" class="ln">    65	</span>	case &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;f&#39;:
+<span id="L66" class="ln">    66	</span>		return c - &#39;a&#39; + 10
+<span id="L67" class="ln">    67	</span>	case &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;F&#39;:
+<span id="L68" class="ln">    68	</span>		return c - &#39;A&#39; + 10
+<span id="L69" class="ln">    69	</span>	}
+<span id="L70" class="ln">    70	</span>	return 0
+<span id="L71" class="ln">    71	</span>}
+<span id="L72" class="ln">    72	</span>
+<span id="L73" class="ln">    73	</span>type encoding int
+<span id="L74" class="ln">    74	</span>
+<span id="L75" class="ln">    75	</span>const (
+<span id="L76" class="ln">    76	</span>	encodePath encoding = 1 + iota
+<span id="L77" class="ln">    77	</span>	encodePathSegment
+<span id="L78" class="ln">    78	</span>	encodeHost
+<span id="L79" class="ln">    79	</span>	encodeZone
+<span id="L80" class="ln">    80	</span>	encodeUserPassword
+<span id="L81" class="ln">    81	</span>	encodeQueryComponent
+<span id="L82" class="ln">    82	</span>	encodeFragment
+<span id="L83" class="ln">    83	</span>)
+<span id="L84" class="ln">    84	</span>
+<span id="L85" class="ln">    85	</span>type EscapeError string
+<span id="L86" class="ln">    86	</span>
+<span id="L87" class="ln">    87	</span>func (e EscapeError) Error() string {
+<span id="L88" class="ln">    88	</span>	return &#34;invalid URL escape &#34; + strconv.Quote(string(e))
+<span id="L89" class="ln">    89	</span>}
+<span id="L90" class="ln">    90	</span>
+<span id="L91" class="ln">    91	</span>type InvalidHostError string
+<span id="L92" class="ln">    92	</span>
+<span id="L93" class="ln">    93	</span>func (e InvalidHostError) Error() string {
+<span id="L94" class="ln">    94	</span>	return &#34;invalid character &#34; + strconv.Quote(string(e)) + &#34; in host name&#34;
+<span id="L95" class="ln">    95	</span>}
+<span id="L96" class="ln">    96	</span>
+<span id="L97" class="ln">    97	</span><span class="comment">// Return true if the specified character should be escaped when</span>
+<span id="L98" class="ln">    98	</span><span class="comment">// appearing in a URL string, according to RFC 3986.</span>
+<span id="L99" class="ln">    99	</span><span class="comment">//</span>
+<span id="L100" class="ln">   100	</span><span class="comment">// Please be informed that for now shouldEscape does not check all</span>
+<span id="L101" class="ln">   101	</span><span class="comment">// reserved characters correctly. See golang.org/issue/5684.</span>
+<span id="L102" class="ln">   102	</span>func shouldEscape(c byte, mode encoding) bool {
+<span id="L103" class="ln">   103	</span>	<span class="comment">// §2.3 Unreserved characters (alphanum)</span>
+<span id="L104" class="ln">   104	</span>	if &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;Z&#39; || &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;z&#39; || &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39; {
+<span id="L105" class="ln">   105	</span>		return false
+<span id="L106" class="ln">   106	</span>	}
+<span id="L107" class="ln">   107	</span>
+<span id="L108" class="ln">   108	</span>	if mode == encodeHost || mode == encodeZone {
+<span id="L109" class="ln">   109	</span>		<span class="comment">// §3.2.2 Host allows</span>
+<span id="L110" class="ln">   110	</span>		<span class="comment">//	sub-delims = &#34;!&#34; / &#34;$&#34; / &#34;&amp;&#34; / &#34;&#39;&#34; / &#34;(&#34; / &#34;)&#34; / &#34;*&#34; / &#34;+&#34; / &#34;,&#34; / &#34;;&#34; / &#34;=&#34;</span>
+<span id="L111" class="ln">   111	</span>		<span class="comment">// as part of reg-name.</span>
+<span id="L112" class="ln">   112	</span>		<span class="comment">// We add : because we include :port as part of host.</span>
+<span id="L113" class="ln">   113	</span>		<span class="comment">// We add [ ] because we include [ipv6]:port as part of host.</span>
+<span id="L114" class="ln">   114	</span>		<span class="comment">// We add &lt; &gt; because they&#39;re the only characters left that</span>
+<span id="L115" class="ln">   115	</span>		<span class="comment">// we could possibly allow, and Parse will reject them if we</span>
+<span id="L116" class="ln">   116	</span>		<span class="comment">// escape them (because hosts can&#39;t use %-encoding for</span>
+<span id="L117" class="ln">   117	</span>		<span class="comment">// ASCII bytes).</span>
+<span id="L118" class="ln">   118	</span>		switch c {
+<span id="L119" class="ln">   119	</span>		case &#39;!&#39;, &#39;$&#39;, &#39;&amp;&#39;, &#39;\&#39;&#39;, &#39;(&#39;, &#39;)&#39;, &#39;*&#39;, &#39;+&#39;, &#39;,&#39;, &#39;;&#39;, &#39;=&#39;, &#39;:&#39;, &#39;[&#39;, &#39;]&#39;, &#39;&lt;&#39;, &#39;&gt;&#39;, &#39;&#34;&#39;:
+<span id="L120" class="ln">   120	</span>			return false
+<span id="L121" class="ln">   121	</span>		}
+<span id="L122" class="ln">   122	</span>	}
+<span id="L123" class="ln">   123	</span>
+<span id="L124" class="ln">   124	</span>	switch c {
+<span id="L125" class="ln">   125	</span>	case &#39;-&#39;, &#39;_&#39;, &#39;.&#39;, &#39;~&#39;: <span class="comment">// §2.3 Unreserved characters (mark)</span>
+<span id="L126" class="ln">   126	</span>		return false
+<span id="L127" class="ln">   127	</span>
+<span id="L128" class="ln">   128	</span>	case &#39;$&#39;, &#39;&amp;&#39;, &#39;+&#39;, &#39;,&#39;, &#39;/&#39;, &#39;:&#39;, &#39;;&#39;, &#39;=&#39;, &#39;?&#39;, &#39;@&#39;: <span class="comment">// §2.2 Reserved characters (reserved)</span>
+<span id="L129" class="ln">   129	</span>		<span class="comment">// Different sections of the URL allow a few of</span>
+<span id="L130" class="ln">   130	</span>		<span class="comment">// the reserved characters to appear unescaped.</span>
+<span id="L131" class="ln">   131	</span>		switch mode {
+<span id="L132" class="ln">   132	</span>		case encodePath: <span class="comment">// §3.3</span>
+<span id="L133" class="ln">   133	</span>			<span class="comment">// The RFC allows : @ &amp; = + $ but saves / ; , for assigning</span>
+<span id="L134" class="ln">   134	</span>			<span class="comment">// meaning to individual path segments. This package</span>
+<span id="L135" class="ln">   135	</span>			<span class="comment">// only manipulates the path as a whole, so we allow those</span>
+<span id="L136" class="ln">   136	</span>			<span class="comment">// last three as well. That leaves only ? to escape.</span>
+<span id="L137" class="ln">   137	</span>			return c == &#39;?&#39;
+<span id="L138" class="ln">   138	</span>
+<span id="L139" class="ln">   139	</span>		case encodePathSegment: <span class="comment">// §3.3</span>
+<span id="L140" class="ln">   140	</span>			<span class="comment">// The RFC allows : @ &amp; = + $ but saves / ; , for assigning</span>
+<span id="L141" class="ln">   141	</span>			<span class="comment">// meaning to individual path segments.</span>
+<span id="L142" class="ln">   142	</span>			return c == &#39;/&#39; || c == &#39;;&#39; || c == &#39;,&#39; || c == &#39;?&#39;
+<span id="L143" class="ln">   143	</span>
+<span id="L144" class="ln">   144	</span>		case encodeUserPassword: <span class="comment">// §3.2.1</span>
+<span id="L145" class="ln">   145	</span>			<span class="comment">// The RFC allows &#39;;&#39;, &#39;:&#39;, &#39;&amp;&#39;, &#39;=&#39;, &#39;+&#39;, &#39;$&#39;, and &#39;,&#39; in</span>
+<span id="L146" class="ln">   146	</span>			<span class="comment">// userinfo, so we must escape only &#39;@&#39;, &#39;/&#39;, and &#39;?&#39;.</span>
+<span id="L147" class="ln">   147	</span>			<span class="comment">// The parsing of userinfo treats &#39;:&#39; as special so we must escape</span>
+<span id="L148" class="ln">   148	</span>			<span class="comment">// that too.</span>
+<span id="L149" class="ln">   149	</span>			return c == &#39;@&#39; || c == &#39;/&#39; || c == &#39;?&#39; || c == &#39;:&#39;
+<span id="L150" class="ln">   150	</span>
+<span id="L151" class="ln">   151	</span>		case encodeQueryComponent: <span class="comment">// §3.4</span>
+<span id="L152" class="ln">   152	</span>			<span class="comment">// The RFC reserves (so we must escape) everything.</span>
+<span id="L153" class="ln">   153	</span>			return true
+<span id="L154" class="ln">   154	</span>
+<span id="L155" class="ln">   155	</span>		case encodeFragment: <span class="comment">// §4.1</span>
+<span id="L156" class="ln">   156	</span>			<span class="comment">// The RFC text is silent but the grammar allows</span>
+<span id="L157" class="ln">   157	</span>			<span class="comment">// everything, so escape nothing.</span>
+<span id="L158" class="ln">   158	</span>			return false
+<span id="L159" class="ln">   159	</span>		}
+<span id="L160" class="ln">   160	</span>	}
+<span id="L161" class="ln">   161	</span>
+<span id="L162" class="ln">   162	</span>	<span class="comment">// Everything else must be escaped.</span>
+<span id="L163" class="ln">   163	</span>	return true
+<span id="L164" class="ln">   164	</span>}
+<span id="L165" class="ln">   165	</span>
+<span id="L166" class="ln">   166	</span><span class="comment">// QueryUnescape does the inverse transformation of QueryEscape, converting</span>
+<span id="L167" class="ln">   167	</span><span class="comment">// %AB into the byte 0xAB and &#39;+&#39; into &#39; &#39; (space). It returns an error if</span>
+<span id="L168" class="ln">   168	</span><span class="comment">// any % is not followed by two hexadecimal digits.</span>
+<span id="L169" class="ln">   169	</span>func QueryUnescape(s string) (string, error) {
+<span id="L170" class="ln">   170	</span>	return unescape(s, encodeQueryComponent)
+<span id="L171" class="ln">   171	</span>}
+<span id="L172" class="ln">   172	</span>
+<span id="L173" class="ln">   173	</span><span class="comment">// PathUnescape does the inverse transformation of PathEscape, converting</span>
+<span id="L174" class="ln">   174	</span><span class="comment">// %AB into the byte 0xAB. It returns an error if any % is not followed by</span>
+<span id="L175" class="ln">   175	</span><span class="comment">// two hexadecimal digits.</span>
+<span id="L176" class="ln">   176	</span><span class="comment">//</span>
+<span id="L177" class="ln">   177	</span><span class="comment">// PathUnescape is identical to QueryUnescape except that it does not unescape &#39;+&#39; to &#39; &#39; (space).</span>
+<span id="L178" class="ln">   178	</span>func PathUnescape(s string) (string, error) {
+<span id="L179" class="ln">   179	</span>	return unescape(s, encodePathSegment)
+<span id="L180" class="ln">   180	</span>}
+<span id="L181" class="ln">   181	</span>
+<span id="L182" class="ln">   182	</span><span class="comment">// unescape unescapes a string; the mode specifies</span>
+<span id="L183" class="ln">   183	</span><span class="comment">// which section of the URL string is being unescaped.</span>
+<span id="L184" class="ln">   184	</span>func unescape(s string, mode encoding) (string, error) {
+<span id="L185" class="ln">   185	</span>	<span class="comment">// Count %, check that they&#39;re well-formed.</span>
+<span id="L186" class="ln">   186	</span>	n := 0
+<span id="L187" class="ln">   187	</span>	hasPlus := false
+<span id="L188" class="ln">   188	</span>	for i := 0; i &lt; len(s); {
+<span id="L189" class="ln">   189	</span>		switch s[i] {
+<span id="L190" class="ln">   190	</span>		case &#39;%&#39;:
+<span id="L191" class="ln">   191	</span>			n++
+<span id="L192" class="ln">   192	</span>			if i+2 &gt;= len(s) || !ishex(s[i+1]) || !ishex(s[i+2]) {
+<span id="L193" class="ln">   193	</span>				s = s[i:]
+<span id="L194" class="ln">   194	</span>				if len(s) &gt; 3 {
+<span id="L195" class="ln">   195	</span>					s = s[:3]
+<span id="L196" class="ln">   196	</span>				}
+<span id="L197" class="ln">   197	</span>				return &#34;&#34;, EscapeError(s)
+<span id="L198" class="ln">   198	</span>			}
+<span id="L199" class="ln">   199	</span>			<span class="comment">// Per https://tools.ietf.org/html/rfc3986#page-21</span>
+<span id="L200" class="ln">   200	</span>			<span class="comment">// in the host component %-encoding can only be used</span>
+<span id="L201" class="ln">   201	</span>			<span class="comment">// for non-ASCII bytes.</span>
+<span id="L202" class="ln">   202	</span>			<span class="comment">// But https://tools.ietf.org/html/rfc6874#section-2</span>
+<span id="L203" class="ln">   203	</span>			<span class="comment">// introduces %25 being allowed to escape a percent sign</span>
+<span id="L204" class="ln">   204	</span>			<span class="comment">// in IPv6 scoped-address literals. Yay.</span>
+<span id="L205" class="ln">   205	</span>			if mode == encodeHost &amp;&amp; unhex(s[i+1]) &lt; 8 &amp;&amp; s[i:i+3] != &#34;%25&#34; {
+<span id="L206" class="ln">   206	</span>				return &#34;&#34;, EscapeError(s[i : i+3])
+<span id="L207" class="ln">   207	</span>			}
+<span id="L208" class="ln">   208	</span>			if mode == encodeZone {
+<span id="L209" class="ln">   209	</span>				<span class="comment">// RFC 6874 says basically &#34;anything goes&#34; for zone identifiers</span>
+<span id="L210" class="ln">   210	</span>				<span class="comment">// and that even non-ASCII can be redundantly escaped,</span>
+<span id="L211" class="ln">   211	</span>				<span class="comment">// but it seems prudent to restrict %-escaped bytes here to those</span>
+<span id="L212" class="ln">   212	</span>				<span class="comment">// that are valid host name bytes in their unescaped form.</span>
+<span id="L213" class="ln">   213	</span>				<span class="comment">// That is, you can use escaping in the zone identifier but not</span>
+<span id="L214" class="ln">   214	</span>				<span class="comment">// to introduce bytes you couldn&#39;t just write directly.</span>
+<span id="L215" class="ln">   215	</span>				<span class="comment">// But Windows puts spaces here! Yay.</span>
+<span id="L216" class="ln">   216	</span>				v := unhex(s[i+1])&lt;&lt;4 | unhex(s[i+2])
+<span id="L217" class="ln">   217	</span>				if s[i:i+3] != &#34;%25&#34; &amp;&amp; v != &#39; &#39; &amp;&amp; shouldEscape(v, encodeHost) {
+<span id="L218" class="ln">   218	</span>					return &#34;&#34;, EscapeError(s[i : i+3])
+<span id="L219" class="ln">   219	</span>				}
+<span id="L220" class="ln">   220	</span>			}
+<span id="L221" class="ln">   221	</span>			i += 3
+<span id="L222" class="ln">   222	</span>		case &#39;+&#39;:
+<span id="L223" class="ln">   223	</span>			hasPlus = mode == encodeQueryComponent
+<span id="L224" class="ln">   224	</span>			i++
+<span id="L225" class="ln">   225	</span>		default:
+<span id="L226" class="ln">   226	</span>			if (mode == encodeHost || mode == encodeZone) &amp;&amp; s[i] &lt; 0x80 &amp;&amp; shouldEscape(s[i], mode) {
+<span id="L227" class="ln">   227	</span>				return &#34;&#34;, InvalidHostError(s[i : i+1])
+<span id="L228" class="ln">   228	</span>			}
+<span id="L229" class="ln">   229	</span>			i++
+<span id="L230" class="ln">   230	</span>		}
+<span id="L231" class="ln">   231	</span>	}
+<span id="L232" class="ln">   232	</span>
+<span id="L233" class="ln">   233	</span>	if n == 0 &amp;&amp; !hasPlus {
+<span id="L234" class="ln">   234	</span>		return s, nil
+<span id="L235" class="ln">   235	</span>	}
+<span id="L236" class="ln">   236	</span>
+<span id="L237" class="ln">   237	</span>	t := make([]byte, len(s)-2*n)
+<span id="L238" class="ln">   238	</span>	j := 0
+<span id="L239" class="ln">   239	</span>	for i := 0; i &lt; len(s); {
+<span id="L240" class="ln">   240	</span>		switch s[i] {
+<span id="L241" class="ln">   241	</span>		case &#39;%&#39;:
+<span id="L242" class="ln">   242	</span>			t[j] = unhex(s[i+1])&lt;&lt;4 | unhex(s[i+2])
+<span id="L243" class="ln">   243	</span>			j++
+<span id="L244" class="ln">   244	</span>			i += 3
+<span id="L245" class="ln">   245	</span>		case &#39;+&#39;:
+<span id="L246" class="ln">   246	</span>			if mode == encodeQueryComponent {
+<span id="L247" class="ln">   247	</span>				t[j] = &#39; &#39;
+<span id="L248" class="ln">   248	</span>			} else {
+<span id="L249" class="ln">   249	</span>				t[j] = &#39;+&#39;
+<span id="L250" class="ln">   250	</span>			}
+<span id="L251" class="ln">   251	</span>			j++
+<span id="L252" class="ln">   252	</span>			i++
+<span id="L253" class="ln">   253	</span>		default:
+<span id="L254" class="ln">   254	</span>			t[j] = s[i]
+<span id="L255" class="ln">   255	</span>			j++
+<span id="L256" class="ln">   256	</span>			i++
+<span id="L257" class="ln">   257	</span>		}
+<span id="L258" class="ln">   258	</span>	}
+<span id="L259" class="ln">   259	</span>	return string(t), nil
+<span id="L260" class="ln">   260	</span>}
+<span id="L261" class="ln">   261	</span>
+<span id="L262" class="ln">   262	</span><span class="comment">// QueryEscape escapes the string so it can be safely placed</span>
+<span id="L263" class="ln">   263	</span><span class="comment">// inside a URL query.</span>
+<span id="L264" class="ln">   264	</span>func QueryEscape(s string) string {
+<span id="L265" class="ln">   265	</span>	return escape(s, encodeQueryComponent)
+<span id="L266" class="ln">   266	</span>}
+<span id="L267" class="ln">   267	</span>
+<span id="L268" class="ln">   268	</span><span class="comment">// PathEscape escapes the string so it can be safely placed</span>
+<span id="L269" class="ln">   269	</span><span class="comment">// inside a URL path segment.</span>
+<span id="L270" class="ln">   270	</span>func PathEscape(s string) string {
+<span id="L271" class="ln">   271	</span>	return escape(s, encodePathSegment)
+<span id="L272" class="ln">   272	</span>}
+<span id="L273" class="ln">   273	</span>
+<span id="L274" class="ln">   274	</span>func escape(s string, mode encoding) string {
+<span id="L275" class="ln">   275	</span>	spaceCount, hexCount := 0, 0
+<span id="L276" class="ln">   276	</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L277" class="ln">   277	</span>		c := s[i]
+<span id="L278" class="ln">   278	</span>		if shouldEscape(c, mode) {
+<span id="L279" class="ln">   279	</span>			if c == &#39; &#39; &amp;&amp; mode == encodeQueryComponent {
+<span id="L280" class="ln">   280	</span>				spaceCount++
+<span id="L281" class="ln">   281	</span>			} else {
+<span id="L282" class="ln">   282	</span>				hexCount++
+<span id="L283" class="ln">   283	</span>			}
+<span id="L284" class="ln">   284	</span>		}
+<span id="L285" class="ln">   285	</span>	}
+<span id="L286" class="ln">   286	</span>
+<span id="L287" class="ln">   287	</span>	if spaceCount == 0 &amp;&amp; hexCount == 0 {
+<span id="L288" class="ln">   288	</span>		return s
+<span id="L289" class="ln">   289	</span>	}
+<span id="L290" class="ln">   290	</span>
+<span id="L291" class="ln">   291	</span>	t := make([]byte, len(s)+2*hexCount)
+<span id="L292" class="ln">   292	</span>	j := 0
+<span id="L293" class="ln">   293	</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L294" class="ln">   294	</span>		switch c := s[i]; {
+<span id="L295" class="ln">   295	</span>		case c == &#39; &#39; &amp;&amp; mode == encodeQueryComponent:
+<span id="L296" class="ln">   296	</span>			t[j] = &#39;+&#39;
+<span id="L297" class="ln">   297	</span>			j++
+<span id="L298" class="ln">   298	</span>		case shouldEscape(c, mode):
+<span id="L299" class="ln">   299	</span>			t[j] = &#39;%&#39;
+<span id="L300" class="ln">   300	</span>			t[j+1] = &#34;0123456789ABCDEF&#34;[c&gt;&gt;4]
+<span id="L301" class="ln">   301	</span>			t[j+2] = &#34;0123456789ABCDEF&#34;[c&amp;15]
+<span id="L302" class="ln">   302	</span>			j += 3
+<span id="L303" class="ln">   303	</span>		default:
+<span id="L304" class="ln">   304	</span>			t[j] = s[i]
+<span id="L305" class="ln">   305	</span>			j++
+<span id="L306" class="ln">   306	</span>		}
+<span id="L307" class="ln">   307	</span>	}
+<span id="L308" class="ln">   308	</span>	return string(t)
+<span id="L309" class="ln">   309	</span>}
+<span id="L310" class="ln">   310	</span>
+<span id="L311" class="ln">   311	</span><span class="comment">// A URL represents a parsed URL (technically, a URI reference).</span>
+<span id="L312" class="ln">   312	</span><span class="comment">// The general form represented is:</span>
+<span id="L313" class="ln">   313	</span><span class="comment">//</span>
+<span id="L314" class="ln">   314	</span><span class="comment">//	scheme://[userinfo@]host/path[?query][#fragment]</span>
+<span id="L315" class="ln">   315	</span><span class="comment">//</span>
+<span id="L316" class="ln">   316	</span><span class="comment">// URLs that do not start with a slash after the scheme are interpreted as:</span>
+<span id="L317" class="ln">   317	</span><span class="comment">//</span>
+<span id="L318" class="ln">   318	</span><span class="comment">//	scheme:opaque[?query][#fragment]</span>
+<span id="L319" class="ln">   319	</span><span class="comment">//</span>
+<span id="L320" class="ln">   320	</span><span class="comment">// Note that the Path field is stored in decoded form: /%47%6f%2f becomes /Go/.</span>
+<span id="L321" class="ln">   321	</span><span class="comment">// A consequence is that it is impossible to tell which slashes in the Path were</span>
+<span id="L322" class="ln">   322	</span><span class="comment">// slashes in the raw URL and which were %2f. This distinction is rarely important,</span>
+<span id="L323" class="ln">   323	</span><span class="comment">// but when it is, code must not use Path directly.</span>
+<span id="L324" class="ln">   324	</span><span class="comment">//</span>
+<span id="L325" class="ln">   325	</span><span class="comment">// Go 1.5 introduced the RawPath field to hold the encoded form of Path.</span>
+<span id="L326" class="ln">   326	</span><span class="comment">// The Parse function sets both Path and RawPath in the URL it returns,</span>
+<span id="L327" class="ln">   327	</span><span class="comment">// and URL&#39;s String method uses RawPath if it is a valid encoding of Path,</span>
+<span id="L328" class="ln">   328	</span><span class="comment">// by calling the EscapedPath method.</span>
+<span id="L329" class="ln">   329	</span><span class="comment">//</span>
+<span id="L330" class="ln">   330	</span><span class="comment">// In earlier versions of Go, the more indirect workarounds were that an</span>
+<span id="L331" class="ln">   331	</span><span class="comment">// HTTP server could consult req.RequestURI and an HTTP client could</span>
+<span id="L332" class="ln">   332	</span><span class="comment">// construct a URL struct directly and set the Opaque field instead of Path.</span>
+<span id="L333" class="ln">   333	</span><span class="comment">// These still work as well.</span>
+<span id="L334" class="ln">   334	</span>type URL struct {
+<span id="L335" class="ln">   335	</span>	Scheme     string
+<span id="L336" class="ln">   336	</span>	Opaque     string    <span class="comment">// encoded opaque data</span>
+<span id="L337" class="ln">   337	</span>	User       *Userinfo <span class="comment">// username and password information</span>
+<span id="L338" class="ln">   338	</span>	Host       string    <span class="comment">// host or host:port</span>
+<span id="L339" class="ln">   339	</span>	Path       string
+<span id="L340" class="ln">   340	</span>	RawPath    string <span class="comment">// encoded path hint (Go 1.5 and later only; see EscapedPath method)</span>
+<span id="L341" class="ln">   341	</span>	ForceQuery bool   <span class="comment">// append a query (&#39;?&#39;) even if RawQuery is empty</span>
+<span id="L342" class="ln">   342	</span>	RawQuery   string <span class="comment">// encoded query values, without &#39;?&#39;</span>
+<span id="L343" class="ln">   343	</span>	Fragment   string <span class="comment">// fragment for references, without &#39;#&#39;</span>
+<span id="L344" class="ln">   344	</span>}
+<span id="L345" class="ln">   345	</span>
+<span id="L346" class="ln">   346	</span><span class="comment">// User returns a Userinfo containing the provided username</span>
+<span id="L347" class="ln">   347	</span><span class="comment">// and no password set.</span>
+<span id="L348" class="ln">   348	</span>func User(username string) *Userinfo {
+<span id="L349" class="ln">   349	</span>	return &amp;Userinfo{username, &#34;&#34;, false}
+<span id="L350" class="ln">   350	</span>}
+<span id="L351" class="ln">   351	</span>
+<span id="L352" class="ln">   352	</span><span class="comment">// UserPassword returns a Userinfo containing the provided username</span>
+<span id="L353" class="ln">   353	</span><span class="comment">// and password.</span>
+<span id="L354" class="ln">   354	</span><span class="comment">// This functionality should only be used with legacy web sites.</span>
+<span id="L355" class="ln">   355	</span><span class="comment">// RFC 2396 warns that interpreting Userinfo this way</span>
+<span id="L356" class="ln">   356	</span><span class="comment">// ``is NOT RECOMMENDED, because the passing of authentication</span>
+<span id="L357" class="ln">   357	</span><span class="comment">// information in clear text (such as URI) has proven to be a</span>
+<span id="L358" class="ln">   358	</span><span class="comment">// security risk in almost every case where it has been used.&#39;&#39;</span>
+<span id="L359" class="ln">   359	</span>func UserPassword(username, password string) *Userinfo {
+<span id="L360" class="ln">   360	</span>	return &amp;Userinfo{username, password, true}
+<span id="L361" class="ln">   361	</span>}
+<span id="L362" class="ln">   362	</span>
+<span id="L363" class="ln">   363	</span><span class="comment">// The Userinfo type is an immutable encapsulation of username and</span>
+<span id="L364" class="ln">   364	</span><span class="comment">// password details for a URL. An existing Userinfo value is guaranteed</span>
+<span id="L365" class="ln">   365	</span><span class="comment">// to have a username set (potentially empty, as allowed by RFC 2396),</span>
+<span id="L366" class="ln">   366	</span><span class="comment">// and optionally a password.</span>
+<span id="L367" class="ln">   367	</span>type Userinfo struct {
+<span id="L368" class="ln">   368	</span>	username    string
+<span id="L369" class="ln">   369	</span>	password    string
+<span id="L370" class="ln">   370	</span>	passwordSet bool
+<span id="L371" class="ln">   371	</span>}
+<span id="L372" class="ln">   372	</span>
+<span id="L373" class="ln">   373	</span><span class="comment">// Username returns the username.</span>
+<span id="L374" class="ln">   374	</span>func (u *Userinfo) Username() string {
+<span id="L375" class="ln">   375	</span>	return u.username
+<span id="L376" class="ln">   376	</span>}
+<span id="L377" class="ln">   377	</span>
+<span id="L378" class="ln">   378	</span><span class="comment">// Password returns the password in case it is set, and whether it is set.</span>
+<span id="L379" class="ln">   379	</span>func (u *Userinfo) Password() (string, bool) {
+<span id="L380" class="ln">   380	</span>	return u.password, u.passwordSet
+<span id="L381" class="ln">   381	</span>}
+<span id="L382" class="ln">   382	</span>
+<span id="L383" class="ln">   383	</span><span class="comment">// String returns the encoded userinfo information in the standard form</span>
+<span id="L384" class="ln">   384	</span><span class="comment">// of &#34;username[:password]&#34;.</span>
+<span id="L385" class="ln">   385	</span>func (u *Userinfo) String() string {
+<span id="L386" class="ln">   386	</span>	s := escape(u.username, encodeUserPassword)
+<span id="L387" class="ln">   387	</span>	if u.passwordSet {
+<span id="L388" class="ln">   388	</span>		s += &#34;:&#34; + escape(u.password, encodeUserPassword)
+<span id="L389" class="ln">   389	</span>	}
+<span id="L390" class="ln">   390	</span>	return s
+<span id="L391" class="ln">   391	</span>}
+<span id="L392" class="ln">   392	</span>
+<span id="L393" class="ln">   393	</span><span class="comment">// Maybe rawurl is of the form scheme:path.</span>
+<span id="L394" class="ln">   394	</span><span class="comment">// (Scheme must be [a-zA-Z][a-zA-Z0-9+-.]*)</span>
+<span id="L395" class="ln">   395	</span><span class="comment">// If so, return scheme, path; else return &#34;&#34;, rawurl.</span>
+<span id="L396" class="ln">   396	</span>func getscheme(rawurl string) (scheme, path string, err error) {
+<span id="L397" class="ln">   397	</span>	for i := 0; i &lt; len(rawurl); i++ {
+<span id="L398" class="ln">   398	</span>		c := rawurl[i]
+<span id="L399" class="ln">   399	</span>		switch {
+<span id="L400" class="ln">   400	</span>		case &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;z&#39; || &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;Z&#39;:
+<span id="L401" class="ln">   401	</span>		<span class="comment">// do nothing</span>
+<span id="L402" class="ln">   402	</span>		case &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39; || c == &#39;+&#39; || c == &#39;-&#39; || c == &#39;.&#39;:
+<span id="L403" class="ln">   403	</span>			if i == 0 {
+<span id="L404" class="ln">   404	</span>				return &#34;&#34;, rawurl, nil
+<span id="L405" class="ln">   405	</span>			}
+<span id="L406" class="ln">   406	</span>		case c == &#39;:&#39;:
+<span id="L407" class="ln">   407	</span>			if i == 0 {
+<span id="L408" class="ln">   408	</span>				return &#34;&#34;, &#34;&#34;, errors.New(&#34;missing protocol scheme&#34;)
+<span id="L409" class="ln">   409	</span>			}
+<span id="L410" class="ln">   410	</span>			return rawurl[:i], rawurl[i+1:], nil
+<span id="L411" class="ln">   411	</span>		default:
+<span id="L412" class="ln">   412	</span>			<span class="comment">// we have encountered an invalid character,</span>
+<span id="L413" class="ln">   413	</span>			<span class="comment">// so there is no valid scheme</span>
+<span id="L414" class="ln">   414	</span>			return &#34;&#34;, rawurl, nil
+<span id="L415" class="ln">   415	</span>		}
+<span id="L416" class="ln">   416	</span>	}
+<span id="L417" class="ln">   417	</span>	return &#34;&#34;, rawurl, nil
+<span id="L418" class="ln">   418	</span>}
+<span id="L419" class="ln">   419	</span>
+<span id="L420" class="ln">   420	</span><span class="comment">// Maybe s is of the form t c u.</span>
+<span id="L421" class="ln">   421	</span><span class="comment">// If so, return t, c u (or t, u if cutc == true).</span>
+<span id="L422" class="ln">   422	</span><span class="comment">// If not, return s, &#34;&#34;.</span>
+<span id="L423" class="ln">   423	</span>func split(s string, c string, cutc bool) (string, string) {
+<span id="L424" class="ln">   424	</span>	i := strings.Index(s, c)
+<span id="L425" class="ln">   425	</span>	if i &lt; 0 {
+<span id="L426" class="ln">   426	</span>		return s, &#34;&#34;
+<span id="L427" class="ln">   427	</span>	}
+<span id="L428" class="ln">   428	</span>	if cutc {
+<span id="L429" class="ln">   429	</span>		return s[:i], s[i+len(c):]
+<span id="L430" class="ln">   430	</span>	}
+<span id="L431" class="ln">   431	</span>	return s[:i], s[i:]
+<span id="L432" class="ln">   432	</span>}
+<span id="L433" class="ln">   433	</span>
+<span id="L434" class="ln">   434	</span><span class="comment">// Parse parses rawurl into a URL structure.</span>
+<span id="L435" class="ln">   435	</span><span class="comment">// The rawurl may be relative or absolute.</span>
+<span id="L436" class="ln">   436	</span>func Parse(rawurl string) (*URL, error) {
+<span id="L437" class="ln">   437	</span>	<span class="comment">// Cut off #frag</span>
+<span id="L438" class="ln">   438	</span>	u, frag := split(rawurl, &#34;#&#34;, true)
+<span id="L439" class="ln">   439	</span>	url, err := parse(u, false)
+<span id="L440" class="ln">   440	</span>	if err != nil {
+<span id="L441" class="ln">   441	</span>		return nil, &amp;Error{&#34;parse&#34;, u, err}
+<span id="L442" class="ln">   442	</span>	}
+<span id="L443" class="ln">   443	</span>	if frag == &#34;&#34; {
+<span id="L444" class="ln">   444	</span>		return url, nil
+<span id="L445" class="ln">   445	</span>	}
+<span id="L446" class="ln">   446	</span>	if url.Fragment, err = unescape(frag, encodeFragment); err != nil {
+<span id="L447" class="ln">   447	</span>		return nil, &amp;Error{&#34;parse&#34;, rawurl, err}
+<span id="L448" class="ln">   448	</span>	}
+<span id="L449" class="ln">   449	</span>	return url, nil
+<span id="L450" class="ln">   450	</span>}
+<span id="L451" class="ln">   451	</span>
+<span id="L452" class="ln">   452	</span><span class="comment">// ParseRequestURI parses rawurl into a URL structure. It assumes that</span>
+<span id="L453" class="ln">   453	</span><span class="comment">// rawurl was received in an HTTP request, so the rawurl is interpreted</span>
+<span id="L454" class="ln">   454	</span><span class="comment">// only as an absolute URI or an absolute path.</span>
+<span id="L455" class="ln">   455	</span><span class="comment">// The string rawurl is assumed not to have a #fragment suffix.</span>
+<span id="L456" class="ln">   456	</span><span class="comment">// (Web browsers strip #fragment before sending the URL to a web server.)</span>
+<span id="L457" class="ln">   457	</span>func ParseRequestURI(rawurl string) (*URL, error) {
+<span id="L458" class="ln">   458	</span>	url, err := parse(rawurl, true)
+<span id="L459" class="ln">   459	</span>	if err != nil {
+<span id="L460" class="ln">   460	</span>		return nil, &amp;Error{&#34;parse&#34;, rawurl, err}
+<span id="L461" class="ln">   461	</span>	}
+<span id="L462" class="ln">   462	</span>	return url, nil
+<span id="L463" class="ln">   463	</span>}
+<span id="L464" class="ln">   464	</span>
+<span id="L465" class="ln">   465	</span><span class="comment">// parse parses a URL from a string in one of two contexts. If</span>
+<span id="L466" class="ln">   466	</span><span class="comment">// viaRequest is true, the URL is assumed to have arrived via an HTTP request,</span>
+<span id="L467" class="ln">   467	</span><span class="comment">// in which case only absolute URLs or path-absolute relative URLs are allowed.</span>
+<span id="L468" class="ln">   468	</span><span class="comment">// If viaRequest is false, all forms of relative URLs are allowed.</span>
+<span id="L469" class="ln">   469	</span>func parse(rawurl string, viaRequest bool) (*URL, error) {
+<span id="L470" class="ln">   470	</span>	var rest string
+<span id="L471" class="ln">   471	</span>	var err error
+<span id="L472" class="ln">   472	</span>
+<span id="L473" class="ln">   473	</span>	if rawurl == &#34;&#34; &amp;&amp; viaRequest {
+<span id="L474" class="ln">   474	</span>		return nil, errors.New(&#34;empty url&#34;)
+<span id="L475" class="ln">   475	</span>	}
+<span id="L476" class="ln">   476	</span>	url := new(URL)
+<span id="L477" class="ln">   477	</span>
+<span id="L478" class="ln">   478	</span>	if rawurl == &#34;*&#34; {
+<span id="L479" class="ln">   479	</span>		url.Path = &#34;*&#34;
+<span id="L480" class="ln">   480	</span>		return url, nil
+<span id="L481" class="ln">   481	</span>	}
+<span id="L482" class="ln">   482	</span>
+<span id="L483" class="ln">   483	</span>	<span class="comment">// Split off possible leading &#34;http:&#34;, &#34;mailto:&#34;, etc.</span>
+<span id="L484" class="ln">   484	</span>	<span class="comment">// Cannot contain escaped characters.</span>
+<span id="L485" class="ln">   485	</span>	if url.Scheme, rest, err = getscheme(rawurl); err != nil {
+<span id="L486" class="ln">   486	</span>		return nil, err
+<span id="L487" class="ln">   487	</span>	}
+<span id="L488" class="ln">   488	</span>	url.Scheme = strings.ToLower(url.Scheme)
+<span id="L489" class="ln">   489	</span>
+<span id="L490" class="ln">   490	</span>	if strings.HasSuffix(rest, &#34;?&#34;) &amp;&amp; strings.Count(rest, &#34;?&#34;) == 1 {
+<span id="L491" class="ln">   491	</span>		url.ForceQuery = true
+<span id="L492" class="ln">   492	</span>		rest = rest[:len(rest)-1]
+<span id="L493" class="ln">   493	</span>	} else {
+<span id="L494" class="ln">   494	</span>		rest, url.RawQuery = split(rest, &#34;?&#34;, true)
+<span id="L495" class="ln">   495	</span>	}
+<span id="L496" class="ln">   496	</span>
+<span id="L497" class="ln">   497	</span>	if !strings.HasPrefix(rest, &#34;/&#34;) {
+<span id="L498" class="ln">   498	</span>		if url.Scheme != &#34;&#34; {
+<span id="L499" class="ln">   499	</span>			<span class="comment">// We consider rootless paths per RFC 3986 as opaque.</span>
+<span id="L500" class="ln">   500	</span>			url.Opaque = rest
+<span id="L501" class="ln">   501	</span>			return url, nil
+<span id="L502" class="ln">   502	</span>		}
+<span id="L503" class="ln">   503	</span>		if viaRequest {
+<span id="L504" class="ln">   504	</span>			return nil, errors.New(&#34;invalid URI for request&#34;)
+<span id="L505" class="ln">   505	</span>		}
+<span id="L506" class="ln">   506	</span>
+<span id="L507" class="ln">   507	</span>		<span class="comment">// Avoid confusion with malformed schemes, like cache_object:foo/bar.</span>
+<span id="L508" class="ln">   508	</span>		<span class="comment">// See golang.org/issue/16822.</span>
+<span id="L509" class="ln">   509	</span>		<span class="comment">//</span>
+<span id="L510" class="ln">   510	</span>		<span class="comment">// RFC 3986, §3.3:</span>
+<span id="L511" class="ln">   511	</span>		<span class="comment">// In addition, a URI reference (Section 4.1) may be a relative-path reference,</span>
+<span id="L512" class="ln">   512	</span>		<span class="comment">// in which case the first path segment cannot contain a colon (&#34;:&#34;) character.</span>
+<span id="L513" class="ln">   513	</span>		colon := strings.Index(rest, &#34;:&#34;)
+<span id="L514" class="ln">   514	</span>		slash := strings.Index(rest, &#34;/&#34;)
+<span id="L515" class="ln">   515	</span>		if colon &gt;= 0 &amp;&amp; (slash &lt; 0 || colon &lt; slash) {
+<span id="L516" class="ln">   516	</span>			<span class="comment">// First path segment has colon. Not allowed in relative URL.</span>
+<span id="L517" class="ln">   517	</span>			return nil, errors.New(&#34;first path segment in URL cannot contain colon&#34;)
+<span id="L518" class="ln">   518	</span>		}
+<span id="L519" class="ln">   519	</span>	}
+<span id="L520" class="ln">   520	</span>
+<span id="L521" class="ln">   521	</span>	if (url.Scheme != &#34;&#34; || !viaRequest &amp;&amp; !strings.HasPrefix(rest, &#34;///&#34;)) &amp;&amp; strings.HasPrefix(rest, &#34;//&#34;) {
+<span id="L522" class="ln">   522	</span>		var authority string
+<span id="L523" class="ln">   523	</span>		authority, rest = split(rest[2:], &#34;/&#34;, false)
+<span id="L524" class="ln">   524	</span>		url.User, url.Host, err = parseAuthority(authority)
+<span id="L525" class="ln">   525	</span>		if err != nil {
+<span id="L526" class="ln">   526	</span>			return nil, err
+<span id="L527" class="ln">   527	</span>		}
+<span id="L528" class="ln">   528	</span>	}
+<span id="L529" class="ln">   529	</span>	<span class="comment">// Set Path and, optionally, RawPath.</span>
+<span id="L530" class="ln">   530	</span>	<span class="comment">// RawPath is a hint of the encoding of Path. We don&#39;t want to set it if</span>
+<span id="L531" class="ln">   531	</span>	<span class="comment">// the default escaping of Path is equivalent, to help make sure that people</span>
+<span id="L532" class="ln">   532	</span>	<span class="comment">// don&#39;t rely on it in general.</span>
+<span id="L533" class="ln">   533	</span>	if err := url.setPath(rest); err != nil {
+<span id="L534" class="ln">   534	</span>		return nil, err
+<span id="L535" class="ln">   535	</span>	}
+<span id="L536" class="ln">   536	</span>	return url, nil
+<span id="L537" class="ln">   537	</span>}
+<span id="L538" class="ln">   538	</span>
+<span id="L539" class="ln">   539	</span>func parseAuthority(authority string) (user *Userinfo, host string, err error) {
+<span id="L540" class="ln">   540	</span>	i := strings.LastIndex(authority, &#34;@&#34;)
+<span id="L541" class="ln">   541	</span>	if i &lt; 0 {
+<span id="L542" class="ln">   542	</span>		host, err = parseHost(authority)
+<span id="L543" class="ln">   543	</span>	} else {
+<span id="L544" class="ln">   544	</span>		host, err = parseHost(authority[i+1:])
+<span id="L545" class="ln">   545	</span>	}
+<span id="L546" class="ln">   546	</span>	if err != nil {
+<span id="L547" class="ln">   547	</span>		return nil, &#34;&#34;, err
+<span id="L548" class="ln">   548	</span>	}
+<span id="L549" class="ln">   549	</span>	if i &lt; 0 {
+<span id="L550" class="ln">   550	</span>		return nil, host, nil
+<span id="L551" class="ln">   551	</span>	}
+<span id="L552" class="ln">   552	</span>	userinfo := authority[:i]
+<span id="L553" class="ln">   553	</span>	if !strings.Contains(userinfo, &#34;:&#34;) {
+<span id="L554" class="ln">   554	</span>		if userinfo, err = unescape(userinfo, encodeUserPassword); err != nil {
+<span id="L555" class="ln">   555	</span>			return nil, &#34;&#34;, err
+<span id="L556" class="ln">   556	</span>		}
+<span id="L557" class="ln">   557	</span>		user = User(userinfo)
+<span id="L558" class="ln">   558	</span>	} else {
+<span id="L559" class="ln">   559	</span>		username, password := split(userinfo, &#34;:&#34;, true)
+<span id="L560" class="ln">   560	</span>		if username, err = unescape(username, encodeUserPassword); err != nil {
+<span id="L561" class="ln">   561	</span>			return nil, &#34;&#34;, err
+<span id="L562" class="ln">   562	</span>		}
+<span id="L563" class="ln">   563	</span>		if password, err = unescape(password, encodeUserPassword); err != nil {
+<span id="L564" class="ln">   564	</span>			return nil, &#34;&#34;, err
+<span id="L565" class="ln">   565	</span>		}
+<span id="L566" class="ln">   566	</span>		user = UserPassword(username, password)
+<span id="L567" class="ln">   567	</span>	}
+<span id="L568" class="ln">   568	</span>	return user, host, nil
+<span id="L569" class="ln">   569	</span>}
+<span id="L570" class="ln">   570	</span>
+<span id="L571" class="ln">   571	</span><span class="comment">// parseHost parses host as an authority without user</span>
+<span id="L572" class="ln">   572	</span><span class="comment">// information. That is, as host[:port].</span>
+<span id="L573" class="ln">   573	</span>func parseHost(host string) (string, error) {
+<span id="L574" class="ln">   574	</span>	if strings.HasPrefix(host, &#34;[&#34;) {
+<span id="L575" class="ln">   575	</span>		<span class="comment">// Parse an IP-Literal in RFC 3986 and RFC 6874.</span>
+<span id="L576" class="ln">   576	</span>		<span class="comment">// E.g., &#34;[fe80::1]&#34;, &#34;[fe80::1%25en0]&#34;, &#34;[fe80::1]:80&#34;.</span>
+<span id="L577" class="ln">   577	</span>		i := strings.LastIndex(host, &#34;]&#34;)
+<span id="L578" class="ln">   578	</span>		if i &lt; 0 {
+<span id="L579" class="ln">   579	</span>			return &#34;&#34;, errors.New(&#34;missing &#39;]&#39; in host&#34;)
+<span id="L580" class="ln">   580	</span>		}
+<span id="L581" class="ln">   581	</span>		colonPort := host[i+1:]
+<span id="L582" class="ln">   582	</span>		if !validOptionalPort(colonPort) {
+<span id="L583" class="ln">   583	</span>			return &#34;&#34;, fmt.Errorf(&#34;invalid port %q after host&#34;, colonPort)
+<span id="L584" class="ln">   584	</span>		}
+<span id="L585" class="ln">   585	</span>
+<span id="L586" class="ln">   586	</span>		<span class="comment">// RFC 6874 defines that %25 (%-encoded percent) introduces</span>
+<span id="L587" class="ln">   587	</span>		<span class="comment">// the zone identifier, and the zone identifier can use basically</span>
+<span id="L588" class="ln">   588	</span>		<span class="comment">// any %-encoding it likes. That&#39;s different from the host, which</span>
+<span id="L589" class="ln">   589	</span>		<span class="comment">// can only %-encode non-ASCII bytes.</span>
+<span id="L590" class="ln">   590	</span>		<span class="comment">// We do impose some restrictions on the zone, to avoid stupidity</span>
+<span id="L591" class="ln">   591	</span>		<span class="comment">// like newlines.</span>
+<span id="L592" class="ln">   592	</span>		zone := strings.Index(host[:i], &#34;%25&#34;)
+<span id="L593" class="ln">   593	</span>		if zone &gt;= 0 {
+<span id="L594" class="ln">   594	</span>			host1, err := unescape(host[:zone], encodeHost)
+<span id="L595" class="ln">   595	</span>			if err != nil {
+<span id="L596" class="ln">   596	</span>				return &#34;&#34;, err
+<span id="L597" class="ln">   597	</span>			}
+<span id="L598" class="ln">   598	</span>			host2, err := unescape(host[zone:i], encodeZone)
+<span id="L599" class="ln">   599	</span>			if err != nil {
+<span id="L600" class="ln">   600	</span>				return &#34;&#34;, err
+<span id="L601" class="ln">   601	</span>			}
+<span id="L602" class="ln">   602	</span>			host3, err := unescape(host[i:], encodeHost)
+<span id="L603" class="ln">   603	</span>			if err != nil {
+<span id="L604" class="ln">   604	</span>				return &#34;&#34;, err
+<span id="L605" class="ln">   605	</span>			}
+<span id="L606" class="ln">   606	</span>			return host1 + host2 + host3, nil
+<span id="L607" class="ln">   607	</span>		}
+<span id="L608" class="ln">   608	</span>	}
+<span id="L609" class="ln">   609	</span>
+<span id="L610" class="ln">   610	</span>	var err error
+<span id="L611" class="ln">   611	</span>	if host, err = unescape(host, encodeHost); err != nil {
+<span id="L612" class="ln">   612	</span>		return &#34;&#34;, err
+<span id="L613" class="ln">   613	</span>	}
+<span id="L614" class="ln">   614	</span>	return host, nil
+<span id="L615" class="ln">   615	</span>}
+<span id="L616" class="ln">   616	</span>
+<span id="L617" class="ln">   617	</span><span class="comment">// setPath sets the Path and RawPath fields of the URL based on the provided</span>
+<span id="L618" class="ln">   618	</span><span class="comment">// escaped path p. It maintains the invariant that RawPath is only specified</span>
+<span id="L619" class="ln">   619	</span><span class="comment">// when it differs from the default encoding of the path.</span>
+<span id="L620" class="ln">   620	</span><span class="comment">// For example:</span>
+<span id="L621" class="ln">   621	</span><span class="comment">// - setPath(&#34;/foo/bar&#34;)   will set Path=&#34;/foo/bar&#34; and RawPath=&#34;&#34;</span>
+<span id="L622" class="ln">   622	</span><span class="comment">// - setPath(&#34;/foo%2fbar&#34;) will set Path=&#34;/foo/bar&#34; and RawPath=&#34;/foo%2fbar&#34;</span>
+<span id="L623" class="ln">   623	</span><span class="comment">// setPath will return an error only if the provided path contains an invalid</span>
+<span id="L624" class="ln">   624	</span><span class="comment">// escaping.</span>
+<span id="L625" class="ln">   625	</span>func (u *URL) setPath(p string) error {
+<span id="L626" class="ln">   626	</span>	path, err := unescape(p, encodePath)
+<span id="L627" class="ln">   627	</span>	if err != nil {
+<span id="L628" class="ln">   628	</span>		return err
+<span id="L629" class="ln">   629	</span>	}
+<span id="L630" class="ln">   630	</span>	u.Path = path
+<span id="L631" class="ln">   631	</span>	if escp := escape(path, encodePath); p == escp {
+<span id="L632" class="ln">   632	</span>		<span class="comment">// Default encoding is fine.</span>
+<span id="L633" class="ln">   633	</span>		u.RawPath = &#34;&#34;
+<span id="L634" class="ln">   634	</span>	} else {
+<span id="L635" class="ln">   635	</span>		u.RawPath = p
+<span id="L636" class="ln">   636	</span>	}
+<span id="L637" class="ln">   637	</span>	return nil
+<span id="L638" class="ln">   638	</span>}
+<span id="L639" class="ln">   639	</span>
+<span id="L640" class="ln">   640	</span><span class="comment">// EscapedPath returns the escaped form of u.Path.</span>
+<span id="L641" class="ln">   641	</span><span class="comment">// In general there are multiple possible escaped forms of any path.</span>
+<span id="L642" class="ln">   642	</span><span class="comment">// EscapedPath returns u.RawPath when it is a valid escaping of u.Path.</span>
+<span id="L643" class="ln">   643	</span><span class="comment">// Otherwise EscapedPath ignores u.RawPath and computes an escaped</span>
+<span id="L644" class="ln">   644	</span><span class="comment">// form on its own.</span>
+<span id="L645" class="ln">   645	</span><span class="comment">// The String and RequestURI methods use EscapedPath to construct</span>
+<span id="L646" class="ln">   646	</span><span class="comment">// their results.</span>
+<span id="L647" class="ln">   647	</span><span class="comment">// In general, code should call EscapedPath instead of</span>
+<span id="L648" class="ln">   648	</span><span class="comment">// reading u.RawPath directly.</span>
+<span id="L649" class="ln">   649	</span>func (u *URL) EscapedPath() string {
+<span id="L650" class="ln">   650	</span>	if u.RawPath != &#34;&#34; &amp;&amp; validEncodedPath(u.RawPath) {
+<span id="L651" class="ln">   651	</span>		p, err := unescape(u.RawPath, encodePath)
+<span id="L652" class="ln">   652	</span>		if err == nil &amp;&amp; p == u.Path {
+<span id="L653" class="ln">   653	</span>			return u.RawPath
+<span id="L654" class="ln">   654	</span>		}
+<span id="L655" class="ln">   655	</span>	}
+<span id="L656" class="ln">   656	</span>	if u.Path == &#34;*&#34; {
+<span id="L657" class="ln">   657	</span>		return &#34;*&#34; <span class="comment">// don&#39;t escape (Issue 11202)</span>
+<span id="L658" class="ln">   658	</span>	}
+<span id="L659" class="ln">   659	</span>	return escape(u.Path, encodePath)
+<span id="L660" class="ln">   660	</span>}
+<span id="L661" class="ln">   661	</span>
+<span id="L662" class="ln">   662	</span><span class="comment">// validEncodedPath reports whether s is a valid encoded path.</span>
+<span id="L663" class="ln">   663	</span><span class="comment">// It must not contain any bytes that require escaping during path encoding.</span>
+<span id="L664" class="ln">   664	</span>func validEncodedPath(s string) bool {
+<span id="L665" class="ln">   665	</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L666" class="ln">   666	</span>		<span class="comment">// RFC 3986, Appendix A.</span>
+<span id="L667" class="ln">   667	</span>		<span class="comment">// pchar = unreserved / pct-encoded / sub-delims / &#34;:&#34; / &#34;@&#34;.</span>
+<span id="L668" class="ln">   668	</span>		<span class="comment">// shouldEscape is not quite compliant with the RFC,</span>
+<span id="L669" class="ln">   669	</span>		<span class="comment">// so we check the sub-delims ourselves and let</span>
+<span id="L670" class="ln">   670	</span>		<span class="comment">// shouldEscape handle the others.</span>
+<span id="L671" class="ln">   671	</span>		switch s[i] {
+<span id="L672" class="ln">   672	</span>		case &#39;!&#39;, &#39;$&#39;, &#39;&amp;&#39;, &#39;\&#39;&#39;, &#39;(&#39;, &#39;)&#39;, &#39;*&#39;, &#39;+&#39;, &#39;,&#39;, &#39;;&#39;, &#39;=&#39;, &#39;:&#39;, &#39;@&#39;:
+<span id="L673" class="ln">   673	</span>			<span class="comment">// ok</span>
+<span id="L674" class="ln">   674	</span>		case &#39;[&#39;, &#39;]&#39;:
+<span id="L675" class="ln">   675	</span>			<span class="comment">// ok - not specified in RFC 3986 but left alone by modern browsers</span>
+<span id="L676" class="ln">   676	</span>		case &#39;%&#39;:
+<span id="L677" class="ln">   677	</span>			<span class="comment">// ok - percent encoded, will decode</span>
+<span id="L678" class="ln">   678	</span>		default:
+<span id="L679" class="ln">   679	</span>			if shouldEscape(s[i], encodePath) {
+<span id="L680" class="ln">   680	</span>				return false
+<span id="L681" class="ln">   681	</span>			}
+<span id="L682" class="ln">   682	</span>		}
+<span id="L683" class="ln">   683	</span>	}
+<span id="L684" class="ln">   684	</span>	return true
+<span id="L685" class="ln">   685	</span>}
+<span id="L686" class="ln">   686	</span>
+<span id="L687" class="ln">   687	</span><span class="comment">// validOptionalPort reports whether port is either an empty string</span>
+<span id="L688" class="ln">   688	</span><span class="comment">// or matches /^:\d*$/</span>
+<span id="L689" class="ln">   689	</span>func validOptionalPort(port string) bool {
+<span id="L690" class="ln">   690	</span>	if port == &#34;&#34; {
+<span id="L691" class="ln">   691	</span>		return true
+<span id="L692" class="ln">   692	</span>	}
+<span id="L693" class="ln">   693	</span>	if port[0] != &#39;:&#39; {
+<span id="L694" class="ln">   694	</span>		return false
+<span id="L695" class="ln">   695	</span>	}
+<span id="L696" class="ln">   696	</span>	for _, b := range port[1:] {
+<span id="L697" class="ln">   697	</span>		if b &lt; &#39;0&#39; || b &gt; &#39;9&#39; {
+<span id="L698" class="ln">   698	</span>			return false
+<span id="L699" class="ln">   699	</span>		}
+<span id="L700" class="ln">   700	</span>	}
+<span id="L701" class="ln">   701	</span>	return true
+<span id="L702" class="ln">   702	</span>}
+<span id="L703" class="ln">   703	</span>
+<span id="L704" class="ln">   704	</span><span class="comment">// String reassembles the URL into a valid URL string.</span>
+<span id="L705" class="ln">   705	</span><span class="comment">// The general form of the result is one of:</span>
+<span id="L706" class="ln">   706	</span><span class="comment">//</span>
+<span id="L707" class="ln">   707	</span><span class="comment">//	scheme:opaque?query#fragment</span>
+<span id="L708" class="ln">   708	</span><span class="comment">//	scheme://userinfo@host/path?query#fragment</span>
+<span id="L709" class="ln">   709	</span><span class="comment">//</span>
+<span id="L710" class="ln">   710	</span><span class="comment">// If u.Opaque is non-empty, String uses the first form;</span>
+<span id="L711" class="ln">   711	</span><span class="comment">// otherwise it uses the second form.</span>
+<span id="L712" class="ln">   712	</span><span class="comment">// To obtain the path, String uses u.EscapedPath().</span>
+<span id="L713" class="ln">   713	</span><span class="comment">//</span>
+<span id="L714" class="ln">   714	</span><span class="comment">// In the second form, the following rules apply:</span>
+<span id="L715" class="ln">   715	</span><span class="comment">//	- if u.Scheme is empty, scheme: is omitted.</span>
+<span id="L716" class="ln">   716	</span><span class="comment">//	- if u.User is nil, userinfo@ is omitted.</span>
+<span id="L717" class="ln">   717	</span><span class="comment">//	- if u.Host is empty, host/ is omitted.</span>
+<span id="L718" class="ln">   718	</span><span class="comment">//	- if u.Scheme and u.Host are empty and u.User is nil,</span>
+<span id="L719" class="ln">   719	</span><span class="comment">//	   the entire scheme://userinfo@host/ is omitted.</span>
+<span id="L720" class="ln">   720	</span><span class="comment">//	- if u.Host is non-empty and u.Path begins with a /,</span>
+<span id="L721" class="ln">   721	</span><span class="comment">//	   the form host/path does not add its own /.</span>
+<span id="L722" class="ln">   722	</span><span class="comment">//	- if u.RawQuery is empty, ?query is omitted.</span>
+<span id="L723" class="ln">   723	</span><span class="comment">//	- if u.Fragment is empty, #fragment is omitted.</span>
+<span id="L724" class="ln">   724	</span>func (u *URL) String() string {
+<span id="L725" class="ln">   725	</span>	var buf bytes.Buffer
+<span id="L726" class="ln">   726	</span>	if u.Scheme != &#34;&#34; {
+<span id="L727" class="ln">   727	</span>		buf.WriteString(u.Scheme)
+<span id="L728" class="ln">   728	</span>		buf.WriteByte(&#39;:&#39;)
+<span id="L729" class="ln">   729	</span>	}
+<span id="L730" class="ln">   730	</span>	if u.Opaque != &#34;&#34; {
+<span id="L731" class="ln">   731	</span>		buf.WriteString(u.Opaque)
+<span id="L732" class="ln">   732	</span>	} else {
+<span id="L733" class="ln">   733	</span>		if u.Scheme != &#34;&#34; || u.Host != &#34;&#34; || u.User != nil {
+<span id="L734" class="ln">   734	</span>			buf.WriteString(&#34;//&#34;)
+<span id="L735" class="ln">   735	</span>			if ui := u.User; ui != nil {
+<span id="L736" class="ln">   736	</span>				buf.WriteString(ui.String())
+<span id="L737" class="ln">   737	</span>				buf.WriteByte(&#39;@&#39;)
+<span id="L738" class="ln">   738	</span>			}
+<span id="L739" class="ln">   739	</span>			if h := u.Host; h != &#34;&#34; {
+<span id="L740" class="ln">   740	</span>				buf.WriteString(escape(h, encodeHost))
+<span id="L741" class="ln">   741	</span>			}
+<span id="L742" class="ln">   742	</span>		}
+<span id="L743" class="ln">   743	</span>		path := u.EscapedPath()
+<span id="L744" class="ln">   744	</span>		if path != &#34;&#34; &amp;&amp; path[0] != &#39;/&#39; &amp;&amp; u.Host != &#34;&#34; {
+<span id="L745" class="ln">   745	</span>			buf.WriteByte(&#39;/&#39;)
+<span id="L746" class="ln">   746	</span>		}
+<span id="L747" class="ln">   747	</span>		if buf.Len() == 0 {
+<span id="L748" class="ln">   748	</span>			<span class="comment">// RFC 3986 §4.2</span>
+<span id="L749" class="ln">   749	</span>			<span class="comment">// A path segment that contains a colon character (e.g., &#34;this:that&#34;)</span>
+<span id="L750" class="ln">   750	</span>			<span class="comment">// cannot be used as the first segment of a relative-path reference, as</span>
+<span id="L751" class="ln">   751	</span>			<span class="comment">// it would be mistaken for a scheme name. Such a segment must be</span>
+<span id="L752" class="ln">   752	</span>			<span class="comment">// preceded by a dot-segment (e.g., &#34;./this:that&#34;) to make a relative-</span>
+<span id="L753" class="ln">   753	</span>			<span class="comment">// path reference.</span>
+<span id="L754" class="ln">   754	</span>			if i := strings.IndexByte(path, &#39;:&#39;); i &gt; -1 &amp;&amp; strings.IndexByte(path[:i], &#39;/&#39;) == -1 {
+<span id="L755" class="ln">   755	</span>				buf.WriteString(&#34;./&#34;)
+<span id="L756" class="ln">   756	</span>			}
+<span id="L757" class="ln">   757	</span>		}
+<span id="L758" class="ln">   758	</span>		buf.WriteString(path)
+<span id="L759" class="ln">   759	</span>	}
+<span id="L760" class="ln">   760	</span>	if u.ForceQuery || u.RawQuery != &#34;&#34; {
+<span id="L761" class="ln">   761	</span>		buf.WriteByte(&#39;?&#39;)
+<span id="L762" class="ln">   762	</span>		buf.WriteString(u.RawQuery)
+<span id="L763" class="ln">   763	</span>	}
+<span id="L764" class="ln">   764	</span>	if u.Fragment != &#34;&#34; {
+<span id="L765" class="ln">   765	</span>		buf.WriteByte(&#39;#&#39;)
+<span id="L766" class="ln">   766	</span>		buf.WriteString(escape(u.Fragment, encodeFragment))
+<span id="L767" class="ln">   767	</span>	}
+<span id="L768" class="ln">   768	</span>	return buf.String()
+<span id="L769" class="ln">   769	</span>}
+<span id="L770" class="ln">   770	</span>
+<span id="L771" class="ln">   771	</span><span class="comment">// Values maps a string key to a list of values.</span>
+<span id="L772" class="ln">   772	</span><span class="comment">// It is typically used for query parameters and form values.</span>
+<span id="L773" class="ln">   773	</span><span class="comment">// Unlike in the http.Header map, the keys in a Values map</span>
+<span id="L774" class="ln">   774	</span><span class="comment">// are case-sensitive.</span>
+<span id="L775" class="ln">   775	</span><span class="selection">type Values map[string][]string</span>
+<span id="L776" class="ln">   776	</span>
+<span id="L777" class="ln">   777	</span><span class="comment">// Get gets the first value associated with the given key.</span>
+<span id="L778" class="ln">   778	</span><span class="comment">// If there are no values associated with the key, Get returns</span>
+<span id="L779" class="ln">   779	</span><span class="comment">// the empty string. To access multiple values, use the map</span>
+<span id="L780" class="ln">   780	</span><span class="comment">// directly.</span>
+<span id="L781" class="ln">   781	</span>func (v Values) Get(key string) string {
+<span id="L782" class="ln">   782	</span>	if v == nil {
+<span id="L783" class="ln">   783	</span>		return &#34;&#34;
+<span id="L784" class="ln">   784	</span>	}
+<span id="L785" class="ln">   785	</span>	vs := v[key]
+<span id="L786" class="ln">   786	</span>	if len(vs) == 0 {
+<span id="L787" class="ln">   787	</span>		return &#34;&#34;
+<span id="L788" class="ln">   788	</span>	}
+<span id="L789" class="ln">   789	</span>	return vs[0]
+<span id="L790" class="ln">   790	</span>}
+<span id="L791" class="ln">   791	</span>
+<span id="L792" class="ln">   792	</span><span class="comment">// Set sets the key to value. It replaces any existing</span>
+<span id="L793" class="ln">   793	</span><span class="comment">// values.</span>
+<span id="L794" class="ln">   794	</span>func (v Values) Set(key, value string) {
+<span id="L795" class="ln">   795	</span>	v[key] = []string{value}
+<span id="L796" class="ln">   796	</span>}
+<span id="L797" class="ln">   797	</span>
+<span id="L798" class="ln">   798	</span><span class="comment">// Add adds the value to key. It appends to any existing</span>
+<span id="L799" class="ln">   799	</span><span class="comment">// values associated with key.</span>
+<span id="L800" class="ln">   800	</span>func (v Values) Add(key, value string) {
+<span id="L801" class="ln">   801	</span>	v[key] = append(v[key], value)
+<span id="L802" class="ln">   802	</span>}
+<span id="L803" class="ln">   803	</span>
+<span id="L804" class="ln">   804	</span><span class="comment">// Del deletes the values associated with key.</span>
+<span id="L805" class="ln">   805	</span>func (v Values) Del(key string) {
+<span id="L806" class="ln">   806	</span>	delete(v, key)
+<span id="L807" class="ln">   807	</span>}
+<span id="L808" class="ln">   808	</span>
+<span id="L809" class="ln">   809	</span><span class="comment">// ParseQuery parses the URL-encoded query string and returns</span>
+<span id="L810" class="ln">   810	</span><span class="comment">// a map listing the values specified for each key.</span>
+<span id="L811" class="ln">   811	</span><span class="comment">// ParseQuery always returns a non-nil map containing all the</span>
+<span id="L812" class="ln">   812	</span><span class="comment">// valid query parameters found; err describes the first decoding error</span>
+<span id="L813" class="ln">   813	</span><span class="comment">// encountered, if any.</span>
+<span id="L814" class="ln">   814	</span><span class="comment">//</span>
+<span id="L815" class="ln">   815	</span><span class="comment">// Query is expected to be a list of key=value settings separated by</span>
+<span id="L816" class="ln">   816	</span><span class="comment">// ampersands or semicolons. A setting without an equals sign is</span>
+<span id="L817" class="ln">   817	</span><span class="comment">// interpreted as a key set to an empty value.</span>
+<span id="L818" class="ln">   818	</span>func ParseQuery(query string) (Values, error) {
+<span id="L819" class="ln">   819	</span>	m := make(Values)
+<span id="L820" class="ln">   820	</span>	err := parseQuery(m, query)
+<span id="L821" class="ln">   821	</span>	return m, err
+<span id="L822" class="ln">   822	</span>}
+<span id="L823" class="ln">   823	</span>
+<span id="L824" class="ln">   824	</span>func parseQuery(m Values, query string) (err error) {
+<span id="L825" class="ln">   825	</span>	for query != &#34;&#34; {
+<span id="L826" class="ln">   826	</span>		key := query
+<span id="L827" class="ln">   827	</span>		if i := strings.IndexAny(key, &#34;&amp;;&#34;); i &gt;= 0 {
+<span id="L828" class="ln">   828	</span>			key, query = key[:i], key[i+1:]
+<span id="L829" class="ln">   829	</span>		} else {
+<span id="L830" class="ln">   830	</span>			query = &#34;&#34;
+<span id="L831" class="ln">   831	</span>		}
+<span id="L832" class="ln">   832	</span>		if key == &#34;&#34; {
+<span id="L833" class="ln">   833	</span>			continue
+<span id="L834" class="ln">   834	</span>		}
+<span id="L835" class="ln">   835	</span>		value := &#34;&#34;
+<span id="L836" class="ln">   836	</span>		if i := strings.Index(key, &#34;=&#34;); i &gt;= 0 {
+<span id="L837" class="ln">   837	</span>			key, value = key[:i], key[i+1:]
+<span id="L838" class="ln">   838	</span>		}
+<span id="L839" class="ln">   839	</span>		key, err1 := QueryUnescape(key)
+<span id="L840" class="ln">   840	</span>		if err1 != nil {
+<span id="L841" class="ln">   841	</span>			if err == nil {
+<span id="L842" class="ln">   842	</span>				err = err1
+<span id="L843" class="ln">   843	</span>			}
+<span id="L844" class="ln">   844	</span>			continue
+<span id="L845" class="ln">   845	</span>		}
+<span id="L846" class="ln">   846	</span>		value, err1 = QueryUnescape(value)
+<span id="L847" class="ln">   847	</span>		if err1 != nil {
+<span id="L848" class="ln">   848	</span>			if err == nil {
+<span id="L849" class="ln">   849	</span>				err = err1
+<span id="L850" class="ln">   850	</span>			}
+<span id="L851" class="ln">   851	</span>			continue
+<span id="L852" class="ln">   852	</span>		}
+<span id="L853" class="ln">   853	</span>		m[key] = append(m[key], value)
+<span id="L854" class="ln">   854	</span>	}
+<span id="L855" class="ln">   855	</span>	return err
+<span id="L856" class="ln">   856	</span>}
+<span id="L857" class="ln">   857	</span>
+<span id="L858" class="ln">   858	</span><span class="comment">// Encode encodes the values into ``URL encoded&#39;&#39; form</span>
+<span id="L859" class="ln">   859	</span><span class="comment">// (&#34;bar=baz&amp;foo=quux&#34;) sorted by key.</span>
+<span id="L860" class="ln">   860	</span>func (v Values) Encode() string {
+<span id="L861" class="ln">   861	</span>	if v == nil {
+<span id="L862" class="ln">   862	</span>		return &#34;&#34;
+<span id="L863" class="ln">   863	</span>	}
+<span id="L864" class="ln">   864	</span>	var buf bytes.Buffer
+<span id="L865" class="ln">   865	</span>	keys := make([]string, 0, len(v))
+<span id="L866" class="ln">   866	</span>	for k := range v {
+<span id="L867" class="ln">   867	</span>		keys = append(keys, k)
+<span id="L868" class="ln">   868	</span>	}
+<span id="L869" class="ln">   869	</span>	sort.Strings(keys)
+<span id="L870" class="ln">   870	</span>	for _, k := range keys {
+<span id="L871" class="ln">   871	</span>		vs := v[k]
+<span id="L872" class="ln">   872	</span>		prefix := QueryEscape(k) + &#34;=&#34;
+<span id="L873" class="ln">   873	</span>		for _, v := range vs {
+<span id="L874" class="ln">   874	</span>			if buf.Len() &gt; 0 {
+<span id="L875" class="ln">   875	</span>				buf.WriteByte(&#39;&amp;&#39;)
+<span id="L876" class="ln">   876	</span>			}
+<span id="L877" class="ln">   877	</span>			buf.WriteString(prefix)
+<span id="L878" class="ln">   878	</span>			buf.WriteString(QueryEscape(v))
+<span id="L879" class="ln">   879	</span>		}
+<span id="L880" class="ln">   880	</span>	}
+<span id="L881" class="ln">   881	</span>	return buf.String()
+<span id="L882" class="ln">   882	</span>}
+<span id="L883" class="ln">   883	</span>
+<span id="L884" class="ln">   884	</span><span class="comment">// resolvePath applies special path segments from refs and applies</span>
+<span id="L885" class="ln">   885	</span><span class="comment">// them to base, per RFC 3986.</span>
+<span id="L886" class="ln">   886	</span>func resolvePath(base, ref string) string {
+<span id="L887" class="ln">   887	</span>	var full string
+<span id="L888" class="ln">   888	</span>	if ref == &#34;&#34; {
+<span id="L889" class="ln">   889	</span>		full = base
+<span id="L890" class="ln">   890	</span>	} else if ref[0] != &#39;/&#39; {
+<span id="L891" class="ln">   891	</span>		i := strings.LastIndex(base, &#34;/&#34;)
+<span id="L892" class="ln">   892	</span>		full = base[:i+1] + ref
+<span id="L893" class="ln">   893	</span>	} else {
+<span id="L894" class="ln">   894	</span>		full = ref
+<span id="L895" class="ln">   895	</span>	}
+<span id="L896" class="ln">   896	</span>	if full == &#34;&#34; {
+<span id="L897" class="ln">   897	</span>		return &#34;&#34;
+<span id="L898" class="ln">   898	</span>	}
+<span id="L899" class="ln">   899	</span>	var dst []string
+<span id="L900" class="ln">   900	</span>	src := strings.Split(full, &#34;/&#34;)
+<span id="L901" class="ln">   901	</span>	for _, elem := range src {
+<span id="L902" class="ln">   902	</span>		switch elem {
+<span id="L903" class="ln">   903	</span>		case &#34;.&#34;:
+<span id="L904" class="ln">   904	</span>			<span class="comment">// drop</span>
+<span id="L905" class="ln">   905	</span>		case &#34;..&#34;:
+<span id="L906" class="ln">   906	</span>			if len(dst) &gt; 0 {
+<span id="L907" class="ln">   907	</span>				dst = dst[:len(dst)-1]
+<span id="L908" class="ln">   908	</span>			}
+<span id="L909" class="ln">   909	</span>		default:
+<span id="L910" class="ln">   910	</span>			dst = append(dst, elem)
+<span id="L911" class="ln">   911	</span>		}
+<span id="L912" class="ln">   912	</span>	}
+<span id="L913" class="ln">   913	</span>	if last := src[len(src)-1]; last == &#34;.&#34; || last == &#34;..&#34; {
+<span id="L914" class="ln">   914	</span>		<span class="comment">// Add final slash to the joined path.</span>
+<span id="L915" class="ln">   915	</span>		dst = append(dst, &#34;&#34;)
+<span id="L916" class="ln">   916	</span>	}
+<span id="L917" class="ln">   917	</span>	return &#34;/&#34; + strings.TrimLeft(strings.Join(dst, &#34;/&#34;), &#34;/&#34;)
+<span id="L918" class="ln">   918	</span>}
+<span id="L919" class="ln">   919	</span>
+<span id="L920" class="ln">   920	</span><span class="comment">// IsAbs reports whether the URL is absolute.</span>
+<span id="L921" class="ln">   921	</span><span class="comment">// Absolute means that it has a non-empty scheme.</span>
+<span id="L922" class="ln">   922	</span>func (u *URL) IsAbs() bool {
+<span id="L923" class="ln">   923	</span>	return u.Scheme != &#34;&#34;
+<span id="L924" class="ln">   924	</span>}
+<span id="L925" class="ln">   925	</span>
+<span id="L926" class="ln">   926	</span><span class="comment">// Parse parses a URL in the context of the receiver. The provided URL</span>
+<span id="L927" class="ln">   927	</span><span class="comment">// may be relative or absolute. Parse returns nil, err on parse</span>
+<span id="L928" class="ln">   928	</span><span class="comment">// failure, otherwise its return value is the same as ResolveReference.</span>
+<span id="L929" class="ln">   929	</span>func (u *URL) Parse(ref string) (*URL, error) {
+<span id="L930" class="ln">   930	</span>	refurl, err := Parse(ref)
+<span id="L931" class="ln">   931	</span>	if err != nil {
+<span id="L932" class="ln">   932	</span>		return nil, err
+<span id="L933" class="ln">   933	</span>	}
+<span id="L934" class="ln">   934	</span>	return u.ResolveReference(refurl), nil
+<span id="L935" class="ln">   935	</span>}
+<span id="L936" class="ln">   936	</span>
+<span id="L937" class="ln">   937	</span><span class="comment">// ResolveReference resolves a URI reference to an absolute URI from</span>
+<span id="L938" class="ln">   938	</span><span class="comment">// an absolute base URI, per RFC 3986 Section 5.2.  The URI reference</span>
+<span id="L939" class="ln">   939	</span><span class="comment">// may be relative or absolute. ResolveReference always returns a new</span>
+<span id="L940" class="ln">   940	</span><span class="comment">// URL instance, even if the returned URL is identical to either the</span>
+<span id="L941" class="ln">   941	</span><span class="comment">// base or reference. If ref is an absolute URL, then ResolveReference</span>
+<span id="L942" class="ln">   942	</span><span class="comment">// ignores base and returns a copy of ref.</span>
+<span id="L943" class="ln">   943	</span>func (u *URL) ResolveReference(ref *URL) *URL {
+<span id="L944" class="ln">   944	</span>	url := *ref
+<span id="L945" class="ln">   945	</span>	if ref.Scheme == &#34;&#34; {
+<span id="L946" class="ln">   946	</span>		url.Scheme = u.Scheme
+<span id="L947" class="ln">   947	</span>	}
+<span id="L948" class="ln">   948	</span>	if ref.Scheme != &#34;&#34; || ref.Host != &#34;&#34; || ref.User != nil {
+<span id="L949" class="ln">   949	</span>		<span class="comment">// The &#34;absoluteURI&#34; or &#34;net_path&#34; cases.</span>
+<span id="L950" class="ln">   950	</span>		<span class="comment">// We can ignore the error from setPath since we know we provided a</span>
+<span id="L951" class="ln">   951	</span>		<span class="comment">// validly-escaped path.</span>
+<span id="L952" class="ln">   952	</span>		url.setPath(resolvePath(ref.EscapedPath(), &#34;&#34;))
+<span id="L953" class="ln">   953	</span>		return &amp;url
+<span id="L954" class="ln">   954	</span>	}
+<span id="L955" class="ln">   955	</span>	if ref.Opaque != &#34;&#34; {
+<span id="L956" class="ln">   956	</span>		url.User = nil
+<span id="L957" class="ln">   957	</span>		url.Host = &#34;&#34;
+<span id="L958" class="ln">   958	</span>		url.Path = &#34;&#34;
+<span id="L959" class="ln">   959	</span>		return &amp;url
+<span id="L960" class="ln">   960	</span>	}
+<span id="L961" class="ln">   961	</span>	if ref.Path == &#34;&#34; {
+<span id="L962" class="ln">   962	</span>		if ref.RawQuery == &#34;&#34; {
+<span id="L963" class="ln">   963	</span>			url.RawQuery = u.RawQuery
+<span id="L964" class="ln">   964	</span>			if ref.Fragment == &#34;&#34; {
+<span id="L965" class="ln">   965	</span>				url.Fragment = u.Fragment
+<span id="L966" class="ln">   966	</span>			}
+<span id="L967" class="ln">   967	</span>		}
+<span id="L968" class="ln">   968	</span>	}
+<span id="L969" class="ln">   969	</span>	<span class="comment">// The &#34;abs_path&#34; or &#34;rel_path&#34; cases.</span>
+<span id="L970" class="ln">   970	</span>	url.Host = u.Host
+<span id="L971" class="ln">   971	</span>	url.User = u.User
+<span id="L972" class="ln">   972	</span>	url.setPath(resolvePath(u.EscapedPath(), ref.EscapedPath()))
+<span id="L973" class="ln">   973	</span>	return &amp;url
+<span id="L974" class="ln">   974	</span>}
+<span id="L975" class="ln">   975	</span>
+<span id="L976" class="ln">   976	</span><span class="comment">// Query parses RawQuery and returns the corresponding values.</span>
+<span id="L977" class="ln">   977	</span>func (u *URL) Query() Values {
+<span id="L978" class="ln">   978	</span>	v, _ := ParseQuery(u.RawQuery)
+<span id="L979" class="ln">   979	</span>	return v
+<span id="L980" class="ln">   980	</span>}
+<span id="L981" class="ln">   981	</span>
+<span id="L982" class="ln">   982	</span><span class="comment">// RequestURI returns the encoded path?query or opaque?query</span>
+<span id="L983" class="ln">   983	</span><span class="comment">// string that would be used in an HTTP request for u.</span>
+<span id="L984" class="ln">   984	</span>func (u *URL) RequestURI() string {
+<span id="L985" class="ln">   985	</span>	result := u.Opaque
+<span id="L986" class="ln">   986	</span>	if result == &#34;&#34; {
+<span id="L987" class="ln">   987	</span>		result = u.EscapedPath()
+<span id="L988" class="ln">   988	</span>		if result == &#34;&#34; {
+<span id="L989" class="ln">   989	</span>			result = &#34;/&#34;
+<span id="L990" class="ln">   990	</span>		}
+<span id="L991" class="ln">   991	</span>	} else {
+<span id="L992" class="ln">   992	</span>		if strings.HasPrefix(result, &#34;//&#34;) {
+<span id="L993" class="ln">   993	</span>			result = u.Scheme + &#34;:&#34; + result
+<span id="L994" class="ln">   994	</span>		}
+<span id="L995" class="ln">   995	</span>	}
+<span id="L996" class="ln">   996	</span>	if u.ForceQuery || u.RawQuery != &#34;&#34; {
+<span id="L997" class="ln">   997	</span>		result += &#34;?&#34; + u.RawQuery
+<span id="L998" class="ln">   998	</span>	}
+<span id="L999" class="ln">   999	</span>	return result
+<span id="L1000" class="ln">  1000	</span>}
+<span id="L1001" class="ln">  1001	</span>
+<span id="L1002" class="ln">  1002	</span><span class="comment">// Hostname returns u.Host, without any port number.</span>
+<span id="L1003" class="ln">  1003	</span><span class="comment">//</span>
+<span id="L1004" class="ln">  1004	</span><span class="comment">// If Host is an IPv6 literal with a port number, Hostname returns the</span>
+<span id="L1005" class="ln">  1005	</span><span class="comment">// IPv6 literal without the square brackets. IPv6 literals may include</span>
+<span id="L1006" class="ln">  1006	</span><span class="comment">// a zone identifier.</span>
+<span id="L1007" class="ln">  1007	</span>func (u *URL) Hostname() string {
+<span id="L1008" class="ln">  1008	</span>	return stripPort(u.Host)
+<span id="L1009" class="ln">  1009	</span>}
+<span id="L1010" class="ln">  1010	</span>
+<span id="L1011" class="ln">  1011	</span><span class="comment">// Port returns the port part of u.Host, without the leading colon.</span>
+<span id="L1012" class="ln">  1012	</span><span class="comment">// If u.Host doesn&#39;t contain a port, Port returns an empty string.</span>
+<span id="L1013" class="ln">  1013	</span>func (u *URL) Port() string {
+<span id="L1014" class="ln">  1014	</span>	return portOnly(u.Host)
+<span id="L1015" class="ln">  1015	</span>}
+<span id="L1016" class="ln">  1016	</span>
+<span id="L1017" class="ln">  1017	</span>func stripPort(hostport string) string {
+<span id="L1018" class="ln">  1018	</span>	colon := strings.IndexByte(hostport, &#39;:&#39;)
+<span id="L1019" class="ln">  1019	</span>	if colon == -1 {
+<span id="L1020" class="ln">  1020	</span>		return hostport
+<span id="L1021" class="ln">  1021	</span>	}
+<span id="L1022" class="ln">  1022	</span>	if i := strings.IndexByte(hostport, &#39;]&#39;); i != -1 {
+<span id="L1023" class="ln">  1023	</span>		return strings.TrimPrefix(hostport[:i], &#34;[&#34;)
+<span id="L1024" class="ln">  1024	</span>	}
+<span id="L1025" class="ln">  1025	</span>	return hostport[:colon]
+<span id="L1026" class="ln">  1026	</span>}
+<span id="L1027" class="ln">  1027	</span>
+<span id="L1028" class="ln">  1028	</span>func portOnly(hostport string) string {
+<span id="L1029" class="ln">  1029	</span>	colon := strings.IndexByte(hostport, &#39;:&#39;)
+<span id="L1030" class="ln">  1030	</span>	if colon == -1 {
+<span id="L1031" class="ln">  1031	</span>		return &#34;&#34;
+<span id="L1032" class="ln">  1032	</span>	}
+<span id="L1033" class="ln">  1033	</span>	if i := strings.Index(hostport, &#34;]:&#34;); i != -1 {
+<span id="L1034" class="ln">  1034	</span>		return hostport[i+len(&#34;]:&#34;):]
+<span id="L1035" class="ln">  1035	</span>	}
+<span id="L1036" class="ln">  1036	</span>	if strings.Contains(hostport, &#34;]&#34;) {
+<span id="L1037" class="ln">  1037	</span>		return &#34;&#34;
+<span id="L1038" class="ln">  1038	</span>	}
+<span id="L1039" class="ln">  1039	</span>	return hostport[colon+len(&#34;:&#34;):]
+<span id="L1040" class="ln">  1040	</span>}
+<span id="L1041" class="ln">  1041	</span>
+<span id="L1042" class="ln">  1042	</span><span class="comment">// Marshaling interface implementations.</span>
+<span id="L1043" class="ln">  1043	</span><span class="comment">// Would like to implement MarshalText/UnmarshalText but that will change the JSON representation of URLs.</span>
+<span id="L1044" class="ln">  1044	</span>
+<span id="L1045" class="ln">  1045	</span>func (u *URL) MarshalBinary() (text []byte, err error) {
+<span id="L1046" class="ln">  1046	</span>	return []byte(u.String()), nil
+<span id="L1047" class="ln">  1047	</span>}
+<span id="L1048" class="ln">  1048	</span>
+<span id="L1049" class="ln">  1049	</span>func (u *URL) UnmarshalBinary(text []byte) error {
+<span id="L1050" class="ln">  1050	</span>	u1, err := Parse(string(text))
+<span id="L1051" class="ln">  1051	</span>	if err != nil {
+<span id="L1052" class="ln">  1052	</span>		return err
+<span id="L1053" class="ln">  1053	</span>	}
+<span id="L1054" class="ln">  1054	</span>	*u = *u1
+<span id="L1055" class="ln">  1055	</span>	return nil
+<span id="L1056" class="ln">  1056	</span>}
+<span id="L1057" class="ln">  1057	</span>
+</pre><p><a href="url.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

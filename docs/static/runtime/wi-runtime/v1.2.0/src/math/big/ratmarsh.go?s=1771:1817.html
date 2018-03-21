@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/ratmarsh.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./ratmarsh.go%3Fs=1771:1817.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/math/big/ratmarsh.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2015 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// This file implements encoding/decoding of Rats.</span>
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>package big
+<span id="L8" class="ln">     8	</span>
+<span id="L9" class="ln">     9	</span>import (
+<span id="L10" class="ln">    10	</span>	&#34;encoding/binary&#34;
+<span id="L11" class="ln">    11	</span>	&#34;errors&#34;
+<span id="L12" class="ln">    12	</span>	&#34;fmt&#34;
+<span id="L13" class="ln">    13	</span>)
+<span id="L14" class="ln">    14	</span>
+<span id="L15" class="ln">    15	</span><span class="comment">// Gob codec version. Permits backward-compatible changes to the encoding.</span>
+<span id="L16" class="ln">    16	</span>const ratGobVersion byte = 1
+<span id="L17" class="ln">    17	</span>
+<span id="L18" class="ln">    18	</span><span class="comment">// GobEncode implements the gob.GobEncoder interface.</span>
+<span id="L19" class="ln">    19	</span>func (x *Rat) GobEncode() ([]byte, error) {
+<span id="L20" class="ln">    20	</span>	if x == nil {
+<span id="L21" class="ln">    21	</span>		return nil, nil
+<span id="L22" class="ln">    22	</span>	}
+<span id="L23" class="ln">    23	</span>	buf := make([]byte, 1+4+(len(x.a.abs)+len(x.b.abs))*_S) <span class="comment">// extra bytes for version and sign bit (1), and numerator length (4)</span>
+<span id="L24" class="ln">    24	</span>	i := x.b.abs.bytes(buf)
+<span id="L25" class="ln">    25	</span>	j := x.a.abs.bytes(buf[:i])
+<span id="L26" class="ln">    26	</span>	n := i - j
+<span id="L27" class="ln">    27	</span>	if int(uint32(n)) != n {
+<span id="L28" class="ln">    28	</span>		<span class="comment">// this should never happen</span>
+<span id="L29" class="ln">    29	</span>		return nil, errors.New(&#34;Rat.GobEncode: numerator too large&#34;)
+<span id="L30" class="ln">    30	</span>	}
+<span id="L31" class="ln">    31	</span>	binary.BigEndian.PutUint32(buf[j-4:j], uint32(n))
+<span id="L32" class="ln">    32	</span>	j -= 1 + 4
+<span id="L33" class="ln">    33	</span>	b := ratGobVersion &lt;&lt; 1 <span class="comment">// make space for sign bit</span>
+<span id="L34" class="ln">    34	</span>	if x.a.neg {
+<span id="L35" class="ln">    35	</span>		b |= 1
+<span id="L36" class="ln">    36	</span>	}
+<span id="L37" class="ln">    37	</span>	buf[j] = b
+<span id="L38" class="ln">    38	</span>	return buf[j:], nil
+<span id="L39" class="ln">    39	</span>}
+<span id="L40" class="ln">    40	</span>
+<span id="L41" class="ln">    41	</span><span class="comment">// GobDecode implements the gob.GobDecoder interface.</span>
+<span id="L42" class="ln">    42	</span>func (z *Rat) GobDecode(buf []byte) error {
+<span id="L43" class="ln">    43	</span>	if len(buf) == 0 {
+<span id="L44" class="ln">    44	</span>		<span class="comment">// Other side sent a nil or default value.</span>
+<span id="L45" class="ln">    45	</span>		*z = Rat{}
+<span id="L46" class="ln">    46	</span>		return nil
+<span id="L47" class="ln">    47	</span>	}
+<span id="L48" class="ln">    48	</span>	b := buf[0]
+<span id="L49" class="ln">    49	</span>	if b&gt;&gt;1 != ratGobVersion {
+<span id="L50" class="ln">    50	</span>		return fmt.Errorf(&#34;Rat.GobDecode: encoding version %d not supported&#34;, b&gt;&gt;1)
+<span id="L51" class="ln">    51	</span>	}
+<span id="L52" class="ln">    52	</span>	const j = 1 + 4
+<span id="L53" class="ln">    53	</span>	i := j + binary.BigEndian.Uint32(buf[j-4:j])
+<span id="L54" class="ln">    54	</span>	z.a.neg = b&amp;1 != 0
+<span id="L55" class="ln">    55	</span>	z.a.abs = z.a.abs.setBytes(buf[j:i])
+<span id="L56" class="ln">    56	</span>	z.b.abs = z.b.abs.setBytes(buf[i:])
+<span id="L57" class="ln">    57	</span>	return nil
+<span id="L58" class="ln">    58	</span>}
+<span id="L59" class="ln">    59	</span>
+<span id="L60" class="ln">    60	</span><span class="comment">// MarshalText implements the encoding.TextMarshaler interface.</span>
+<span id="L61" class="ln">    61	</span>func (x *Rat) MarshalText() (text []byte, err error) {
+<span id="L62" class="ln">    62	</span>	<span class="comment">// TODO(gri): get rid of the []byte/string conversion</span>
+<span id="L63" class="ln">    63	</span>	return []byte(x.RatString()), nil
+<span id="L64" class="ln">    64	</span>}
+<span id="L65" class="ln">    65	</span>
+<span id="L66" class="ln">    66	</span><span class="comment">// UnmarshalText implements the encoding.TextUnmarshaler interface.</span>
+<span id="L67" class="ln">    67	</span><span class="selection">func (z *Rat) UnmarshalText(text []byte) error</span> {
+<span id="L68" class="ln">    68	</span>	<span class="comment">// TODO(gri): get rid of the []byte/string conversion</span>
+<span id="L69" class="ln">    69	</span>	if _, ok := z.SetString(string(text)); !ok {
+<span id="L70" class="ln">    70	</span>		return fmt.Errorf(&#34;math/big: cannot unmarshal %q into a *big.Rat&#34;, text)
+<span id="L71" class="ln">    71	</span>	}
+<span id="L72" class="ln">    72	</span>	return nil
+<span id="L73" class="ln">    73	</span>}
+<span id="L74" class="ln">    74	</span>
+</pre><p><a href="ratmarsh.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

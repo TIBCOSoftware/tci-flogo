@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/x509/pkcs8.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="pkcs8.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/crypto/x509/pkcs8.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span>package x509
+<span id="L6" class="ln">     6	</span>
+<span id="L7" class="ln">     7	</span>import (
+<span id="L8" class="ln">     8	</span>	&#34;crypto/x509/pkix&#34;
+<span id="L9" class="ln">     9	</span>	&#34;encoding/asn1&#34;
+<span id="L10" class="ln">    10	</span>	&#34;errors&#34;
+<span id="L11" class="ln">    11	</span>	&#34;fmt&#34;
+<span id="L12" class="ln">    12	</span>)
+<span id="L13" class="ln">    13	</span>
+<span id="L14" class="ln">    14	</span><span class="comment">// pkcs8 reflects an ASN.1, PKCS#8 PrivateKey. See</span>
+<span id="L15" class="ln">    15	</span><span class="comment">// ftp://ftp.rsasecurity.com/pub/pkcs/pkcs-8/pkcs-8v1_2.asn</span>
+<span id="L16" class="ln">    16	</span><span class="comment">// and RFC 5208.</span>
+<span id="L17" class="ln">    17	</span>type pkcs8 struct {
+<span id="L18" class="ln">    18	</span>	Version    int
+<span id="L19" class="ln">    19	</span>	Algo       pkix.AlgorithmIdentifier
+<span id="L20" class="ln">    20	</span>	PrivateKey []byte
+<span id="L21" class="ln">    21	</span>	<span class="comment">// optional attributes omitted.</span>
+<span id="L22" class="ln">    22	</span>}
+<span id="L23" class="ln">    23	</span>
+<span id="L24" class="ln">    24	</span><span class="comment">// ParsePKCS8PrivateKey parses an unencrypted, PKCS#8 private key.</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// See RFC 5208.</span>
+<span id="L26" class="ln">    26	</span>func ParsePKCS8PrivateKey(der []byte) (key interface{}, err error) {
+<span id="L27" class="ln">    27	</span>	var privKey pkcs8
+<span id="L28" class="ln">    28	</span>	if _, err := asn1.Unmarshal(der, &amp;privKey); err != nil {
+<span id="L29" class="ln">    29	</span>		return nil, err
+<span id="L30" class="ln">    30	</span>	}
+<span id="L31" class="ln">    31	</span>	switch {
+<span id="L32" class="ln">    32	</span>	case privKey.Algo.Algorithm.Equal(oidPublicKeyRSA):
+<span id="L33" class="ln">    33	</span>		key, err = ParsePKCS1PrivateKey(privKey.PrivateKey)
+<span id="L34" class="ln">    34	</span>		if err != nil {
+<span id="L35" class="ln">    35	</span>			return nil, errors.New(&#34;x509: failed to parse RSA private key embedded in PKCS#8: &#34; + err.Error())
+<span id="L36" class="ln">    36	</span>		}
+<span id="L37" class="ln">    37	</span>		return key, nil
+<span id="L38" class="ln">    38	</span>
+<span id="L39" class="ln">    39	</span>	case privKey.Algo.Algorithm.Equal(oidPublicKeyECDSA):
+<span id="L40" class="ln">    40	</span>		bytes := privKey.Algo.Parameters.FullBytes
+<span id="L41" class="ln">    41	</span>		namedCurveOID := new(asn1.ObjectIdentifier)
+<span id="L42" class="ln">    42	</span>		if _, err := asn1.Unmarshal(bytes, namedCurveOID); err != nil {
+<span id="L43" class="ln">    43	</span>			namedCurveOID = nil
+<span id="L44" class="ln">    44	</span>		}
+<span id="L45" class="ln">    45	</span>		key, err = parseECPrivateKey(namedCurveOID, privKey.PrivateKey)
+<span id="L46" class="ln">    46	</span>		if err != nil {
+<span id="L47" class="ln">    47	</span>			return nil, errors.New(&#34;x509: failed to parse EC private key embedded in PKCS#8: &#34; + err.Error())
+<span id="L48" class="ln">    48	</span>		}
+<span id="L49" class="ln">    49	</span>		return key, nil
+<span id="L50" class="ln">    50	</span>
+<span id="L51" class="ln">    51	</span>	default:
+<span id="L52" class="ln">    52	</span>		return nil, fmt.Errorf(&#34;x509: PKCS#8 wrapping contained private key with unknown algorithm: %v&#34;, privKey.Algo.Algorithm)
+<span id="L53" class="ln">    53	</span>	}
+<span id="L54" class="ln">    54	</span>}
+<span id="L55" class="ln">    55	</span>
+</pre><p><a href="pkcs8.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

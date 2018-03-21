@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/syscall/syscall.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./syscall.go%3Fs=3044:3094.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>Source file src/syscall/syscall.go</h1>
+
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1	</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln">     2	</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln">     3	</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln">     4	</span>
+<span id="L5" class="ln">     5	</span><span class="comment">// Package syscall contains an interface to the low-level operating system</span>
+<span id="L6" class="ln">     6	</span><span class="comment">// primitives. The details vary depending on the underlying system, and</span>
+<span id="L7" class="ln">     7	</span><span class="comment">// by default, godoc will display the syscall documentation for the current</span>
+<span id="L8" class="ln">     8	</span><span class="comment">// system. If you want godoc to display syscall documentation for another</span>
+<span id="L9" class="ln">     9	</span><span class="comment">// system, set $GOOS and $GOARCH to the desired system. For example, if</span>
+<span id="L10" class="ln">    10	</span><span class="comment">// you want to view documentation for freebsd/arm on linux/amd64, set $GOOS</span>
+<span id="L11" class="ln">    11	</span><span class="comment">// to freebsd and $GOARCH to arm.</span>
+<span id="L12" class="ln">    12	</span><span class="comment">// The primary use of syscall is inside other packages that provide a more</span>
+<span id="L13" class="ln">    13	</span><span class="comment">// portable interface to the system, such as &#34;os&#34;, &#34;time&#34; and &#34;net&#34;.  Use</span>
+<span id="L14" class="ln">    14	</span><span class="comment">// those packages rather than this one if you can.</span>
+<span id="L15" class="ln">    15	</span><span class="comment">// For details of the functions and data types in this package consult</span>
+<span id="L16" class="ln">    16	</span><span class="comment">// the manuals for the appropriate operating system.</span>
+<span id="L17" class="ln">    17	</span><span class="comment">// These calls return err == nil to indicate success; otherwise</span>
+<span id="L18" class="ln">    18	</span><span class="comment">// err is an operating system error describing the failure.</span>
+<span id="L19" class="ln">    19	</span><span class="comment">// On most systems, that error has type syscall.Errno.</span>
+<span id="L20" class="ln">    20	</span><span class="comment">//</span>
+<span id="L21" class="ln">    21	</span><span class="comment">// NOTE: This package is locked down. Code outside the standard</span>
+<span id="L22" class="ln">    22	</span><span class="comment">// Go repository should be migrated to use the corresponding</span>
+<span id="L23" class="ln">    23	</span><span class="comment">// package in the golang.org/x/sys repository. That is also where updates</span>
+<span id="L24" class="ln">    24	</span><span class="comment">// required by new systems or versions should be applied.</span>
+<span id="L25" class="ln">    25	</span><span class="comment">// See https://golang.org/s/go1.4-syscall for more information.</span>
+<span id="L26" class="ln">    26	</span><span class="comment">//</span>
+<span id="L27" class="ln">    27	</span>package syscall
+<span id="L28" class="ln">    28	</span>
+<span id="L29" class="ln">    29	</span>import &#34;unsafe&#34;
+<span id="L30" class="ln">    30	</span>
+<span id="L31" class="ln">    31	</span><span class="comment">//go:generate go run mksyscall_windows.go -systemdll -output zsyscall_windows.go syscall_windows.go security_windows.go</span>
+<span id="L32" class="ln">    32	</span>
+<span id="L33" class="ln">    33	</span><span class="comment">// StringByteSlice converts a string to a NUL-terminated []byte,</span>
+<span id="L34" class="ln">    34	</span><span class="comment">// If s contains a NUL byte this function panics instead of</span>
+<span id="L35" class="ln">    35	</span><span class="comment">// returning an error.</span>
+<span id="L36" class="ln">    36	</span><span class="comment">//</span>
+<span id="L37" class="ln">    37	</span><span class="comment">// Deprecated: Use ByteSliceFromString instead.</span>
+<span id="L38" class="ln">    38	</span>func StringByteSlice(s string) []byte {
+<span id="L39" class="ln">    39	</span>	a, err := ByteSliceFromString(s)
+<span id="L40" class="ln">    40	</span>	if err != nil {
+<span id="L41" class="ln">    41	</span>		panic(&#34;syscall: string with NUL passed to StringByteSlice&#34;)
+<span id="L42" class="ln">    42	</span>	}
+<span id="L43" class="ln">    43	</span>	return a
+<span id="L44" class="ln">    44	</span>}
+<span id="L45" class="ln">    45	</span>
+<span id="L46" class="ln">    46	</span><span class="comment">// ByteSliceFromString returns a NUL-terminated slice of bytes</span>
+<span id="L47" class="ln">    47	</span><span class="comment">// containing the text of s. If s contains a NUL byte at any</span>
+<span id="L48" class="ln">    48	</span><span class="comment">// location, it returns (nil, EINVAL).</span>
+<span id="L49" class="ln">    49	</span>func ByteSliceFromString(s string) ([]byte, error) {
+<span id="L50" class="ln">    50	</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L51" class="ln">    51	</span>		if s[i] == 0 {
+<span id="L52" class="ln">    52	</span>			return nil, EINVAL
+<span id="L53" class="ln">    53	</span>		}
+<span id="L54" class="ln">    54	</span>	}
+<span id="L55" class="ln">    55	</span>	a := make([]byte, len(s)+1)
+<span id="L56" class="ln">    56	</span>	copy(a, s)
+<span id="L57" class="ln">    57	</span>	return a, nil
+<span id="L58" class="ln">    58	</span>}
+<span id="L59" class="ln">    59	</span>
+<span id="L60" class="ln">    60	</span><span class="comment">// StringBytePtr returns a pointer to a NUL-terminated array of bytes.</span>
+<span id="L61" class="ln">    61	</span><span class="comment">// If s contains a NUL byte this function panics instead of returning</span>
+<span id="L62" class="ln">    62	</span><span class="comment">// an error.</span>
+<span id="L63" class="ln">    63	</span><span class="comment">//</span>
+<span id="L64" class="ln">    64	</span><span class="comment">// Deprecated: Use BytePtrFromString instead.</span>
+<span id="L65" class="ln">    65	</span>func StringBytePtr(s string) *byte { return &amp;StringByteSlice(s)[0] }
+<span id="L66" class="ln">    66	</span>
+<span id="L67" class="ln">    67	</span><span class="comment">// BytePtrFromString returns a pointer to a NUL-terminated array of</span>
+<span id="L68" class="ln">    68	</span><span class="comment">// bytes containing the text of s. If s contains a NUL byte at any</span>
+<span id="L69" class="ln">    69	</span><span class="comment">// location, it returns (nil, EINVAL).</span>
+<span id="L70" class="ln">    70	</span>func BytePtrFromString(s string) (*byte, error) {
+<span id="L71" class="ln">    71	</span>	a, err := ByteSliceFromString(s)
+<span id="L72" class="ln">    72	</span>	if err != nil {
+<span id="L73" class="ln">    73	</span>		return nil, err
+<span id="L74" class="ln">    74	</span>	}
+<span id="L75" class="ln">    75	</span>	return &amp;a[0], nil
+<span id="L76" class="ln">    76	</span>}
+<span id="L77" class="ln">    77	</span>
+<span id="L78" class="ln">    78	</span><span class="comment">// Single-word zero for use when we need a valid pointer to 0 bytes.</span>
+<span id="L79" class="ln">    79	</span><span class="comment">// See mksyscall.pl.</span>
+<span id="L80" class="ln">    80	</span>var _zero uintptr
+<span id="L81" class="ln">    81	</span>
+<span id="L82" class="ln">    82	</span><span class="selection">func (ts *Timespec) Unix() (sec int64, nsec int64)</span> {
+<span id="L83" class="ln">    83	</span>	return int64(ts.Sec), int64(ts.Nsec)
+<span id="L84" class="ln">    84	</span>}
+<span id="L85" class="ln">    85	</span>
+<span id="L86" class="ln">    86	</span>func (tv *Timeval) Unix() (sec int64, nsec int64) {
+<span id="L87" class="ln">    87	</span>	return int64(tv.Sec), int64(tv.Usec) * 1000
+<span id="L88" class="ln">    88	</span>}
+<span id="L89" class="ln">    89	</span>
+<span id="L90" class="ln">    90	</span>func (ts *Timespec) Nano() int64 {
+<span id="L91" class="ln">    91	</span>	return int64(ts.Sec)*1e9 + int64(ts.Nsec)
+<span id="L92" class="ln">    92	</span>}
+<span id="L93" class="ln">    93	</span>
+<span id="L94" class="ln">    94	</span>func (tv *Timeval) Nano() int64 {
+<span id="L95" class="ln">    95	</span>	return int64(tv.Sec)*1e9 + int64(tv.Usec)*1000
+<span id="L96" class="ln">    96	</span>}
+<span id="L97" class="ln">    97	</span>
+<span id="L98" class="ln">    98	</span><span class="comment">// Getpagesize is provided by the runtime.</span>
+<span id="L99" class="ln">    99	</span>
+<span id="L100" class="ln">   100	</span>func Getpagesize() int
+<span id="L101" class="ln">   101	</span>
+<span id="L102" class="ln">   102	</span><span class="comment">// use is a no-op, but the compiler cannot see that it is.</span>
+<span id="L103" class="ln">   103	</span><span class="comment">// Calling use(p) ensures that p is kept live until that point.</span>
+<span id="L104" class="ln">   104	</span><span class="comment">// This was needed until Go 1.6 to call syscall.Syscall correctly.</span>
+<span id="L105" class="ln">   105	</span><span class="comment">// As of Go 1.6 the compiler handles that case automatically.</span>
+<span id="L106" class="ln">   106	</span><span class="comment">// The uses and definition of use can be removed early in the Go 1.7 cycle.</span>
+<span id="L107" class="ln">   107	</span><span class="comment">//go:noescape</span>
+<span id="L108" class="ln">   108	</span>func use(p unsafe.Pointer)
+<span id="L109" class="ln">   109	</span>
+</pre><p><a href="syscall.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.8.1.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.8.1";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+
