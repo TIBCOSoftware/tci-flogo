@@ -1,33 +1,33 @@
-# wi-cli
-The commandline tool designed to help developers with the Web Integrator SDK. The SDK is bundled inside a docker image which can be run without downloading the SDK's separately.
+# fe-cli
+The commandline tool designed to help developers with the Flogo Enterprise SDK. The SDK is bundled inside a docker image which can be run without downloading the SDK's separately.
 
 ## Pre-requisites
 1. Docker - [download](https://www.docker.com/get-docker)
 
 ## Install
-You can install tibcli-wi by downloading the wi-cli.tar.gz from the releases section 
+You can install flogo-enterprise-cli by downloading the flogo-enterprise-cli.tar.gz from the releases section 
 
 
-### 1. Import the docker image from wi-cli.tar.gz to your docker machine installation or download the scripts from the `tools` folder of this github repository.
+### 1. Import the docker image from flogo-enterprise-cli.tar.gz to your docker machine installation or download the scripts from the `tools` folder of this github repository.
 ```
-gunzip -c wi-cli.tar.gz| docker load
+gunzip -c flogo-enterprise-cli.tar.gz| docker load
 ```
-### 2. Create a executable shell script in your shell $PATH  called `wi-cli.sh` with the following contents or download the script from the `tools` folder of this github repository.
+### 2. Create a executable shell script in your shell $PATH  called `fe-cli.sh` with the following contents or download the script from the `tools` folder of this github repository.
 ```
 #!/bin/bash
-docker run --rm -ti -v $PWD:/src wi-cli:latest $@
+docker run --rm -ti -v $PWD:/src flogo-enterprise-cli:latest $@
 ```
-### 3. Run the `wi-cli.sh` shell command from your plugin project work folder
+### 3. Run the `fe-cli.sh` shell command from your plugin project work folder
 ```
 >cd <your project folder>
->wi-cli.sh --help
+>fe-cli.sh --help
 ```
 ### 4. Run a test container as shown below from your plugin project work folder or download the  `test.sh` script from the `tools` folder of this github repository.
 ```
 >cd <your project folder> 
->docker run --rm -ti -v $PWD:/src --entrypoint bash wi-cli:latest
+>docker run --rm -ti -v $PWD:/src --entrypoint bash flogo-enterprise-cli:latest
 # cd /src
-# wi-test
+# fe-test
 ```
 ### 5. Packaging Steps - The packaging file jszip.json is generated in your project folder. It can be done separately as shown below.
 ```
@@ -38,29 +38,29 @@ docker run --rm -ti -v $PWD:/src wi-cli:latest $@
   
 
 ## Command Line Help Documentation
-### `wi-cli.sh --help`
-The wi-cli has three basic commands as follows in order of their execution.
+### `fe-cli.sh --help`
+The fe-cli has three basic commands as follows in order of their execution.
 
   1. `init | initialize` -  This is the first step to initialize a wi-studio contribution project with the creation of the following files :-
       * `package.json` - Node Package Manager configuration
-      * `wi-cli.json` - wi-studio command line interface configuration
+      * `fe-cli.json` - wi-studio command line interface configuration
       * `tsconfig.json` - Typescript compiler configuration
       * `tslint.json` - Typescript language and coding standard configuration.
       * `karma-test-shim.js` - Karma testing framework file.
       * `karma.conf.js` - Karma test framework configuration.
       * `test-setup.sh` - Karma pre-test script.
       * `jszip.json` - jsZip configuration.
-1. `add` -  This is the second step to add contribution service artifacts. The user can choose between `Handler` or a `Provider` contribution implementation styles and add their respective input parameters which are then stored in the wi-cli.json file. `Handler` contribution implementation style is the most easier style to use and is recommended. `Provider` contribution implementation style is recommended for advanced users who prefer better and smaller code management and readability. **It is recommended to use only one style for the whole plugin instead of mixing and matching and can lead to unpredictable results**.
+1. `add` -  This is the second step to add contribution service artifacts. The user can choose between `Handler` or a `Provider` contribution implementation styles and add their respective input parameters which are then stored in the fe-cli.json file. `Handler` contribution implementation style is the most easier style to use and is recommended. `Provider` contribution implementation style is recommended for advanced users who prefer better and smaller code management and readability. **It is recommended to use only one style for the whole plugin instead of mixing and matching and can lead to unpredictable results**.
 
 1. The third step is to add the triggers, activities,connector to the  `Handler` or `Provider`
 1. `compile` -  The compile step compiles the typescript `*.ts` files to `*.js` files using the typescript compiler. This is the fourth and the final step.
 ```
 >cd <your project folder>
->wi-cli.sh --help
+>fe-cli.sh --help
  
-  Usage: wi-cli [options] [command]
+  Usage: fe-cli [options] [command]
  
-  Welcome to wi-cli command line
+  Welcome to fe-cli command line
  
  
   Options:
@@ -71,35 +71,35 @@ The wi-cli has three basic commands as follows in order of their execution.
  
   Commands:
  
-    initialize|init   Initialize wi-cli contribution project
+    initialize|init   Initialize fe-cli contribution project
     add|add           Add service artifacts
     compile|compile   Add service artifacts
     help [cmd]        display help for [cmd]
 ```
-### `wi-cli.sh init --help`
+### `fe-cli.sh init --help`
 ```
 >cd <your project folder>
->wi-cli.sh init --help
+>fe-cli.sh init --help
  
-  Usage: wi-cli-initialize [options]
+  Usage: fe-cli-initialize [options]
  
  
   Options:
  
     -c, --category [categoryName]  <required> Category Name
-    -s, --sdkpath [sdkpath]        <optional> wi-cli.tar.gz file path OR wi-cli sdk folder path
+    -s, --sdkpath [sdkpath]        <optional> fe-cli.tar.gz file path OR fe-cli sdk folder path
     -h, --help                     output usage information
   Examples:
  
-    $ wi-cli --help
-    $ wi-cli -h
+    $ fe-cli --help
+    $ fe-cli -h
 ```
-### `wi-cli.sh add --help`
+### `fe-cli.sh add --help`
 ```
 >cd <your project folder>
->wi-cli.sh add --help
+>fe-cli.sh add --help
  
-  Usage: wi-cli-add [options] [command]
+  Usage: fe-cli-add [options] [command]
  
  
   Options:
@@ -116,12 +116,12 @@ The wi-cli has three basic commands as follows in order of their execution.
     provider    Add a Module Provider Contribution Type
     help [cmd]  display help for [cmd]
 ```
-### `wi-cli.sh add activity --help`
+### `fe-cli.sh add activity --help`
 ```
 >cd <your project folder>
->wi-cli.sh add activity --help
+>fe-cli.sh add activity --help
  
-  Usage: wi-cli-add-activity [options]
+  Usage: fe-cli-add-activity [options]
  
  
   Options:
@@ -131,14 +131,14 @@ The wi-cli has three basic commands as follows in order of their execution.
     -h, --help                 output usage information
   Examples:
  
-    $ wi-cli add activity -n ACTIVITY_NAME
+    $ fe-cli add activity -n ACTIVITY_NAME
 ```
-### `wi-cli.sh add connector --help`
+### `fe-cli.sh add connector --help`
 ```
 >cd <your project folder>
->wi-cli.sh add connector --help
+>fe-cli.sh add connector --help
  
-  Usage: wi-cli-add-connector [options]
+  Usage: fe-cli-add-connector [options]
  
  
   Options:
@@ -148,14 +148,14 @@ The wi-cli has three basic commands as follows in order of their execution.
     -h, --help                  output usage information
   Examples:
  
-    $ wi-cli add connector -n CONNECTOR_NAME
+    $ fe-cli add connector -n CONNECTOR_NAME
 ```
-### `wi-cli.sh add trigger --help`
+### `fe-cli.sh add trigger --help`
 ```
 >cd <your project folder>
->wi-cli.sh add trigger --help
+>fe-cli.sh add trigger --help
  
-  Usage: wi-cli-add-trigger [options]
+  Usage: fe-cli-add-trigger [options]
  
  
   Options:
@@ -165,14 +165,14 @@ The wi-cli has three basic commands as follows in order of their execution.
     -h, --help                output usage information
   Examples:
  
-    $ wi-cli add trigger -n TRIGGER_NAME
+    $ fe-cli add trigger -n TRIGGER_NAME
 ```
-### `wi-cli.sh add handler --help`
+### `fe-cli.sh add handler --help`
 ```
 >cd <your project folder>
->wi-cli.sh add handler --help
+>fe-cli.sh add handler --help
  
-  Usage: wi-cli-add-handler [options]
+  Usage: fe-cli-add-handler [options]
  
  
   Options:
@@ -183,23 +183,23 @@ The wi-cli has three basic commands as follows in order of their execution.
     -h, --help                     output usage information
   Examples:
  
-    $ wi-cli add handler -n CONTRIBUTION_NAME --sample
+    $ fe-cli add handler -n CONTRIBUTION_NAME --sample
 ```
-### `wi-cli.sh compile`
+### `fe-cli.sh compile`
 ```
 >cd <your project folder>
->wi-cli.sh compile
+>fe-cli.sh compile
 ```
 
 ## Example Usage
 ```
 >cd <your project folder> 
->wi-cli.sh init -c myCategory
-Using default SDK path:/usr/local/share/.config/yarn/global/node_modules/wi-cli/wi-studio
+>fe-cli.sh init -c myCategory
+Using default SDK path:/usr/local/share/.config/yarn/global/node_modules/fe-cli/wi-studio
   Setting up metadata [==========          ] 50% 0.0syarn install v1.3.2
 ...
 
->wi-cli.sh add activity -n myActivity
+>fe-cli.sh add activity -n myActivity
 Using current directory for output
   Adding Activity [====================] 100% 0.0s
 Generating the activity
@@ -208,7 +208,7 @@ Generating the activity
 complete
 ...
 
->wi-cli.sh add trigger -n myTrigger
+>fe-cli.sh add trigger -n myTrigger
 Using current directory for output
   Adding Trigger [====================] 100% 0.0s
 Generating the trigger
@@ -217,7 +217,7 @@ Generating the trigger
 complete
 ...
 
->wi-cli.sh add connector -n myConnector
+>fe-cli.sh add connector -n myConnector
 Using current directory for output
   Adding Connector [====================] 100% 0.0s
 Generating the connector
@@ -226,7 +226,7 @@ Generating the connector
 complete
 ...
 
->wi-cli.sh add handler -n myActivity --sample
+>fe-cli.sh add handler -n myActivity --sample
 Using current directory for output
   Adding Handler [====================] 100% 0.0s
 Generating the handlers
@@ -235,7 +235,7 @@ Generating the handlers
 complete
 ...
 
->wi-cli.sh add handler -n myTrigger --sample
+>fe-cli.sh add handler -n myTrigger --sample
 Using current directory for output
   Adding Handler [====================] 100% 0.0s
 Generating the handlers
@@ -244,7 +244,7 @@ Generating the handlers
 complete
 ...
 
->wi-cli.sh add handler -n myConnector --sample
+>fe-cli.sh add handler -n myConnector --sample
 Using current directory for output
   Adding Handler [====================] 100% 0.0s
 Generating the handlers
@@ -253,7 +253,7 @@ Generating the handlers
 complete
 ...
 
->wi-cli.sh compile
+>fe-cli.sh compile
   Setting up metadata [===                 ] 13% 0.0syarn install v1.3.2
  
 [1/4] Resolving packages...

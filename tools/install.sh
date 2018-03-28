@@ -1,2 +1,2 @@
 #!/bin/bash
-gunzip -c wi-cli.tar.gz| docker load
+gunzip -c flogo-enterprise-cli.tar.gz| docker load
