@@ -20,7 +20,7 @@ To receive a message from Amazon SQS we'll create a Receive Message activity. Th
 		"smallIcon": "sqsreceivemessage.png",
 		"description": "This activity receives a message from the standard queue"
 	},
-	"ref": "github.com/TIBCOSoftware/tci-webintegrator/examples/AWS/activity/sqsreceivemessage",
+	"ref": "github.com/TIBCOSoftware/tci-flogo/examples/AWS/activity/sqsreceivemessage",
 	"inputs": [
 		{
 			"name": "sqsConnection",

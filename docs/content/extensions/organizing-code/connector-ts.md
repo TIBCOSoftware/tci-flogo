@@ -4,7 +4,7 @@ title: connector.ts
 weight: 53
 ---
 
-The connector.ts file handles the validation and actions for the fields described in the model. For example it validates that values have been entered in the textboxes or what to do when you click _connect_. The connector.module.ts makes sure that Web Integrator knows about your extension and injects the validation rules into it. This isn't the full code, so if you want to see a sample check out the samples section!
+The connector.ts file handles the validation and actions for the fields described in the model. For example it validates that values have been entered in the textboxes or what to do when you click _connect_. The connector.module.ts makes sure that Flogo knows about your extension and injects the validation rules into it. This isn't the full code, so if you want to see a sample check out the samples section!
 
 ## connector.ts
 ```typescript

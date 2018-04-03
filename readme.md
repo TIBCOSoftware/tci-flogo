@@ -11,10 +11,10 @@ The [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome) repository is wh
 
 * Submit feature requests on our [ideas](https://ideas.tibco.com/?project=TCI) portal
 * Review the docs in this repo or on our docs [page](https://integration.cloud.tibco.com/docs/index.html) and let us know at `tci@tibco.com` what we've missed.
-* Contribute new activities or projects for our Web Integrator or Business Studio.
+* Contribute new activities or projects for our Flogo or Business Studio.
 
 ## Contributing
-If you want to build your own activities for Web Integrator please read the [docs](https://tibcosoftware.github.io/tci-webintegrator/).
+If you want to build your own activities for TCI Flogo please read the [docs](https://tibcosoftware.github.io/tci-flogo/).
 
 If you want to showcase your project, check out [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome)
 
@@ -35,4 +35,4 @@ You might also want to visit our other repos
 * [Command Line Interface for Node.js](https://github.com/TIBCOSoftware/tibcli-node)
 
 ## License
-This project is licensed under a BSD-type license. See [license.txt](license.txt).
+This TCI Flogo SDK project is licensed under a BSD-type license. See [license.txt](license.txt).

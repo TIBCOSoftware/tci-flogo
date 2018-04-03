@@ -4,7 +4,7 @@ title: Organizing your code
 weight: 51
 ---
 
-The extensions for Web Integrator consist of a bunch of files that all have a very specific function. The files are either used for the model, the UI or the runtime. In the below tables you can see which files you need and which are optional when you're developing connectors and activities.
+The extensions for TCI Flogo consist of a bunch of files that all have a very specific function. The files are either used for the model, the UI or the runtime. In the below tables you can see which files you need and which are optional when you're developing connectors and activities.
 
 ## Connector
 

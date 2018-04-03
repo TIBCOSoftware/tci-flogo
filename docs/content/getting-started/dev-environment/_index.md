@@ -7,7 +7,7 @@ weight: 6
 Let's get started with the setup of your development environment!
 
 ## The Go part
-The TIBCO Cloud Integration - Web Integrator is powered by [Project Flogo](https://flogo.io), so when you're developing extensions for Web Integrator the runtime parts are the same as you would create them for Flogo. That also means that extensions for Flogo will work in Web Integrator and vice versa.
+The TIBCO Cloud Integration - Flogo is powered by [Project Flogo](https://flogo.io), so when you're developing extensions for Flogo the runtime parts are the same as you would create them for Flogo. That also means that extensions for Flogo will work in Flogo and vice versa.
 
 To install the Project Flogo parts you need to:
 

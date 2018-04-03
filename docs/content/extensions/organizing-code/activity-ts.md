@@ -4,7 +4,7 @@ title: activity.ts
 weight: 56
 ---
 
-The activity.ts file handles the validation and actions for the fields described in the model. For example it validates that a valid connection has been chosen, or retrieves additional information based on values in certain fields. This part is optional and you can rely on the out of the box UI as well! The activity.module.ts makes sure that Web Integrator knows about your extension and injects the validation rules into it. This isn't the full code, so if you want to see a sample check out the samples section!
+The activity.ts file handles the validation and actions for the fields described in the model. For example it validates that a valid connection has been chosen, or retrieves additional information based on values in certain fields. This part is optional and you can rely on the out of the box UI as well! The activity.module.ts makes sure that Flogo knows about your extension and injects the validation rules into it. This isn't the full code, so if you want to see a sample check out the samples section!
 
 ## activity.ts
 ```typescript

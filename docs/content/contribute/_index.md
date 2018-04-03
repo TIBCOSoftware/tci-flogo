@@ -10,17 +10,17 @@ We need your help and we love to see your contributions! The good news is there 
 ## Submit your ideas
 If you have an amazign idea for TIBCO Cloud Integration, submit feature requests on our [ideas](https://ideas.tibco.com/?project=TCI) portal. Our Product Management team reviews the ideas on a regular basis when planning for new releases.
 
-If you have thoughts, comments or suggestions for this SDK and the docs, let us know what we missed or need to improve by creating an [issue on our GitHub repo](https://github.com/TIBCOsoftware/tci-webintegrator/issues)
+If you have thoughts, comments or suggestions for this SDK and the docs, let us know what we missed or need to improve by creating an [issue on our GitHub repo](https://github.com/TIBCOsoftware/tci-flogo/issues)
 
 ## Update the docs 
 You can also help by reviewing the docs in this repo. If you want to update them please follow the instructions below:
 
-* Fork the [tci-webintegrator](https://github.com/TIBCOSoftware/tci-webintegrator) repo
+* Fork the [tci-flogo](https://github.com/TIBCOSoftware/tci-flogo) repo
 * Update the docs with your content in the **content** folder
-* Create a PR against the [tci-webintegrator](https://github.com/TIBCOSoftware/tci-webintegrator) repo
+* Create a PR against the [tci-flogo](https://github.com/TIBCOSoftware/tci-flogo) repo
 
 {{% notice info %}}
-If you don't want to fork and create a pull request, you can always open an [issue](https://github.com/TIBCOSoftware/tci-webintegrator/issues) and have of our team fix it :)
+If you don't want to fork and create a pull request, you can always open an [issue](https://github.com/TIBCOSoftware/tci-flogo/issues) and have of our team fix it :)
 {{% /notice %}}
 
 ## Show your extensions!

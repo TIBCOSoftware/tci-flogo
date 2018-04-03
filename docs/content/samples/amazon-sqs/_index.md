@@ -39,4 +39,4 @@ AWS
         └───sqs.png
 ```
 
-The complete code of this connector and the two activities can be found in our [GitHub](https://github.com/TIBCOSoftware/tci-webintegrator/tree/master/examples/AWS) repo too.
+The complete code of this connector and the two activities can be found in our [GitHub](https://github.com/TIBCOSoftware/tci-flogo/tree/master/examples/AWS) repo too.

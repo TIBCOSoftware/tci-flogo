@@ -22,7 +22,7 @@ To send a message to Amazon SQS we'll create a Send Message activity. The API th
        "description": "This activity sends a message to the standard queue"
     },
  
-    "ref": "github.com/TIBCOSoftware/tci-webintegrator/examples/AWS/activity/sqssendmessage",
+    "ref": "github.com/TIBCOSoftware/tci-flogo/examples/AWS/activity/sqssendmessage",
     "inputs": [
            {
             "name": "sqsConnection",

@@ -8,7 +8,7 @@ Every extension must write the runtime code in Go (activity.go). You can, and 
 
 ## activity.go
 ```go
-// Package ifttt provides connectivity to IFTTT for TIBCO Cloud Integration - Web Integrator
+// Package ifttt provides connectivity to IFTTT for TIBCO Cloud Integration - Flogo
 // using the WebHooks service from IFTTT (https://ifttt.com/maker_webhooks)
 package ifttt
 
@@ -133,7 +133,7 @@ func (a *IFTTTActivity) Eval(context activity.Context) (done bool, err error) {
 
 ## activity_test.go
 ```go
-// Package ifttt provides connectivity to IFTTT for TIBCO Cloud Integration - Web Integrator
+// Package ifttt provides connectivity to IFTTT for TIBCO Cloud Integration - Flogo
 // using the WebHooks service from IFTTT (https://ifttt.com/maker_webhooks)
 package ifttt
 
