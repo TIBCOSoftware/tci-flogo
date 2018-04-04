@@ -49,7 +49,10 @@ The fe-cli has three basic commands as follows in order of their execution.
       * `karma-test-shim.js` - Karma testing framework file.
       * `karma.conf.js` - Karma test framework configuration.
       * `test-setup.sh` - Karma pre-test script.
+      * `.babelrc` - Babelrc configuration for running gulp.
+      * `gulpfile.babel.js` - Gulp build script.
       * `jszip.json` - jsZip configuration.
+      * `jszip.prod.json` - jsZip configuration for production builds.
 1. `add` -  This is the second step to add contribution service artifacts. The user can choose between `Handler` or a `Provider` contribution implementation styles and add their respective input parameters which are then stored in the fe-cli.json file. `Handler` contribution implementation style is the most easier style to use and is recommended. `Provider` contribution implementation style is recommended for advanced users who prefer better and smaller code management and readability. **It is recommended to use only one style for the whole plugin instead of mixing and matching and can lead to unpredictable results**.
 
 1. The third step is to add the triggers, activities,connector to the  `Handler` or `Provider`
