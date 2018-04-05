@@ -30,7 +30,7 @@ export class RecvMsgActivityContribution extends WiServiceHandlerContribution {
             //Connector Type must match with the name defined in connector.json
             return Observable.create(observer => {
                 let connectionRefs = [];
-                WiContributionUtils.getConnections(this.http, "AWS").subscribe((data: IConnectorContribution[]) => {
+                WiContributionUtils.getConnections(this.http, "AWSSQS").subscribe((data: IConnectorContribution[]) => {
                     data.forEach(connection => {
                         for (let i = 0; i < connection.settings.length; i++) {
                             if (connection.settings[i].name === "name") {
