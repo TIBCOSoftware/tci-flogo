@@ -1,6 +1,6 @@
 ---
 title: SDK
-weight: 8
+weight: 9
 chapter: true
 pre: "<i class=\"fa fa-list-alt\" aria-hidden=\"true\"></i> "
 ---
