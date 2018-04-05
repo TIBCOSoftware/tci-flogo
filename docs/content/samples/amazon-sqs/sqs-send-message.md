@@ -16,13 +16,13 @@ To send a message to Amazon SQS we'll create a Send Message activity. The API th
     "title": "Send SQS Message",
      
     "display": {
-       "category": "AWS",
+       "category": "AWSSQS",
        "visible": true,
        "smallIcon": "sqssendmessage.png",
        "description": "This activity sends a message to the standard queue"
     },
  
-    "ref": "github.com/TIBCOSoftware/tci-flogo/examples/AWS/activity/sqssendmessage",
+    "ref": "github.com/TIBCOSoftware/tci-flogo/examples/AWSSQS/activity/sqssendmessage",
     "inputs": [
            {
             "name": "sqsConnection",
@@ -139,7 +139,7 @@ export class SendMsgActivityContribution extends WiServiceHandlerContribution {
             //Connector Type must match with the category defined in connector.json
             return Observable.create(observer => {
                 let connectionRefs = [];
-                WiContributionUtils.getConnections(this.http, "AWS").subscribe((data: IConnectorContribution[]) => {
+                WiContributionUtils.getConnections(this.http, "AWSSQS").subscribe((data: IConnectorContribution[]) => {
                     data.forEach(connection => {
                         for (let i = 0; i < connection.settings.length; i++) {
                             if (connection.settings[i].name === "name") {

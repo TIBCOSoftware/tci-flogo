@@ -15,12 +15,12 @@ To receive a message from Amazon SQS we'll create a Receive Message activity. Th
 	"author": "TIBCO Software Inc.",
 	"type": "flogo:activity",
 	"display": {
-		"category": "AWS",
+		"category": "AWSSQS",
 		"visible": true,
 		"smallIcon": "sqsreceivemessage.png",
 		"description": "This activity receives a message from the standard queue"
 	},
-	"ref": "github.com/TIBCOSoftware/tci-flogo/examples/AWS/activity/sqsreceivemessage",
+	"ref": "github.com/TIBCOSoftware/tci-flogo/examples/AWSSQS/activity/sqsreceivemessage",
 	"inputs": [
 		{
 			"name": "sqsConnection",
@@ -158,7 +158,7 @@ export class RecvMsgActivityContribution extends WiServiceHandlerContribution {
             //Connector Type must match with the name defined in connector.json
             return Observable.create(observer => {
                 let connectionRefs = [];
-                WiContributionUtils.getConnections(this.http, "AWS").subscribe((data: IConnectorContribution[]) => {
+                WiContributionUtils.getConnections(this.http, "AWSSQS").subscribe((data: IConnectorContribution[]) => {
                     data.forEach(connection => {
                         for (let i = 0; i < connection.settings.length; i++) {
                             if (connection.settings[i].name === "name") {

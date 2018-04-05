@@ -17,12 +17,12 @@ The connector will use a bunch of files `connector.json` for the model and `conn
  
     "display": {
        "description": "This is Amazon SQS connector",
-       "category": "AWS",
+       "category": "AWSSQS",
        "visible": true,
        "smallIcon": "sqs.png"
     },
  
-    "ref": "github.com/TIBCOSoftware/tci/examples/AWS/connector/sqs",
+    "ref": "github.com/TIBCOSoftware/tci/examples/AWSSQS/connector/sqs",
     "keyfield": "name",
     "settings": [
            {

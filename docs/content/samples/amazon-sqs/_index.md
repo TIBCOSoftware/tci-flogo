@@ -15,7 +15,7 @@ To follow along, please make sure you have:
 If you follow along with the steps your layout at the end should be:
 
 ```
-AWS
+AWSSQS
 ├───activity
 │   ├───sqsreceivemessage
 │   |   ├───activity.json
@@ -39,4 +39,4 @@ AWS
         └───sqs.png
 ```
 
-The complete code of this connector and the two activities can be found in our [GitHub](https://github.com/TIBCOSoftware/tci-flogo/tree/master/examples/AWS) repo too.
+The complete code of this connector and the two activities can be found in our [GitHub](https://github.com/TIBCOSoftware/tci-flogo/tree/master/examples/AWSSQS) repo too.
