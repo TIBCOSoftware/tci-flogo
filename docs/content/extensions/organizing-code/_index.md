@@ -21,17 +21,27 @@ The extensions for TCI Flogo consist of a bunch of files that all have a very sp
 | Runtime         | Go         | [activity.go<br/>activity_test.go](./activity-go)   | Every extension must write the runtime code in Go (activity.go). You can, and really should, leverage the Go testing framework for writing unit test cases (activity_test.go) for your extension.
 | UI (_optional_) | TypeScript | [activity.ts<br/>activity.module.ts](./activity-ts) | The activity.ts file handles the validation and actions for the fields described in the model. For example it validates that a valid connection has been chosen, or retrieves additional information based on values in certain fields. This part is optional and you can rely on the out of the box UI as well! 
 
+## Trigger
+
+| Component       | Technology | Filename                           | Description
+| --------------- | ---------- | ---------------------------------- | -----------
+| Model           | JSON       | [trigger.json](./trigger-json)                    | The trigger.json describes the model, the meta data, of the trigger. It describes, among other things, what the input and outputs are, who built it and which version you're using.
+| Runtime         | Go         | [trigger.go<br/>trigger_test.go](./trigger-go)   | Every extension must write the runtime code in Go (trigger.go). You can, and really should, leverage the Go testing framework for writing unit test cases (trigger_test.go) for your extension.
+| UI (_optional_) | TypeScript | [trigger.ts<br/>trigger.module.ts](./trigger-ts) | The trigger.ts file handles the validation and actions for the fields described in the model. For example it validates that a valid connection has been chosen, or retrieves additional information based on values in certain fields. This part is optional and you can rely on the out of the box UI as well! 
+
 ## Folder Layout 
 
 The layout of your folder has to follow a specific structure.
 ```
 <category>
 ├───activity
-│   └───<activity>
+│   └───<activity name>
 └───connector
-    └───<connector>
+│   └───<connector name>
+└───trigger
+    └───<trigger name>
 ```
-The category you want your activities to be in should be the name of your top level folder. Your activities will be in separate folders under the **activity** folder and your connectors will be subfolders of the **connector** folder. Please note that names of activities and connectors should be in lowercase
+The category you want your activities to be in should be the name of your top level folder. Your activities will be in separate folders under the **activity** folder and your connectors will be subfolders of the **connector** folder and the triggers will be under the **trigger** folder. Please note that names of activities connectors and triggers should be in lowercase
 
 {{% notice warning %}}
 Please note that names of activities and connectors should be in lowercase

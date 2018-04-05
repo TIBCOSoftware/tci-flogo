@@ -1,10 +1,10 @@
 ---
 date: 2016-04-09T16:50:16+02:00
 title: Display settings
-weight: 57
+weight: 60
 ---
 
-The **display** element in the activity.json and the connector.json can be used to enhance the user experience even more!
+The **display** element in the activity.json, connector.json and the trigger.json can be used to enhance the user experience even more!
 
 ## Types
 Each display element has a type associated with it. The below table displays the types you can use and the **Go type** column shows how that translates into Go data types you can use in your activity.go file
