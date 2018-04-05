@@ -47,5 +47,19 @@ go get github.com/stretchr/testify/assert
 The user interface for your activities can either be generated from the **activity.json** files of your extension, or you have the ability to enhance them with a bit of TypeScript.
 
 {{% notice tip %}}
-The latest release of the SDK can be found in the **releases** section of the [repository] (https://github.com/TIBCOSoftware/tci/releases).
+The latest release of the SDK can be found in the **releases** section of the [repository] (https://github.com/TIBCOSoftware/tci-flogo/releases).
+{{% /notice %}}
+
+
+## The Tooling Part
+
+The [Tooling](https://github.com/TIBCOSoftware/tci-flogo/blob/master/tools/readme.md) helps the user to generate a project scaffolding code for the User interface and then the user can proceed with adding the runtime GOLANG code incrementally. The tooling is built as a docker image which is downloadable from the [releases section](https://github.com/TIBCOSoftware/tci-flogo/releases) of this Github repository for individual releases. The Docker image contains both the User Interface and the Run Time SDK and the tooling command line. 
+
+The tooling currently supports :
+
+  1. User Interface Scaffolding code generation.
+  1. User Interface code compilation.
+  1. User Interface code testing.
+{{% notice tip%}}
+More Information for the tooling can be found [here](../../tooling/tooling) and on [Github Readme documentaion](https://github.com/TIBCOSoftware/tci-flogo/blob/master/tools/readme.md).
 {{% /notice %}}
