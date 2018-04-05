@@ -8,11 +8,11 @@ The commandline tool designed to help developers with the Flogo Enterprise SDK. 
 You can install flogo-enterprise-cli by downloading the flogo-enterprise-cli.tar.gz from the releases section 
 
 
-### 1. Import the docker image from flogo-enterprise-cli.tar.gz to your docker machine installation or download the scripts from the `tools` folder of this github repository.
+### 1. Import the docker image from flogo-enterprise-cli.tar.gz to your docker machine installation or download the scripts from the [`tools`](https://github.com/TIBCOSoftware/tci-flogo/tree/master/tools) folder of this github repository.
 ```
 gunzip -c flogo-enterprise-cli.tar.gz| docker load
 ```
-### 2. Create a executable shell script in your shell $PATH  called `fe-cli.sh` with the following contents or download the script from the `tools` folder of this github repository.
+### 2. Create a executable shell script in your shell $PATH  called `fe-cli.sh` with the following contents or download the script from the [`tools`](https://github.com/TIBCOSoftware/tci-flogo/tree/master/tools) folder of this github repository.
 ```
 #!/bin/bash
 docker run --rm -ti -v $PWD:/src flogo-enterprise-cli:latest $@
@@ -22,7 +22,7 @@ docker run --rm -ti -v $PWD:/src flogo-enterprise-cli:latest $@
 >cd <your project folder>
 >fe-cli.sh --help
 ```
-### 4. Run a test container as shown below from your plugin project work folder or download the  `test.sh` script from the `tools` folder of this github repository.
+### 4. Run a test container as shown below from your plugin project work folder or download the  `test.sh` script from the [`tools`](https://github.com/TIBCOSoftware/tci-flogo/tree/master/tools) folder of this github repository.
 ```
 >cd <your project folder> 
 >docker run --rm -ti -v $PWD:/src --entrypoint bash flogo-enterprise-cli:latest

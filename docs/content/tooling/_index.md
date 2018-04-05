@@ -1,6 +1,8 @@
 ---
 title: Tooling
 weight: 60
+chapter: true
+pre: "<i class=\"fa fa-terminal\" aria-hidden=\"true\"></i> "
 ---
 # fe-cli
 In this section we'll walk through a command line tooling to help generate a scaffolding code for the extension User Interface.
@@ -14,32 +16,37 @@ The commandline tool designed to help developers with the Flogo Enterprise SDK. 
 You can install flogo-enterprise-cli by downloading the flogo-enterprise-cli.tar.gz from the releases section 
 
 
-1. Import the docker image from flogo-enterprise-cli.tar.gz to your docker machine installation or download the scripts from the `tools` folder of this github repository.
-```sh
-gunzip -c flogo-enterprise-cli.tar.gz| docker load
-```
-2. Create a executable shell script in your shell $PATH  called `fe-cli.sh` with the following contents or download the script from the `tools` folder of this github repository.
-```sh
-#!/bin/bash
-docker run --rm -ti -v $PWD:/src flogo-enterprise-cli:latest $@
-```
+1. Import the docker image from flogo-enterprise-cli.tar.gz to your docker machine installation or download the scripts from the [`tools`](https://github.com/TIBCOSoftware/tci-flogo/tree/master/tools) folder of this github repository.
+
+    ```sh
+    gunzip -c flogo-enterprise-cli.tar.gz| docker load
+    ```
+2. Create a executable shell script in your shell $PATH  called `fe-cli.sh` with the following contents or download the script from the [`tools`](https://github.com/TIBCOSoftware/tci-flogo/tree/master/tools) folder of this github repository.
+
+    ```sh
+    #!/bin/bash
+    docker run --rm -ti -v $PWD:/src flogo-enterprise-cli:latest $@
+    ```
 3. Run the `fe-cli.sh` shell command from your plugin project work folder
-```sh
->cd <your project folder>
->fe-cli.sh --help
-```
-4. Run a test container as shown below from your plugin project work folder or download the  `test.sh` script from the `tools` folder of this github repository.
-```sh
->cd <your project folder> 
->docker run --rm -ti -v $PWD:/src --entrypoint bash flogo-enterprise-cli:latest
-# cd /src
-# fe-test
-```
+
+    ```sh
+    >cd <your project folder>
+    >fe-cli.sh --help
+    ```
+4. Run a test container as shown below from your plugin project work folder or download the  `test.sh` script from the [`tools`](https://github.com/TIBCOSoftware/tci-flogo/tree/master/tools) folder of this github repository.
+
+    ```sh
+    >cd <your project folder> 
+    >docker run --rm -ti -v $PWD:/src --entrypoint bash flogo-enterprise-cli:latest
+    # cd /src
+    # fe-test
+    ```
 5. Packaging Steps - The packaging file jszip.json is generated in your project folder. It can be done separately as shown below.
-```sh
->cd <your project folder>
->npm run zip
-```
+
+    ```sh
+    >cd <your project folder>
+    >npm run zip
+    ```
 6. Node module Reinstall - In case you need to re-install `node_modules/packages` you can use the `test.sh` to create a docker container shell where you can run `yarn install`.
   
 
