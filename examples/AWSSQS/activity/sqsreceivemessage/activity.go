@@ -58,7 +58,7 @@ func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, e
 	var region string
 	var accesskey string
 	var secreteKey string
-	connectionSettings, _ := data.CoerceToAnyArray(connectionInfo["settings"])
+	connectionSettings, _ := connectionInfo["settings"].([]interface{})
 	if connectionSettings != nil {
 		for _, v := range connectionSettings {
 			setting, _ := data.CoerceToObject(v)
@@ -83,7 +83,7 @@ func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, e
 	receiveMessageInput := &sqs.ReceiveMessageInput{}
 	receiveMessageInput.QueueUrl = aws.String(context.GetInput(ivQueueUrl).(string))
 
-	attrsNames, _ := data.CoerceToAnyArray(context.GetInput(ivAttributeNames))
+	attrsNames, _ := context.GetInput(ivAttributeNames).([]interface{})
 	if attrsNames != nil && len(attrsNames) > 0 {
 		//Add attribute names
 		attrs := make([]*string, len(attrsNames))
@@ -96,7 +96,7 @@ func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, e
 		receiveMessageInput.AttributeNames = attrs
 	}
 
-	attrsNames, _ = data.CoerceToAnyArray(context.GetInput(ivMessageAttributeNames))
+	attrsNames, _ = context.GetInput(ivMessageAttributeNames).([]interface{})
 	if attrsNames != nil && len(attrsNames) > 0 {
 		attrs := make([]*string, len(attrsNames))
 		for i, v := range attrsNames {

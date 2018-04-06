@@ -60,7 +60,7 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 	var region string
 	var accesskey string
 	var secreteKey string
-	connectionSettings, _ := data.CoerceToAnyArray(connectionInfo["settings"])
+	connectionSettings, _ := connectionInfo["settings"].([]interface{})
 	if connectionSettings != nil {
 		for _, v := range connectionSettings {
 			setting, _ := data.CoerceToObject(v)
@@ -86,7 +86,7 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 	sendMessageInput.MessageBody = aws.String(context.GetInput(ivMessageBody).(string))
 
 	messageAttributes, _ := data.CoerceToComplexObject(context.GetInput(ivMessageAttributes))
-	attrsName, _ := data.CoerceToAnyArray(context.GetInput(ivMessageAttributeNames))
+	attrsName, _ := context.GetInput(ivMessageAttributeNames).([]interface{})
 	if messageAttributes != nil && attrsName != nil {
 
 		//Read mapped values
