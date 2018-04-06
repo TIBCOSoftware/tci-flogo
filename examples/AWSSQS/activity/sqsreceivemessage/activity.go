@@ -43,31 +43,37 @@ func (a *SQSReceiveMessageActivity) Metadata() *activity.Metadata {
 }
 func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, err error) {
 	activityLog.Info("Executing SQS Receive Message activity")
-	//Read Inputs
-	if context.GetInput(ivConnection) == nil {
-		return false, activity.NewError("SQS connection is not configured", "SQS-RECEIVEMESSAGE-4001", nil)
-	}
 
 	if context.GetInput(ivQueueUrl) == nil {
 		return false, activity.NewError("SQS Queue URL is not configured", "SQS-RECEIVEMESSAGE-4002", nil)
 	}
 
 	//Read connection details
-	connectionInfo := context.GetInput(ivConnection).(map[string]interface{})
-	connectionSettings := connectionInfo["settings"].([]interface{})
+	connectionInfo, _ := data.CoerceToObject(context.GetInput(ivConnection))
+
+	if connectionInfo == nil {
+		return false, activity.NewError("SQS connection is not configured", "SQS-RECEIVEMESSAGE-4001", nil)
+	}
+
 	var region string
 	var accesskey string
 	var secreteKey string
-	for _, v := range connectionSettings {
-		setting := v.(map[string]interface{})
-		if setting["name"] == "accessKeyId" {
-			accesskey = setting["value"].(string)
-		} else if setting["name"] == "region" {
-			region = setting["value"].(string)
-		} else if setting["name"] == "secreteAccessKey" {
-			secreteKey = setting["value"].(string)
+	connectionSettings, _ := data.CoerceToAnyArray(connectionInfo["settings"])
+	if connectionSettings != nil {
+		for _, v := range connectionSettings {
+			setting, _ := data.CoerceToObject(v)
+			if setting != nil {
+				if setting["name"] == "accessKeyId" {
+					accesskey, _ = data.CoerceToString(setting["value"])
+				} else if setting["name"] == "region" {
+					region, _ = data.CoerceToString(setting["value"])
+				} else if setting["name"] == "secreteAccessKey" {
+					secreteKey, _ = data.CoerceToString(setting["value"])
+				}
+			}
 		}
 	}
+
 	session, err := session.NewSession(aws.NewConfig().WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accesskey, secreteKey, "")))
 	if err != nil {
 		return false, activity.NewError(fmt.Sprintf("Failed to connect to AWS due to error:%s. Check credentials configured in the connection:%s.", err.Error(), connectionInfo["name"].(string)), "SQS-SENDMESSAGE-4004", nil)
@@ -77,24 +83,27 @@ func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, e
 	receiveMessageInput := &sqs.ReceiveMessageInput{}
 	receiveMessageInput.QueueUrl = aws.String(context.GetInput(ivQueueUrl).(string))
 
-	if context.GetInput(ivAttributeNames) != nil {
+	attrsNames, _ := data.CoerceToAnyArray(context.GetInput(ivAttributeNames))
+	if attrsNames != nil && len(attrsNames) > 0 {
 		//Add attribute names
-		attrsNames := context.GetInput(ivAttributeNames).([]interface{})
 		attrs := make([]*string, len(attrsNames))
 		for i, v := range attrsNames {
-			attrInfo := v.(map[string]interface{})
-			attrs[i] = aws.String(attrInfo["Name"].(string))
+			attrInfo, _ := data.CoerceToObject(v)
+			if attrInfo != nil && attrInfo["Name"] != nil {
+				attrs[i] = aws.String(attrInfo["Name"].(string))
+			}
 		}
 		receiveMessageInput.AttributeNames = attrs
 	}
 
-	if context.GetInput(ivMessageAttributeNames) != nil {
-		//Add message attribute names
-		attrsNames := context.GetInput(ivMessageAttributeNames).([]interface{})
+	attrsNames, _ = data.CoerceToAnyArray(context.GetInput(ivMessageAttributeNames))
+	if attrsNames != nil && len(attrsNames) > 0 {
 		attrs := make([]*string, len(attrsNames))
 		for i, v := range attrsNames {
-			attrInfo := v.(map[string]interface{})
-			attrs[i] = aws.String(attrInfo["Name"].(string))
+			attrInfo, _ := data.CoerceToObject(v)
+			if attrInfo != nil && attrInfo["Name"] != nil {
+				attrs[i] = aws.String(attrInfo["Name"].(string))
+			}
 		}
 		receiveMessageInput.MessageAttributeNames = attrs
 	}

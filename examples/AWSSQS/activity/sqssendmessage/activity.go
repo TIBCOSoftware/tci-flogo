@@ -41,10 +41,6 @@ func (a *SQSSendMessageActivity) Metadata() *activity.Metadata {
 }
 func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err error) {
 	activityLog.Info("Executing SQS Send Message activity")
-	//Read Inputs
-	if context.GetInput(ivConnection) == nil {
-		return false, activity.NewError("SQS connection is not configured", "SQS-SENDMESSAGE-4001", nil)
-	}
 
 	if context.GetInput(ivQueueUrl) == nil {
 		return false, activity.NewError("SQS Queue URL is not configured", "SQS-SENDMESSAGE-4002", nil)
@@ -55,19 +51,28 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 	}
 
 	//Read connection details
-	connectionInfo := context.GetInput(ivConnection).(map[string]interface{})
-	connectionSettings := connectionInfo["settings"].([]interface{})
+	connectionInfo, _ := data.CoerceToObject(context.GetInput(ivConnection))
+
+	if connectionInfo == nil {
+		return false, activity.NewError("SQS connection is not configured", "SQS-SENDMESSAGE-4001", nil)
+	}
+
 	var region string
 	var accesskey string
 	var secreteKey string
-	for _, v := range connectionSettings {
-		setting := v.(map[string]interface{})
-		if setting["name"] == "accessKeyId" {
-			accesskey = setting["value"].(string)
-		} else if setting["name"] == "region" {
-			region = setting["value"].(string)
-		} else if setting["name"] == "secreteAccessKey" {
-			secreteKey = setting["value"].(string)
+	connectionSettings, _ := data.CoerceToAnyArray(connectionInfo["settings"])
+	if connectionSettings != nil {
+		for _, v := range connectionSettings {
+			setting, _ := data.CoerceToObject(v)
+			if setting != nil {
+				if setting["name"] == "accessKeyId" {
+					accesskey, _ = data.CoerceToString(setting["value"])
+				} else if setting["name"] == "region" {
+					region, _ = data.CoerceToString(setting["value"])
+				} else if setting["name"] == "secreteAccessKey" {
+					secreteKey, _ = data.CoerceToString(setting["value"])
+				}
+			}
 		}
 	}
 	session, err := session.NewSession(aws.NewConfig().WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accesskey, secreteKey, "")))
@@ -80,34 +85,36 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 	sendMessageInput.QueueUrl = aws.String(context.GetInput(ivQueueUrl).(string))
 	sendMessageInput.MessageBody = aws.String(context.GetInput(ivMessageBody).(string))
 
-	if context.GetInput(ivMessageAttributes) != nil && context.GetInput(ivMessageAttributeNames) != nil {
-		//Add message attributes
+	messageAttributes, _ := data.CoerceToComplexObject(context.GetInput(ivMessageAttributes))
+	attrsName, _ := data.CoerceToAnyArray(context.GetInput(ivMessageAttributeNames))
+	if messageAttributes != nil && attrsName != nil {
 
 		//Read mapped values
-		messageAttributes := context.GetInput(ivMessageAttributes).(*data.ComplexObject)
 		if messageAttributes.Value != nil {
 			switch messageAttributes.Value.(type) {
 			case map[string]interface{}:
-				msgAttrs := messageAttributes.Value.(map[string]interface{})
-
-				//Read table values
-				attrsName := context.GetInput(ivMessageAttributeNames).([]interface{})
-				attrs := make(map[string]*sqs.MessageAttributeValue, len(msgAttrs))
-				for _, v := range attrsName {
-					attr := v.(map[string]interface{})
-					// Has mapped value??
-					if msgAttrs[attr["Name"].(string)] != nil {
-						attrVal, err := data.CoerceToString(msgAttrs[attr["Name"].(string)])
-						if err != nil && attr["Type"].(string) == "Number" {
-							attrVal, err = data.CoerceToString(int(msgAttrs[attr["Name"].(string)].(int64)))
-						}
-						attrs[attr["Name"].(string)] = &sqs.MessageAttributeValue{
-							DataType:    aws.String(attr["Type"].(string)),
-							StringValue: aws.String(attrVal),
+				msgAttrs, _ := data.CoerceToObject(messageAttributes.Value)
+				if msgAttrs != nil {
+					//Read table values
+					attrs := make(map[string]*sqs.MessageAttributeValue, len(msgAttrs))
+					for _, v := range attrsName {
+						attr, _ := data.CoerceToObject(v)
+						if attr != nil && attr["Name"] != nil && attr["Type"] != nil {
+							// Has mapped value??
+							if msgAttrs[attr["Name"].(string)] != nil {
+								attrVal, err := data.CoerceToString(msgAttrs[attr["Name"].(string)])
+								if err != nil && attr["Type"].(string) == "Number" {
+									attrVal, err = data.CoerceToString(int(msgAttrs[attr["Name"].(string)].(int64)))
+								}
+								attrs[attr["Name"].(string)] = &sqs.MessageAttributeValue{
+									DataType:    aws.String(attr["Type"].(string)),
+									StringValue: aws.String(attrVal),
+								}
+							}
 						}
 					}
+					sendMessageInput.MessageAttributes = attrs
 				}
-				sendMessageInput.MessageAttributes = attrs
 			}
 		}
 	}
