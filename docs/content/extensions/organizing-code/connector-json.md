@@ -4,7 +4,7 @@ title: connector.json
 weight: 52
 ---
 
-The connector.json describes the model, the meta data, of the connector. It describes which fields are displayed and what kind of actions are supported in the connector UI. The below code explains which fields are in the JSON document as well as what kind of values are allowed. For more samples, check out the samples section!
+The `connector.json` describes the model, the meta data, of the connector. It describes which fields are displayed and what kind of actions are supported in the connector UI. The below code explains which fields are in the JSON document as well as what kind of values are allowed. For more samples, check out the samples section!
 ```json
 {
     "name": "wi-ext-ifttt",
@@ -69,7 +69,7 @@ The connector.json describes the model, the meta data, of the connector. It desc
   }
 ```
 ## Validation
-When creating the connector.json file, there are a few validation rules that you need take into account:
+When creating the `connector.json` file, there are a few validation rules that you need take into account:
 
 * **name**: The name cannot start with "tibco-" and should only contain alphanumeric chararcters and underscores
 * **title**: The title of your connector (which also shows up on your activity) should only contain alphanumeric chararcters and spaces

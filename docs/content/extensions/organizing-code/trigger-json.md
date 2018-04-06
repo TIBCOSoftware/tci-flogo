@@ -4,8 +4,8 @@ title: trigger.json
 weight: 57
 ---
 
-The trigger.json describes the model, the meta data, of the trigger. It describes, among other things, what the input and outputs are, who built it and which version you're using. 
-Every trigger contribution must define its model in trigger.json file.This model is shared by both UI and runtime. The trigger model contains following parts:
+The `trigger.json` file describes the model, the metadata, of the trigger. It describes, among other things, what the input and outputs are, who built it and which version you're using. 
+Every trigger contribution must define its model in `trigger.json` file.This model is shared by both UI and runtime. The trigger model contains following parts:
 #### Trigger JSON sections
 1. `settings` - Zero or more fields that contribute to the trigger configuration. * It is the common configuration for all handlers of same trigger type.
 1. `handler` - A trigger must define a handler. It contains zero or more fields that contribute to the handler configuration. All handlers of the same type are grouped together in the WI application.
@@ -155,7 +155,7 @@ Every trigger contribution must define its model in trigger.json file.This model
 }
 ```
 ## Validation
-When creating the trigger.json file, there are a few validation rules that you need take into account:
+When creating the `trigger.json` file, there are a few validation rules that you need take into account:
 
 * **name**: The name cannot start with "tibco-" and should only contain alphanumeric chararcters and underscores
 * **title**: The title of your trigger (which also shows up on your trigger palette) should only contain alphanumeric chararcters and spaces
@@ -186,7 +186,7 @@ Any element in the **settings** section of your trigger.json that has a **displa
 ```
 
 ### Output
-Any element in the **outputs** section of your trigger.json that doesn't have a **display** element associated with it will be shown in the output section so you use it in the inputs for activities in the rest of your flow.
+Any element in the **outputs** section of your `trigger.json` file that doesn't have a **display** element associated with it will be shown in the output section so you use it in the inputs for activities in the rest of your flow.
 ```json
 {
     "name": "result",
@@ -195,7 +195,7 @@ Any element in the **outputs** section of your trigger.json that doesn't have a 
 ```
 
 ### Output settings
-Any element in the **outputs** section of your trigger.json that has a **display** element associated with it and has a schema associated with it will be shown in the Output settings section. Note that you also need to set the **mappable** element to true.
+Any element in the **outputs** section of your `trigger.json` file that has a **display** element associated with it and has a schema associated with it will be shown in the Output settings section. Note that you also need to set the **mappable** element to true.
 ```json
 {
     "name": "body",
@@ -303,7 +303,7 @@ In this case, the output is defined by the JSON schema. A tree constructed from 
 ```
 
 ### Model for user defined schema based output
-In this case, users will input a JSON data  inthe Output Settings section. A tree constructed from the JSON would be displayed in the Output section.
+In this case, users will input a JSON data in the Output Settings section. A tree constructed from the JSON would be displayed in the Output section.
 
 ```json
 {

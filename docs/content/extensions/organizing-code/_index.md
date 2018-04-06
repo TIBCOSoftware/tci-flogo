@@ -4,30 +4,30 @@ title: Organizing your code
 weight: 51
 ---
 
-The extensions for TCI Flogo consist of a bunch of files that all have a very specific function. The files are either used for the model, the UI or the runtime. In the below tables you can see which files you need and which are optional when you're developing connectors and activities.
+The extensions for TIBCO Cloud<sup>&trade;</sup> Integration Flogo<sup>&trade;</sup> consist of several files that all have a very specific function. The files are either used for the model, the UI or the runtime. In the below tables you can see which files you need and which are optional when you're developing connectors and activities.
 
 ## Connector
 
 | Component | Technology | Filename                             | Description
 | --------- | ---------- | ------------------------------------ | -----------
-| Model     | JSON       | [connector.json](./connector-json)                       | The connector.json describes the model, the meta data, of the connector. It describes which fields are displayed and what kind of actions are supported in the connector UI.
-| UI        | TypeScript | [connector.ts<br/>connector.module.ts](./connector-ts) | The connector.ts file handles the validation and actions for the fields described in the model. For example it validates that values have been entered in the textboxes or what to do when you click _connect_ 
+| Model     | JSON       | [connector.json](./connector-json)                       | The `connector.json ` file describes the model, the meta data, of the connector. It describes which fields are displayed and what kind of actions are supported in the connector UI.
+| UI        | TypeScript | [connector.ts<br/>connector.module.ts](./connector-ts) | The `connector.ts` file handles the validation and actions for the fields described in the model. For example it validates that values have been entered in the text boxes or what to do when you click _connect_ 
 
 ## Activity
 
 | Component       | Technology | Filename                           | Description
 | --------------- | ---------- | ---------------------------------- | -----------
-| Model           | JSON       | [activity.json](./activity-json)                    | The activity.json describes the model, the meta data, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using.
-| Runtime         | Go         | [activity.go<br/>activity_test.go](./activity-go)   | Every extension must write the runtime code in Go (activity.go). You can, and really should, leverage the Go testing framework for writing unit test cases (activity_test.go) for your extension.
-| UI (_optional_) | TypeScript | [activity.ts<br/>activity.module.ts](./activity-ts) | The activity.ts file handles the validation and actions for the fields described in the model. For example it validates that a valid connection has been chosen, or retrieves additional information based on values in certain fields. This part is optional and you can rely on the out of the box UI as well! 
+| Model           | JSON       | [activity.json](./activity-json)                    | The `activity.json` describes the model, the meta data, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using.
+| Runtime         | Go         | [activity.go<br/>activity_test.go](./activity-go)   | Every extension must write the runtime code in Go (`activity.go`). You can, and really should, leverage the Go testing framework for writing unit test cases (`activity_test.go`) for your extension.
+| UI (_optional_) | TypeScript | [activity.ts<br/>activity.module.ts](./activity-ts) | The `activity.ts` file handles the validation and actions for the fields described in the model. For example it validates that a valid connection has been chosen, or retrieves additional information based on values in certain fields. This part is optional and you can rely on the out of the box UI as well! 
 
 ## Trigger
 
 | Component       | Technology | Filename                           | Description
 | --------------- | ---------- | ---------------------------------- | -----------
-| Model           | JSON       | [trigger.json](./trigger-json)                    | The trigger.json describes the model, the meta data, of the trigger. It describes, among other things, what the input and outputs are, who built it and which version you're using.
-| Runtime         | Go         | [trigger.go<br/>trigger_test.go](./trigger-go)   | Every extension must write the runtime code in Go (trigger.go). You can, and really should, leverage the Go testing framework for writing unit test cases (trigger_test.go) for your extension.
-| UI (_optional_) | TypeScript | [trigger.ts<br/>trigger.module.ts](./trigger-ts) | The trigger.ts file handles the validation and actions for the fields described in the model. For example it validates that a valid connection has been chosen, or retrieves additional information based on values in certain fields. This part is optional and you can rely on the out of the box UI as well! 
+| Model           | JSON       | [trigger.json](./trigger-json)                    | The `trigger.json` file describes the model, the metadata, of the trigger. It describes, among other things, what the input and outputs are, who built it and which version you're using.
+| Runtime         | Go         | [trigger.go<br/>trigger_test.go](./trigger-go)   | Every extension must write the runtime code in Go (`trigger.go`). You can, and really should, leverage the Go testing framework for writing unit test cases (`trigger_test.go`) for your extension.
+| UI (_optional_) | TypeScript | [trigger.ts<br/>trigger.module.ts](./trigger-ts) | The `trigger.ts` file handles the validation and actions for the fields described in the model. For example it validates that a valid connection has been chosen, or retrieves additional information based on values in certain fields. This part is optional and you can rely on the out of the box UI as well! 
 
 ## Folder Layout 
 

@@ -5,7 +5,7 @@ weight: 1
 pre: "<i class=\"fa fa-home\" aria-hidden=\"true\"></i> "
 ---
 
-[TIBCO Cloud Integration](https://www.tibco.com/products/tibco-cloud-integration) is a way to seamlessly connect cloud-based services and on-premises applications, and easily model, create, test, and deploy custom APIs. The latest addition to TIBCO Cloud Integration is our Flogo. A web-native design-time making sure that you can connect apps and APIs from within your browser.
+[TIBCO Cloud<sup>&trade;</sup> Integration](https://www.tibco.com/products/tibco-cloud-integration) is a way to seamlessly connect cloud-based services and on-premises applications, and easily model, create, test, and deploy custom APIs. The latest addition to TIBCO<sup>&reg;</sup> Cloud Integration is our Flogo. A web-native design-time making sure that you can connect apps and APIs from within your browser.
 
 [This](https://github.com/TIBCOSoftware/tci-flogo) repository is the place to find the docs and tools to build extensions for Flogo integration product. There are a few ways you can help us:
 

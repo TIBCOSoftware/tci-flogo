@@ -4,7 +4,7 @@ title: activity.go
 weight: 55
 ---
 
-Every extension must write the runtime code in Go (activity.go). You can, and really should, leverage the Go testing framework for writing unit test cases (activity_test.go) for your extension. The code here give you an overview of what files are structured like, but for samples you should really check out the samples section!
+Every extension must write the runtime code in Go (`activity.go`). You can, and really should, leverage the Go testing framework for writing unit test cases (`activity_test.go`) for your extension. The code here give you an overview of what files are structured like, but for samples you should really check out the samples section!
 
 ## activity.go
 ```go

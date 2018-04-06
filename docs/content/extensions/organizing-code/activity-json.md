@@ -4,7 +4,7 @@ title: activity.json
 weight: 54
 ---
 
-The activity.json describes the model, the meta data, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using. The below code explains which fields are in the JSON document as well as what kind of values are allowed. For more samples, check out the samples section!
+The `activity.json` describes the model, the metadata, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using. The below code explains which fields are in the JSON document as well as what kind of values are allowed. For more samples, check out the samples section!
 ```json
 {
     "name": "webhook",
@@ -56,10 +56,10 @@ The activity.json describes the model, the meta data, of the activity. It descri
 }
 ```
 ## Validation
-When creating the activity.json file, there are a few validation rules that you need take into account:
+When creating the `activity.json` file, there are a few validation rules that you need take into account:
 
 * **name**: The name cannot start with "tibco-" and should only contain alphanumeric chararcters and underscores
-* **title**: The title of your activity (which also shows up on your activity) should only contain alphanumeric chararcters and spaces
+* **title**: The title of your activity (which also shows up on your activity) should only contain alphanumeric characters and spaces
 * **version**: The version of your activity follows the semver notation (x.y.z), with numeric characters separated by dots
 * **type**: The type must always be **flogo:activity**
 * **ref**: The ref field must be in the form of `<category>/activity/<activityname>` and the category and activity name must be the exact same case as the category and name specified above
@@ -75,7 +75,7 @@ The user interface is divided into five main sections and these sections are pop
 * Output settings
 
 ### Configuration
-Any element in the **inputs** section of your activity.json that has a **display** element associated with it will be shown in the configuration section:
+Any element in the **inputs** section of your `activity.json` that has a **display** element associated with it will be shown in the configuration section:
 ```json
 {
     "name": "iftttConnection",
@@ -91,7 +91,7 @@ Any element in the **inputs** section of your activity.json that has a **display
 ```
 
 ### Input
-Any element in the **inputs** section of your activity.json that doesn't have a **display** element associated with it will be shown in the input section so you can still use it in the mapper.
+Any element in the **inputs** section of your `activity.json` that doesn't have a **display** element associated with it will be shown in the input section so you can still use it in the mapper.
 ```json
 {
     "name": "value1",
@@ -101,13 +101,13 @@ Any element in the **inputs** section of your activity.json that doesn't have a 
 ```
 
 ### Input settings
-Any element in the **inputs** section of your activity.json that has a **display** element associated with it and has a schema associated with it will be shown in the Input settings section. Note that you also need to set the **mappable** element to true.
+Any element in the **inputs** section of your `activity.json` that has a **display** element associated with it and has a schema associated with it will be shown in the Input settings section. Note that you also need to set the **mappable** element to true.
 ```json
 
 ```
 
 ### Output
-Any element in the **outputs** section of your activity.json that doesn't have a **display** element associated with it will be shown in the output section so you use it in the inputs for activities in the rest of your flow.
+Any element in the **outputs** section of your `activity.json` that doesn't have a **display** element associated with it will be shown in the output section so you use it in the inputs for activities in the rest of your flow.
 ```json
 {
     "name": "result",
@@ -116,7 +116,7 @@ Any element in the **outputs** section of your activity.json that doesn't have a
 ```
 
 ### Output settings
-Any element in the **outputs** section of your activity.json that has a **display** element associated with it and has a schema associated with it will be shown in the Output settings section. Note that you also need to set the **mappable** element to true.
+Any element in the **outputs** section of your `activity.json` that has a **display** element associated with it and has a schema associated with it will be shown in the Output settings section. Note that you also need to set the **mappable** element to true.
 ```json
 
 ```

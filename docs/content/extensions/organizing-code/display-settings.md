@@ -4,10 +4,10 @@ title: Display settings
 weight: 60
 ---
 
-The **display** element in the activity.json, connector.json and the trigger.json can be used to enhance the user experience even more!
+The **display** element in the `activity.json`, `connector.json` and the `trigger.json` files can be used to enhance the user experience even more!
 
 ## Types
-Each display element has a type associated with it. The below table displays the types you can use and the **Go type** column shows how that translates into Go data types you can use in your activity.go file
+Each display element has a type associated with it. The below table displays the types you can use and the **Go type** column shows how that translates into Go data types you can use in your `activity.go` file
 
 | Type           | Go type                  | Description 
 | -------------- | ------------------------ | ----------- 
@@ -20,7 +20,7 @@ Each display element has a type associated with it. The below table displays the
 | object         | map[string]interface{}   | A JSON object
 
 ## Special types
-There are a few special types that you can use in your activity.json and connector.json to enhance the user experience even further. These special types drive the user interface and are "translated" to the type you selected for it during runtime.
+There are a few special types that you can use in your `activity.json` and `connector.json` files to enhance the user experience even further. These special types drive the user interface and are "translated" to the type you selected for it during runtime.
 
 | Type         | Description                                                                              | Example 
 | ------------ | ---------------------------------------------------------------------------------------- | --------
@@ -34,7 +34,7 @@ There are a few special types that you can use in your activity.json and connect
 | TextEditor   | Renders a text editor to paste JSON schemas or objects (the type must be complex_object) | <pre>{ &quot;name&quot;: &quot;responseBody&quot;, &quot;type&quot;: &quot;complex_object&quot;, &quot;display&quot;: { &quot;type&quot;: &quot;texteditor&quot;, &quot;description&quot;: &quot;An example JSON data that you expect back from the REST service&quot;, &quot;name&quot;:&quot;Response Schema&quot;, &quot;syntax&quot;:&quot;json&quot; } }</pre>
 
 ## Other settings
-Apart from the type, you can also set a two other elements in the display setting of your activity.json and connector.json
+Apart from the type, you can also set a two other elements in the display setting of your `activity.json` and `connector.json` files:
 
 | Element  | Explanation                                                           | Example 
 | -------- | --------------------------------------------------------------------- | ----------- 

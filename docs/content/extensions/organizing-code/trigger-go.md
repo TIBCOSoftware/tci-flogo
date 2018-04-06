@@ -5,7 +5,7 @@ title: trigger.go
 weight: 59
 ---
 
-Every extension must write the runtime code in Go (trigger.go). You can, and really should, leverage the Go testing framework for writing unit test cases (trigger_test.go) for your extension. The code here give you an overview of what files are structured like, but for samples you should really check out the samples section!
+Every extension must write the runtime code in Go (`trigger.go`). You can, and really should, leverage the Go testing framework for writing unit test cases (`trigger_test.go`) for your extension. The code here give you an overview of what files are structured like, but for samples you should really check out the samples section!
 
 **trigger.go**
 ```go
