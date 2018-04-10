@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/encoding/gob/debug.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="debug.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/encoding">encoding</a>/<a href="../gob.1.html">gob</a>/<span class="text-muted">debug.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/encoding/gob.html">encoding/gob</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// Delete the next line to include in the gob package.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// +build ignore</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>package gob
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span><span class="comment">// This file is not normally included in the gob package. Used only for debugging the package itself.</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span><span class="comment">// Except for reading uints, it is an implementation of a reader that is independent of</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span><span class="comment">// the one implemented by Decoder.</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span><span class="comment">// To enable the Debug function, delete the +build ignore line above and do</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">//	go install</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>import (
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	&#34;os&#34;
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	&#34;sync&#34;
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>)
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>var dumpBytes = false <span class="comment">// If true, print the remaining bytes in the input buffer at each item.</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span><span class="comment">// Init installs the debugging facility. If this file is not compiled in the</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span><span class="comment">// package, the tests in codec_test.go are no-ops.</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>func init() {
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	debugFunc = Debug
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>}
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>var (
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	blanks = bytes.Repeat([]byte{&#39; &#39;}, 3*10)
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	empty  = []byte(&#34;: &lt;empty&gt;\n&#34;)
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	tabs   = strings.Repeat(&#34;\t&#34;, 100)
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>)
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span><span class="comment">// tab indents itself when printed.</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>type tab int
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>func (t tab) String() string {
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	n := int(t)
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	if n &gt; len(tabs) {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>		n = len(tabs)
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	}
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	return tabs[0:n]
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>}
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>func (t tab) print() {
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	fmt.Fprint(os.Stderr, t)
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>}
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span><span class="comment">// A peekReader wraps an io.Reader, allowing one to peek ahead to see</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span><span class="comment">// what&#39;s coming without stealing the data from the client of the Reader.</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>type peekReader struct {
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	r    io.Reader
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	data []byte <span class="comment">// read-ahead data</span>
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>}
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span><span class="comment">// newPeekReader returns a peekReader that wraps r.</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>func newPeekReader(r io.Reader) *peekReader {
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	return &amp;peekReader{r: r}
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>}
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span><span class="comment">// Read is the usual method. It will first take data that has been read ahead.</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>func (p *peekReader) Read(b []byte) (n int, err error) {
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>	if len(p.data) == 0 {
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>		return p.r.Read(b)
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	}
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>	<span class="comment">// Satisfy what&#39;s possible from the read-ahead data.</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	n = copy(b, p.data)
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	<span class="comment">// Move data down to beginning of slice, to avoid endless growth</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	copy(p.data, p.data[n:])
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	p.data = p.data[:len(p.data)-n]
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	return
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>}
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span><span class="comment">// peek returns as many bytes as possible from the unread</span>
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span><span class="comment">// portion of the stream, up to the length of b.</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>func (p *peekReader) peek(b []byte) (n int, err error) {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	if len(p.data) &gt; 0 {
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		n = copy(b, p.data)
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>		if n == len(b) {
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>			return
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>		}
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>		b = b[n:]
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	}
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	if len(b) == 0 {
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>		return
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	}
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	m, e := io.ReadFull(p.r, b)
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	if m &gt; 0 {
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>		p.data = append(p.data, b[:m]...)
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	}
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	n += m
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	if e == io.ErrUnexpectedEOF {
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>		<span class="comment">// That means m &gt; 0 but we reached EOF. If we got data</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>		<span class="comment">// we won&#39;t complain about not being able to peek enough.</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>		if n &gt; 0 {
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>			e = nil
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>		} else {
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>			e = io.EOF
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		}
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	}
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	return n, e
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>}
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>type debugger struct {
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>	mutex          sync.Mutex
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	remain         int  <span class="comment">// the number of bytes known to remain in the input</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>	remainingKnown bool <span class="comment">// the value of &#39;remain&#39; is valid</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	r              *peekReader
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	wireType       map[typeId]*wireType
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>	tmp            []byte <span class="comment">// scratch space for decoding uints.</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>}
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span><span class="comment">// dump prints the next nBytes of the input.</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span><span class="comment">// It arranges to print the output aligned from call to</span>
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span><span class="comment">// call, to make it easy to see what has been consumed.</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>func (deb *debugger) dump(format string, args ...interface{}) {
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	if !dumpBytes {
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>		return
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	}
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, format+&#34; &#34;, args...)
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	if !deb.remainingKnown {
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>		return
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	}
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	if deb.remain &lt; 0 {
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;remaining byte count is negative! %d\n&#34;, deb.remain)
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>		return
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	}
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	data := make([]byte, deb.remain)
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	n, _ := deb.r.peek(data)
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	if n == 0 {
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>		os.Stderr.Write(empty)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>		return
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	}
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	b := new(bytes.Buffer)
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>	fmt.Fprintf(b, &#34;[%d]{\n&#34;, deb.remain)
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	<span class="comment">// Blanks until first byte</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	lineLength := 0
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	if n := len(data); n%10 != 0 {
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		lineLength = 10 - n%10
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>		fmt.Fprintf(b, &#34;\t%s&#34;, blanks[:lineLength*3])
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	}
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>	<span class="comment">// 10 bytes per line</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	for len(data) &gt; 0 {
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>		if lineLength == 0 {
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>			fmt.Fprint(b, &#34;\t&#34;)
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		}
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>		m := 10 - lineLength
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>		lineLength = 0
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>		if m &gt; len(data) {
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>			m = len(data)
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>		}
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>		fmt.Fprintf(b, &#34;% x\n&#34;, data[:m])
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>		data = data[m:]
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	}
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	fmt.Fprint(b, &#34;}\n&#34;)
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	os.Stderr.Write(b.Bytes())
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>}
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span><span class="comment">// Debug prints a human-readable representation of the gob data read from r.</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span><span class="comment">// It is a no-op unless debugging was enabled when the package was built.</span>
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>func Debug(r io.Reader) {
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>	err := debug(r)
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;gob debug: %s\n&#34;, err)
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	}
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>}
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span><span class="comment">// debug implements Debug, but catches panics and returns</span>
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span><span class="comment">// them as errors to be printed by Debug.</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>func debug(r io.Reader) (err error) {
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>	defer catchError(&amp;err)
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	fmt.Fprintln(os.Stderr, &#34;Start of debugging&#34;)
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	deb := &amp;debugger{
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		r:        newPeekReader(r),
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>		wireType: make(map[typeId]*wireType),
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		tmp:      make([]byte, 16),
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	if b, ok := r.(*bytes.Buffer); ok {
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>		deb.remain = b.Len()
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		deb.remainingKnown = true
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	}
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	deb.gobStream()
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	return
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>}
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span><span class="comment">// note that we&#39;ve consumed some bytes</span>
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>func (deb *debugger) consumed(n int) {
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>	if deb.remainingKnown {
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>		deb.remain -= n
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	}
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>}
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span><span class="comment">// int64 decodes and returns the next integer, which must be present.</span>
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span><span class="comment">// Don&#39;t call this if you could be at EOF.</span>
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>func (deb *debugger) int64() int64 {
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	return toInt(deb.uint64())
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>}
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span><span class="comment">// uint64 returns and decodes the next unsigned integer, which must be present.</span>
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span><span class="comment">// Don&#39;t call this if you could be at EOF.</span>
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span><span class="comment">// TODO: handle errors better.</span>
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>func (deb *debugger) uint64() uint64 {
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>	n, w, err := decodeUintReader(deb.r, deb.tmp)
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		errorf(&#34;debug: read error: %s&#34;, err)
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	}
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	deb.consumed(w)
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	return n
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>}
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span><span class="comment">// GobStream:</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span><span class="comment">//	DelimitedMessage* (until EOF)</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>func (deb *debugger) gobStream() {
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	<span class="comment">// Make sure we&#39;re single-threaded through here.</span>
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	deb.mutex.Lock()
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	defer deb.mutex.Unlock()
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	for deb.delimitedMessage(0) {
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	}
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>}
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span><span class="comment">// DelimitedMessage:</span>
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span><span class="comment">//	uint(lengthOfMessage) Message</span>
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>func (deb *debugger) delimitedMessage(indent tab) bool {
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	for {
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>		n := deb.loadBlock(true)
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>		if n &lt; 0 {
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>			return false
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>		}
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>		deb.dump(&#34;Delimited message of length %d&#34;, n)
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>		deb.message(indent)
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	}
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	return true
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>}
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span><span class="comment">// loadBlock preps us to read a message</span>
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span><span class="comment">// of the length specified next in the input. It returns</span>
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span><span class="comment">// the length of the block. The argument tells whether</span>
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span><span class="comment">// an EOF is acceptable now. If it is and one is found,</span>
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span><span class="comment">// the return value is negative.</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>func (deb *debugger) loadBlock(eofOK bool) int {
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	n64, w, err := decodeUintReader(deb.r, deb.tmp) <span class="comment">// deb.uint64 will error at EOF</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		if eofOK &amp;&amp; err == io.EOF {
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>			return -1
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>		}
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>		errorf(&#34;debug: unexpected error: %s&#34;, err)
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	}
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	deb.consumed(w)
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	n := int(n64)
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	if n &lt; 0 {
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>		errorf(&#34;huge value for message length: %d&#34;, n64)
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	}
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	return int(n)
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>}
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span><span class="comment">// Message:</span>
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span><span class="comment">//	TypeSequence TypedValue</span>
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span><span class="comment">// TypeSequence</span>
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span><span class="comment">//	(TypeDefinition DelimitedTypeDefinition*)?</span>
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span><span class="comment">// DelimitedTypeDefinition:</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span><span class="comment">//	uint(lengthOfTypeDefinition) TypeDefinition</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span><span class="comment">// TypedValue:</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span><span class="comment">//	int(typeId) Value</span>
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>func (deb *debugger) message(indent tab) bool {
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	for {
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>		<span class="comment">// Convert the uint64 to a signed integer typeId</span>
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>		uid := deb.int64()
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>		id := typeId(uid)
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>		deb.dump(&#34;type id=%d&#34;, id)
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		if id &lt; 0 {
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>			deb.typeDefinition(indent, -id)
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>			n := deb.loadBlock(false)
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>			deb.dump(&#34;Message of length %d&#34;, n)
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>			continue
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>		} else {
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>			deb.value(indent, id)
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>			break
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>		}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	}
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	return true
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>}
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span><span class="comment">// Helper methods to make it easy to scan a type descriptor.</span>
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span><span class="comment">// common returns the CommonType at the input point.</span>
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>func (deb *debugger) common() CommonType {
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	fieldNum := -1
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	name := &#34;&#34;
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	id := typeId(0)
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	for {
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		delta := deb.delta(-1)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>		if delta == 0 {
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>			break
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		}
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>		fieldNum += delta
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>		switch fieldNum {
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>		case 0:
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>			name = deb.string()
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>		case 1:
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>			<span class="comment">// Id typeId</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>			id = deb.typeId()
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>		default:
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>			errorf(&#34;corrupted CommonType, delta is %d fieldNum is %d&#34;, delta, fieldNum)
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>		}
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	}
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	return CommonType{name, id}
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>}
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span><span class="comment">// uint returns the unsigned int at the input point, as a uint (not uint64).</span>
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>func (deb *debugger) uint() uint {
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	return uint(deb.uint64())
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>}
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span><span class="comment">// int returns the signed int at the input point, as an int (not int64).</span>
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>func (deb *debugger) int() int {
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>	return int(deb.int64())
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>}
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span><span class="comment">// typeId returns the type id at the input point.</span>
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>func (deb *debugger) typeId() typeId {
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>	return typeId(deb.int64())
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>}
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span><span class="comment">// string returns the string at the input point.</span>
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>func (deb *debugger) string() string {
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	x := int(deb.uint64())
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>	b := make([]byte, x)
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>	nb, _ := deb.r.Read(b)
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	if nb != x {
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>		errorf(&#34;corrupted type&#34;)
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	}
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>	deb.consumed(nb)
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	return string(b)
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>}
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span><span class="comment">// delta returns the field delta at the input point. The expect argument,</span>
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span><span class="comment">// if non-negative, identifies what the value should be.</span>
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>func (deb *debugger) delta(expect int) int {
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	delta := int(deb.uint64())
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	if delta &lt; 0 || (expect &gt;= 0 &amp;&amp; delta != expect) {
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>		errorf(&#34;decode: corrupted type: delta %d expected %d&#34;, delta, expect)
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	}
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>	return delta
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>}
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span><span class="comment">// TypeDefinition:</span>
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span><span class="comment">//	[int(-typeId) (already read)] encodingOfWireType</span>
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>func (deb *debugger) typeDefinition(indent tab, id typeId) {
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	deb.dump(&#34;type definition for id %d&#34;, id)
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	<span class="comment">// Encoding is of a wireType. Decode the structure as usual</span>
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	fieldNum := -1
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	wire := new(wireType)
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>	<span class="comment">// A wireType defines a single field.</span>
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	delta := deb.delta(-1)
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	fieldNum += delta
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	switch fieldNum {
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	case 0: <span class="comment">// array type, one field of {{Common}, elem, length}</span>
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>		<span class="comment">// Field number 0 is CommonType</span>
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>		com := deb.common()
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>		<span class="comment">// Field number 1 is type Id of elem</span>
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>		id := deb.typeId()
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>		<span class="comment">// Field number 3 is length</span>
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>		length := deb.int()
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>		wire.ArrayT = &amp;arrayType{com, id, length}
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	case 1: <span class="comment">// slice type, one field of {{Common}, elem}</span>
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>		<span class="comment">// Field number 0 is CommonType</span>
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>		com := deb.common()
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>		<span class="comment">// Field number 1 is type Id of elem</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>		id := deb.typeId()
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>		wire.SliceT = &amp;sliceType{com, id}
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>	case 2: <span class="comment">// struct type, one field of {{Common}, []fieldType}</span>
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>		<span class="comment">// Field number 0 is CommonType</span>
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>		com := deb.common()
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>		<span class="comment">// Field number 1 is slice of FieldType</span>
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>		numField := int(deb.uint())
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>		field := make([]*fieldType, numField)
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>		for i := 0; i &lt; numField; i++ {
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>			field[i] = new(fieldType)
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>			deb.delta(1) <span class="comment">// field 0 of fieldType: name</span>
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>			field[i].Name = deb.string()
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>			deb.delta(1) <span class="comment">// field 1 of fieldType: id</span>
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>			field[i].Id = deb.typeId()
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>			deb.delta(0) <span class="comment">// end of fieldType</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>		}
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>		wire.StructT = &amp;structType{com, field}
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	case 3: <span class="comment">// map type, one field of {{Common}, key, elem}</span>
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>		<span class="comment">// Field number 0 is CommonType</span>
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>		com := deb.common()
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>		<span class="comment">// Field number 1 is type Id of key</span>
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>		keyId := deb.typeId()
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>		<span class="comment">// Field number 2 is type Id of elem</span>
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>		elemId := deb.typeId()
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>		wire.MapT = &amp;mapType{com, keyId, elemId}
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>	case 4: <span class="comment">// GobEncoder type, one field of {{Common}}</span>
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		<span class="comment">// Field number 0 is CommonType</span>
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>		com := deb.common()
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>		wire.GobEncoderT = &amp;gobEncoderType{com}
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>	case 5: <span class="comment">// BinaryMarshaler type, one field of {{Common}}</span>
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>		<span class="comment">// Field number 0 is CommonType</span>
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>		com := deb.common()
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>		wire.BinaryMarshalerT = &amp;gobEncoderType{com}
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>	case 6: <span class="comment">// TextMarshaler type, one field of {{Common}}</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>		<span class="comment">// Field number 0 is CommonType</span>
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>		deb.delta(1)
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>		com := deb.common()
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>		wire.TextMarshalerT = &amp;gobEncoderType{com}
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>	default:
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>		errorf(&#34;bad field in type %d&#34;, fieldNum)
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	}
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>	deb.printWireType(indent, wire)
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>	deb.delta(0) <span class="comment">// end inner type (arrayType, etc.)</span>
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	deb.delta(0) <span class="comment">// end wireType</span>
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>	<span class="comment">// Remember we&#39;ve seen this type.</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	deb.wireType[id] = wire
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>}
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span><span class="comment">// Value:</span>
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span><span class="comment">//	SingletonValue | StructValue</span>
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>func (deb *debugger) value(indent tab, id typeId) {
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>	wire, ok := deb.wireType[id]
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>	if ok &amp;&amp; wire.StructT != nil {
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>		deb.structValue(indent, id)
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	} else {
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>		deb.singletonValue(indent, id)
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>	}
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>}
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span><span class="comment">// SingletonValue:</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span><span class="comment">//	uint(0) FieldValue</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>func (deb *debugger) singletonValue(indent tab, id typeId) {
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>	deb.dump(&#34;Singleton value&#34;)
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>	<span class="comment">// is it a builtin type?</span>
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>	wire := deb.wireType[id]
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>	_, ok := builtinIdToType[id]
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>	if !ok &amp;&amp; wire == nil {
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>		errorf(&#34;type id %d not defined&#34;, id)
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>	}
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>	m := deb.uint64()
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>	if m != 0 {
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>		errorf(&#34;expected zero; got %d&#34;, m)
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>	}
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>	deb.fieldValue(indent, id)
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>}
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span><span class="comment">// InterfaceValue:</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span><span class="comment">//	NilInterfaceValue | NonNilInterfaceValue</span>
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>func (deb *debugger) interfaceValue(indent tab) {
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>	deb.dump(&#34;Start of interface value&#34;)
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>	if nameLen := deb.uint64(); nameLen == 0 {
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>		deb.nilInterfaceValue(indent)
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>	} else {
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>		deb.nonNilInterfaceValue(indent, int(nameLen))
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	}
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>}
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span><span class="comment">// NilInterfaceValue:</span>
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span><span class="comment">//	uint(0) [already read]</span>
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>func (deb *debugger) nilInterfaceValue(indent tab) int {
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, &#34;%snil interface\n&#34;, indent)
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>	return 0
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>}
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span><span class="comment">// NonNilInterfaceValue:</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span><span class="comment">//	ConcreteTypeName TypeSequence InterfaceContents</span>
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span><span class="comment">// ConcreteTypeName:</span>
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span><span class="comment">//	uint(lengthOfName) [already read=n] name</span>
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span><span class="comment">// InterfaceContents:</span>
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span><span class="comment">//	int(concreteTypeId) DelimitedValue</span>
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span><span class="comment">// DelimitedValue:</span>
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span><span class="comment">//	uint(length) Value</span>
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>func (deb *debugger) nonNilInterfaceValue(indent tab, nameLen int) {
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>	<span class="comment">// ConcreteTypeName</span>
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>	b := make([]byte, nameLen)
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>	deb.r.Read(b) <span class="comment">// TODO: CHECK THESE READS!!</span>
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>	deb.consumed(nameLen)
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>	name := string(b)
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>	for {
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>		id := deb.typeId()
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>		if id &lt; 0 {
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>			deb.typeDefinition(indent, -id)
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>			n := deb.loadBlock(false)
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>			deb.dump(&#34;Nested message of length %d&#34;, n)
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>		} else {
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>			<span class="comment">// DelimitedValue</span>
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>			x := deb.uint64() <span class="comment">// in case we want to ignore the value; we don&#39;t.</span>
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>			fmt.Fprintf(os.Stderr, &#34;%sinterface value, type %q id=%d; valueLength %d\n&#34;, indent, name, id, x)
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>			deb.value(indent, id)
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>			break
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>		}
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>	}
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>}
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span><span class="comment">// printCommonType prints a common type; used by printWireType.</span>
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>func (deb *debugger) printCommonType(indent tab, kind string, common *CommonType) {
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>	indent.print()
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, &#34;%s %q id=%d\n&#34;, kind, common.Name, common.Id)
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>}
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span><span class="comment">// printWireType prints the contents of a wireType.</span>
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>func (deb *debugger) printWireType(indent tab, wire *wireType) {
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, &#34;%stype definition {\n&#34;, indent)
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>	indent++
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>	switch {
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>	case wire.ArrayT != nil:
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>		deb.printCommonType(indent, &#34;array&#34;, &amp;wire.ArrayT.CommonType)
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%slen %d\n&#34;, indent+1, wire.ArrayT.Len)
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%selemid %d\n&#34;, indent+1, wire.ArrayT.Elem)
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>	case wire.MapT != nil:
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>		deb.printCommonType(indent, &#34;map&#34;, &amp;wire.MapT.CommonType)
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%skey id=%d\n&#34;, indent+1, wire.MapT.Key)
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%selem id=%d\n&#34;, indent+1, wire.MapT.Elem)
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>	case wire.SliceT != nil:
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>		deb.printCommonType(indent, &#34;slice&#34;, &amp;wire.SliceT.CommonType)
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%selem id=%d\n&#34;, indent+1, wire.SliceT.Elem)
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>	case wire.StructT != nil:
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>		deb.printCommonType(indent, &#34;struct&#34;, &amp;wire.StructT.CommonType)
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>		for i, field := range wire.StructT.Field {
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>			fmt.Fprintf(os.Stderr, &#34;%sfield %d:\t%s\tid=%d\n&#34;, indent+1, i, field.Name, field.Id)
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>		}
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>	case wire.GobEncoderT != nil:
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>		deb.printCommonType(indent, &#34;GobEncoder&#34;, &amp;wire.GobEncoderT.CommonType)
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>	}
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>	indent--
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, &#34;%s}\n&#34;, indent)
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>}
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span><span class="comment">// fieldValue prints a value of any type, such as a struct field.</span>
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span><span class="comment">// FieldValue:</span>
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span><span class="comment">//	builtinValue | ArrayValue | MapValue | SliceValue | StructValue | InterfaceValue</span>
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>func (deb *debugger) fieldValue(indent tab, id typeId) {
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>	_, ok := builtinIdToType[id]
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>	if ok {
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>		if id == tInterface {
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>			deb.interfaceValue(indent)
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>		} else {
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>			deb.printBuiltin(indent, id)
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>		}
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>		return
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>	}
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>	wire, ok := deb.wireType[id]
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>	if !ok {
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>		errorf(&#34;type id %d not defined&#34;, id)
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	}
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>	switch {
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>	case wire.ArrayT != nil:
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>		deb.arrayValue(indent, wire)
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>	case wire.MapT != nil:
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>		deb.mapValue(indent, wire)
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>	case wire.SliceT != nil:
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>		deb.sliceValue(indent, wire)
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>	case wire.StructT != nil:
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		deb.structValue(indent, id)
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>	case wire.GobEncoderT != nil:
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>		deb.gobEncoderValue(indent, id)
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>	default:
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>		panic(&#34;bad wire type for field&#34;)
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>	}
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>}
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span><span class="comment">// printBuiltin prints a value not of a fundamental type, that is,</span>
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span><span class="comment">// one whose type is known to gobs at bootstrap time.</span>
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>func (deb *debugger) printBuiltin(indent tab, id typeId) {
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>	switch id {
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>	case tBool:
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>		x := deb.int64()
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>		if x == 0 {
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>			fmt.Fprintf(os.Stderr, &#34;%sfalse\n&#34;, indent)
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>		} else {
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>			fmt.Fprintf(os.Stderr, &#34;%strue\n&#34;, indent)
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>		}
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>	case tInt:
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>		x := deb.int64()
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%s%d\n&#34;, indent, x)
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>	case tUint:
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>		x := deb.int64()
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%s%d\n&#34;, indent, x)
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>	case tFloat:
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>		x := deb.uint64()
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%s%g\n&#34;, indent, float64FromBits(x))
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>	case tComplex:
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>		r := deb.uint64()
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>		i := deb.uint64()
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%s%g+%gi\n&#34;, indent, float64FromBits(r), float64FromBits(i))
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>	case tBytes:
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>		x := int(deb.uint64())
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>		b := make([]byte, x)
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>		deb.r.Read(b)
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>		deb.consumed(x)
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%s{% x}=%q\n&#34;, indent, b, b)
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>	case tString:
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>		x := int(deb.uint64())
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>		b := make([]byte, x)
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>		deb.r.Read(b)
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>		deb.consumed(x)
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%s%q\n&#34;, indent, b)
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>	default:
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>		panic(&#34;unknown builtin&#34;)
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>	}
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>}
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span><span class="comment">// ArrayValue:</span>
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span><span class="comment">//	uint(n) FieldValue*n</span>
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>func (deb *debugger) arrayValue(indent tab, wire *wireType) {
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>	elemId := wire.ArrayT.Elem
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>	u := deb.uint64()
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>	length := int(u)
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>	for i := 0; i &lt; length; i++ {
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>		deb.fieldValue(indent, elemId)
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>	}
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>	if length != wire.ArrayT.Len {
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%s(wrong length for array: %d should be %d)\n&#34;, indent, length, wire.ArrayT.Len)
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>	}
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>}
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span><span class="comment">// MapValue:</span>
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span><span class="comment">//	uint(n) (FieldValue FieldValue)*n  [n (key, value) pairs]</span>
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>func (deb *debugger) mapValue(indent tab, wire *wireType) {
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>	keyId := wire.MapT.Key
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>	elemId := wire.MapT.Elem
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>	u := deb.uint64()
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>	length := int(u)
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>	for i := 0; i &lt; length; i++ {
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>		deb.fieldValue(indent+1, keyId)
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>		deb.fieldValue(indent+1, elemId)
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>	}
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>}
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span><span class="comment">// SliceValue:</span>
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span><span class="comment">//	uint(n) (n FieldValue)</span>
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>func (deb *debugger) sliceValue(indent tab, wire *wireType) {
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>	elemId := wire.SliceT.Elem
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	u := deb.uint64()
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>	length := int(u)
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>	deb.dump(&#34;Start of slice of length %d&#34;, length)
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>	for i := 0; i &lt; length; i++ {
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>		deb.fieldValue(indent, elemId)
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>	}
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>}
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span><span class="comment">// StructValue:</span>
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span><span class="comment">//	(uint(fieldDelta) FieldValue)*</span>
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>func (deb *debugger) structValue(indent tab, id typeId) {
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>	deb.dump(&#34;Start of struct value of %q id=%d\n&lt;&lt;\n&#34;, id.name(), id)
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, &#34;%s%s struct {\n&#34;, indent, id.name())
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>	wire, ok := deb.wireType[id]
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>	if !ok {
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>		errorf(&#34;type id %d not defined&#34;, id)
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>	}
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>	strct := wire.StructT
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>	fieldNum := -1
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	indent++
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>	for {
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		delta := deb.uint64()
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>		if delta == 0 { <span class="comment">// struct terminator is zero delta fieldnum</span>
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>			break
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>		}
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>		fieldNum += int(delta)
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>		if fieldNum &lt; 0 || fieldNum &gt;= len(strct.Field) {
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>			deb.dump(&#34;field number out of range: prevField=%d delta=%d&#34;, fieldNum-int(delta), delta)
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>			break
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>		}
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>		fmt.Fprintf(os.Stderr, &#34;%sfield %d:\t%s\n&#34;, indent, fieldNum, wire.StructT.Field[fieldNum].Name)
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>		deb.fieldValue(indent+1, strct.Field[fieldNum].Id)
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>	}
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	indent--
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, &#34;%s} // end %s struct\n&#34;, indent, id.name())
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>	deb.dump(&#34;&gt;&gt; End of struct value of type %d %q&#34;, id, id.name())
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>}
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span><span class="comment">// GobEncoderValue:</span>
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span><span class="comment">//	uint(n) byte*n</span>
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>func (deb *debugger) gobEncoderValue(indent tab, id typeId) {
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>	len := deb.uint64()
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>	deb.dump(&#34;GobEncoder value of %q id=%d, length %d\n&#34;, id.name(), id, len)
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, &#34;%s%s (implements GobEncoder)\n&#34;, indent, id.name())
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>	data := make([]byte, len)
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>	_, err := deb.r.Read(data)
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>		errorf(&#34;gobEncoder data read: %s&#34;, err)
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>	}
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>	fmt.Fprintf(os.Stderr, &#34;%s[% .2x]\n&#34;, indent+1, data)
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>}
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>
+</pre><p><a href="debug.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

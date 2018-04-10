@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/intconv.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./intconv.go%3Fs=2059:2101.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">intconv.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2015 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// This file implements int-to-string conversion functions.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>package big
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>import (
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>)
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">// TODO(gri) Should rename itoa to utoa (there&#39;s no sign). That</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// would permit the introduction of itoa which is like utoa but</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// reserves a byte for a possible sign that&#39;s passed in. That</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">// would permit Int.Text to be implemented w/o the need for</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span><span class="comment">// string copy if the number is negative.</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span><span class="comment">// Text returns the string representation of x in the given base.</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span><span class="comment">// Base must be between 2 and 36, inclusive. The result uses the</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span><span class="comment">// lower-case letters &#39;a&#39; to &#39;z&#39; for digit values &gt;= 10. No base</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span><span class="comment">// prefix (such as &#34;0x&#34;) is added to the string.</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>func (x *Int) Text(base int) string {
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	if x == nil {
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>		return &#34;&lt;nil&gt;&#34;
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	}
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	return string(x.abs.itoa(x.neg, base))
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>}
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span><span class="comment">// Append appends the string representation of x, as generated by</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span><span class="comment">// x.Text(base), to buf and returns the extended buffer.</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>func (x *Int) Append(buf []byte, base int) []byte {
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	if x == nil {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>		return append(buf, &#34;&lt;nil&gt;&#34;...)
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	}
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	return append(buf, x.abs.itoa(x.neg, base)...)
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>}
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>func (x *Int) String() string {
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	return x.Text(10)
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>}
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span><span class="comment">// write count copies of text to s</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>func writeMultiple(s fmt.State, text string, count int) {
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	if len(text) &gt; 0 {
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>		b := []byte(text)
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>		for ; count &gt; 0; count-- {
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>			s.Write(b)
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>		}
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	}
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>}
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>var _ fmt.Formatter = intOne <span class="comment">// *Int must implement fmt.Formatter</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span><span class="comment">// Format implements fmt.Formatter. It accepts the formats</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span><span class="comment">// &#39;b&#39; (binary), &#39;o&#39; (octal), &#39;d&#39; (decimal), &#39;x&#39; (lowercase</span>
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span><span class="comment">// hexadecimal), and &#39;X&#39; (uppercase hexadecimal).</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span><span class="comment">// Also supported are the full suite of package fmt&#39;s format</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span><span class="comment">// flags for integral types, including &#39;+&#39; and &#39; &#39; for sign</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span><span class="comment">// control, &#39;#&#39; for leading zero in octal and for hexadecimal,</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span><span class="comment">// a leading &#34;0x&#34; or &#34;0X&#34; for &#34;%#x&#34; and &#34;%#X&#34; respectively,</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span><span class="comment">// specification of minimum digits precision, output field</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span><span class="comment">// width, space or zero padding, and &#39;-&#39; for left or right</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span><span class="comment">// justification.</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span><span class="selection">func (x *Int) Format(s fmt.State, ch rune)</span> {
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	<span class="comment">// determine base</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	var base int
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>	switch ch {
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	case &#39;b&#39;:
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>		base = 2
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	case &#39;o&#39;:
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>		base = 8
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	case &#39;d&#39;, &#39;s&#39;, &#39;v&#39;:
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>		base = 10
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	case &#39;x&#39;, &#39;X&#39;:
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		base = 16
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	default:
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>		<span class="comment">// unknown format</span>
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		fmt.Fprintf(s, &#34;%%!%c(big.Int=%s)&#34;, ch, x.String())
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		return
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	}
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	if x == nil {
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>		fmt.Fprint(s, &#34;&lt;nil&gt;&#34;)
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>		return
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	}
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	<span class="comment">// determine sign character</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	sign := &#34;&#34;
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	switch {
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	case x.neg:
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>		sign = &#34;-&#34;
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	case s.Flag(&#39;+&#39;): <span class="comment">// supersedes &#39; &#39; when both specified</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>		sign = &#34;+&#34;
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	case s.Flag(&#39; &#39;):
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>		sign = &#34; &#34;
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	}
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	<span class="comment">// determine prefix characters for indicating output base</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	prefix := &#34;&#34;
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	if s.Flag(&#39;#&#39;) {
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		switch ch {
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>		case &#39;o&#39;: <span class="comment">// octal</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>			prefix = &#34;0&#34;
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>		case &#39;x&#39;: <span class="comment">// hexadecimal</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>			prefix = &#34;0x&#34;
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		case &#39;X&#39;:
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>			prefix = &#34;0X&#34;
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		}
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	}
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>	digits := x.abs.utoa(base)
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	if ch == &#39;X&#39; {
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		<span class="comment">// faster than bytes.ToUpper</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>		for i, d := range digits {
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>			if &#39;a&#39; &lt;= d &amp;&amp; d &lt;= &#39;z&#39; {
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>				digits[i] = &#39;A&#39; + (d - &#39;a&#39;)
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>			}
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>		}
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	}
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	<span class="comment">// number of characters for the three classes of number padding</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	var left int  <span class="comment">// space characters to left of digits for right justification (&#34;%8d&#34;)</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	var zeros int <span class="comment">// zero characters (actually cs[0]) as left-most digits (&#34;%.8d&#34;)</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	var right int <span class="comment">// space characters to right of digits for left justification (&#34;%-8d&#34;)</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	<span class="comment">// determine number padding from precision: the least number of digits to output</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	precision, precisionSet := s.Precision()
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	if precisionSet {
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>		switch {
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>		case len(digits) &lt; precision:
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>			zeros = precision - len(digits) <span class="comment">// count of zero padding</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>		case len(digits) == 1 &amp;&amp; digits[0] == &#39;0&#39; &amp;&amp; precision == 0:
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>			return <span class="comment">// print nothing if zero value (x == 0) and zero precision (&#34;.&#34; or &#34;.0&#34;)</span>
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>		}
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	}
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	<span class="comment">// determine field pad from width: the least number of characters to output</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	length := len(sign) + len(prefix) + zeros + len(digits)
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	if width, widthSet := s.Width(); widthSet &amp;&amp; length &lt; width { <span class="comment">// pad as specified</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		switch d := width - length; {
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>		case s.Flag(&#39;-&#39;):
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>			<span class="comment">// pad on the right with spaces; supersedes &#39;0&#39; when both specified</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>			right = d
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		case s.Flag(&#39;0&#39;) &amp;&amp; !precisionSet:
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>			<span class="comment">// pad with zeros unless precision also specified</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>			zeros = d
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		default:
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>			<span class="comment">// pad on the left with spaces</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>			left = d
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>		}
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	}
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>	<span class="comment">// print number as [left pad][sign][prefix][zero pad][digits][right pad]</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>	writeMultiple(s, &#34; &#34;, left)
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	writeMultiple(s, sign, 1)
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	writeMultiple(s, prefix, 1)
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	writeMultiple(s, &#34;0&#34;, zeros)
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	s.Write(digits)
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	writeMultiple(s, &#34; &#34;, right)
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>}
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span><span class="comment">// scan sets z to the integer value corresponding to the longest possible prefix</span>
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span><span class="comment">// read from r representing a signed integer number in a given conversion base.</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span><span class="comment">// It returns z, the actual conversion base used, and an error, if any. In the</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span><span class="comment">// error case, the value of z is undefined but the returned value is nil. The</span>
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span><span class="comment">// syntax follows the syntax of integer literals in Go.</span>
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span><span class="comment">// The base argument must be 0 or a value from 2 through MaxBase. If the base</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span><span class="comment">// is 0, the string prefix determines the actual conversion base. A prefix of</span>
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span><span class="comment">// ``0x&#39;&#39; or ``0X&#39;&#39; selects base 16; the ``0&#39;&#39; prefix selects base 8, and a</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span><span class="comment">// ``0b&#39;&#39; or ``0B&#39;&#39; prefix selects base 2. Otherwise the selected base is 10.</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>func (z *Int) scan(r io.ByteScanner, base int) (*Int, int, error) {
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	<span class="comment">// determine sign</span>
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>	neg, err := scanSign(r)
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		return nil, 0, err
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>	<span class="comment">// determine mantissa</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>	z.abs, base, _, err = z.abs.scan(r, base, false)
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>		return nil, base, err
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	}
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	z.neg = len(z.abs) &gt; 0 &amp;&amp; neg <span class="comment">// 0 has no sign</span>
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	return z, base, nil
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>}
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>func scanSign(r io.ByteScanner) (neg bool, err error) {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	var ch byte
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	if ch, err = r.ReadByte(); err != nil {
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		return false, err
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	}
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	switch ch {
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	case &#39;-&#39;:
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		neg = true
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	case &#39;+&#39;:
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		<span class="comment">// nothing to do</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	default:
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>		r.UnreadByte()
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>	}
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	return
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>}
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span><span class="comment">// byteReader is a local wrapper around fmt.ScanState;</span>
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span><span class="comment">// it implements the ByteReader interface.</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>type byteReader struct {
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	fmt.ScanState
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>}
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>func (r byteReader) ReadByte() (byte, error) {
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>	ch, size, err := r.ReadRune()
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	if size != 1 &amp;&amp; err == nil {
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		err = fmt.Errorf(&#34;invalid rune %#U&#34;, ch)
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	}
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	return byte(ch), err
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>}
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>func (r byteReader) UnreadByte() error {
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	return r.UnreadRune()
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>}
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>var _ fmt.Scanner = intOne <span class="comment">// *Int must implement fmt.Scanner</span>
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span><span class="comment">// Scan is a support routine for fmt.Scanner; it sets z to the value of</span>
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span><span class="comment">// the scanned number. It accepts the formats &#39;b&#39; (binary), &#39;o&#39; (octal),</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span><span class="comment">// &#39;d&#39; (decimal), &#39;x&#39; (lowercase hexadecimal), and &#39;X&#39; (uppercase hexadecimal).</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>func (z *Int) Scan(s fmt.ScanState, ch rune) error {
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	s.SkipSpace() <span class="comment">// skip leading space characters</span>
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	base := 0
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	switch ch {
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	case &#39;b&#39;:
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>		base = 2
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	case &#39;o&#39;:
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>		base = 8
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	case &#39;d&#39;:
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>		base = 10
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	case &#39;x&#39;, &#39;X&#39;:
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>		base = 16
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	case &#39;s&#39;, &#39;v&#39;:
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>		<span class="comment">// let scan determine the base</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	default:
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>		return errors.New(&#34;Int.Scan: invalid verb&#34;)
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	}
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>	_, _, err := z.scan(byteReader{s}, base)
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	return err
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>}
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>
+</pre><p><a href="intconv.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

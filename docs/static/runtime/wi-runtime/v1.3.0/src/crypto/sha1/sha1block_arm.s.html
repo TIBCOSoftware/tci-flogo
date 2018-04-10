@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/sha1/sha1block_arm.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="sha1block_arm.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../sha1.1.html">sha1</a>/<span class="text-muted">sha1block_arm.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/sha1.1.html">crypto/sha1</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2014 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	//
+<span id="L5" class="ln">     5</span>	// ARM version of md5block.go
+<span id="L6" class="ln">     6</span>	
+<span id="L7" class="ln">     7</span>	#include &#34;textflag.h&#34;
+<span id="L8" class="ln">     8</span>	
+<span id="L9" class="ln">     9</span>	// SHA-1 block routine. See sha1block.go for Go equivalent.
+<span id="L10" class="ln">    10</span>	//
+<span id="L11" class="ln">    11</span>	// There are 80 rounds of 4 types:
+<span id="L12" class="ln">    12</span>	//   - rounds 0-15 are type 1 and load data (ROUND1 macro).
+<span id="L13" class="ln">    13</span>	//   - rounds 16-19 are type 1 and do not load data (ROUND1x macro).
+<span id="L14" class="ln">    14</span>	//   - rounds 20-39 are type 2 and do not load data (ROUND2 macro).
+<span id="L15" class="ln">    15</span>	//   - rounds 40-59 are type 3 and do not load data (ROUND3 macro).
+<span id="L16" class="ln">    16</span>	//   - rounds 60-79 are type 4 and do not load data (ROUND4 macro).
+<span id="L17" class="ln">    17</span>	//
+<span id="L18" class="ln">    18</span>	// Each round loads or shuffles the data, then computes a per-round
+<span id="L19" class="ln">    19</span>	// function of b, c, d, and then mixes the result into and rotates the
+<span id="L20" class="ln">    20</span>	// five registers a, b, c, d, e holding the intermediate results.
+<span id="L21" class="ln">    21</span>	//
+<span id="L22" class="ln">    22</span>	// The register rotation is implemented by rotating the arguments to
+<span id="L23" class="ln">    23</span>	// the round macros instead of by explicit move instructions.
+<span id="L24" class="ln">    24</span>	
+<span id="L25" class="ln">    25</span>	// Register definitions
+<span id="L26" class="ln">    26</span>	#define Rdata	R0	// Pointer to incoming data
+<span id="L27" class="ln">    27</span>	#define Rconst	R1	// Current constant for SHA round
+<span id="L28" class="ln">    28</span>	#define Ra	R2		// SHA-1 accumulator
+<span id="L29" class="ln">    29</span>	#define Rb	R3		// SHA-1 accumulator
+<span id="L30" class="ln">    30</span>	#define Rc	R4		// SHA-1 accumulator
+<span id="L31" class="ln">    31</span>	#define Rd	R5		// SHA-1 accumulator
+<span id="L32" class="ln">    32</span>	#define Re	R6		// SHA-1 accumulator
+<span id="L33" class="ln">    33</span>	#define Rt0	R7		// Temporary
+<span id="L34" class="ln">    34</span>	#define Rt1	R8		// Temporary
+<span id="L35" class="ln">    35</span>	// r9, r10 are forbidden
+<span id="L36" class="ln">    36</span>	// r11 is OK provided you check the assembler that no synthetic instructions use it
+<span id="L37" class="ln">    37</span>	#define Rt2	R11		// Temporary
+<span id="L38" class="ln">    38</span>	#define Rctr	R12	// loop counter
+<span id="L39" class="ln">    39</span>	#define Rw	R14		// point to w buffer
+<span id="L40" class="ln">    40</span>	
+<span id="L41" class="ln">    41</span>	// func block(dig *digest, p []byte)
+<span id="L42" class="ln">    42</span>	// 0(FP) is *digest
+<span id="L43" class="ln">    43</span>	// 4(FP) is p.array (struct Slice)
+<span id="L44" class="ln">    44</span>	// 8(FP) is p.len
+<span id="L45" class="ln">    45</span>	//12(FP) is p.cap
+<span id="L46" class="ln">    46</span>	//
+<span id="L47" class="ln">    47</span>	// Stack frame
+<span id="L48" class="ln">    48</span>	#define p_end	end-4(SP)		// pointer to the end of data
+<span id="L49" class="ln">    49</span>	#define p_data	data-8(SP)	// current data pointer (unused?)
+<span id="L50" class="ln">    50</span>	#define w_buf	buf-(8+4*80)(SP)	//80 words temporary buffer w uint32[80]
+<span id="L51" class="ln">    51</span>	#define saved	abcde-(8+4*80+4*5)(SP)	// saved sha1 registers a,b,c,d,e - these must be last (unused?)
+<span id="L52" class="ln">    52</span>	// Total size +4 for saved LR is 352
+<span id="L53" class="ln">    53</span>	
+<span id="L54" class="ln">    54</span>		// w[i] = p[j]&lt;&lt;24 | p[j+1]&lt;&lt;16 | p[j+2]&lt;&lt;8 | p[j+3]
+<span id="L55" class="ln">    55</span>		// e += w[i]
+<span id="L56" class="ln">    56</span>	#define LOAD(Re) \
+<span id="L57" class="ln">    57</span>		MOVBU	2(Rdata), Rt0 ; \
+<span id="L58" class="ln">    58</span>		MOVBU	3(Rdata), Rt1 ; \
+<span id="L59" class="ln">    59</span>		MOVBU	1(Rdata), Rt2 ; \
+<span id="L60" class="ln">    60</span>		ORR	Rt0&lt;&lt;8, Rt1, Rt0	    ; \
+<span id="L61" class="ln">    61</span>		MOVBU.P	4(Rdata), Rt1 ; \
+<span id="L62" class="ln">    62</span>		ORR	Rt2&lt;&lt;16, Rt0, Rt0	    ; \
+<span id="L63" class="ln">    63</span>		ORR	Rt1&lt;&lt;24, Rt0, Rt0	    ; \
+<span id="L64" class="ln">    64</span>		MOVW.P	Rt0, 4(Rw)		    ; \
+<span id="L65" class="ln">    65</span>		ADD	Rt0, Re, Re
+<span id="L66" class="ln">    66</span>		
+<span id="L67" class="ln">    67</span>		// tmp := w[(i-3)&amp;0xf] ^ w[(i-8)&amp;0xf] ^ w[(i-14)&amp;0xf] ^ w[(i)&amp;0xf]
+<span id="L68" class="ln">    68</span>		// w[i&amp;0xf] = tmp&lt;&lt;1 | tmp&gt;&gt;(32-1)
+<span id="L69" class="ln">    69</span>		// e += w[i&amp;0xf] 
+<span id="L70" class="ln">    70</span>	#define SHUFFLE(Re) \
+<span id="L71" class="ln">    71</span>		MOVW	(-16*4)(Rw), Rt0 ; \
+<span id="L72" class="ln">    72</span>		MOVW	(-14*4)(Rw), Rt1 ; \
+<span id="L73" class="ln">    73</span>		MOVW	(-8*4)(Rw), Rt2  ; \
+<span id="L74" class="ln">    74</span>		EOR	Rt0, Rt1, Rt0  ; \
+<span id="L75" class="ln">    75</span>		MOVW	(-3*4)(Rw), Rt1  ; \
+<span id="L76" class="ln">    76</span>		EOR	Rt2, Rt0, Rt0  ; \
+<span id="L77" class="ln">    77</span>		EOR	Rt0, Rt1, Rt0  ; \
+<span id="L78" class="ln">    78</span>		MOVW	Rt0@&gt;(32-1), Rt0  ; \
+<span id="L79" class="ln">    79</span>		MOVW.P	Rt0, 4(Rw)	  ; \
+<span id="L80" class="ln">    80</span>		ADD	Rt0, Re, Re
+<span id="L81" class="ln">    81</span>	
+<span id="L82" class="ln">    82</span>		// t1 = (b &amp; c) | ((~b) &amp; d)
+<span id="L83" class="ln">    83</span>	#define FUNC1(Ra, Rb, Rc, Rd, Re) \
+<span id="L84" class="ln">    84</span>		MVN	Rb, Rt1	   ; \
+<span id="L85" class="ln">    85</span>		AND	Rb, Rc, Rt0  ; \
+<span id="L86" class="ln">    86</span>		AND	Rd, Rt1, Rt1 ; \
+<span id="L87" class="ln">    87</span>		ORR	Rt0, Rt1, Rt1
+<span id="L88" class="ln">    88</span>	
+<span id="L89" class="ln">    89</span>		// t1 = b ^ c ^ d
+<span id="L90" class="ln">    90</span>	#define FUNC2(Ra, Rb, Rc, Rd, Re) \
+<span id="L91" class="ln">    91</span>		EOR	Rb, Rc, Rt1 ; \
+<span id="L92" class="ln">    92</span>		EOR	Rd, Rt1, Rt1
+<span id="L93" class="ln">    93</span>	
+<span id="L94" class="ln">    94</span>		// t1 = (b &amp; c) | (b &amp; d) | (c &amp; d) =
+<span id="L95" class="ln">    95</span>		// t1 = (b &amp; c) | ((b | c) &amp; d)
+<span id="L96" class="ln">    96</span>	#define FUNC3(Ra, Rb, Rc, Rd, Re) \
+<span id="L97" class="ln">    97</span>		ORR	Rb, Rc, Rt0  ; \
+<span id="L98" class="ln">    98</span>		AND	Rb, Rc, Rt1  ; \
+<span id="L99" class="ln">    99</span>		AND	Rd, Rt0, Rt0 ; \
+<span id="L100" class="ln">   100</span>		ORR	Rt0, Rt1, Rt1
+<span id="L101" class="ln">   101</span>	
+<span id="L102" class="ln">   102</span>	#define FUNC4 FUNC2
+<span id="L103" class="ln">   103</span>	
+<span id="L104" class="ln">   104</span>		// a5 := a&lt;&lt;5 | a&gt;&gt;(32-5)
+<span id="L105" class="ln">   105</span>		// b = b&lt;&lt;30 | b&gt;&gt;(32-30)
+<span id="L106" class="ln">   106</span>		// e = a5 + t1 + e + const
+<span id="L107" class="ln">   107</span>	#define MIX(Ra, Rb, Rc, Rd, Re) \
+<span id="L108" class="ln">   108</span>		ADD	Rt1, Re, Re	 ; \
+<span id="L109" class="ln">   109</span>		MOVW	Rb@&gt;(32-30), Rb	 ; \
+<span id="L110" class="ln">   110</span>		ADD	Ra@&gt;(32-5), Re, Re ; \
+<span id="L111" class="ln">   111</span>		ADD	Rconst, Re, Re
+<span id="L112" class="ln">   112</span>	
+<span id="L113" class="ln">   113</span>	#define ROUND1(Ra, Rb, Rc, Rd, Re) \
+<span id="L114" class="ln">   114</span>		LOAD(Re)		; \
+<span id="L115" class="ln">   115</span>		FUNC1(Ra, Rb, Rc, Rd, Re)	; \
+<span id="L116" class="ln">   116</span>		MIX(Ra, Rb, Rc, Rd, Re)
+<span id="L117" class="ln">   117</span>	
+<span id="L118" class="ln">   118</span>	#define ROUND1x(Ra, Rb, Rc, Rd, Re) \
+<span id="L119" class="ln">   119</span>		SHUFFLE(Re)	; \
+<span id="L120" class="ln">   120</span>		FUNC1(Ra, Rb, Rc, Rd, Re)	; \
+<span id="L121" class="ln">   121</span>		MIX(Ra, Rb, Rc, Rd, Re)
+<span id="L122" class="ln">   122</span>	
+<span id="L123" class="ln">   123</span>	#define ROUND2(Ra, Rb, Rc, Rd, Re) \
+<span id="L124" class="ln">   124</span>		SHUFFLE(Re)	; \
+<span id="L125" class="ln">   125</span>		FUNC2(Ra, Rb, Rc, Rd, Re)	; \
+<span id="L126" class="ln">   126</span>		MIX(Ra, Rb, Rc, Rd, Re)
+<span id="L127" class="ln">   127</span>	
+<span id="L128" class="ln">   128</span>	#define ROUND3(Ra, Rb, Rc, Rd, Re) \
+<span id="L129" class="ln">   129</span>		SHUFFLE(Re)	; \
+<span id="L130" class="ln">   130</span>		FUNC3(Ra, Rb, Rc, Rd, Re)	; \
+<span id="L131" class="ln">   131</span>		MIX(Ra, Rb, Rc, Rd, Re)
+<span id="L132" class="ln">   132</span>	
+<span id="L133" class="ln">   133</span>	#define ROUND4(Ra, Rb, Rc, Rd, Re) \
+<span id="L134" class="ln">   134</span>		SHUFFLE(Re)	; \
+<span id="L135" class="ln">   135</span>		FUNC4(Ra, Rb, Rc, Rd, Re)	; \
+<span id="L136" class="ln">   136</span>		MIX(Ra, Rb, Rc, Rd, Re)
+<span id="L137" class="ln">   137</span>	
+<span id="L138" class="ln">   138</span>	
+<span id="L139" class="ln">   139</span>	// func block(dig *digest, p []byte)
+<span id="L140" class="ln">   140</span>	TEXT	·block(SB), 0, $352-16
+<span id="L141" class="ln">   141</span>		MOVW	p+4(FP), Rdata	// pointer to the data
+<span id="L142" class="ln">   142</span>		MOVW	p_len+8(FP), Rt0	// number of bytes
+<span id="L143" class="ln">   143</span>		ADD	Rdata, Rt0
+<span id="L144" class="ln">   144</span>		MOVW	Rt0, p_end	// pointer to end of data
+<span id="L145" class="ln">   145</span>	
+<span id="L146" class="ln">   146</span>		// Load up initial SHA-1 accumulator
+<span id="L147" class="ln">   147</span>		MOVW	dig+0(FP), Rt0
+<span id="L148" class="ln">   148</span>		MOVM.IA (Rt0), [Ra,Rb,Rc,Rd,Re]
+<span id="L149" class="ln">   149</span>	
+<span id="L150" class="ln">   150</span>	loop:
+<span id="L151" class="ln">   151</span>		// Save registers at SP+4 onwards
+<span id="L152" class="ln">   152</span>		MOVM.IB [Ra,Rb,Rc,Rd,Re], (R13)
+<span id="L153" class="ln">   153</span>	
+<span id="L154" class="ln">   154</span>		MOVW	$w_buf, Rw
+<span id="L155" class="ln">   155</span>		MOVW	$0x5A827999, Rconst
+<span id="L156" class="ln">   156</span>		MOVW	$3, Rctr
+<span id="L157" class="ln">   157</span>	loop1:	ROUND1(Ra, Rb, Rc, Rd, Re)
+<span id="L158" class="ln">   158</span>		ROUND1(Re, Ra, Rb, Rc, Rd)
+<span id="L159" class="ln">   159</span>		ROUND1(Rd, Re, Ra, Rb, Rc)
+<span id="L160" class="ln">   160</span>		ROUND1(Rc, Rd, Re, Ra, Rb)
+<span id="L161" class="ln">   161</span>		ROUND1(Rb, Rc, Rd, Re, Ra)
+<span id="L162" class="ln">   162</span>		SUB.S	$1, Rctr
+<span id="L163" class="ln">   163</span>		BNE	loop1
+<span id="L164" class="ln">   164</span>	
+<span id="L165" class="ln">   165</span>		ROUND1(Ra, Rb, Rc, Rd, Re)
+<span id="L166" class="ln">   166</span>		ROUND1x(Re, Ra, Rb, Rc, Rd)
+<span id="L167" class="ln">   167</span>		ROUND1x(Rd, Re, Ra, Rb, Rc)
+<span id="L168" class="ln">   168</span>		ROUND1x(Rc, Rd, Re, Ra, Rb)
+<span id="L169" class="ln">   169</span>		ROUND1x(Rb, Rc, Rd, Re, Ra)
+<span id="L170" class="ln">   170</span>		
+<span id="L171" class="ln">   171</span>		MOVW	$0x6ED9EBA1, Rconst
+<span id="L172" class="ln">   172</span>		MOVW	$4, Rctr
+<span id="L173" class="ln">   173</span>	loop2:	ROUND2(Ra, Rb, Rc, Rd, Re)
+<span id="L174" class="ln">   174</span>		ROUND2(Re, Ra, Rb, Rc, Rd)
+<span id="L175" class="ln">   175</span>		ROUND2(Rd, Re, Ra, Rb, Rc)
+<span id="L176" class="ln">   176</span>		ROUND2(Rc, Rd, Re, Ra, Rb)
+<span id="L177" class="ln">   177</span>		ROUND2(Rb, Rc, Rd, Re, Ra)
+<span id="L178" class="ln">   178</span>		SUB.S	$1, Rctr
+<span id="L179" class="ln">   179</span>		BNE	loop2
+<span id="L180" class="ln">   180</span>		
+<span id="L181" class="ln">   181</span>		MOVW	$0x8F1BBCDC, Rconst
+<span id="L182" class="ln">   182</span>		MOVW	$4, Rctr
+<span id="L183" class="ln">   183</span>	loop3:	ROUND3(Ra, Rb, Rc, Rd, Re)
+<span id="L184" class="ln">   184</span>		ROUND3(Re, Ra, Rb, Rc, Rd)
+<span id="L185" class="ln">   185</span>		ROUND3(Rd, Re, Ra, Rb, Rc)
+<span id="L186" class="ln">   186</span>		ROUND3(Rc, Rd, Re, Ra, Rb)
+<span id="L187" class="ln">   187</span>		ROUND3(Rb, Rc, Rd, Re, Ra)
+<span id="L188" class="ln">   188</span>		SUB.S	$1, Rctr
+<span id="L189" class="ln">   189</span>		BNE	loop3
+<span id="L190" class="ln">   190</span>		
+<span id="L191" class="ln">   191</span>		MOVW	$0xCA62C1D6, Rconst
+<span id="L192" class="ln">   192</span>		MOVW	$4, Rctr
+<span id="L193" class="ln">   193</span>	loop4:	ROUND4(Ra, Rb, Rc, Rd, Re)
+<span id="L194" class="ln">   194</span>		ROUND4(Re, Ra, Rb, Rc, Rd)
+<span id="L195" class="ln">   195</span>		ROUND4(Rd, Re, Ra, Rb, Rc)
+<span id="L196" class="ln">   196</span>		ROUND4(Rc, Rd, Re, Ra, Rb)
+<span id="L197" class="ln">   197</span>		ROUND4(Rb, Rc, Rd, Re, Ra)
+<span id="L198" class="ln">   198</span>		SUB.S	$1, Rctr
+<span id="L199" class="ln">   199</span>		BNE	loop4
+<span id="L200" class="ln">   200</span>	
+<span id="L201" class="ln">   201</span>		// Accumulate - restoring registers from SP+4
+<span id="L202" class="ln">   202</span>		MOVM.IB (R13), [Rt0,Rt1,Rt2,Rctr,Rw]
+<span id="L203" class="ln">   203</span>		ADD	Rt0, Ra
+<span id="L204" class="ln">   204</span>		ADD	Rt1, Rb
+<span id="L205" class="ln">   205</span>		ADD	Rt2, Rc
+<span id="L206" class="ln">   206</span>		ADD	Rctr, Rd
+<span id="L207" class="ln">   207</span>		ADD	Rw, Re
+<span id="L208" class="ln">   208</span>	
+<span id="L209" class="ln">   209</span>		MOVW	p_end, Rt0
+<span id="L210" class="ln">   210</span>		CMP	Rt0, Rdata
+<span id="L211" class="ln">   211</span>		BLO	loop
+<span id="L212" class="ln">   212</span>	
+<span id="L213" class="ln">   213</span>		// Save final SHA-1 accumulator
+<span id="L214" class="ln">   214</span>		MOVW	dig+0(FP), Rt0
+<span id="L215" class="ln">   215</span>		MOVM.IA [Ra,Rb,Rc,Rd,Re], (Rt0)
+<span id="L216" class="ln">   216</span>	
+<span id="L217" class="ln">   217</span>		RET
+</pre><p><a href="sha1block_arm.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

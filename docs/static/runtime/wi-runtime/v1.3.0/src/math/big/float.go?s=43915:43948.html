@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/float.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./float.go%3Fs=43915:43948.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">float.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2014 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// This file implements multi-precision floating-point numbers.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// Like in the GNU MPFR library (http://www.mpfr.org/), operands</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">// can be of mixed precision. Unlike MPFR, the rounding mode is</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span><span class="comment">// not specified with each operation, but with each operand. The</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span><span class="comment">// rounding mode of the result operand determines the rounding</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span><span class="comment">// mode of an operation. This is a from-scratch implementation.</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>package big
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>import (
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;math&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;math/bits&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>)
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>const debugFloat = false <span class="comment">// enable for debugging</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span><span class="comment">// A nonzero finite Float represents a multi-precision floating point number</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span><span class="comment">//   sign × mantissa × 2**exponent</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span><span class="comment">// with 0.5 &lt;= mantissa &lt; 1.0, and MinExp &lt;= exponent &lt;= MaxExp.</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span><span class="comment">// A Float may also be zero (+0, -0) or infinite (+Inf, -Inf).</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span><span class="comment">// All Floats are ordered, and the ordering of two Floats x and y</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span><span class="comment">// is defined by x.Cmp(y).</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span><span class="comment">// Each Float value also has a precision, rounding mode, and accuracy.</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span><span class="comment">// The precision is the maximum number of mantissa bits available to</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span><span class="comment">// represent the value. The rounding mode specifies how a result should</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span><span class="comment">// be rounded to fit into the mantissa bits, and accuracy describes the</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span><span class="comment">// rounding error with respect to the exact result.</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span><span class="comment">// Unless specified otherwise, all operations (including setters) that</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span><span class="comment">// specify a *Float variable for the result (usually via the receiver</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span><span class="comment">// with the exception of MantExp), round the numeric result according</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span><span class="comment">// to the precision and rounding mode of the result variable.</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span><span class="comment">// If the provided result precision is 0 (see below), it is set to the</span>
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span><span class="comment">// precision of the argument with the largest precision value before any</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span><span class="comment">// rounding takes place, and the rounding mode remains unchanged. Thus,</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span><span class="comment">// uninitialized Floats provided as result arguments will have their</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span><span class="comment">// precision set to a reasonable value determined by the operands and</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span><span class="comment">// their mode is the zero value for RoundingMode (ToNearestEven).</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span><span class="comment">// By setting the desired precision to 24 or 53 and using matching rounding</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span><span class="comment">// mode (typically ToNearestEven), Float operations produce the same results</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span><span class="comment">// as the corresponding float32 or float64 IEEE-754 arithmetic for operands</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span><span class="comment">// that correspond to normal (i.e., not denormal) float32 or float64 numbers.</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span><span class="comment">// Exponent underflow and overflow lead to a 0 or an Infinity for different</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span><span class="comment">// values than IEEE-754 because Float exponents have a much larger range.</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span><span class="comment">// The zero (uninitialized) value for a Float is ready to use and represents</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span><span class="comment">// the number +0.0 exactly, with precision 0 and rounding mode ToNearestEven.</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>type Float struct {
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	prec uint32
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	mode RoundingMode
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	acc  Accuracy
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	form form
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	neg  bool
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>	mant nat
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>	exp  int32
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>}
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span><span class="comment">// An ErrNaN panic is raised by a Float operation that would lead to</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span><span class="comment">// a NaN under IEEE-754 rules. An ErrNaN implements the error interface.</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>type ErrNaN struct {
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	msg string
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>}
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>func (err ErrNaN) Error() string {
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	return err.msg
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>}
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span><span class="comment">// NewFloat allocates and returns a new Float set to x,</span>
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span><span class="comment">// with precision 53 and rounding mode ToNearestEven.</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span><span class="comment">// NewFloat panics with ErrNaN if x is a NaN.</span>
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>func NewFloat(x float64) *Float {
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	if math.IsNaN(x) {
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>		panic(ErrNaN{&#34;NewFloat(NaN)&#34;})
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	}
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	return new(Float).SetFloat64(x)
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>}
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span><span class="comment">// Exponent and precision limits.</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>const (
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	MaxExp  = math.MaxInt32  <span class="comment">// largest supported exponent</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	MinExp  = math.MinInt32  <span class="comment">// smallest supported exponent</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	MaxPrec = math.MaxUint32 <span class="comment">// largest (theoretically) supported precision; likely memory-limited</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>)
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span><span class="comment">// Internal representation: The mantissa bits x.mant of a nonzero finite</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span><span class="comment">// Float x are stored in a nat slice long enough to hold up to x.prec bits;</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span><span class="comment">// the slice may (but doesn&#39;t have to) be shorter if the mantissa contains</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span><span class="comment">// trailing 0 bits. x.mant is normalized if the msb of x.mant == 1 (i.e.,</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span><span class="comment">// the msb is shifted all the way &#34;to the left&#34;). Thus, if the mantissa has</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span><span class="comment">// trailing 0 bits or x.prec is not a multiple of the Word size _W,</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span><span class="comment">// x.mant[0] has trailing zero bits. The msb of the mantissa corresponds</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span><span class="comment">// to the value 0.5; the exponent x.exp shifts the binary point as needed.</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span><span class="comment">// A zero or non-finite Float x ignores x.mant and x.exp.</span>
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span><span class="comment">// x                 form      neg      mant         exp</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span><span class="comment">// ----------------------------------------------------------</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span><span class="comment">// ±0                zero      sign     -            -</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span><span class="comment">// 0 &lt; |x| &lt; +Inf    finite    sign     mantissa     exponent</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span><span class="comment">// ±Inf              inf       sign     -            -</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span><span class="comment">// A form value describes the internal representation.</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>type form byte
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span><span class="comment">// The form value order is relevant - do not change!</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>const (
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	zero form = iota
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	finite
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	inf
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>)
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span><span class="comment">// RoundingMode determines how a Float value is rounded to the</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span><span class="comment">// desired precision. Rounding may change the Float value; the</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span><span class="comment">// rounding error is described by the Float&#39;s Accuracy.</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>type RoundingMode byte
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span><span class="comment">// These constants define supported rounding modes.</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>const (
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	ToNearestEven RoundingMode = iota <span class="comment">// == IEEE 754-2008 roundTiesToEven</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	ToNearestAway                     <span class="comment">// == IEEE 754-2008 roundTiesToAway</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	ToZero                            <span class="comment">// == IEEE 754-2008 roundTowardZero</span>
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	AwayFromZero                      <span class="comment">// no IEEE 754-2008 equivalent</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	ToNegativeInf                     <span class="comment">// == IEEE 754-2008 roundTowardNegative</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	ToPositiveInf                     <span class="comment">// == IEEE 754-2008 roundTowardPositive</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span><span class="comment">//go:generate stringer -type=RoundingMode</span>
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span><span class="comment">// Accuracy describes the rounding error produced by the most recent</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span><span class="comment">// operation that generated a Float value, relative to the exact value.</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>type Accuracy int8
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span><span class="comment">// Constants describing the Accuracy of a Float.</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>const (
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	Below Accuracy = -1
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>	Exact Accuracy = 0
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	Above Accuracy = +1
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>)
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span><span class="comment">//go:generate stringer -type=Accuracy</span>
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span><span class="comment">// SetPrec sets z&#39;s precision to prec and returns the (possibly) rounded</span>
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span><span class="comment">// value of z. Rounding occurs according to z&#39;s rounding mode if the mantissa</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span><span class="comment">// cannot be represented in prec bits without loss of precision.</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span><span class="comment">// SetPrec(0) maps all finite values to ±0; infinite values remain unchanged.</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span><span class="comment">// If prec &gt; MaxPrec, it is set to MaxPrec.</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>func (z *Float) SetPrec(prec uint) *Float {
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	z.acc = Exact <span class="comment">// optimistically assume no rounding is needed</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	<span class="comment">// special case</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	if prec == 0 {
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		z.prec = 0
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>		if z.form == finite {
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>			<span class="comment">// truncate z to 0</span>
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>			z.acc = makeAcc(z.neg)
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>			z.form = zero
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		}
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>		return z
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	}
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	<span class="comment">// general case</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	if prec &gt; MaxPrec {
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		prec = MaxPrec
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>	}
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>	old := z.prec
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	z.prec = uint32(prec)
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	if z.prec &lt; old {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		z.round(0)
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	}
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	return z
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>func makeAcc(above bool) Accuracy {
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>	if above {
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		return Above
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	}
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	return Below
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>}
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span><span class="comment">// SetMode sets z&#39;s rounding mode to mode and returns an exact z.</span>
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span><span class="comment">// z remains unchanged otherwise.</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span><span class="comment">// z.SetMode(z.Mode()) is a cheap way to set z&#39;s accuracy to Exact.</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>func (z *Float) SetMode(mode RoundingMode) *Float {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	z.mode = mode
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	return z
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>}
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span><span class="comment">// Prec returns the mantissa precision of x in bits.</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span><span class="comment">// The result may be 0 for |x| == 0 and |x| == Inf.</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>func (x *Float) Prec() uint {
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	return uint(x.prec)
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>}
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span><span class="comment">// MinPrec returns the minimum precision required to represent x exactly</span>
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span><span class="comment">// (i.e., the smallest prec before x.SetPrec(prec) would start rounding x).</span>
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span><span class="comment">// The result is 0 for |x| == 0 and |x| == Inf.</span>
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>func (x *Float) MinPrec() uint {
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	if x.form != finite {
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>		return 0
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	}
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	return uint(len(x.mant))*_W - x.mant.trailingZeroBits()
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>}
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span><span class="comment">// Mode returns the rounding mode of x.</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>func (x *Float) Mode() RoundingMode {
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	return x.mode
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>}
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span><span class="comment">// Acc returns the accuracy of x produced by the most recent operation.</span>
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>func (x *Float) Acc() Accuracy {
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	return x.acc
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>}
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span><span class="comment">// Sign returns:</span>
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span><span class="comment">//	-1 if x &lt;   0</span>
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span><span class="comment">//	 0 if x is ±0</span>
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span><span class="comment">//	+1 if x &gt;   0</span>
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>func (x *Float) Sign() int {
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>		x.validate()
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	}
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	if x.form == zero {
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>		return 0
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	}
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>		return -1
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	}
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>	return 1
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>}
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span><span class="comment">// MantExp breaks x into its mantissa and exponent components</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span><span class="comment">// and returns the exponent. If a non-nil mant argument is</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span><span class="comment">// provided its value is set to the mantissa of x, with the</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span><span class="comment">// same precision and rounding mode as x. The components</span>
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span><span class="comment">// satisfy x == mant × 2**exp, with 0.5 &lt;= |mant| &lt; 1.0.</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span><span class="comment">// Calling MantExp with a nil argument is an efficient way to</span>
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span><span class="comment">// get the exponent of the receiver.</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span><span class="comment">// Special cases are:</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span><span class="comment">//	(  ±0).MantExp(mant) = 0, with mant set to   ±0</span>
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span><span class="comment">//	(±Inf).MantExp(mant) = 0, with mant set to ±Inf</span>
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span><span class="comment">// x and mant may be the same in which case x is set to its</span>
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span><span class="comment">// mantissa value.</span>
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>func (x *Float) MantExp(mant *Float) (exp int) {
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>		x.validate()
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>	}
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	if x.form == finite {
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>		exp = int(x.exp)
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	}
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>	if mant != nil {
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>		mant.Copy(x)
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>		if mant.form == finite {
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>			mant.exp = 0
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		}
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	}
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	return
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>}
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>func (z *Float) setExpAndRound(exp int64, sbit uint) {
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	if exp &lt; MinExp {
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		<span class="comment">// underflow</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>		z.acc = makeAcc(z.neg)
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>		return
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	}
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	if exp &gt; MaxExp {
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>		<span class="comment">// overflow</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>		z.acc = makeAcc(!z.neg)
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		z.form = inf
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>		return
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>	}
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>	z.form = finite
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>	z.exp = int32(exp)
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	z.round(sbit)
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>}
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span><span class="comment">// SetMantExp sets z to mant × 2**exp and and returns z.</span>
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span><span class="comment">// The result z has the same precision and rounding mode</span>
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span><span class="comment">// as mant. SetMantExp is an inverse of MantExp but does</span>
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span><span class="comment">// not require 0.5 &lt;= |mant| &lt; 1.0. Specifically:</span>
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span><span class="comment">//	mant := new(Float)</span>
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span><span class="comment">//	new(Float).SetMantExp(mant, x.MantExp(mant)).Cmp(x) == 0</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span><span class="comment">// Special cases are:</span>
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span><span class="comment">//	z.SetMantExp(  ±0, exp) =   ±0</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span><span class="comment">//	z.SetMantExp(±Inf, exp) = ±Inf</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span><span class="comment">// z and mant may be the same in which case z&#39;s exponent</span>
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span><span class="comment">// is set to exp.</span>
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>func (z *Float) SetMantExp(mant *Float, exp int) *Float {
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		z.validate()
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		mant.validate()
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	}
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>	z.Copy(mant)
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	if z.form != finite {
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		return z
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>	}
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>	z.setExpAndRound(int64(z.exp)+int64(exp), 0)
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	return z
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>}
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span><span class="comment">// Signbit returns true if x is negative or negative zero.</span>
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>func (x *Float) Signbit() bool {
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	return x.neg
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>}
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span><span class="comment">// IsInf reports whether x is +Inf or -Inf.</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>func (x *Float) IsInf() bool {
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	return x.form == inf
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>}
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span><span class="comment">// IsInt reports whether x is an integer.</span>
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span><span class="comment">// ±Inf values are not integers.</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>func (x *Float) IsInt() bool {
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		x.validate()
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	}
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	<span class="comment">// special cases</span>
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	if x.form != finite {
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>		return x.form == zero
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	}
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>	<span class="comment">// x.form == finite</span>
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	if x.exp &lt;= 0 {
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>		return false
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	}
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	<span class="comment">// x.exp &gt; 0</span>
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>	return x.prec &lt;= uint32(x.exp) || x.MinPrec() &lt;= uint(x.exp) <span class="comment">// not enough bits for fractional mantissa</span>
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>}
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span><span class="comment">// debugging support</span>
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>func (x *Float) validate() {
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>	if !debugFloat {
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>		<span class="comment">// avoid performance bugs</span>
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>		panic(&#34;validate called but debugFloat is not set&#34;)
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	}
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	if x.form != finite {
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>		return
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	}
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	m := len(x.mant)
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	if m == 0 {
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		panic(&#34;nonzero finite number with empty mantissa&#34;)
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	}
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	const msb = 1 &lt;&lt; (_W - 1)
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>	if x.mant[m-1]&amp;msb == 0 {
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>		panic(fmt.Sprintf(&#34;msb not set in last word %#x of %s&#34;, x.mant[m-1], x.Text(&#39;p&#39;, 0)))
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	}
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	if x.prec == 0 {
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>		panic(&#34;zero precision finite number&#34;)
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>	}
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>}
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span><span class="comment">// round rounds z according to z.mode to z.prec bits and sets z.acc accordingly.</span>
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span><span class="comment">// sbit must be 0 or 1 and summarizes any &#34;sticky bit&#34; information one might</span>
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span><span class="comment">// have before calling round. z&#39;s mantissa must be normalized (with the msb set)</span>
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span><span class="comment">// or empty.</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span><span class="comment">// CAUTION: The rounding modes ToNegativeInf, ToPositiveInf are affected by the</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span><span class="comment">// sign of z. For correct rounding, the sign of z must be set correctly before</span>
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span><span class="comment">// calling round.</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>func (z *Float) round(sbit uint) {
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		z.validate()
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>	}
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	if z.form != finite {
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>		<span class="comment">// ±0 or ±Inf =&gt; nothing left to do</span>
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>		return
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>	}
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	<span class="comment">// z.form == finite &amp;&amp; len(z.mant) &gt; 0</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>	<span class="comment">// m &gt; 0 implies z.prec &gt; 0 (checked by validate)</span>
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>	m := uint32(len(z.mant)) <span class="comment">// present mantissa length in words</span>
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>	bits := m * _W           <span class="comment">// present mantissa bits; bits &gt; 0</span>
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>	if bits &lt;= z.prec {
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>		<span class="comment">// mantissa fits =&gt; nothing to do</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>		return
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	}
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>	<span class="comment">// bits &gt; z.prec</span>
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>	<span class="comment">// Rounding is based on two bits: the rounding bit (rbit) and the</span>
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>	<span class="comment">// sticky bit (sbit). The rbit is the bit immediately before the</span>
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>	<span class="comment">// z.prec leading mantissa bits (the &#34;0.5&#34;). The sbit is set if any</span>
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>	<span class="comment">// of the bits before the rbit are set (the &#34;0.25&#34;, &#34;0.125&#34;, etc.):</span>
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>	<span class="comment">//   rbit  sbit  =&gt; &#34;fractional part&#34;</span>
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>	<span class="comment">//   0     0        == 0</span>
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>	<span class="comment">//   0     1        &gt;  0  , &lt; 0.5</span>
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	<span class="comment">//   1     0        == 0.5</span>
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>	<span class="comment">//   1     1        &gt;  0.5, &lt; 1.0</span>
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>	<span class="comment">// bits &gt; z.prec: mantissa too large =&gt; round</span>
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>	r := uint(bits - z.prec - 1) <span class="comment">// rounding bit position; r &gt;= 0</span>
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>	rbit := z.mant.bit(r) &amp; 1    <span class="comment">// rounding bit; be safe and ensure it&#39;s a single bit</span>
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>	if sbit == 0 {
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>		<span class="comment">// TODO(gri) if rbit != 0 we don&#39;t need to compute sbit for some rounding modes (optimization)</span>
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>		sbit = z.mant.sticky(r)
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>	}
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	sbit &amp;= 1 <span class="comment">// be safe and ensure it&#39;s a single bit</span>
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	<span class="comment">// cut off extra words</span>
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>	n := (z.prec + (_W - 1)) / _W <span class="comment">// mantissa length in words for desired precision</span>
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>	if m &gt; n {
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>		copy(z.mant, z.mant[m-n:]) <span class="comment">// move n last words to front</span>
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>		z.mant = z.mant[:n]
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>	}
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>	<span class="comment">// determine number of trailing zero bits (ntz) and compute lsb mask of mantissa&#39;s least-significant word</span>
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>	ntz := n*_W - z.prec <span class="comment">// 0 &lt;= ntz &lt; _W</span>
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	lsb := Word(1) &lt;&lt; ntz
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	<span class="comment">// round if result is inexact</span>
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>	if rbit|sbit != 0 {
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>		<span class="comment">// Make rounding decision: The result mantissa is truncated (&#34;rounded down&#34;)</span>
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>		<span class="comment">// by default. Decide if we need to increment, or &#34;round up&#34;, the (unsigned)</span>
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>		<span class="comment">// mantissa.</span>
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>		inc := false
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>		switch z.mode {
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		case ToNegativeInf:
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>			inc = z.neg
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>		case ToZero:
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>			<span class="comment">// nothing to do</span>
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>		case ToNearestEven:
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>			inc = rbit != 0 &amp;&amp; (sbit != 0 || z.mant[0]&amp;lsb != 0)
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>		case ToNearestAway:
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>			inc = rbit != 0
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>		case AwayFromZero:
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>			inc = true
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>		case ToPositiveInf:
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>			inc = !z.neg
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>		default:
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>			panic(&#34;unreachable&#34;)
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>		}
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>		<span class="comment">// A positive result (!z.neg) is Above the exact result if we increment,</span>
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>		<span class="comment">// and it&#39;s Below if we truncate (Exact results require no rounding).</span>
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>		<span class="comment">// For a negative result (z.neg) it is exactly the opposite.</span>
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>		z.acc = makeAcc(inc != z.neg)
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>		if inc {
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>			<span class="comment">// add 1 to mantissa</span>
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>			if addVW(z.mant, z.mant, lsb) != 0 {
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>				<span class="comment">// mantissa overflow =&gt; adjust exponent</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>				if z.exp &gt;= MaxExp {
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>					<span class="comment">// exponent overflow</span>
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>					z.form = inf
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>					return
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>				}
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>				z.exp++
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>				<span class="comment">// adjust mantissa: divide by 2 to compensate for exponent adjustment</span>
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>				shrVU(z.mant, z.mant, 1)
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>				<span class="comment">// set msb == carry == 1 from the mantissa overflow above</span>
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>				const msb = 1 &lt;&lt; (_W - 1)
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>				z.mant[n-1] |= msb
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>			}
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>		}
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	}
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>	<span class="comment">// zero out trailing bits in least-significant word</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>	z.mant[0] &amp;^= lsb - 1
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		z.validate()
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>	}
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>}
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>func (z *Float) setBits64(neg bool, x uint64) *Float {
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>	if z.prec == 0 {
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>		z.prec = 64
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>	}
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>	z.neg = neg
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>	if x == 0 {
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>		return z
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>	}
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>	<span class="comment">// x != 0</span>
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>	z.form = finite
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>	s := bits.LeadingZeros64(x)
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>	z.mant = z.mant.setUint64(x &lt;&lt; uint(s))
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>	z.exp = int32(64 - s) <span class="comment">// always fits</span>
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>	if z.prec &lt; 64 {
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>		z.round(0)
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>	}
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>	return z
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>}
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span><span class="comment">// SetUint64 sets z to the (possibly rounded) value of x and returns z.</span>
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span><span class="comment">// If z&#39;s precision is 0, it is changed to 64 (and rounding will have</span>
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span><span class="comment">// no effect).</span>
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>func (z *Float) SetUint64(x uint64) *Float {
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>	return z.setBits64(false, x)
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>}
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span><span class="comment">// SetInt64 sets z to the (possibly rounded) value of x and returns z.</span>
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span><span class="comment">// If z&#39;s precision is 0, it is changed to 64 (and rounding will have</span>
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span><span class="comment">// no effect).</span>
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>func (z *Float) SetInt64(x int64) *Float {
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>	u := x
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>	if u &lt; 0 {
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>		u = -u
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>	}
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>	<span class="comment">// We cannot simply call z.SetUint64(uint64(u)) and change</span>
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>	<span class="comment">// the sign afterwards because the sign affects rounding.</span>
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>	return z.setBits64(x &lt; 0, uint64(u))
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>}
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span><span class="comment">// SetFloat64 sets z to the (possibly rounded) value of x and returns z.</span>
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span><span class="comment">// If z&#39;s precision is 0, it is changed to 53 (and rounding will have</span>
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span><span class="comment">// no effect). SetFloat64 panics with ErrNaN if x is a NaN.</span>
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>func (z *Float) SetFloat64(x float64) *Float {
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>	if z.prec == 0 {
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>		z.prec = 53
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>	}
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>	if math.IsNaN(x) {
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>		panic(ErrNaN{&#34;Float.SetFloat64(NaN)&#34;})
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	}
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>	z.neg = math.Signbit(x) <span class="comment">// handle -0, -Inf correctly</span>
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	if x == 0 {
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>		return z
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>	}
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>	if math.IsInf(x, 0) {
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>		z.form = inf
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>		return z
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>	}
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>	<span class="comment">// normalized x != 0</span>
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>	z.form = finite
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>	fmant, exp := math.Frexp(x) <span class="comment">// get normalized mantissa</span>
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>	z.mant = z.mant.setUint64(1&lt;&lt;63 | math.Float64bits(fmant)&lt;&lt;11)
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>	z.exp = int32(exp) <span class="comment">// always fits</span>
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>	if z.prec &lt; 53 {
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>		z.round(0)
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>	}
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>	return z
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>}
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span><span class="comment">// fnorm normalizes mantissa m by shifting it to the left</span>
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span><span class="comment">// such that the msb of the most-significant word (msw) is 1.</span>
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span><span class="comment">// It returns the shift amount. It assumes that len(m) != 0.</span>
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>func fnorm(m nat) int64 {
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>	if debugFloat &amp;&amp; (len(m) == 0 || m[len(m)-1] == 0) {
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>		panic(&#34;msw of mantissa is 0&#34;)
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>	}
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>	s := nlz(m[len(m)-1])
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>	if s &gt; 0 {
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>		c := shlVU(m, m, s)
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>		if debugFloat &amp;&amp; c != 0 {
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>			panic(&#34;nlz or shlVU incorrect&#34;)
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		}
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>	}
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>	return int64(s)
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>}
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span><span class="comment">// SetInt sets z to the (possibly rounded) value of x and returns z.</span>
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span><span class="comment">// If z&#39;s precision is 0, it is changed to the larger of x.BitLen()</span>
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span><span class="comment">// or 64 (and rounding will have no effect).</span>
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>func (z *Float) SetInt(x *Int) *Float {
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri) can be more efficient if z.prec &gt; 0</span>
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>	<span class="comment">// but small compared to the size of x, or if there</span>
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>	<span class="comment">// are many trailing 0&#39;s.</span>
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>	bits := uint32(x.BitLen())
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>	if z.prec == 0 {
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>		z.prec = umax32(bits, 64)
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>	}
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>	z.neg = x.neg
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>	if len(x.abs) == 0 {
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>		return z
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>	}
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>	<span class="comment">// x != 0</span>
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>	z.mant = z.mant.set(x.abs)
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>	fnorm(z.mant)
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>	z.setExpAndRound(int64(bits), 0)
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>	return z
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>}
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span><span class="comment">// SetRat sets z to the (possibly rounded) value of x and returns z.</span>
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span><span class="comment">// If z&#39;s precision is 0, it is changed to the largest of a.BitLen(),</span>
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span><span class="comment">// b.BitLen(), or 64; with x = a/b.</span>
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>func (z *Float) SetRat(x *Rat) *Float {
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>	if x.IsInt() {
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>		return z.SetInt(x.Num())
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>	}
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>	var a, b Float
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>	a.SetInt(x.Num())
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>	b.SetInt(x.Denom())
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>	if z.prec == 0 {
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>		z.prec = umax32(a.prec, b.prec)
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>	}
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>	return z.Quo(&amp;a, &amp;b)
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>}
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span><span class="comment">// SetInf sets z to the infinite Float -Inf if signbit is</span>
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span><span class="comment">// set, or +Inf if signbit is not set, and returns z. The</span>
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span><span class="comment">// precision of z is unchanged and the result is always</span>
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span><span class="comment">// Exact.</span>
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>func (z *Float) SetInf(signbit bool) *Float {
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>	z.form = inf
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>	z.neg = signbit
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>	return z
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>}
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span><span class="comment">// Set sets z to the (possibly rounded) value of x and returns z.</span>
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span><span class="comment">// If z&#39;s precision is 0, it is changed to the precision of x</span>
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span><span class="comment">// before setting z (and rounding will have no effect).</span>
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span><span class="comment">// Rounding is performed according to z&#39;s precision and rounding</span>
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span><span class="comment">// mode; and z&#39;s accuracy reports the result error relative to the</span>
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span><span class="comment">// exact (not rounded) result.</span>
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>func (z *Float) Set(x *Float) *Float {
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>		x.validate()
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>	}
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>	if z != x {
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>		z.form = x.form
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>		z.neg = x.neg
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>		if x.form == finite {
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>			z.exp = x.exp
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>			z.mant = z.mant.set(x.mant)
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>		}
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>		if z.prec == 0 {
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>			z.prec = x.prec
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>		} else if z.prec &lt; x.prec {
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>			z.round(0)
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>		}
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>	}
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	return z
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>}
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span><span class="comment">// Copy sets z to x, with the same precision, rounding mode, and</span>
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span><span class="comment">// accuracy as x, and returns z. x is not changed even if z and</span>
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span><span class="comment">// x are the same.</span>
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>func (z *Float) Copy(x *Float) *Float {
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>		x.validate()
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>	}
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>	if z != x {
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>		z.prec = x.prec
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>		z.mode = x.mode
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>		z.acc = x.acc
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>		z.form = x.form
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>		z.neg = x.neg
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>		if z.form == finite {
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>			z.mant = z.mant.set(x.mant)
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>			z.exp = x.exp
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>		}
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	}
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>	return z
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>}
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span><span class="comment">// msb32 returns the 32 most significant bits of x.</span>
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>func msb32(x nat) uint32 {
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>	i := len(x) - 1
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>	if i &lt; 0 {
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>		return 0
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>	}
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>	if debugFloat &amp;&amp; x[i]&amp;(1&lt;&lt;(_W-1)) == 0 {
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>		panic(&#34;x not normalized&#34;)
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>	}
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>	switch _W {
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	case 32:
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>		return uint32(x[i])
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>	case 64:
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>		return uint32(x[i] &gt;&gt; 32)
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>	}
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>	panic(&#34;unreachable&#34;)
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>}
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span><span class="comment">// msb64 returns the 64 most significant bits of x.</span>
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>func msb64(x nat) uint64 {
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>	i := len(x) - 1
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>	if i &lt; 0 {
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>		return 0
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>	}
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>	if debugFloat &amp;&amp; x[i]&amp;(1&lt;&lt;(_W-1)) == 0 {
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>		panic(&#34;x not normalized&#34;)
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>	}
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>	switch _W {
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>	case 32:
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>		v := uint64(x[i]) &lt;&lt; 32
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>		if i &gt; 0 {
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>			v |= uint64(x[i-1])
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>		}
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>		return v
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>	case 64:
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>		return uint64(x[i])
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>	}
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>	panic(&#34;unreachable&#34;)
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>}
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span><span class="comment">// Uint64 returns the unsigned integer resulting from truncating x</span>
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span><span class="comment">// towards zero. If 0 &lt;= x &lt;= math.MaxUint64, the result is Exact</span>
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span><span class="comment">// if x is an integer and Below otherwise.</span>
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span><span class="comment">// The result is (0, Above) for x &lt; 0, and (math.MaxUint64, Below)</span>
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span><span class="comment">// for x &gt; math.MaxUint64.</span>
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>func (x *Float) Uint64() (uint64, Accuracy) {
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>		x.validate()
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>	}
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>	switch x.form {
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>	case finite:
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>			return 0, Above
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>		}
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>		<span class="comment">// 0 &lt; x &lt; +Inf</span>
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>		if x.exp &lt;= 0 {
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>			<span class="comment">// 0 &lt; x &lt; 1</span>
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>			return 0, Below
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>		}
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>		<span class="comment">// 1 &lt;= x &lt; Inf</span>
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>		if x.exp &lt;= 64 {
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>			<span class="comment">// u = trunc(x) fits into a uint64</span>
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>			u := msb64(x.mant) &gt;&gt; (64 - uint32(x.exp))
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>			if x.MinPrec() &lt;= 64 {
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>				return u, Exact
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>			}
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>			return u, Below <span class="comment">// x truncated</span>
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>		}
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>		<span class="comment">// x too large</span>
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>		return math.MaxUint64, Below
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>	case zero:
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>		return 0, Exact
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>	case inf:
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>			return 0, Above
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>		}
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>		return math.MaxUint64, Below
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>	}
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>	panic(&#34;unreachable&#34;)
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>}
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span><span class="comment">// Int64 returns the integer resulting from truncating x towards zero.</span>
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span><span class="comment">// If math.MinInt64 &lt;= x &lt;= math.MaxInt64, the result is Exact if x is</span>
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span><span class="comment">// an integer, and Above (x &lt; 0) or Below (x &gt; 0) otherwise.</span>
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span><span class="comment">// The result is (math.MinInt64, Above) for x &lt; math.MinInt64,</span>
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span><span class="comment">// and (math.MaxInt64, Below) for x &gt; math.MaxInt64.</span>
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>func (x *Float) Int64() (int64, Accuracy) {
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>		x.validate()
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>	}
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>	switch x.form {
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>	case finite:
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>		<span class="comment">// 0 &lt; |x| &lt; +Inf</span>
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>		acc := makeAcc(x.neg)
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>		if x.exp &lt;= 0 {
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>			<span class="comment">// 0 &lt; |x| &lt; 1</span>
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>			return 0, acc
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>		}
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>		<span class="comment">// x.exp &gt; 0</span>
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>		<span class="comment">// 1 &lt;= |x| &lt; +Inf</span>
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>		if x.exp &lt;= 63 {
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>			<span class="comment">// i = trunc(x) fits into an int64 (excluding math.MinInt64)</span>
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>			i := int64(msb64(x.mant) &gt;&gt; (64 - uint32(x.exp)))
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>			if x.neg {
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>				i = -i
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>			}
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>			if x.MinPrec() &lt;= uint(x.exp) {
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>				return i, Exact
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>			}
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>			return i, acc <span class="comment">// x truncated</span>
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>		}
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>			<span class="comment">// check for special case x == math.MinInt64 (i.e., x == -(0.5 &lt;&lt; 64))</span>
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>			if x.exp == 64 &amp;&amp; x.MinPrec() == 1 {
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>				acc = Exact
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>			}
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>			return math.MinInt64, acc
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>		}
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>		<span class="comment">// x too large</span>
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>		return math.MaxInt64, Below
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>	case zero:
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>		return 0, Exact
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>	case inf:
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>			return math.MinInt64, Above
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>		}
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>		return math.MaxInt64, Below
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>	}
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>	panic(&#34;unreachable&#34;)
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>}
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span><span class="comment">// Float32 returns the float32 value nearest to x. If x is too small to be</span>
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span><span class="comment">// represented by a float32 (|x| &lt; math.SmallestNonzeroFloat32), the result</span>
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span><span class="comment">// is (0, Below) or (-0, Above), respectively, depending on the sign of x.</span>
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span><span class="comment">// If x is too large to be represented by a float32 (|x| &gt; math.MaxFloat32),</span>
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span><span class="comment">// the result is (+Inf, Above) or (-Inf, Below), depending on the sign of x.</span>
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>func (x *Float) Float32() (float32, Accuracy) {
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>		x.validate()
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>	}
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>	switch x.form {
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>	case finite:
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>		<span class="comment">// 0 &lt; |x| &lt; +Inf</span>
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>		const (
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>			fbits = 32                <span class="comment">//        float size</span>
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>			mbits = 23                <span class="comment">//        mantissa size (excluding implicit msb)</span>
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>			ebits = fbits - mbits - 1 <span class="comment">//     8  exponent size</span>
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>			bias  = 1&lt;&lt;(ebits-1) - 1  <span class="comment">//   127  exponent bias</span>
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>			dmin  = 1 - bias - mbits  <span class="comment">//  -149  smallest unbiased exponent (denormal)</span>
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>			emin  = 1 - bias          <span class="comment">//  -126  smallest unbiased exponent (normal)</span>
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>			emax  = bias              <span class="comment">//   127  largest unbiased exponent (normal)</span>
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>		)
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>		<span class="comment">// Float mantissa m is 0.5 &lt;= m &lt; 1.0; compute exponent e for float32 mantissa.</span>
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>		e := x.exp - 1 <span class="comment">// exponent for normal mantissa m with 1.0 &lt;= m &lt; 2.0</span>
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>		<span class="comment">// Compute precision p for float32 mantissa.</span>
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>		<span class="comment">// If the exponent is too small, we have a denormal number before</span>
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>		<span class="comment">// rounding and fewer than p mantissa bits of precision available</span>
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>		<span class="comment">// (the exponent remains fixed but the mantissa gets shifted right).</span>
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>		p := mbits + 1 <span class="comment">// precision of normal float</span>
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>		if e &lt; emin {
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>			<span class="comment">// recompute precision</span>
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>			p = mbits + 1 - emin + int(e)
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>			<span class="comment">// If p == 0, the mantissa of x is shifted so much to the right</span>
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>			<span class="comment">// that its msb falls immediately to the right of the float32</span>
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>			<span class="comment">// mantissa space. In other words, if the smallest denormal is</span>
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>			<span class="comment">// considered &#34;1.0&#34;, for p == 0, the mantissa value m is &gt;= 0.5.</span>
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>			<span class="comment">// If m &gt; 0.5, it is rounded up to 1.0; i.e., the smallest denormal.</span>
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>			<span class="comment">// If m == 0.5, it is rounded down to even, i.e., 0.0.</span>
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>			<span class="comment">// If p &lt; 0, the mantissa value m is &lt;= &#34;0.25&#34; which is never rounded up.</span>
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>			if p &lt; 0 <span class="comment">/* m &lt;= 0.25 */</span> || p == 0 &amp;&amp; x.mant.sticky(uint(len(x.mant))*_W-1) == 0 <span class="comment">/* m == 0.5 */</span> {
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>				<span class="comment">// underflow to ±0</span>
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>				if x.neg {
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>					var z float32
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>					return -z, Above
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>				}
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>				return 0.0, Below
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>			}
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>			<span class="comment">// otherwise, round up</span>
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>			<span class="comment">// We handle p == 0 explicitly because it&#39;s easy and because</span>
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>			<span class="comment">// Float.round doesn&#39;t support rounding to 0 bits of precision.</span>
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>			if p == 0 {
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>				if x.neg {
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>					return -math.SmallestNonzeroFloat32, Below
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>				}
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>				return math.SmallestNonzeroFloat32, Above
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>			}
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>		}
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>		<span class="comment">// p &gt; 0</span>
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>		<span class="comment">// round</span>
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>		var r Float
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span>		r.prec = uint32(p)
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>		r.Set(x)
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>		e = r.exp - 1
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>		<span class="comment">// Rounding may have caused r to overflow to ±Inf</span>
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>		<span class="comment">// (rounding never causes underflows to 0).</span>
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>		<span class="comment">// If the exponent is too large, also overflow to ±Inf.</span>
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>		if r.form == inf || e &gt; emax {
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>			<span class="comment">// overflow</span>
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>			if x.neg {
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>				return float32(math.Inf(-1)), Below
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>			}
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>			return float32(math.Inf(+1)), Above
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>		}
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>		<span class="comment">// e &lt;= emax</span>
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>		<span class="comment">// Determine sign, biased exponent, and mantissa.</span>
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>		var sign, bexp, mant uint32
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>			sign = 1 &lt;&lt; (fbits - 1)
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>		}
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>		<span class="comment">// Rounding may have caused a denormal number to</span>
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>		<span class="comment">// become normal. Check again.</span>
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>		if e &lt; emin {
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>			<span class="comment">// denormal number: recompute precision</span>
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>			<span class="comment">// Since rounding may have at best increased precision</span>
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>			<span class="comment">// and we have eliminated p &lt;= 0 early, we know p &gt; 0.</span>
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>			<span class="comment">// bexp == 0 for denormals</span>
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>			p = mbits + 1 - emin + int(e)
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>			mant = msb32(r.mant) &gt;&gt; uint(fbits-p)
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>		} else {
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>			<span class="comment">// normal number: emin &lt;= e &lt;= emax</span>
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>			bexp = uint32(e+bias) &lt;&lt; mbits
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>			mant = msb32(r.mant) &gt;&gt; ebits &amp; (1&lt;&lt;mbits - 1) <span class="comment">// cut off msb (implicit 1 bit)</span>
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>		}
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>		return math.Float32frombits(sign | bexp | mant), r.acc
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>	case zero:
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>			var z float32
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>			return -z, Exact
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>		}
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>		return 0.0, Exact
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>	case inf:
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>			return float32(math.Inf(-1)), Exact
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>		}
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>		return float32(math.Inf(+1)), Exact
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>	}
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>	panic(&#34;unreachable&#34;)
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>}
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span><span class="comment">// Float64 returns the float64 value nearest to x. If x is too small to be</span>
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span><span class="comment">// represented by a float64 (|x| &lt; math.SmallestNonzeroFloat64), the result</span>
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span><span class="comment">// is (0, Below) or (-0, Above), respectively, depending on the sign of x.</span>
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span><span class="comment">// If x is too large to be represented by a float64 (|x| &gt; math.MaxFloat64),</span>
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span><span class="comment">// the result is (+Inf, Above) or (-Inf, Below), depending on the sign of x.</span>
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>func (x *Float) Float64() (float64, Accuracy) {
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>		x.validate()
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>	}
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>	switch x.form {
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>	case finite:
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>		<span class="comment">// 0 &lt; |x| &lt; +Inf</span>
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>		const (
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>			fbits = 64                <span class="comment">//        float size</span>
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>			mbits = 52                <span class="comment">//        mantissa size (excluding implicit msb)</span>
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>			ebits = fbits - mbits - 1 <span class="comment">//    11  exponent size</span>
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>			bias  = 1&lt;&lt;(ebits-1) - 1  <span class="comment">//  1023  exponent bias</span>
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>			dmin  = 1 - bias - mbits  <span class="comment">// -1074  smallest unbiased exponent (denormal)</span>
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>			emin  = 1 - bias          <span class="comment">// -1022  smallest unbiased exponent (normal)</span>
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>			emax  = bias              <span class="comment">//  1023  largest unbiased exponent (normal)</span>
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>		)
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>		<span class="comment">// Float mantissa m is 0.5 &lt;= m &lt; 1.0; compute exponent e for float64 mantissa.</span>
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>		e := x.exp - 1 <span class="comment">// exponent for normal mantissa m with 1.0 &lt;= m &lt; 2.0</span>
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>		<span class="comment">// Compute precision p for float64 mantissa.</span>
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>		<span class="comment">// If the exponent is too small, we have a denormal number before</span>
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>		<span class="comment">// rounding and fewer than p mantissa bits of precision available</span>
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>		<span class="comment">// (the exponent remains fixed but the mantissa gets shifted right).</span>
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>		p := mbits + 1 <span class="comment">// precision of normal float</span>
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>		if e &lt; emin {
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>			<span class="comment">// recompute precision</span>
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>			p = mbits + 1 - emin + int(e)
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span>			<span class="comment">// If p == 0, the mantissa of x is shifted so much to the right</span>
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span>			<span class="comment">// that its msb falls immediately to the right of the float64</span>
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span>			<span class="comment">// mantissa space. In other words, if the smallest denormal is</span>
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span>			<span class="comment">// considered &#34;1.0&#34;, for p == 0, the mantissa value m is &gt;= 0.5.</span>
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span>			<span class="comment">// If m &gt; 0.5, it is rounded up to 1.0; i.e., the smallest denormal.</span>
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span>			<span class="comment">// If m == 0.5, it is rounded down to even, i.e., 0.0.</span>
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span>			<span class="comment">// If p &lt; 0, the mantissa value m is &lt;= &#34;0.25&#34; which is never rounded up.</span>
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span>			if p &lt; 0 <span class="comment">/* m &lt;= 0.25 */</span> || p == 0 &amp;&amp; x.mant.sticky(uint(len(x.mant))*_W-1) == 0 <span class="comment">/* m == 0.5 */</span> {
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span>				<span class="comment">// underflow to ±0</span>
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span>				if x.neg {
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span>					var z float64
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span>					return -z, Above
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span>				}
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span>				return 0.0, Below
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span>			}
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span>			<span class="comment">// otherwise, round up</span>
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span>			<span class="comment">// We handle p == 0 explicitly because it&#39;s easy and because</span>
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span>			<span class="comment">// Float.round doesn&#39;t support rounding to 0 bits of precision.</span>
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span>			if p == 0 {
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span>				if x.neg {
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span>					return -math.SmallestNonzeroFloat64, Below
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span>				}
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span>				return math.SmallestNonzeroFloat64, Above
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span>			}
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span>		}
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span>		<span class="comment">// p &gt; 0</span>
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span>
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span>		<span class="comment">// round</span>
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span>		var r Float
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span>		r.prec = uint32(p)
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span>		r.Set(x)
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span>		e = r.exp - 1
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span>
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span>		<span class="comment">// Rounding may have caused r to overflow to ±Inf</span>
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span>		<span class="comment">// (rounding never causes underflows to 0).</span>
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span>		<span class="comment">// If the exponent is too large, also overflow to ±Inf.</span>
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span>		if r.form == inf || e &gt; emax {
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span>			<span class="comment">// overflow</span>
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span>			if x.neg {
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span>				return math.Inf(-1), Below
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>			}
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>			return math.Inf(+1), Above
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span>		}
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span>		<span class="comment">// e &lt;= emax</span>
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>		<span class="comment">// Determine sign, biased exponent, and mantissa.</span>
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>		var sign, bexp, mant uint64
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>			sign = 1 &lt;&lt; (fbits - 1)
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>		}
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span>
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>		<span class="comment">// Rounding may have caused a denormal number to</span>
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>		<span class="comment">// become normal. Check again.</span>
+<span id="L1026" class="ln" data-content="  1026">&nbsp;&nbsp;</span>		if e &lt; emin {
+<span id="L1027" class="ln" data-content="  1027">&nbsp;&nbsp;</span>			<span class="comment">// denormal number: recompute precision</span>
+<span id="L1028" class="ln" data-content="  1028">&nbsp;&nbsp;</span>			<span class="comment">// Since rounding may have at best increased precision</span>
+<span id="L1029" class="ln" data-content="  1029">&nbsp;&nbsp;</span>			<span class="comment">// and we have eliminated p &lt;= 0 early, we know p &gt; 0.</span>
+<span id="L1030" class="ln" data-content="  1030">&nbsp;&nbsp;</span>			<span class="comment">// bexp == 0 for denormals</span>
+<span id="L1031" class="ln" data-content="  1031">&nbsp;&nbsp;</span>			p = mbits + 1 - emin + int(e)
+<span id="L1032" class="ln" data-content="  1032">&nbsp;&nbsp;</span>			mant = msb64(r.mant) &gt;&gt; uint(fbits-p)
+<span id="L1033" class="ln" data-content="  1033">&nbsp;&nbsp;</span>		} else {
+<span id="L1034" class="ln" data-content="  1034">&nbsp;&nbsp;</span>			<span class="comment">// normal number: emin &lt;= e &lt;= emax</span>
+<span id="L1035" class="ln" data-content="  1035">&nbsp;&nbsp;</span>			bexp = uint64(e+bias) &lt;&lt; mbits
+<span id="L1036" class="ln" data-content="  1036">&nbsp;&nbsp;</span>			mant = msb64(r.mant) &gt;&gt; ebits &amp; (1&lt;&lt;mbits - 1) <span class="comment">// cut off msb (implicit 1 bit)</span>
+<span id="L1037" class="ln" data-content="  1037">&nbsp;&nbsp;</span>		}
+<span id="L1038" class="ln" data-content="  1038">&nbsp;&nbsp;</span>
+<span id="L1039" class="ln" data-content="  1039">&nbsp;&nbsp;</span>		return math.Float64frombits(sign | bexp | mant), r.acc
+<span id="L1040" class="ln" data-content="  1040">&nbsp;&nbsp;</span>
+<span id="L1041" class="ln" data-content="  1041">&nbsp;&nbsp;</span>	case zero:
+<span id="L1042" class="ln" data-content="  1042">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L1043" class="ln" data-content="  1043">&nbsp;&nbsp;</span>			var z float64
+<span id="L1044" class="ln" data-content="  1044">&nbsp;&nbsp;</span>			return -z, Exact
+<span id="L1045" class="ln" data-content="  1045">&nbsp;&nbsp;</span>		}
+<span id="L1046" class="ln" data-content="  1046">&nbsp;&nbsp;</span>		return 0.0, Exact
+<span id="L1047" class="ln" data-content="  1047">&nbsp;&nbsp;</span>
+<span id="L1048" class="ln" data-content="  1048">&nbsp;&nbsp;</span>	case inf:
+<span id="L1049" class="ln" data-content="  1049">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L1050" class="ln" data-content="  1050">&nbsp;&nbsp;</span>			return math.Inf(-1), Exact
+<span id="L1051" class="ln" data-content="  1051">&nbsp;&nbsp;</span>		}
+<span id="L1052" class="ln" data-content="  1052">&nbsp;&nbsp;</span>		return math.Inf(+1), Exact
+<span id="L1053" class="ln" data-content="  1053">&nbsp;&nbsp;</span>	}
+<span id="L1054" class="ln" data-content="  1054">&nbsp;&nbsp;</span>
+<span id="L1055" class="ln" data-content="  1055">&nbsp;&nbsp;</span>	panic(&#34;unreachable&#34;)
+<span id="L1056" class="ln" data-content="  1056">&nbsp;&nbsp;</span>}
+<span id="L1057" class="ln" data-content="  1057">&nbsp;&nbsp;</span>
+<span id="L1058" class="ln" data-content="  1058">&nbsp;&nbsp;</span><span class="comment">// Int returns the result of truncating x towards zero;</span>
+<span id="L1059" class="ln" data-content="  1059">&nbsp;&nbsp;</span><span class="comment">// or nil if x is an infinity.</span>
+<span id="L1060" class="ln" data-content="  1060">&nbsp;&nbsp;</span><span class="comment">// The result is Exact if x.IsInt(); otherwise it is Below</span>
+<span id="L1061" class="ln" data-content="  1061">&nbsp;&nbsp;</span><span class="comment">// for x &gt; 0, and Above for x &lt; 0.</span>
+<span id="L1062" class="ln" data-content="  1062">&nbsp;&nbsp;</span><span class="comment">// If a non-nil *Int argument z is provided, Int stores</span>
+<span id="L1063" class="ln" data-content="  1063">&nbsp;&nbsp;</span><span class="comment">// the result in z instead of allocating a new Int.</span>
+<span id="L1064" class="ln" data-content="  1064">&nbsp;&nbsp;</span>func (x *Float) Int(z *Int) (*Int, Accuracy) {
+<span id="L1065" class="ln" data-content="  1065">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1066" class="ln" data-content="  1066">&nbsp;&nbsp;</span>		x.validate()
+<span id="L1067" class="ln" data-content="  1067">&nbsp;&nbsp;</span>	}
+<span id="L1068" class="ln" data-content="  1068">&nbsp;&nbsp;</span>
+<span id="L1069" class="ln" data-content="  1069">&nbsp;&nbsp;</span>	if z == nil &amp;&amp; x.form &lt;= finite {
+<span id="L1070" class="ln" data-content="  1070">&nbsp;&nbsp;</span>		z = new(Int)
+<span id="L1071" class="ln" data-content="  1071">&nbsp;&nbsp;</span>	}
+<span id="L1072" class="ln" data-content="  1072">&nbsp;&nbsp;</span>
+<span id="L1073" class="ln" data-content="  1073">&nbsp;&nbsp;</span>	switch x.form {
+<span id="L1074" class="ln" data-content="  1074">&nbsp;&nbsp;</span>	case finite:
+<span id="L1075" class="ln" data-content="  1075">&nbsp;&nbsp;</span>		<span class="comment">// 0 &lt; |x| &lt; +Inf</span>
+<span id="L1076" class="ln" data-content="  1076">&nbsp;&nbsp;</span>		acc := makeAcc(x.neg)
+<span id="L1077" class="ln" data-content="  1077">&nbsp;&nbsp;</span>		if x.exp &lt;= 0 {
+<span id="L1078" class="ln" data-content="  1078">&nbsp;&nbsp;</span>			<span class="comment">// 0 &lt; |x| &lt; 1</span>
+<span id="L1079" class="ln" data-content="  1079">&nbsp;&nbsp;</span>			return z.SetInt64(0), acc
+<span id="L1080" class="ln" data-content="  1080">&nbsp;&nbsp;</span>		}
+<span id="L1081" class="ln" data-content="  1081">&nbsp;&nbsp;</span>		<span class="comment">// x.exp &gt; 0</span>
+<span id="L1082" class="ln" data-content="  1082">&nbsp;&nbsp;</span>
+<span id="L1083" class="ln" data-content="  1083">&nbsp;&nbsp;</span>		<span class="comment">// 1 &lt;= |x| &lt; +Inf</span>
+<span id="L1084" class="ln" data-content="  1084">&nbsp;&nbsp;</span>		<span class="comment">// determine minimum required precision for x</span>
+<span id="L1085" class="ln" data-content="  1085">&nbsp;&nbsp;</span>		allBits := uint(len(x.mant)) * _W
+<span id="L1086" class="ln" data-content="  1086">&nbsp;&nbsp;</span>		exp := uint(x.exp)
+<span id="L1087" class="ln" data-content="  1087">&nbsp;&nbsp;</span>		if x.MinPrec() &lt;= exp {
+<span id="L1088" class="ln" data-content="  1088">&nbsp;&nbsp;</span>			acc = Exact
+<span id="L1089" class="ln" data-content="  1089">&nbsp;&nbsp;</span>		}
+<span id="L1090" class="ln" data-content="  1090">&nbsp;&nbsp;</span>		<span class="comment">// shift mantissa as needed</span>
+<span id="L1091" class="ln" data-content="  1091">&nbsp;&nbsp;</span>		if z == nil {
+<span id="L1092" class="ln" data-content="  1092">&nbsp;&nbsp;</span>			z = new(Int)
+<span id="L1093" class="ln" data-content="  1093">&nbsp;&nbsp;</span>		}
+<span id="L1094" class="ln" data-content="  1094">&nbsp;&nbsp;</span>		z.neg = x.neg
+<span id="L1095" class="ln" data-content="  1095">&nbsp;&nbsp;</span>		switch {
+<span id="L1096" class="ln" data-content="  1096">&nbsp;&nbsp;</span>		case exp &gt; allBits:
+<span id="L1097" class="ln" data-content="  1097">&nbsp;&nbsp;</span>			z.abs = z.abs.shl(x.mant, exp-allBits)
+<span id="L1098" class="ln" data-content="  1098">&nbsp;&nbsp;</span>		default:
+<span id="L1099" class="ln" data-content="  1099">&nbsp;&nbsp;</span>			z.abs = z.abs.set(x.mant)
+<span id="L1100" class="ln" data-content="  1100">&nbsp;&nbsp;</span>		case exp &lt; allBits:
+<span id="L1101" class="ln" data-content="  1101">&nbsp;&nbsp;</span>			z.abs = z.abs.shr(x.mant, allBits-exp)
+<span id="L1102" class="ln" data-content="  1102">&nbsp;&nbsp;</span>		}
+<span id="L1103" class="ln" data-content="  1103">&nbsp;&nbsp;</span>		return z, acc
+<span id="L1104" class="ln" data-content="  1104">&nbsp;&nbsp;</span>
+<span id="L1105" class="ln" data-content="  1105">&nbsp;&nbsp;</span>	case zero:
+<span id="L1106" class="ln" data-content="  1106">&nbsp;&nbsp;</span>		return z.SetInt64(0), Exact
+<span id="L1107" class="ln" data-content="  1107">&nbsp;&nbsp;</span>
+<span id="L1108" class="ln" data-content="  1108">&nbsp;&nbsp;</span>	case inf:
+<span id="L1109" class="ln" data-content="  1109">&nbsp;&nbsp;</span>		return nil, makeAcc(x.neg)
+<span id="L1110" class="ln" data-content="  1110">&nbsp;&nbsp;</span>	}
+<span id="L1111" class="ln" data-content="  1111">&nbsp;&nbsp;</span>
+<span id="L1112" class="ln" data-content="  1112">&nbsp;&nbsp;</span>	panic(&#34;unreachable&#34;)
+<span id="L1113" class="ln" data-content="  1113">&nbsp;&nbsp;</span>}
+<span id="L1114" class="ln" data-content="  1114">&nbsp;&nbsp;</span>
+<span id="L1115" class="ln" data-content="  1115">&nbsp;&nbsp;</span><span class="comment">// Rat returns the rational number corresponding to x;</span>
+<span id="L1116" class="ln" data-content="  1116">&nbsp;&nbsp;</span><span class="comment">// or nil if x is an infinity.</span>
+<span id="L1117" class="ln" data-content="  1117">&nbsp;&nbsp;</span><span class="comment">// The result is Exact if x is not an Inf.</span>
+<span id="L1118" class="ln" data-content="  1118">&nbsp;&nbsp;</span><span class="comment">// If a non-nil *Rat argument z is provided, Rat stores</span>
+<span id="L1119" class="ln" data-content="  1119">&nbsp;&nbsp;</span><span class="comment">// the result in z instead of allocating a new Rat.</span>
+<span id="L1120" class="ln" data-content="  1120">&nbsp;&nbsp;</span>func (x *Float) Rat(z *Rat) (*Rat, Accuracy) {
+<span id="L1121" class="ln" data-content="  1121">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1122" class="ln" data-content="  1122">&nbsp;&nbsp;</span>		x.validate()
+<span id="L1123" class="ln" data-content="  1123">&nbsp;&nbsp;</span>	}
+<span id="L1124" class="ln" data-content="  1124">&nbsp;&nbsp;</span>
+<span id="L1125" class="ln" data-content="  1125">&nbsp;&nbsp;</span>	if z == nil &amp;&amp; x.form &lt;= finite {
+<span id="L1126" class="ln" data-content="  1126">&nbsp;&nbsp;</span>		z = new(Rat)
+<span id="L1127" class="ln" data-content="  1127">&nbsp;&nbsp;</span>	}
+<span id="L1128" class="ln" data-content="  1128">&nbsp;&nbsp;</span>
+<span id="L1129" class="ln" data-content="  1129">&nbsp;&nbsp;</span>	switch x.form {
+<span id="L1130" class="ln" data-content="  1130">&nbsp;&nbsp;</span>	case finite:
+<span id="L1131" class="ln" data-content="  1131">&nbsp;&nbsp;</span>		<span class="comment">// 0 &lt; |x| &lt; +Inf</span>
+<span id="L1132" class="ln" data-content="  1132">&nbsp;&nbsp;</span>		allBits := int32(len(x.mant)) * _W
+<span id="L1133" class="ln" data-content="  1133">&nbsp;&nbsp;</span>		<span class="comment">// build up numerator and denominator</span>
+<span id="L1134" class="ln" data-content="  1134">&nbsp;&nbsp;</span>		z.a.neg = x.neg
+<span id="L1135" class="ln" data-content="  1135">&nbsp;&nbsp;</span>		switch {
+<span id="L1136" class="ln" data-content="  1136">&nbsp;&nbsp;</span>		case x.exp &gt; allBits:
+<span id="L1137" class="ln" data-content="  1137">&nbsp;&nbsp;</span>			z.a.abs = z.a.abs.shl(x.mant, uint(x.exp-allBits))
+<span id="L1138" class="ln" data-content="  1138">&nbsp;&nbsp;</span>			z.b.abs = z.b.abs[:0] <span class="comment">// == 1 (see Rat)</span>
+<span id="L1139" class="ln" data-content="  1139">&nbsp;&nbsp;</span>			<span class="comment">// z already in normal form</span>
+<span id="L1140" class="ln" data-content="  1140">&nbsp;&nbsp;</span>		default:
+<span id="L1141" class="ln" data-content="  1141">&nbsp;&nbsp;</span>			z.a.abs = z.a.abs.set(x.mant)
+<span id="L1142" class="ln" data-content="  1142">&nbsp;&nbsp;</span>			z.b.abs = z.b.abs[:0] <span class="comment">// == 1 (see Rat)</span>
+<span id="L1143" class="ln" data-content="  1143">&nbsp;&nbsp;</span>			<span class="comment">// z already in normal form</span>
+<span id="L1144" class="ln" data-content="  1144">&nbsp;&nbsp;</span>		case x.exp &lt; allBits:
+<span id="L1145" class="ln" data-content="  1145">&nbsp;&nbsp;</span>			z.a.abs = z.a.abs.set(x.mant)
+<span id="L1146" class="ln" data-content="  1146">&nbsp;&nbsp;</span>			t := z.b.abs.setUint64(1)
+<span id="L1147" class="ln" data-content="  1147">&nbsp;&nbsp;</span>			z.b.abs = t.shl(t, uint(allBits-x.exp))
+<span id="L1148" class="ln" data-content="  1148">&nbsp;&nbsp;</span>			z.norm()
+<span id="L1149" class="ln" data-content="  1149">&nbsp;&nbsp;</span>		}
+<span id="L1150" class="ln" data-content="  1150">&nbsp;&nbsp;</span>		return z, Exact
+<span id="L1151" class="ln" data-content="  1151">&nbsp;&nbsp;</span>
+<span id="L1152" class="ln" data-content="  1152">&nbsp;&nbsp;</span>	case zero:
+<span id="L1153" class="ln" data-content="  1153">&nbsp;&nbsp;</span>		return z.SetInt64(0), Exact
+<span id="L1154" class="ln" data-content="  1154">&nbsp;&nbsp;</span>
+<span id="L1155" class="ln" data-content="  1155">&nbsp;&nbsp;</span>	case inf:
+<span id="L1156" class="ln" data-content="  1156">&nbsp;&nbsp;</span>		return nil, makeAcc(x.neg)
+<span id="L1157" class="ln" data-content="  1157">&nbsp;&nbsp;</span>	}
+<span id="L1158" class="ln" data-content="  1158">&nbsp;&nbsp;</span>
+<span id="L1159" class="ln" data-content="  1159">&nbsp;&nbsp;</span>	panic(&#34;unreachable&#34;)
+<span id="L1160" class="ln" data-content="  1160">&nbsp;&nbsp;</span>}
+<span id="L1161" class="ln" data-content="  1161">&nbsp;&nbsp;</span>
+<span id="L1162" class="ln" data-content="  1162">&nbsp;&nbsp;</span><span class="comment">// Abs sets z to the (possibly rounded) value |x| (the absolute value of x)</span>
+<span id="L1163" class="ln" data-content="  1163">&nbsp;&nbsp;</span><span class="comment">// and returns z.</span>
+<span id="L1164" class="ln" data-content="  1164">&nbsp;&nbsp;</span>func (z *Float) Abs(x *Float) *Float {
+<span id="L1165" class="ln" data-content="  1165">&nbsp;&nbsp;</span>	z.Set(x)
+<span id="L1166" class="ln" data-content="  1166">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L1167" class="ln" data-content="  1167">&nbsp;&nbsp;</span>	return z
+<span id="L1168" class="ln" data-content="  1168">&nbsp;&nbsp;</span>}
+<span id="L1169" class="ln" data-content="  1169">&nbsp;&nbsp;</span>
+<span id="L1170" class="ln" data-content="  1170">&nbsp;&nbsp;</span><span class="comment">// Neg sets z to the (possibly rounded) value of x with its sign negated,</span>
+<span id="L1171" class="ln" data-content="  1171">&nbsp;&nbsp;</span><span class="comment">// and returns z.</span>
+<span id="L1172" class="ln" data-content="  1172">&nbsp;&nbsp;</span>func (z *Float) Neg(x *Float) *Float {
+<span id="L1173" class="ln" data-content="  1173">&nbsp;&nbsp;</span>	z.Set(x)
+<span id="L1174" class="ln" data-content="  1174">&nbsp;&nbsp;</span>	z.neg = !z.neg
+<span id="L1175" class="ln" data-content="  1175">&nbsp;&nbsp;</span>	return z
+<span id="L1176" class="ln" data-content="  1176">&nbsp;&nbsp;</span>}
+<span id="L1177" class="ln" data-content="  1177">&nbsp;&nbsp;</span>
+<span id="L1178" class="ln" data-content="  1178">&nbsp;&nbsp;</span>func validateBinaryOperands(x, y *Float) {
+<span id="L1179" class="ln" data-content="  1179">&nbsp;&nbsp;</span>	if !debugFloat {
+<span id="L1180" class="ln" data-content="  1180">&nbsp;&nbsp;</span>		<span class="comment">// avoid performance bugs</span>
+<span id="L1181" class="ln" data-content="  1181">&nbsp;&nbsp;</span>		panic(&#34;validateBinaryOperands called but debugFloat is not set&#34;)
+<span id="L1182" class="ln" data-content="  1182">&nbsp;&nbsp;</span>	}
+<span id="L1183" class="ln" data-content="  1183">&nbsp;&nbsp;</span>	if len(x.mant) == 0 {
+<span id="L1184" class="ln" data-content="  1184">&nbsp;&nbsp;</span>		panic(&#34;empty mantissa for x&#34;)
+<span id="L1185" class="ln" data-content="  1185">&nbsp;&nbsp;</span>	}
+<span id="L1186" class="ln" data-content="  1186">&nbsp;&nbsp;</span>	if len(y.mant) == 0 {
+<span id="L1187" class="ln" data-content="  1187">&nbsp;&nbsp;</span>		panic(&#34;empty mantissa for y&#34;)
+<span id="L1188" class="ln" data-content="  1188">&nbsp;&nbsp;</span>	}
+<span id="L1189" class="ln" data-content="  1189">&nbsp;&nbsp;</span>}
+<span id="L1190" class="ln" data-content="  1190">&nbsp;&nbsp;</span>
+<span id="L1191" class="ln" data-content="  1191">&nbsp;&nbsp;</span><span class="comment">// z = x + y, ignoring signs of x and y for the addition</span>
+<span id="L1192" class="ln" data-content="  1192">&nbsp;&nbsp;</span><span class="comment">// but using the sign of z for rounding the result.</span>
+<span id="L1193" class="ln" data-content="  1193">&nbsp;&nbsp;</span><span class="comment">// x and y must have a non-empty mantissa and valid exponent.</span>
+<span id="L1194" class="ln" data-content="  1194">&nbsp;&nbsp;</span>func (z *Float) uadd(x, y *Float) {
+<span id="L1195" class="ln" data-content="  1195">&nbsp;&nbsp;</span>	<span class="comment">// Note: This implementation requires 2 shifts most of the</span>
+<span id="L1196" class="ln" data-content="  1196">&nbsp;&nbsp;</span>	<span class="comment">// time. It is also inefficient if exponents or precisions</span>
+<span id="L1197" class="ln" data-content="  1197">&nbsp;&nbsp;</span>	<span class="comment">// differ by wide margins. The following article describes</span>
+<span id="L1198" class="ln" data-content="  1198">&nbsp;&nbsp;</span>	<span class="comment">// an efficient (but much more complicated) implementation</span>
+<span id="L1199" class="ln" data-content="  1199">&nbsp;&nbsp;</span>	<span class="comment">// compatible with the internal representation used here:</span>
+<span id="L1200" class="ln" data-content="  1200">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L1201" class="ln" data-content="  1201">&nbsp;&nbsp;</span>	<span class="comment">// Vincent Lefèvre: &#34;The Generic Multiple-Precision Floating-</span>
+<span id="L1202" class="ln" data-content="  1202">&nbsp;&nbsp;</span>	<span class="comment">// Point Addition With Exact Rounding (as in the MPFR Library)&#34;</span>
+<span id="L1203" class="ln" data-content="  1203">&nbsp;&nbsp;</span>	<span class="comment">// http://www.vinc17.net/research/papers/rnc6.pdf</span>
+<span id="L1204" class="ln" data-content="  1204">&nbsp;&nbsp;</span>
+<span id="L1205" class="ln" data-content="  1205">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1206" class="ln" data-content="  1206">&nbsp;&nbsp;</span>		validateBinaryOperands(x, y)
+<span id="L1207" class="ln" data-content="  1207">&nbsp;&nbsp;</span>	}
+<span id="L1208" class="ln" data-content="  1208">&nbsp;&nbsp;</span>
+<span id="L1209" class="ln" data-content="  1209">&nbsp;&nbsp;</span>	<span class="comment">// compute exponents ex, ey for mantissa with &#34;binary point&#34;</span>
+<span id="L1210" class="ln" data-content="  1210">&nbsp;&nbsp;</span>	<span class="comment">// on the right (mantissa.0) - use int64 to avoid overflow</span>
+<span id="L1211" class="ln" data-content="  1211">&nbsp;&nbsp;</span>	ex := int64(x.exp) - int64(len(x.mant))*_W
+<span id="L1212" class="ln" data-content="  1212">&nbsp;&nbsp;</span>	ey := int64(y.exp) - int64(len(y.mant))*_W
+<span id="L1213" class="ln" data-content="  1213">&nbsp;&nbsp;</span>
+<span id="L1214" class="ln" data-content="  1214">&nbsp;&nbsp;</span>	al := alias(z.mant, x.mant) || alias(z.mant, y.mant)
+<span id="L1215" class="ln" data-content="  1215">&nbsp;&nbsp;</span>
+<span id="L1216" class="ln" data-content="  1216">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri) having a combined add-and-shift primitive</span>
+<span id="L1217" class="ln" data-content="  1217">&nbsp;&nbsp;</span>	<span class="comment">//           could make this code significantly faster</span>
+<span id="L1218" class="ln" data-content="  1218">&nbsp;&nbsp;</span>	switch {
+<span id="L1219" class="ln" data-content="  1219">&nbsp;&nbsp;</span>	case ex &lt; ey:
+<span id="L1220" class="ln" data-content="  1220">&nbsp;&nbsp;</span>		if al {
+<span id="L1221" class="ln" data-content="  1221">&nbsp;&nbsp;</span>			t := nat(nil).shl(y.mant, uint(ey-ex))
+<span id="L1222" class="ln" data-content="  1222">&nbsp;&nbsp;</span>			z.mant = z.mant.add(x.mant, t)
+<span id="L1223" class="ln" data-content="  1223">&nbsp;&nbsp;</span>		} else {
+<span id="L1224" class="ln" data-content="  1224">&nbsp;&nbsp;</span>			z.mant = z.mant.shl(y.mant, uint(ey-ex))
+<span id="L1225" class="ln" data-content="  1225">&nbsp;&nbsp;</span>			z.mant = z.mant.add(x.mant, z.mant)
+<span id="L1226" class="ln" data-content="  1226">&nbsp;&nbsp;</span>		}
+<span id="L1227" class="ln" data-content="  1227">&nbsp;&nbsp;</span>	default:
+<span id="L1228" class="ln" data-content="  1228">&nbsp;&nbsp;</span>		<span class="comment">// ex == ey, no shift needed</span>
+<span id="L1229" class="ln" data-content="  1229">&nbsp;&nbsp;</span>		z.mant = z.mant.add(x.mant, y.mant)
+<span id="L1230" class="ln" data-content="  1230">&nbsp;&nbsp;</span>	case ex &gt; ey:
+<span id="L1231" class="ln" data-content="  1231">&nbsp;&nbsp;</span>		if al {
+<span id="L1232" class="ln" data-content="  1232">&nbsp;&nbsp;</span>			t := nat(nil).shl(x.mant, uint(ex-ey))
+<span id="L1233" class="ln" data-content="  1233">&nbsp;&nbsp;</span>			z.mant = z.mant.add(t, y.mant)
+<span id="L1234" class="ln" data-content="  1234">&nbsp;&nbsp;</span>		} else {
+<span id="L1235" class="ln" data-content="  1235">&nbsp;&nbsp;</span>			z.mant = z.mant.shl(x.mant, uint(ex-ey))
+<span id="L1236" class="ln" data-content="  1236">&nbsp;&nbsp;</span>			z.mant = z.mant.add(z.mant, y.mant)
+<span id="L1237" class="ln" data-content="  1237">&nbsp;&nbsp;</span>		}
+<span id="L1238" class="ln" data-content="  1238">&nbsp;&nbsp;</span>		ex = ey
+<span id="L1239" class="ln" data-content="  1239">&nbsp;&nbsp;</span>	}
+<span id="L1240" class="ln" data-content="  1240">&nbsp;&nbsp;</span>	<span class="comment">// len(z.mant) &gt; 0</span>
+<span id="L1241" class="ln" data-content="  1241">&nbsp;&nbsp;</span>
+<span id="L1242" class="ln" data-content="  1242">&nbsp;&nbsp;</span>	z.setExpAndRound(ex+int64(len(z.mant))*_W-fnorm(z.mant), 0)
+<span id="L1243" class="ln" data-content="  1243">&nbsp;&nbsp;</span>}
+<span id="L1244" class="ln" data-content="  1244">&nbsp;&nbsp;</span>
+<span id="L1245" class="ln" data-content="  1245">&nbsp;&nbsp;</span><span class="comment">// z = x - y for |x| &gt; |y|, ignoring signs of x and y for the subtraction</span>
+<span id="L1246" class="ln" data-content="  1246">&nbsp;&nbsp;</span><span class="comment">// but using the sign of z for rounding the result.</span>
+<span id="L1247" class="ln" data-content="  1247">&nbsp;&nbsp;</span><span class="comment">// x and y must have a non-empty mantissa and valid exponent.</span>
+<span id="L1248" class="ln" data-content="  1248">&nbsp;&nbsp;</span>func (z *Float) usub(x, y *Float) {
+<span id="L1249" class="ln" data-content="  1249">&nbsp;&nbsp;</span>	<span class="comment">// This code is symmetric to uadd.</span>
+<span id="L1250" class="ln" data-content="  1250">&nbsp;&nbsp;</span>	<span class="comment">// We have not factored the common code out because</span>
+<span id="L1251" class="ln" data-content="  1251">&nbsp;&nbsp;</span>	<span class="comment">// eventually uadd (and usub) should be optimized</span>
+<span id="L1252" class="ln" data-content="  1252">&nbsp;&nbsp;</span>	<span class="comment">// by special-casing, and the code will diverge.</span>
+<span id="L1253" class="ln" data-content="  1253">&nbsp;&nbsp;</span>
+<span id="L1254" class="ln" data-content="  1254">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1255" class="ln" data-content="  1255">&nbsp;&nbsp;</span>		validateBinaryOperands(x, y)
+<span id="L1256" class="ln" data-content="  1256">&nbsp;&nbsp;</span>	}
+<span id="L1257" class="ln" data-content="  1257">&nbsp;&nbsp;</span>
+<span id="L1258" class="ln" data-content="  1258">&nbsp;&nbsp;</span>	ex := int64(x.exp) - int64(len(x.mant))*_W
+<span id="L1259" class="ln" data-content="  1259">&nbsp;&nbsp;</span>	ey := int64(y.exp) - int64(len(y.mant))*_W
+<span id="L1260" class="ln" data-content="  1260">&nbsp;&nbsp;</span>
+<span id="L1261" class="ln" data-content="  1261">&nbsp;&nbsp;</span>	al := alias(z.mant, x.mant) || alias(z.mant, y.mant)
+<span id="L1262" class="ln" data-content="  1262">&nbsp;&nbsp;</span>
+<span id="L1263" class="ln" data-content="  1263">&nbsp;&nbsp;</span>	switch {
+<span id="L1264" class="ln" data-content="  1264">&nbsp;&nbsp;</span>	case ex &lt; ey:
+<span id="L1265" class="ln" data-content="  1265">&nbsp;&nbsp;</span>		if al {
+<span id="L1266" class="ln" data-content="  1266">&nbsp;&nbsp;</span>			t := nat(nil).shl(y.mant, uint(ey-ex))
+<span id="L1267" class="ln" data-content="  1267">&nbsp;&nbsp;</span>			z.mant = t.sub(x.mant, t)
+<span id="L1268" class="ln" data-content="  1268">&nbsp;&nbsp;</span>		} else {
+<span id="L1269" class="ln" data-content="  1269">&nbsp;&nbsp;</span>			z.mant = z.mant.shl(y.mant, uint(ey-ex))
+<span id="L1270" class="ln" data-content="  1270">&nbsp;&nbsp;</span>			z.mant = z.mant.sub(x.mant, z.mant)
+<span id="L1271" class="ln" data-content="  1271">&nbsp;&nbsp;</span>		}
+<span id="L1272" class="ln" data-content="  1272">&nbsp;&nbsp;</span>	default:
+<span id="L1273" class="ln" data-content="  1273">&nbsp;&nbsp;</span>		<span class="comment">// ex == ey, no shift needed</span>
+<span id="L1274" class="ln" data-content="  1274">&nbsp;&nbsp;</span>		z.mant = z.mant.sub(x.mant, y.mant)
+<span id="L1275" class="ln" data-content="  1275">&nbsp;&nbsp;</span>	case ex &gt; ey:
+<span id="L1276" class="ln" data-content="  1276">&nbsp;&nbsp;</span>		if al {
+<span id="L1277" class="ln" data-content="  1277">&nbsp;&nbsp;</span>			t := nat(nil).shl(x.mant, uint(ex-ey))
+<span id="L1278" class="ln" data-content="  1278">&nbsp;&nbsp;</span>			z.mant = t.sub(t, y.mant)
+<span id="L1279" class="ln" data-content="  1279">&nbsp;&nbsp;</span>		} else {
+<span id="L1280" class="ln" data-content="  1280">&nbsp;&nbsp;</span>			z.mant = z.mant.shl(x.mant, uint(ex-ey))
+<span id="L1281" class="ln" data-content="  1281">&nbsp;&nbsp;</span>			z.mant = z.mant.sub(z.mant, y.mant)
+<span id="L1282" class="ln" data-content="  1282">&nbsp;&nbsp;</span>		}
+<span id="L1283" class="ln" data-content="  1283">&nbsp;&nbsp;</span>		ex = ey
+<span id="L1284" class="ln" data-content="  1284">&nbsp;&nbsp;</span>	}
+<span id="L1285" class="ln" data-content="  1285">&nbsp;&nbsp;</span>
+<span id="L1286" class="ln" data-content="  1286">&nbsp;&nbsp;</span>	<span class="comment">// operands may have canceled each other out</span>
+<span id="L1287" class="ln" data-content="  1287">&nbsp;&nbsp;</span>	if len(z.mant) == 0 {
+<span id="L1288" class="ln" data-content="  1288">&nbsp;&nbsp;</span>		z.acc = Exact
+<span id="L1289" class="ln" data-content="  1289">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L1290" class="ln" data-content="  1290">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L1291" class="ln" data-content="  1291">&nbsp;&nbsp;</span>		return
+<span id="L1292" class="ln" data-content="  1292">&nbsp;&nbsp;</span>	}
+<span id="L1293" class="ln" data-content="  1293">&nbsp;&nbsp;</span>	<span class="comment">// len(z.mant) &gt; 0</span>
+<span id="L1294" class="ln" data-content="  1294">&nbsp;&nbsp;</span>
+<span id="L1295" class="ln" data-content="  1295">&nbsp;&nbsp;</span>	z.setExpAndRound(ex+int64(len(z.mant))*_W-fnorm(z.mant), 0)
+<span id="L1296" class="ln" data-content="  1296">&nbsp;&nbsp;</span>}
+<span id="L1297" class="ln" data-content="  1297">&nbsp;&nbsp;</span>
+<span id="L1298" class="ln" data-content="  1298">&nbsp;&nbsp;</span><span class="comment">// z = x * y, ignoring signs of x and y for the multiplication</span>
+<span id="L1299" class="ln" data-content="  1299">&nbsp;&nbsp;</span><span class="comment">// but using the sign of z for rounding the result.</span>
+<span id="L1300" class="ln" data-content="  1300">&nbsp;&nbsp;</span><span class="comment">// x and y must have a non-empty mantissa and valid exponent.</span>
+<span id="L1301" class="ln" data-content="  1301">&nbsp;&nbsp;</span>func (z *Float) umul(x, y *Float) {
+<span id="L1302" class="ln" data-content="  1302">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1303" class="ln" data-content="  1303">&nbsp;&nbsp;</span>		validateBinaryOperands(x, y)
+<span id="L1304" class="ln" data-content="  1304">&nbsp;&nbsp;</span>	}
+<span id="L1305" class="ln" data-content="  1305">&nbsp;&nbsp;</span>
+<span id="L1306" class="ln" data-content="  1306">&nbsp;&nbsp;</span>	<span class="comment">// Note: This is doing too much work if the precision</span>
+<span id="L1307" class="ln" data-content="  1307">&nbsp;&nbsp;</span>	<span class="comment">// of z is less than the sum of the precisions of x</span>
+<span id="L1308" class="ln" data-content="  1308">&nbsp;&nbsp;</span>	<span class="comment">// and y which is often the case (e.g., if all floats</span>
+<span id="L1309" class="ln" data-content="  1309">&nbsp;&nbsp;</span>	<span class="comment">// have the same precision).</span>
+<span id="L1310" class="ln" data-content="  1310">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri) Optimize this for the common case.</span>
+<span id="L1311" class="ln" data-content="  1311">&nbsp;&nbsp;</span>
+<span id="L1312" class="ln" data-content="  1312">&nbsp;&nbsp;</span>	e := int64(x.exp) + int64(y.exp)
+<span id="L1313" class="ln" data-content="  1313">&nbsp;&nbsp;</span>	z.mant = z.mant.mul(x.mant, y.mant)
+<span id="L1314" class="ln" data-content="  1314">&nbsp;&nbsp;</span>
+<span id="L1315" class="ln" data-content="  1315">&nbsp;&nbsp;</span>	z.setExpAndRound(e-fnorm(z.mant), 0)
+<span id="L1316" class="ln" data-content="  1316">&nbsp;&nbsp;</span>}
+<span id="L1317" class="ln" data-content="  1317">&nbsp;&nbsp;</span>
+<span id="L1318" class="ln" data-content="  1318">&nbsp;&nbsp;</span><span class="comment">// z = x / y, ignoring signs of x and y for the division</span>
+<span id="L1319" class="ln" data-content="  1319">&nbsp;&nbsp;</span><span class="comment">// but using the sign of z for rounding the result.</span>
+<span id="L1320" class="ln" data-content="  1320">&nbsp;&nbsp;</span><span class="comment">// x and y must have a non-empty mantissa and valid exponent.</span>
+<span id="L1321" class="ln" data-content="  1321">&nbsp;&nbsp;</span>func (z *Float) uquo(x, y *Float) {
+<span id="L1322" class="ln" data-content="  1322">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1323" class="ln" data-content="  1323">&nbsp;&nbsp;</span>		validateBinaryOperands(x, y)
+<span id="L1324" class="ln" data-content="  1324">&nbsp;&nbsp;</span>	}
+<span id="L1325" class="ln" data-content="  1325">&nbsp;&nbsp;</span>
+<span id="L1326" class="ln" data-content="  1326">&nbsp;&nbsp;</span>	<span class="comment">// mantissa length in words for desired result precision + 1</span>
+<span id="L1327" class="ln" data-content="  1327">&nbsp;&nbsp;</span>	<span class="comment">// (at least one extra bit so we get the rounding bit after</span>
+<span id="L1328" class="ln" data-content="  1328">&nbsp;&nbsp;</span>	<span class="comment">// the division)</span>
+<span id="L1329" class="ln" data-content="  1329">&nbsp;&nbsp;</span>	n := int(z.prec/_W) + 1
+<span id="L1330" class="ln" data-content="  1330">&nbsp;&nbsp;</span>
+<span id="L1331" class="ln" data-content="  1331">&nbsp;&nbsp;</span>	<span class="comment">// compute adjusted x.mant such that we get enough result precision</span>
+<span id="L1332" class="ln" data-content="  1332">&nbsp;&nbsp;</span>	xadj := x.mant
+<span id="L1333" class="ln" data-content="  1333">&nbsp;&nbsp;</span>	if d := n - len(x.mant) + len(y.mant); d &gt; 0 {
+<span id="L1334" class="ln" data-content="  1334">&nbsp;&nbsp;</span>		<span class="comment">// d extra words needed =&gt; add d &#34;0 digits&#34; to x</span>
+<span id="L1335" class="ln" data-content="  1335">&nbsp;&nbsp;</span>		xadj = make(nat, len(x.mant)+d)
+<span id="L1336" class="ln" data-content="  1336">&nbsp;&nbsp;</span>		copy(xadj[d:], x.mant)
+<span id="L1337" class="ln" data-content="  1337">&nbsp;&nbsp;</span>	}
+<span id="L1338" class="ln" data-content="  1338">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri): If we have too many digits (d &lt; 0), we should be able</span>
+<span id="L1339" class="ln" data-content="  1339">&nbsp;&nbsp;</span>	<span class="comment">// to shorten x for faster division. But we must be extra careful</span>
+<span id="L1340" class="ln" data-content="  1340">&nbsp;&nbsp;</span>	<span class="comment">// with rounding in that case.</span>
+<span id="L1341" class="ln" data-content="  1341">&nbsp;&nbsp;</span>
+<span id="L1342" class="ln" data-content="  1342">&nbsp;&nbsp;</span>	<span class="comment">// Compute d before division since there may be aliasing of x.mant</span>
+<span id="L1343" class="ln" data-content="  1343">&nbsp;&nbsp;</span>	<span class="comment">// (via xadj) or y.mant with z.mant.</span>
+<span id="L1344" class="ln" data-content="  1344">&nbsp;&nbsp;</span>	d := len(xadj) - len(y.mant)
+<span id="L1345" class="ln" data-content="  1345">&nbsp;&nbsp;</span>
+<span id="L1346" class="ln" data-content="  1346">&nbsp;&nbsp;</span>	<span class="comment">// divide</span>
+<span id="L1347" class="ln" data-content="  1347">&nbsp;&nbsp;</span>	var r nat
+<span id="L1348" class="ln" data-content="  1348">&nbsp;&nbsp;</span>	z.mant, r = z.mant.div(nil, xadj, y.mant)
+<span id="L1349" class="ln" data-content="  1349">&nbsp;&nbsp;</span>	e := int64(x.exp) - int64(y.exp) - int64(d-len(z.mant))*_W
+<span id="L1350" class="ln" data-content="  1350">&nbsp;&nbsp;</span>
+<span id="L1351" class="ln" data-content="  1351">&nbsp;&nbsp;</span>	<span class="comment">// The result is long enough to include (at least) the rounding bit.</span>
+<span id="L1352" class="ln" data-content="  1352">&nbsp;&nbsp;</span>	<span class="comment">// If there&#39;s a non-zero remainder, the corresponding fractional part</span>
+<span id="L1353" class="ln" data-content="  1353">&nbsp;&nbsp;</span>	<span class="comment">// (if it were computed), would have a non-zero sticky bit (if it were</span>
+<span id="L1354" class="ln" data-content="  1354">&nbsp;&nbsp;</span>	<span class="comment">// zero, it couldn&#39;t have a non-zero remainder).</span>
+<span id="L1355" class="ln" data-content="  1355">&nbsp;&nbsp;</span>	var sbit uint
+<span id="L1356" class="ln" data-content="  1356">&nbsp;&nbsp;</span>	if len(r) &gt; 0 {
+<span id="L1357" class="ln" data-content="  1357">&nbsp;&nbsp;</span>		sbit = 1
+<span id="L1358" class="ln" data-content="  1358">&nbsp;&nbsp;</span>	}
+<span id="L1359" class="ln" data-content="  1359">&nbsp;&nbsp;</span>
+<span id="L1360" class="ln" data-content="  1360">&nbsp;&nbsp;</span>	z.setExpAndRound(e-fnorm(z.mant), sbit)
+<span id="L1361" class="ln" data-content="  1361">&nbsp;&nbsp;</span>}
+<span id="L1362" class="ln" data-content="  1362">&nbsp;&nbsp;</span>
+<span id="L1363" class="ln" data-content="  1363">&nbsp;&nbsp;</span><span class="comment">// ucmp returns -1, 0, or +1, depending on whether</span>
+<span id="L1364" class="ln" data-content="  1364">&nbsp;&nbsp;</span><span class="comment">// |x| &lt; |y|, |x| == |y|, or |x| &gt; |y|.</span>
+<span id="L1365" class="ln" data-content="  1365">&nbsp;&nbsp;</span><span class="comment">// x and y must have a non-empty mantissa and valid exponent.</span>
+<span id="L1366" class="ln" data-content="  1366">&nbsp;&nbsp;</span>func (x *Float) ucmp(y *Float) int {
+<span id="L1367" class="ln" data-content="  1367">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1368" class="ln" data-content="  1368">&nbsp;&nbsp;</span>		validateBinaryOperands(x, y)
+<span id="L1369" class="ln" data-content="  1369">&nbsp;&nbsp;</span>	}
+<span id="L1370" class="ln" data-content="  1370">&nbsp;&nbsp;</span>
+<span id="L1371" class="ln" data-content="  1371">&nbsp;&nbsp;</span>	switch {
+<span id="L1372" class="ln" data-content="  1372">&nbsp;&nbsp;</span>	case x.exp &lt; y.exp:
+<span id="L1373" class="ln" data-content="  1373">&nbsp;&nbsp;</span>		return -1
+<span id="L1374" class="ln" data-content="  1374">&nbsp;&nbsp;</span>	case x.exp &gt; y.exp:
+<span id="L1375" class="ln" data-content="  1375">&nbsp;&nbsp;</span>		return +1
+<span id="L1376" class="ln" data-content="  1376">&nbsp;&nbsp;</span>	}
+<span id="L1377" class="ln" data-content="  1377">&nbsp;&nbsp;</span>	<span class="comment">// x.exp == y.exp</span>
+<span id="L1378" class="ln" data-content="  1378">&nbsp;&nbsp;</span>
+<span id="L1379" class="ln" data-content="  1379">&nbsp;&nbsp;</span>	<span class="comment">// compare mantissas</span>
+<span id="L1380" class="ln" data-content="  1380">&nbsp;&nbsp;</span>	i := len(x.mant)
+<span id="L1381" class="ln" data-content="  1381">&nbsp;&nbsp;</span>	j := len(y.mant)
+<span id="L1382" class="ln" data-content="  1382">&nbsp;&nbsp;</span>	for i &gt; 0 || j &gt; 0 {
+<span id="L1383" class="ln" data-content="  1383">&nbsp;&nbsp;</span>		var xm, ym Word
+<span id="L1384" class="ln" data-content="  1384">&nbsp;&nbsp;</span>		if i &gt; 0 {
+<span id="L1385" class="ln" data-content="  1385">&nbsp;&nbsp;</span>			i--
+<span id="L1386" class="ln" data-content="  1386">&nbsp;&nbsp;</span>			xm = x.mant[i]
+<span id="L1387" class="ln" data-content="  1387">&nbsp;&nbsp;</span>		}
+<span id="L1388" class="ln" data-content="  1388">&nbsp;&nbsp;</span>		if j &gt; 0 {
+<span id="L1389" class="ln" data-content="  1389">&nbsp;&nbsp;</span>			j--
+<span id="L1390" class="ln" data-content="  1390">&nbsp;&nbsp;</span>			ym = y.mant[j]
+<span id="L1391" class="ln" data-content="  1391">&nbsp;&nbsp;</span>		}
+<span id="L1392" class="ln" data-content="  1392">&nbsp;&nbsp;</span>		switch {
+<span id="L1393" class="ln" data-content="  1393">&nbsp;&nbsp;</span>		case xm &lt; ym:
+<span id="L1394" class="ln" data-content="  1394">&nbsp;&nbsp;</span>			return -1
+<span id="L1395" class="ln" data-content="  1395">&nbsp;&nbsp;</span>		case xm &gt; ym:
+<span id="L1396" class="ln" data-content="  1396">&nbsp;&nbsp;</span>			return +1
+<span id="L1397" class="ln" data-content="  1397">&nbsp;&nbsp;</span>		}
+<span id="L1398" class="ln" data-content="  1398">&nbsp;&nbsp;</span>	}
+<span id="L1399" class="ln" data-content="  1399">&nbsp;&nbsp;</span>
+<span id="L1400" class="ln" data-content="  1400">&nbsp;&nbsp;</span>	return 0
+<span id="L1401" class="ln" data-content="  1401">&nbsp;&nbsp;</span>}
+<span id="L1402" class="ln" data-content="  1402">&nbsp;&nbsp;</span>
+<span id="L1403" class="ln" data-content="  1403">&nbsp;&nbsp;</span><span class="comment">// Handling of sign bit as defined by IEEE 754-2008, section 6.3:</span>
+<span id="L1404" class="ln" data-content="  1404">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1405" class="ln" data-content="  1405">&nbsp;&nbsp;</span><span class="comment">// When neither the inputs nor result are NaN, the sign of a product or</span>
+<span id="L1406" class="ln" data-content="  1406">&nbsp;&nbsp;</span><span class="comment">// quotient is the exclusive OR of the operands’ signs; the sign of a sum,</span>
+<span id="L1407" class="ln" data-content="  1407">&nbsp;&nbsp;</span><span class="comment">// or of a difference x−y regarded as a sum x+(−y), differs from at most</span>
+<span id="L1408" class="ln" data-content="  1408">&nbsp;&nbsp;</span><span class="comment">// one of the addends’ signs; and the sign of the result of conversions,</span>
+<span id="L1409" class="ln" data-content="  1409">&nbsp;&nbsp;</span><span class="comment">// the quantize operation, the roundToIntegral operations, and the</span>
+<span id="L1410" class="ln" data-content="  1410">&nbsp;&nbsp;</span><span class="comment">// roundToIntegralExact (see 5.3.1) is the sign of the first or only operand.</span>
+<span id="L1411" class="ln" data-content="  1411">&nbsp;&nbsp;</span><span class="comment">// These rules shall apply even when operands or results are zero or infinite.</span>
+<span id="L1412" class="ln" data-content="  1412">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1413" class="ln" data-content="  1413">&nbsp;&nbsp;</span><span class="comment">// When the sum of two operands with opposite signs (or the difference of</span>
+<span id="L1414" class="ln" data-content="  1414">&nbsp;&nbsp;</span><span class="comment">// two operands with like signs) is exactly zero, the sign of that sum (or</span>
+<span id="L1415" class="ln" data-content="  1415">&nbsp;&nbsp;</span><span class="comment">// difference) shall be +0 in all rounding-direction attributes except</span>
+<span id="L1416" class="ln" data-content="  1416">&nbsp;&nbsp;</span><span class="comment">// roundTowardNegative; under that attribute, the sign of an exact zero</span>
+<span id="L1417" class="ln" data-content="  1417">&nbsp;&nbsp;</span><span class="comment">// sum (or difference) shall be −0. However, x+x = x−(−x) retains the same</span>
+<span id="L1418" class="ln" data-content="  1418">&nbsp;&nbsp;</span><span class="comment">// sign as x even when x is zero.</span>
+<span id="L1419" class="ln" data-content="  1419">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1420" class="ln" data-content="  1420">&nbsp;&nbsp;</span><span class="comment">// See also: https://play.golang.org/p/RtH3UCt5IH</span>
+<span id="L1421" class="ln" data-content="  1421">&nbsp;&nbsp;</span>
+<span id="L1422" class="ln" data-content="  1422">&nbsp;&nbsp;</span><span class="comment">// Add sets z to the rounded sum x+y and returns z. If z&#39;s precision is 0,</span>
+<span id="L1423" class="ln" data-content="  1423">&nbsp;&nbsp;</span><span class="comment">// it is changed to the larger of x&#39;s or y&#39;s precision before the operation.</span>
+<span id="L1424" class="ln" data-content="  1424">&nbsp;&nbsp;</span><span class="comment">// Rounding is performed according to z&#39;s precision and rounding mode; and</span>
+<span id="L1425" class="ln" data-content="  1425">&nbsp;&nbsp;</span><span class="comment">// z&#39;s accuracy reports the result error relative to the exact (not rounded)</span>
+<span id="L1426" class="ln" data-content="  1426">&nbsp;&nbsp;</span><span class="comment">// result. Add panics with ErrNaN if x and y are infinities with opposite</span>
+<span id="L1427" class="ln" data-content="  1427">&nbsp;&nbsp;</span><span class="comment">// signs. The value of z is undefined in that case.</span>
+<span id="L1428" class="ln" data-content="  1428">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1429" class="ln" data-content="  1429">&nbsp;&nbsp;</span><span class="comment">// BUG(gri) When rounding ToNegativeInf, the sign of Float values rounded to 0 is incorrect.</span>
+<span id="L1430" class="ln" data-content="  1430">&nbsp;&nbsp;</span>func (z *Float) Add(x, y *Float) *Float {
+<span id="L1431" class="ln" data-content="  1431">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1432" class="ln" data-content="  1432">&nbsp;&nbsp;</span>		x.validate()
+<span id="L1433" class="ln" data-content="  1433">&nbsp;&nbsp;</span>		y.validate()
+<span id="L1434" class="ln" data-content="  1434">&nbsp;&nbsp;</span>	}
+<span id="L1435" class="ln" data-content="  1435">&nbsp;&nbsp;</span>
+<span id="L1436" class="ln" data-content="  1436">&nbsp;&nbsp;</span>	if z.prec == 0 {
+<span id="L1437" class="ln" data-content="  1437">&nbsp;&nbsp;</span>		z.prec = umax32(x.prec, y.prec)
+<span id="L1438" class="ln" data-content="  1438">&nbsp;&nbsp;</span>	}
+<span id="L1439" class="ln" data-content="  1439">&nbsp;&nbsp;</span>
+<span id="L1440" class="ln" data-content="  1440">&nbsp;&nbsp;</span>	if x.form == finite &amp;&amp; y.form == finite {
+<span id="L1441" class="ln" data-content="  1441">&nbsp;&nbsp;</span>		<span class="comment">// x + y (common case)</span>
+<span id="L1442" class="ln" data-content="  1442">&nbsp;&nbsp;</span>
+<span id="L1443" class="ln" data-content="  1443">&nbsp;&nbsp;</span>		<span class="comment">// Below we set z.neg = x.neg, and when z aliases y this will</span>
+<span id="L1444" class="ln" data-content="  1444">&nbsp;&nbsp;</span>		<span class="comment">// change the y operand&#39;s sign. This is fine, because if an</span>
+<span id="L1445" class="ln" data-content="  1445">&nbsp;&nbsp;</span>		<span class="comment">// operand aliases the receiver it&#39;ll be overwritten, but we still</span>
+<span id="L1446" class="ln" data-content="  1446">&nbsp;&nbsp;</span>		<span class="comment">// want the original x.neg and y.neg values when we evaluate</span>
+<span id="L1447" class="ln" data-content="  1447">&nbsp;&nbsp;</span>		<span class="comment">// x.neg != y.neg, so we need to save y.neg before setting z.neg.</span>
+<span id="L1448" class="ln" data-content="  1448">&nbsp;&nbsp;</span>		yneg := y.neg
+<span id="L1449" class="ln" data-content="  1449">&nbsp;&nbsp;</span>
+<span id="L1450" class="ln" data-content="  1450">&nbsp;&nbsp;</span>		z.neg = x.neg
+<span id="L1451" class="ln" data-content="  1451">&nbsp;&nbsp;</span>		if x.neg == yneg {
+<span id="L1452" class="ln" data-content="  1452">&nbsp;&nbsp;</span>			<span class="comment">// x + y == x + y</span>
+<span id="L1453" class="ln" data-content="  1453">&nbsp;&nbsp;</span>			<span class="comment">// (-x) + (-y) == -(x + y)</span>
+<span id="L1454" class="ln" data-content="  1454">&nbsp;&nbsp;</span>			z.uadd(x, y)
+<span id="L1455" class="ln" data-content="  1455">&nbsp;&nbsp;</span>		} else {
+<span id="L1456" class="ln" data-content="  1456">&nbsp;&nbsp;</span>			<span class="comment">// x + (-y) == x - y == -(y - x)</span>
+<span id="L1457" class="ln" data-content="  1457">&nbsp;&nbsp;</span>			<span class="comment">// (-x) + y == y - x == -(x - y)</span>
+<span id="L1458" class="ln" data-content="  1458">&nbsp;&nbsp;</span>			if x.ucmp(y) &gt; 0 {
+<span id="L1459" class="ln" data-content="  1459">&nbsp;&nbsp;</span>				z.usub(x, y)
+<span id="L1460" class="ln" data-content="  1460">&nbsp;&nbsp;</span>			} else {
+<span id="L1461" class="ln" data-content="  1461">&nbsp;&nbsp;</span>				z.neg = !z.neg
+<span id="L1462" class="ln" data-content="  1462">&nbsp;&nbsp;</span>				z.usub(y, x)
+<span id="L1463" class="ln" data-content="  1463">&nbsp;&nbsp;</span>			}
+<span id="L1464" class="ln" data-content="  1464">&nbsp;&nbsp;</span>		}
+<span id="L1465" class="ln" data-content="  1465">&nbsp;&nbsp;</span>		return z
+<span id="L1466" class="ln" data-content="  1466">&nbsp;&nbsp;</span>	}
+<span id="L1467" class="ln" data-content="  1467">&nbsp;&nbsp;</span>
+<span id="L1468" class="ln" data-content="  1468">&nbsp;&nbsp;</span>	if x.form == inf &amp;&amp; y.form == inf &amp;&amp; x.neg != y.neg {
+<span id="L1469" class="ln" data-content="  1469">&nbsp;&nbsp;</span>		<span class="comment">// +Inf + -Inf</span>
+<span id="L1470" class="ln" data-content="  1470">&nbsp;&nbsp;</span>		<span class="comment">// -Inf + +Inf</span>
+<span id="L1471" class="ln" data-content="  1471">&nbsp;&nbsp;</span>		<span class="comment">// value of z is undefined but make sure it&#39;s valid</span>
+<span id="L1472" class="ln" data-content="  1472">&nbsp;&nbsp;</span>		z.acc = Exact
+<span id="L1473" class="ln" data-content="  1473">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L1474" class="ln" data-content="  1474">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L1475" class="ln" data-content="  1475">&nbsp;&nbsp;</span>		panic(ErrNaN{&#34;addition of infinities with opposite signs&#34;})
+<span id="L1476" class="ln" data-content="  1476">&nbsp;&nbsp;</span>	}
+<span id="L1477" class="ln" data-content="  1477">&nbsp;&nbsp;</span>
+<span id="L1478" class="ln" data-content="  1478">&nbsp;&nbsp;</span>	if x.form == zero &amp;&amp; y.form == zero {
+<span id="L1479" class="ln" data-content="  1479">&nbsp;&nbsp;</span>		<span class="comment">// ±0 + ±0</span>
+<span id="L1480" class="ln" data-content="  1480">&nbsp;&nbsp;</span>		z.acc = Exact
+<span id="L1481" class="ln" data-content="  1481">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L1482" class="ln" data-content="  1482">&nbsp;&nbsp;</span>		z.neg = x.neg &amp;&amp; y.neg <span class="comment">// -0 + -0 == -0</span>
+<span id="L1483" class="ln" data-content="  1483">&nbsp;&nbsp;</span>		return z
+<span id="L1484" class="ln" data-content="  1484">&nbsp;&nbsp;</span>	}
+<span id="L1485" class="ln" data-content="  1485">&nbsp;&nbsp;</span>
+<span id="L1486" class="ln" data-content="  1486">&nbsp;&nbsp;</span>	if x.form == inf || y.form == zero {
+<span id="L1487" class="ln" data-content="  1487">&nbsp;&nbsp;</span>		<span class="comment">// ±Inf + y</span>
+<span id="L1488" class="ln" data-content="  1488">&nbsp;&nbsp;</span>		<span class="comment">// x + ±0</span>
+<span id="L1489" class="ln" data-content="  1489">&nbsp;&nbsp;</span>		return z.Set(x)
+<span id="L1490" class="ln" data-content="  1490">&nbsp;&nbsp;</span>	}
+<span id="L1491" class="ln" data-content="  1491">&nbsp;&nbsp;</span>
+<span id="L1492" class="ln" data-content="  1492">&nbsp;&nbsp;</span>	<span class="comment">// ±0 + y</span>
+<span id="L1493" class="ln" data-content="  1493">&nbsp;&nbsp;</span>	<span class="comment">// x + ±Inf</span>
+<span id="L1494" class="ln" data-content="  1494">&nbsp;&nbsp;</span>	return z.Set(y)
+<span id="L1495" class="ln" data-content="  1495">&nbsp;&nbsp;</span>}
+<span id="L1496" class="ln" data-content="  1496">&nbsp;&nbsp;</span>
+<span id="L1497" class="ln" data-content="  1497">&nbsp;&nbsp;</span><span class="comment">// Sub sets z to the rounded difference x-y and returns z.</span>
+<span id="L1498" class="ln" data-content="  1498">&nbsp;&nbsp;</span><span class="comment">// Precision, rounding, and accuracy reporting are as for Add.</span>
+<span id="L1499" class="ln" data-content="  1499">&nbsp;&nbsp;</span><span class="comment">// Sub panics with ErrNaN if x and y are infinities with equal</span>
+<span id="L1500" class="ln" data-content="  1500">&nbsp;&nbsp;</span><span class="comment">// signs. The value of z is undefined in that case.</span>
+<span id="L1501" class="ln" data-content="  1501">&nbsp;&nbsp;</span>func (z *Float) Sub(x, y *Float) *Float {
+<span id="L1502" class="ln" data-content="  1502">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1503" class="ln" data-content="  1503">&nbsp;&nbsp;</span>		x.validate()
+<span id="L1504" class="ln" data-content="  1504">&nbsp;&nbsp;</span>		y.validate()
+<span id="L1505" class="ln" data-content="  1505">&nbsp;&nbsp;</span>	}
+<span id="L1506" class="ln" data-content="  1506">&nbsp;&nbsp;</span>
+<span id="L1507" class="ln" data-content="  1507">&nbsp;&nbsp;</span>	if z.prec == 0 {
+<span id="L1508" class="ln" data-content="  1508">&nbsp;&nbsp;</span>		z.prec = umax32(x.prec, y.prec)
+<span id="L1509" class="ln" data-content="  1509">&nbsp;&nbsp;</span>	}
+<span id="L1510" class="ln" data-content="  1510">&nbsp;&nbsp;</span>
+<span id="L1511" class="ln" data-content="  1511">&nbsp;&nbsp;</span>	if x.form == finite &amp;&amp; y.form == finite {
+<span id="L1512" class="ln" data-content="  1512">&nbsp;&nbsp;</span>		<span class="comment">// x - y (common case)</span>
+<span id="L1513" class="ln" data-content="  1513">&nbsp;&nbsp;</span>		yneg := y.neg
+<span id="L1514" class="ln" data-content="  1514">&nbsp;&nbsp;</span>		z.neg = x.neg
+<span id="L1515" class="ln" data-content="  1515">&nbsp;&nbsp;</span>		if x.neg != yneg {
+<span id="L1516" class="ln" data-content="  1516">&nbsp;&nbsp;</span>			<span class="comment">// x - (-y) == x + y</span>
+<span id="L1517" class="ln" data-content="  1517">&nbsp;&nbsp;</span>			<span class="comment">// (-x) - y == -(x + y)</span>
+<span id="L1518" class="ln" data-content="  1518">&nbsp;&nbsp;</span>			z.uadd(x, y)
+<span id="L1519" class="ln" data-content="  1519">&nbsp;&nbsp;</span>		} else {
+<span id="L1520" class="ln" data-content="  1520">&nbsp;&nbsp;</span>			<span class="comment">// x - y == x - y == -(y - x)</span>
+<span id="L1521" class="ln" data-content="  1521">&nbsp;&nbsp;</span>			<span class="comment">// (-x) - (-y) == y - x == -(x - y)</span>
+<span id="L1522" class="ln" data-content="  1522">&nbsp;&nbsp;</span>			if x.ucmp(y) &gt; 0 {
+<span id="L1523" class="ln" data-content="  1523">&nbsp;&nbsp;</span>				z.usub(x, y)
+<span id="L1524" class="ln" data-content="  1524">&nbsp;&nbsp;</span>			} else {
+<span id="L1525" class="ln" data-content="  1525">&nbsp;&nbsp;</span>				z.neg = !z.neg
+<span id="L1526" class="ln" data-content="  1526">&nbsp;&nbsp;</span>				z.usub(y, x)
+<span id="L1527" class="ln" data-content="  1527">&nbsp;&nbsp;</span>			}
+<span id="L1528" class="ln" data-content="  1528">&nbsp;&nbsp;</span>		}
+<span id="L1529" class="ln" data-content="  1529">&nbsp;&nbsp;</span>		return z
+<span id="L1530" class="ln" data-content="  1530">&nbsp;&nbsp;</span>	}
+<span id="L1531" class="ln" data-content="  1531">&nbsp;&nbsp;</span>
+<span id="L1532" class="ln" data-content="  1532">&nbsp;&nbsp;</span>	if x.form == inf &amp;&amp; y.form == inf &amp;&amp; x.neg == y.neg {
+<span id="L1533" class="ln" data-content="  1533">&nbsp;&nbsp;</span>		<span class="comment">// +Inf - +Inf</span>
+<span id="L1534" class="ln" data-content="  1534">&nbsp;&nbsp;</span>		<span class="comment">// -Inf - -Inf</span>
+<span id="L1535" class="ln" data-content="  1535">&nbsp;&nbsp;</span>		<span class="comment">// value of z is undefined but make sure it&#39;s valid</span>
+<span id="L1536" class="ln" data-content="  1536">&nbsp;&nbsp;</span>		z.acc = Exact
+<span id="L1537" class="ln" data-content="  1537">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L1538" class="ln" data-content="  1538">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L1539" class="ln" data-content="  1539">&nbsp;&nbsp;</span>		panic(ErrNaN{&#34;subtraction of infinities with equal signs&#34;})
+<span id="L1540" class="ln" data-content="  1540">&nbsp;&nbsp;</span>	}
+<span id="L1541" class="ln" data-content="  1541">&nbsp;&nbsp;</span>
+<span id="L1542" class="ln" data-content="  1542">&nbsp;&nbsp;</span>	if x.form == zero &amp;&amp; y.form == zero {
+<span id="L1543" class="ln" data-content="  1543">&nbsp;&nbsp;</span>		<span class="comment">// ±0 - ±0</span>
+<span id="L1544" class="ln" data-content="  1544">&nbsp;&nbsp;</span>		z.acc = Exact
+<span id="L1545" class="ln" data-content="  1545">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L1546" class="ln" data-content="  1546">&nbsp;&nbsp;</span>		z.neg = x.neg &amp;&amp; !y.neg <span class="comment">// -0 - +0 == -0</span>
+<span id="L1547" class="ln" data-content="  1547">&nbsp;&nbsp;</span>		return z
+<span id="L1548" class="ln" data-content="  1548">&nbsp;&nbsp;</span>	}
+<span id="L1549" class="ln" data-content="  1549">&nbsp;&nbsp;</span>
+<span id="L1550" class="ln" data-content="  1550">&nbsp;&nbsp;</span>	if x.form == inf || y.form == zero {
+<span id="L1551" class="ln" data-content="  1551">&nbsp;&nbsp;</span>		<span class="comment">// ±Inf - y</span>
+<span id="L1552" class="ln" data-content="  1552">&nbsp;&nbsp;</span>		<span class="comment">// x - ±0</span>
+<span id="L1553" class="ln" data-content="  1553">&nbsp;&nbsp;</span>		return z.Set(x)
+<span id="L1554" class="ln" data-content="  1554">&nbsp;&nbsp;</span>	}
+<span id="L1555" class="ln" data-content="  1555">&nbsp;&nbsp;</span>
+<span id="L1556" class="ln" data-content="  1556">&nbsp;&nbsp;</span>	<span class="comment">// ±0 - y</span>
+<span id="L1557" class="ln" data-content="  1557">&nbsp;&nbsp;</span>	<span class="comment">// x - ±Inf</span>
+<span id="L1558" class="ln" data-content="  1558">&nbsp;&nbsp;</span>	return z.Neg(y)
+<span id="L1559" class="ln" data-content="  1559">&nbsp;&nbsp;</span>}
+<span id="L1560" class="ln" data-content="  1560">&nbsp;&nbsp;</span>
+<span id="L1561" class="ln" data-content="  1561">&nbsp;&nbsp;</span><span class="comment">// Mul sets z to the rounded product x*y and returns z.</span>
+<span id="L1562" class="ln" data-content="  1562">&nbsp;&nbsp;</span><span class="comment">// Precision, rounding, and accuracy reporting are as for Add.</span>
+<span id="L1563" class="ln" data-content="  1563">&nbsp;&nbsp;</span><span class="comment">// Mul panics with ErrNaN if one operand is zero and the other</span>
+<span id="L1564" class="ln" data-content="  1564">&nbsp;&nbsp;</span><span class="comment">// operand an infinity. The value of z is undefined in that case.</span>
+<span id="L1565" class="ln" data-content="  1565">&nbsp;&nbsp;</span>func (z *Float) Mul(x, y *Float) *Float {
+<span id="L1566" class="ln" data-content="  1566">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1567" class="ln" data-content="  1567">&nbsp;&nbsp;</span>		x.validate()
+<span id="L1568" class="ln" data-content="  1568">&nbsp;&nbsp;</span>		y.validate()
+<span id="L1569" class="ln" data-content="  1569">&nbsp;&nbsp;</span>	}
+<span id="L1570" class="ln" data-content="  1570">&nbsp;&nbsp;</span>
+<span id="L1571" class="ln" data-content="  1571">&nbsp;&nbsp;</span>	if z.prec == 0 {
+<span id="L1572" class="ln" data-content="  1572">&nbsp;&nbsp;</span>		z.prec = umax32(x.prec, y.prec)
+<span id="L1573" class="ln" data-content="  1573">&nbsp;&nbsp;</span>	}
+<span id="L1574" class="ln" data-content="  1574">&nbsp;&nbsp;</span>
+<span id="L1575" class="ln" data-content="  1575">&nbsp;&nbsp;</span>	z.neg = x.neg != y.neg
+<span id="L1576" class="ln" data-content="  1576">&nbsp;&nbsp;</span>
+<span id="L1577" class="ln" data-content="  1577">&nbsp;&nbsp;</span>	if x.form == finite &amp;&amp; y.form == finite {
+<span id="L1578" class="ln" data-content="  1578">&nbsp;&nbsp;</span>		<span class="comment">// x * y (common case)</span>
+<span id="L1579" class="ln" data-content="  1579">&nbsp;&nbsp;</span>		z.umul(x, y)
+<span id="L1580" class="ln" data-content="  1580">&nbsp;&nbsp;</span>		return z
+<span id="L1581" class="ln" data-content="  1581">&nbsp;&nbsp;</span>	}
+<span id="L1582" class="ln" data-content="  1582">&nbsp;&nbsp;</span>
+<span id="L1583" class="ln" data-content="  1583">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L1584" class="ln" data-content="  1584">&nbsp;&nbsp;</span>	if x.form == zero &amp;&amp; y.form == inf || x.form == inf &amp;&amp; y.form == zero {
+<span id="L1585" class="ln" data-content="  1585">&nbsp;&nbsp;</span>		<span class="comment">// ±0 * ±Inf</span>
+<span id="L1586" class="ln" data-content="  1586">&nbsp;&nbsp;</span>		<span class="comment">// ±Inf * ±0</span>
+<span id="L1587" class="ln" data-content="  1587">&nbsp;&nbsp;</span>		<span class="comment">// value of z is undefined but make sure it&#39;s valid</span>
+<span id="L1588" class="ln" data-content="  1588">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L1589" class="ln" data-content="  1589">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L1590" class="ln" data-content="  1590">&nbsp;&nbsp;</span>		panic(ErrNaN{&#34;multiplication of zero with infinity&#34;})
+<span id="L1591" class="ln" data-content="  1591">&nbsp;&nbsp;</span>	}
+<span id="L1592" class="ln" data-content="  1592">&nbsp;&nbsp;</span>
+<span id="L1593" class="ln" data-content="  1593">&nbsp;&nbsp;</span>	if x.form == inf || y.form == inf {
+<span id="L1594" class="ln" data-content="  1594">&nbsp;&nbsp;</span>		<span class="comment">// ±Inf * y</span>
+<span id="L1595" class="ln" data-content="  1595">&nbsp;&nbsp;</span>		<span class="comment">// x * ±Inf</span>
+<span id="L1596" class="ln" data-content="  1596">&nbsp;&nbsp;</span>		z.form = inf
+<span id="L1597" class="ln" data-content="  1597">&nbsp;&nbsp;</span>		return z
+<span id="L1598" class="ln" data-content="  1598">&nbsp;&nbsp;</span>	}
+<span id="L1599" class="ln" data-content="  1599">&nbsp;&nbsp;</span>
+<span id="L1600" class="ln" data-content="  1600">&nbsp;&nbsp;</span>	<span class="comment">// ±0 * y</span>
+<span id="L1601" class="ln" data-content="  1601">&nbsp;&nbsp;</span>	<span class="comment">// x * ±0</span>
+<span id="L1602" class="ln" data-content="  1602">&nbsp;&nbsp;</span>	z.form = zero
+<span id="L1603" class="ln" data-content="  1603">&nbsp;&nbsp;</span>	return z
+<span id="L1604" class="ln" data-content="  1604">&nbsp;&nbsp;</span>}
+<span id="L1605" class="ln" data-content="  1605">&nbsp;&nbsp;</span>
+<span id="L1606" class="ln" data-content="  1606">&nbsp;&nbsp;</span><span class="comment">// Quo sets z to the rounded quotient x/y and returns z.</span>
+<span id="L1607" class="ln" data-content="  1607">&nbsp;&nbsp;</span><span class="comment">// Precision, rounding, and accuracy reporting are as for Add.</span>
+<span id="L1608" class="ln" data-content="  1608">&nbsp;&nbsp;</span><span class="comment">// Quo panics with ErrNaN if both operands are zero or infinities.</span>
+<span id="L1609" class="ln" data-content="  1609">&nbsp;&nbsp;</span><span class="comment">// The value of z is undefined in that case.</span>
+<span id="L1610" class="ln" data-content="  1610">&nbsp;&nbsp;</span>func (z *Float) Quo(x, y *Float) *Float {
+<span id="L1611" class="ln" data-content="  1611">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1612" class="ln" data-content="  1612">&nbsp;&nbsp;</span>		x.validate()
+<span id="L1613" class="ln" data-content="  1613">&nbsp;&nbsp;</span>		y.validate()
+<span id="L1614" class="ln" data-content="  1614">&nbsp;&nbsp;</span>	}
+<span id="L1615" class="ln" data-content="  1615">&nbsp;&nbsp;</span>
+<span id="L1616" class="ln" data-content="  1616">&nbsp;&nbsp;</span>	if z.prec == 0 {
+<span id="L1617" class="ln" data-content="  1617">&nbsp;&nbsp;</span>		z.prec = umax32(x.prec, y.prec)
+<span id="L1618" class="ln" data-content="  1618">&nbsp;&nbsp;</span>	}
+<span id="L1619" class="ln" data-content="  1619">&nbsp;&nbsp;</span>
+<span id="L1620" class="ln" data-content="  1620">&nbsp;&nbsp;</span>	z.neg = x.neg != y.neg
+<span id="L1621" class="ln" data-content="  1621">&nbsp;&nbsp;</span>
+<span id="L1622" class="ln" data-content="  1622">&nbsp;&nbsp;</span>	if x.form == finite &amp;&amp; y.form == finite {
+<span id="L1623" class="ln" data-content="  1623">&nbsp;&nbsp;</span>		<span class="comment">// x / y (common case)</span>
+<span id="L1624" class="ln" data-content="  1624">&nbsp;&nbsp;</span>		z.uquo(x, y)
+<span id="L1625" class="ln" data-content="  1625">&nbsp;&nbsp;</span>		return z
+<span id="L1626" class="ln" data-content="  1626">&nbsp;&nbsp;</span>	}
+<span id="L1627" class="ln" data-content="  1627">&nbsp;&nbsp;</span>
+<span id="L1628" class="ln" data-content="  1628">&nbsp;&nbsp;</span>	z.acc = Exact
+<span id="L1629" class="ln" data-content="  1629">&nbsp;&nbsp;</span>	if x.form == zero &amp;&amp; y.form == zero || x.form == inf &amp;&amp; y.form == inf {
+<span id="L1630" class="ln" data-content="  1630">&nbsp;&nbsp;</span>		<span class="comment">// ±0 / ±0</span>
+<span id="L1631" class="ln" data-content="  1631">&nbsp;&nbsp;</span>		<span class="comment">// ±Inf / ±Inf</span>
+<span id="L1632" class="ln" data-content="  1632">&nbsp;&nbsp;</span>		<span class="comment">// value of z is undefined but make sure it&#39;s valid</span>
+<span id="L1633" class="ln" data-content="  1633">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L1634" class="ln" data-content="  1634">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L1635" class="ln" data-content="  1635">&nbsp;&nbsp;</span>		panic(ErrNaN{&#34;division of zero by zero or infinity by infinity&#34;})
+<span id="L1636" class="ln" data-content="  1636">&nbsp;&nbsp;</span>	}
+<span id="L1637" class="ln" data-content="  1637">&nbsp;&nbsp;</span>
+<span id="L1638" class="ln" data-content="  1638">&nbsp;&nbsp;</span>	if x.form == zero || y.form == inf {
+<span id="L1639" class="ln" data-content="  1639">&nbsp;&nbsp;</span>		<span class="comment">// ±0 / y</span>
+<span id="L1640" class="ln" data-content="  1640">&nbsp;&nbsp;</span>		<span class="comment">// x / ±Inf</span>
+<span id="L1641" class="ln" data-content="  1641">&nbsp;&nbsp;</span>		z.form = zero
+<span id="L1642" class="ln" data-content="  1642">&nbsp;&nbsp;</span>		return z
+<span id="L1643" class="ln" data-content="  1643">&nbsp;&nbsp;</span>	}
+<span id="L1644" class="ln" data-content="  1644">&nbsp;&nbsp;</span>
+<span id="L1645" class="ln" data-content="  1645">&nbsp;&nbsp;</span>	<span class="comment">// x / ±0</span>
+<span id="L1646" class="ln" data-content="  1646">&nbsp;&nbsp;</span>	<span class="comment">// ±Inf / y</span>
+<span id="L1647" class="ln" data-content="  1647">&nbsp;&nbsp;</span>	z.form = inf
+<span id="L1648" class="ln" data-content="  1648">&nbsp;&nbsp;</span>	return z
+<span id="L1649" class="ln" data-content="  1649">&nbsp;&nbsp;</span>}
+<span id="L1650" class="ln" data-content="  1650">&nbsp;&nbsp;</span>
+<span id="L1651" class="ln" data-content="  1651">&nbsp;&nbsp;</span><span class="comment">// Cmp compares x and y and returns:</span>
+<span id="L1652" class="ln" data-content="  1652">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1653" class="ln" data-content="  1653">&nbsp;&nbsp;</span><span class="comment">//   -1 if x &lt;  y</span>
+<span id="L1654" class="ln" data-content="  1654">&nbsp;&nbsp;</span><span class="comment">//    0 if x == y (incl. -0 == 0, -Inf == -Inf, and +Inf == +Inf)</span>
+<span id="L1655" class="ln" data-content="  1655">&nbsp;&nbsp;</span><span class="comment">//   +1 if x &gt;  y</span>
+<span id="L1656" class="ln" data-content="  1656">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1657" class="ln" data-content="  1657">&nbsp;&nbsp;</span><span class="selection">func (x *Float) Cmp(y *Float) int</span> {
+<span id="L1658" class="ln" data-content="  1658">&nbsp;&nbsp;</span>	if debugFloat {
+<span id="L1659" class="ln" data-content="  1659">&nbsp;&nbsp;</span>		x.validate()
+<span id="L1660" class="ln" data-content="  1660">&nbsp;&nbsp;</span>		y.validate()
+<span id="L1661" class="ln" data-content="  1661">&nbsp;&nbsp;</span>	}
+<span id="L1662" class="ln" data-content="  1662">&nbsp;&nbsp;</span>
+<span id="L1663" class="ln" data-content="  1663">&nbsp;&nbsp;</span>	mx := x.ord()
+<span id="L1664" class="ln" data-content="  1664">&nbsp;&nbsp;</span>	my := y.ord()
+<span id="L1665" class="ln" data-content="  1665">&nbsp;&nbsp;</span>	switch {
+<span id="L1666" class="ln" data-content="  1666">&nbsp;&nbsp;</span>	case mx &lt; my:
+<span id="L1667" class="ln" data-content="  1667">&nbsp;&nbsp;</span>		return -1
+<span id="L1668" class="ln" data-content="  1668">&nbsp;&nbsp;</span>	case mx &gt; my:
+<span id="L1669" class="ln" data-content="  1669">&nbsp;&nbsp;</span>		return +1
+<span id="L1670" class="ln" data-content="  1670">&nbsp;&nbsp;</span>	}
+<span id="L1671" class="ln" data-content="  1671">&nbsp;&nbsp;</span>	<span class="comment">// mx == my</span>
+<span id="L1672" class="ln" data-content="  1672">&nbsp;&nbsp;</span>
+<span id="L1673" class="ln" data-content="  1673">&nbsp;&nbsp;</span>	<span class="comment">// only if |mx| == 1 we have to compare the mantissae</span>
+<span id="L1674" class="ln" data-content="  1674">&nbsp;&nbsp;</span>	switch mx {
+<span id="L1675" class="ln" data-content="  1675">&nbsp;&nbsp;</span>	case -1:
+<span id="L1676" class="ln" data-content="  1676">&nbsp;&nbsp;</span>		return y.ucmp(x)
+<span id="L1677" class="ln" data-content="  1677">&nbsp;&nbsp;</span>	case +1:
+<span id="L1678" class="ln" data-content="  1678">&nbsp;&nbsp;</span>		return x.ucmp(y)
+<span id="L1679" class="ln" data-content="  1679">&nbsp;&nbsp;</span>	}
+<span id="L1680" class="ln" data-content="  1680">&nbsp;&nbsp;</span>
+<span id="L1681" class="ln" data-content="  1681">&nbsp;&nbsp;</span>	return 0
+<span id="L1682" class="ln" data-content="  1682">&nbsp;&nbsp;</span>}
+<span id="L1683" class="ln" data-content="  1683">&nbsp;&nbsp;</span>
+<span id="L1684" class="ln" data-content="  1684">&nbsp;&nbsp;</span><span class="comment">// ord classifies x and returns:</span>
+<span id="L1685" class="ln" data-content="  1685">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1686" class="ln" data-content="  1686">&nbsp;&nbsp;</span><span class="comment">//	-2 if -Inf == x</span>
+<span id="L1687" class="ln" data-content="  1687">&nbsp;&nbsp;</span><span class="comment">//	-1 if -Inf &lt; x &lt; 0</span>
+<span id="L1688" class="ln" data-content="  1688">&nbsp;&nbsp;</span><span class="comment">//	 0 if x == 0 (signed or unsigned)</span>
+<span id="L1689" class="ln" data-content="  1689">&nbsp;&nbsp;</span><span class="comment">//	+1 if 0 &lt; x &lt; +Inf</span>
+<span id="L1690" class="ln" data-content="  1690">&nbsp;&nbsp;</span><span class="comment">//	+2 if x == +Inf</span>
+<span id="L1691" class="ln" data-content="  1691">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1692" class="ln" data-content="  1692">&nbsp;&nbsp;</span>func (x *Float) ord() int {
+<span id="L1693" class="ln" data-content="  1693">&nbsp;&nbsp;</span>	var m int
+<span id="L1694" class="ln" data-content="  1694">&nbsp;&nbsp;</span>	switch x.form {
+<span id="L1695" class="ln" data-content="  1695">&nbsp;&nbsp;</span>	case finite:
+<span id="L1696" class="ln" data-content="  1696">&nbsp;&nbsp;</span>		m = 1
+<span id="L1697" class="ln" data-content="  1697">&nbsp;&nbsp;</span>	case zero:
+<span id="L1698" class="ln" data-content="  1698">&nbsp;&nbsp;</span>		return 0
+<span id="L1699" class="ln" data-content="  1699">&nbsp;&nbsp;</span>	case inf:
+<span id="L1700" class="ln" data-content="  1700">&nbsp;&nbsp;</span>		m = 2
+<span id="L1701" class="ln" data-content="  1701">&nbsp;&nbsp;</span>	}
+<span id="L1702" class="ln" data-content="  1702">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L1703" class="ln" data-content="  1703">&nbsp;&nbsp;</span>		m = -m
+<span id="L1704" class="ln" data-content="  1704">&nbsp;&nbsp;</span>	}
+<span id="L1705" class="ln" data-content="  1705">&nbsp;&nbsp;</span>	return m
+<span id="L1706" class="ln" data-content="  1706">&nbsp;&nbsp;</span>}
+<span id="L1707" class="ln" data-content="  1707">&nbsp;&nbsp;</span>
+<span id="L1708" class="ln" data-content="  1708">&nbsp;&nbsp;</span>func umax32(x, y uint32) uint32 {
+<span id="L1709" class="ln" data-content="  1709">&nbsp;&nbsp;</span>	if x &gt; y {
+<span id="L1710" class="ln" data-content="  1710">&nbsp;&nbsp;</span>		return x
+<span id="L1711" class="ln" data-content="  1711">&nbsp;&nbsp;</span>	}
+<span id="L1712" class="ln" data-content="  1712">&nbsp;&nbsp;</span>	return y
+<span id="L1713" class="ln" data-content="  1713">&nbsp;&nbsp;</span>}
+<span id="L1714" class="ln" data-content="  1714">&nbsp;&nbsp;</span>
+</pre><p><a href="float.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

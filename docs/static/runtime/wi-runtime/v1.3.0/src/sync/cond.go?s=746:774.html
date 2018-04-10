@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/sync/cond.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./cond.go%3Fs=746:774.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/sync">sync</a>/<span class="text-muted">cond.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:6060/pkg/sync">sync</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package sync
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;sync/atomic&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;unsafe&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>)
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span><span class="comment">// Cond implements a condition variable, a rendezvous point</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span><span class="comment">// for goroutines waiting for or announcing the occurrence</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// of an event.</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// Each Cond has an associated Locker L (often a *Mutex or *RWMutex),</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// which must be held when changing the condition and</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">// when calling the Wait method.</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span><span class="comment">// A Cond must not be copied after first use.</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>type Cond struct {
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	noCopy noCopy
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	<span class="comment">// L is held while observing or changing the condition</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	L Locker
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	notify  notifyList
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	checker copyChecker
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>}
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span><span class="comment">// NewCond returns a new Cond with Locker l.</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span><span class="selection">func NewCond(l Locker) *Cond</span> {
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	return &amp;Cond{L: l}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>}
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span><span class="comment">// Wait atomically unlocks c.L and suspends execution</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span><span class="comment">// of the calling goroutine. After later resuming execution,</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span><span class="comment">// Wait locks c.L before returning. Unlike in other systems,</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span><span class="comment">// Wait cannot return unless awoken by Broadcast or Signal.</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span><span class="comment">// Because c.L is not locked when Wait first resumes, the caller</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span><span class="comment">// typically cannot assume that the condition is true when</span>
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span><span class="comment">// Wait returns. Instead, the caller should Wait in a loop:</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span><span class="comment">//    c.L.Lock()</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span><span class="comment">//    for !condition() {</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span><span class="comment">//        c.Wait()</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span><span class="comment">//    }</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span><span class="comment">//    ... make use of condition ...</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span><span class="comment">//    c.L.Unlock()</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>func (c *Cond) Wait() {
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	c.checker.check()
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	t := runtime_notifyListAdd(&amp;c.notify)
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	c.L.Unlock()
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	runtime_notifyListWait(&amp;c.notify, t)
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	c.L.Lock()
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>}
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span><span class="comment">// Signal wakes one goroutine waiting on c, if there is any.</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span><span class="comment">// It is allowed but not required for the caller to hold c.L</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span><span class="comment">// during the call.</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>func (c *Cond) Signal() {
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>	c.checker.check()
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>	runtime_notifyListNotifyOne(&amp;c.notify)
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>}
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span><span class="comment">// Broadcast wakes all goroutines waiting on c.</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span><span class="comment">// It is allowed but not required for the caller to hold c.L</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span><span class="comment">// during the call.</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>func (c *Cond) Broadcast() {
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	c.checker.check()
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	runtime_notifyListNotifyAll(&amp;c.notify)
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>}
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span><span class="comment">// copyChecker holds back pointer to itself to detect object copying.</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>type copyChecker uintptr
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>func (c *copyChecker) check() {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	if uintptr(*c) != uintptr(unsafe.Pointer(c)) &amp;&amp;
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		!atomic.CompareAndSwapUintptr((*uintptr)(c), 0, uintptr(unsafe.Pointer(c))) &amp;&amp;
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>		uintptr(*c) != uintptr(unsafe.Pointer(c)) {
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>		panic(&#34;sync.Cond is copied&#34;)
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	}
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>}
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span><span class="comment">// noCopy may be embedded into structs which must not be copied</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span><span class="comment">// after the first use.</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span><span class="comment">// See https://github.com/golang/go/issues/8005#issuecomment-190753527</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span><span class="comment">// for details.</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>type noCopy struct{}
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span><span class="comment">// Lock is a no-op used by -copylocks checker from `go vet`.</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>func (*noCopy) Lock() {}
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>
+</pre><p><a href="cond.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

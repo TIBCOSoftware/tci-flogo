@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/github.com/TIBCOSoftware/flogo-contrib/action/flow/support/manager.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../../../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../../../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="manager.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/github.com">github.com</a>/<a href="../../../../../TIBCOSoftware.1.html">TIBCOSoftware</a>/<a href="../../../../flogo-contrib.1.html">flogo-contrib</a>/<a href="../../../action.1.html">action</a>/<a href="../../flow.1.html">flow</a>/<a href="../support.1.html">support</a>/<span class="text-muted">manager.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../../../../../pkg/github.com/TIBCOSoftware/flogo-contrib/action/flow/support.1.html">github.com/TIBCOSoftware/flogo-contrib/action/flow/support</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span>package support
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span>import (
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>	&#34;compress/gzip&#34;
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>	&#34;encoding/base64&#34;
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>	&#34;encoding/json&#34;
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;io/ioutil&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;net/http&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;sync&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;github.com/TIBCOSoftware/flogo-contrib/action/flow/linker&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;github.com/TIBCOSoftware/flogo-contrib/action/flow/definition&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;github.com/TIBCOSoftware/flogo-lib/app/resource&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;github.com/TIBCOSoftware/flogo-lib/logger&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;github.com/TIBCOSoftware/flogo-lib/util&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>)
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>const (
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	uriSchemeFile = &#34;file://&#34;
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	uriSchemeHttp = &#34;http://&#34;
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	uriSchemeRes  = &#34;res://&#34;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	RESTYPE_FLOW  = &#34;flow&#34;
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>)
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>var defaultManager *FlowManager
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>func GetFlowManager() *FlowManager {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	return defaultManager
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>type FlowManager struct {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	resFlows map[string]*definition.Definition
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	<span class="comment">//todo switch to cache</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	rfMu         sync.Mutex <span class="comment">// protects the flow maps</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	remoteFlows  map[string]*definition.Definition
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	flowProvider definition.Provider
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>}
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>func NewFlowManager(flowProvider definition.Provider) *FlowManager {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	manager := &amp;FlowManager{}
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	manager.resFlows = make(map[string]*definition.Definition)
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	if flowProvider != nil {
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>		manager.flowProvider = flowProvider
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	} else {
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>		manager.flowProvider = &amp;BasicRemoteFlowProvider{}
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	}
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	<span class="comment">//temp hack</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	defaultManager = manager
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	return manager
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>}
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>func (fm *FlowManager) LoadResource(config *resource.Config) error {
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	var flowDefBytes []byte
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	if config.Compressed {
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>		decodedBytes, err := decodeAndUnzip(string(config.Data))
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>			return fmt.Errorf(&#34;error decoding compressed resource with id &#39;%s&#39;, %s&#34;, config.ID, err.Error())
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		}
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>		flowDefBytes = decodedBytes
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>	} else {
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>		flowDefBytes = config.Data
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	}
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	var defRep *definition.DefinitionRep
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	err := json.Unmarshal(flowDefBytes, &amp;defRep)
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>		return fmt.Errorf(&#34;error marshalling flow resource with id &#39;%s&#39;, %s&#34;, config.ID, err.Error())
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	}
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	flow, err := fm.materializeFlow(defRep)
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		return err
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	}
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	fm.resFlows[config.ID] = flow
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	return nil
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>}
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>func (fm *FlowManager) GetResource(id string) interface{} {
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	return fm.resFlows[id]
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>}
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>func (fm *FlowManager) GetFlow(uri string) (*definition.Definition, error) {
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	if strings.HasPrefix(uri, uriSchemeRes) {
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>		return fm.resFlows[uri[6:]], nil
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	}
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	fm.rfMu.Lock()
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	defer fm.rfMu.Unlock()
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	if fm.remoteFlows == nil {
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		fm.remoteFlows = make(map[string]*definition.Definition)
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	}
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	flow, exists := fm.remoteFlows[uri]
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	if !exists {
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		defRep, err := fm.flowProvider.GetFlow(uri)
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>			return nil, err
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		}
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>		flow, err = fm.materializeFlow(defRep)
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>			return nil, err
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>		}
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		fm.remoteFlows[uri] = flow
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	}
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	return flow, nil
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>}
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>func (fm *FlowManager) materializeFlow(flowRep *definition.DefinitionRep) (*definition.Definition, error) {
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	def, err := definition.NewDefinition(flowRep)
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>		return nil, fmt.Errorf(&#34;error unmarshalling flow: %s&#34;, err.Error())
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	}
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	<span class="comment">//todo validate flow</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	<span class="comment">//todo fix this up</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	factory := definition.GetLinkExprManagerFactory()
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	if factory == nil {
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>		factory = linker.NewDefaultLinkerFactory()
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	}
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	def.SetLinkExprManager(factory.NewLinkExprManager())
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>	<span class="comment">//todo init activities</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	return def, nil
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>}
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>type BasicRemoteFlowProvider struct {
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>}
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>func (*BasicRemoteFlowProvider) GetFlow(flowURI string) (*definition.DefinitionRep, error) {
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	var flowDefBytes []byte
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>	if strings.HasPrefix(flowURI, uriSchemeFile) {
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>		<span class="comment">// File URI</span>
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		logger.Infof(&#34;Loading Local Flow: %s\n&#34;, flowURI)
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		flowFilePath, _ := util.URLStringToFilePath(flowURI)
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>		readBytes, err := ioutil.ReadFile(flowFilePath)
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>			readErr := fmt.Errorf(&#34;error reading flow with uri &#39;%s&#39;, %s&#34;, flowURI, err.Error())
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>			logger.Errorf(readErr.Error())
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>			return nil, readErr
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>		}
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		if readBytes[0] == 0x1f &amp;&amp; readBytes[2] == 0x8b {
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>			flowDefBytes, err = unzip(readBytes)
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>				decompressErr := fmt.Errorf(&#34;error uncompressing flow with uri &#39;%s&#39;, %s&#34;, flowURI, err.Error())
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>				logger.Errorf(decompressErr.Error())
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>				return nil, decompressErr
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>			}
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		} else {
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>			flowDefBytes = readBytes
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>		}
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	} else {
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		<span class="comment">// URI</span>
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>		req, err := http.NewRequest(&#34;GET&#34;, flowURI, nil)
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>		client := &amp;http.Client{}
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>		resp, err := client.Do(req)
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>			getErr := fmt.Errorf(&#34;error getting flow with uri &#39;%s&#39;, %s&#34;, flowURI, err.Error())
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>			logger.Errorf(getErr.Error())
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>			return nil, getErr
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>		}
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>		defer resp.Body.Close()
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>		logger.Infof(&#34;response Status:&#34;, resp.Status)
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>		if resp.StatusCode &gt;= 300 {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>			<span class="comment">//not found</span>
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>			getErr := fmt.Errorf(&#34;error getting flow with uri &#39;%s&#39;, status code %d&#34;, flowURI, resp.StatusCode)
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>			logger.Errorf(getErr.Error())
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>			return nil, getErr
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>		}
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		body, err := ioutil.ReadAll(resp.Body)
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>			readErr := fmt.Errorf(&#34;error reading flow response body with uri &#39;%s&#39;, %s&#34;, flowURI, err.Error())
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>			logger.Errorf(readErr.Error())
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>			return nil, readErr
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		}
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>		val := resp.Header.Get(&#34;flow-compressed&#34;)
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>		if strings.ToLower(val) == &#34;true&#34; {
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>			decodedBytes, err := decodeAndUnzip(string(body))
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>				decodeErr := fmt.Errorf(&#34;error decoding compressed flow with uri &#39;%s&#39;, %s&#34;, flowURI, err.Error())
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>				logger.Errorf(decodeErr.Error())
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>				return nil, decodeErr
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>			}
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>			flowDefBytes = decodedBytes
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>		} else {
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>			flowDefBytes = body
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		}
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	}
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>	var flow *definition.DefinitionRep
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	err := json.Unmarshal(flowDefBytes, &amp;flow)
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>		logger.Errorf(err.Error())
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>		return nil, fmt.Errorf(&#34;error marshalling flow with uri &#39;%s&#39;, %s&#34;, flowURI, err.Error())
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	}
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	return flow, nil
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>}
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>func decodeAndUnzip(encoded string) ([]byte, error) {
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	decoded, _ := base64.StdEncoding.DecodeString(encoded)
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	return unzip(decoded)
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>}
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>func unzip(compressed []byte) ([]byte, error) {
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>	buf := bytes.NewBuffer(compressed)
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	r, err := gzip.NewReader(buf)
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>		return nil, err
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	}
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	jsonAsBytes, err := ioutil.ReadAll(r)
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>		return nil, err
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>	}
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>	return jsonAsBytes, nil
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>}
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>
+</pre><p><a href="manager.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../../../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../../../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../../../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../../../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

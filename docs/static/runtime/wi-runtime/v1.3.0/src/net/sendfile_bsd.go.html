@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/sendfile_bsd.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="sendfile_bsd.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/net">net</a>/<span class="text-muted">sendfile_bsd.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:6060/pkg/net">net</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// +build dragonfly freebsd</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>package net
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>import (
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;internal/poll&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;os&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>)
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">// sendFile copies the contents of r to c using the sendfile</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// system call to minimize copies.</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">// if handled == true, sendFile returns the number of bytes copied and any</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span><span class="comment">// non-EOF error.</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span><span class="comment">// if handled == false, sendFile performed no work.</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>func sendFile(c *netFD, r io.Reader) (written int64, err error, handled bool) {
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	<span class="comment">// FreeBSD and DragonFly use 0 as the &#34;until EOF&#34; value.</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	<span class="comment">// If you pass in more bytes than the file contains, it will</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	<span class="comment">// loop back to the beginning ad nauseam until it&#39;s sent</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	<span class="comment">// exactly the number of bytes told to. As such, we need to</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	<span class="comment">// know exactly how many bytes to send.</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	var remain int64 = 0
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	lr, ok := r.(*io.LimitedReader)
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	if ok {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>		remain, r = lr.N, lr.R
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>		if remain &lt;= 0 {
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>			return 0, nil, true
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>		}
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	}
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	f, ok := r.(*os.File)
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	if !ok {
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>		return 0, nil, false
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	}
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	if remain == 0 {
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		fi, err := f.Stat()
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>			return 0, err, false
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>		}
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>		remain = fi.Size()
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	}
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	<span class="comment">// The other quirk with FreeBSD/DragonFly&#39;s sendfile</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	<span class="comment">// implementation is that it doesn&#39;t use the current position</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	<span class="comment">// of the file -- if you pass it offset 0, it starts from</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	<span class="comment">// offset 0. There&#39;s no way to tell it &#34;start from current</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	<span class="comment">// position&#34;, so we have to manage that explicitly.</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	pos, err := f.Seek(0, io.SeekCurrent)
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>		return 0, err, false
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	}
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	written, err = poll.SendFile(&amp;c.pfd, int(f.Fd()), pos, remain)
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	if lr != nil {
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>		lr.N = remain - written
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>	}
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>	return written, wrapSyscallError(&#34;sendfile&#34;, err), written &gt; 0
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>}
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>
+</pre><p><a href="sendfile_bsd.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

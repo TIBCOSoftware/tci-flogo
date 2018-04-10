@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/x509/root_cgo_darwin.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="root_cgo_darwin.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../x509.1.html">x509</a>/<span class="text-muted">root_cgo_darwin.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/x509.1.html">crypto/x509</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// +build cgo,!arm,!arm64,!ios</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>package x509
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span><span class="comment">/*
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>#cgo CFLAGS: -mmacosx-version-min=10.6 -D__MAC_OS_X_VERSION_MAX_ALLOWED=1080
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>#cgo LDFLAGS: -framework CoreFoundation -framework Security
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>#include &lt;errno.h&gt;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>#include &lt;sys/sysctl.h&gt;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>#include &lt;CoreFoundation/CoreFoundation.h&gt;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>#include &lt;Security/Security.h&gt;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>// FetchPEMRoots_MountainLion is the version of FetchPEMRoots from Go 1.6
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>// which still works on OS X 10.8 (Mountain Lion).
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>// It lacks support for admin &amp; user cert domains.
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>// See golang.org/issue/16473
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>int FetchPEMRoots_MountainLion(CFDataRef *pemRoots) {
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	if (pemRoots == NULL) {
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>		return -1;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	}
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	CFArrayRef certs = NULL;
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	OSStatus err = SecTrustCopyAnchorCertificates(&amp;certs);
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	if (err != noErr) {
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>		return -1;
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	}
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	CFMutableDataRef combinedData = CFDataCreateMutable(kCFAllocatorDefault, 0);
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	int i, ncerts = CFArrayGetCount(certs);
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	for (i = 0; i &lt; ncerts; i++) {
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>		CFDataRef data = NULL;
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>		SecCertificateRef cert = (SecCertificateRef)CFArrayGetValueAtIndex(certs, i);
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>		if (cert == NULL) {
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>			continue;
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>		}
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>		// Note: SecKeychainItemExport is deprecated as of 10.7 in favor of SecItemExport.
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		// Once we support weak imports via cgo we should prefer that, and fall back to this
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>		// for older systems.
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		err = SecKeychainItemExport(cert, kSecFormatX509Cert, kSecItemPemArmour, NULL, &amp;data);
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		if (err != noErr) {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>			continue;
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>		}
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>		if (data != NULL) {
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>			CFDataAppendBytes(combinedData, CFDataGetBytePtr(data), CFDataGetLength(data));
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>			CFRelease(data);
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>		}
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	}
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	CFRelease(certs);
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	*pemRoots = combinedData;
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	return 0;
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>}
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>// useOldCode reports whether the running machine is OS X 10.8 Mountain Lion
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>// or older. We only support Mountain Lion and higher, but we&#39;ll at least try our
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>// best on older machines and continue to use the old code path.
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>//
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>// See golang.org/issue/16473
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>int useOldCode() {
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	char str[256];
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	size_t size = sizeof(str);
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>	memset(str, 0, size);
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>	sysctlbyname(&#34;kern.osrelease&#34;, str, &amp;size, NULL, 0);
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	// OS X 10.8 is osrelease &#34;12.*&#34;, 10.7 is 11.*, 10.6 is 10.*.
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>	// We never supported things before that.
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	return memcmp(str, &#34;12.&#34;, 3) == 0 || memcmp(str, &#34;11.&#34;, 3) == 0 || memcmp(str, &#34;10.&#34;, 3) == 0;
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>}
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>// FetchPEMRoots fetches the system&#39;s list of trusted X.509 root certificates.
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>//
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>// On success it returns 0 and fills pemRoots with a CFDataRef that contains the extracted root
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>// certificates of the system. On failure, the function returns -1.
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>// Additionally, it fills untrustedPemRoots with certs that must be removed from pemRoots.
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>//
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>// Note: The CFDataRef returned in pemRoots and untrustedPemRoots must
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>// be released (using CFRelease) after we&#39;ve consumed its content.
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>int FetchPEMRoots(CFDataRef *pemRoots, CFDataRef *untrustedPemRoots) {
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	if (useOldCode()) {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		return FetchPEMRoots_MountainLion(pemRoots);
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	}
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	// Get certificates from all domains, not just System, this lets
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	// the user add CAs to their &#34;login&#34; keychain, and Admins to add
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	// to the &#34;System&#34; keychain
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	SecTrustSettingsDomain domains[] = { kSecTrustSettingsDomainSystem,
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>					     kSecTrustSettingsDomainAdmin,
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>					     kSecTrustSettingsDomainUser };
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	int numDomains = sizeof(domains)/sizeof(SecTrustSettingsDomain);
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	if (pemRoots == NULL) {
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>		return -1;
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	}
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	// kSecTrustSettingsResult is defined as CFSTR(&#34;kSecTrustSettingsResult&#34;),
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	// but the Go linker&#39;s internal linking mode can&#39;t handle CFSTR relocations.
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	// Create our own dynamic string instead and release it below.
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	CFStringRef policy = CFStringCreateWithCString(NULL, &#34;kSecTrustSettingsResult&#34;, kCFStringEncodingUTF8);
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	CFMutableDataRef combinedData = CFDataCreateMutable(kCFAllocatorDefault, 0);
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	CFMutableDataRef combinedUntrustedData = CFDataCreateMutable(kCFAllocatorDefault, 0);
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	for (int i = 0; i &lt; numDomains; i++) {
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		CFArrayRef certs = NULL;
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>		OSStatus err = SecTrustSettingsCopyCertificates(domains[i], &amp;certs);
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>		if (err != noErr) {
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>			continue;
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		}
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		CFIndex numCerts = CFArrayGetCount(certs);
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		for (int j = 0; j &lt; numCerts; j++) {
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>			CFDataRef data = NULL;
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>			CFErrorRef errRef = NULL;
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>			CFArrayRef trustSettings = NULL;
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>			SecCertificateRef cert = (SecCertificateRef)CFArrayGetValueAtIndex(certs, j);
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>			if (cert == NULL) {
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>				continue;
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>			}
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>			// We only want trusted certs.
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>			int untrusted = 0;
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>			if (i != 0) {
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>				// Certs found in the system domain are always trusted. If the user
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>				// configures &#34;Never Trust&#34; on such a cert, it will also be found in the
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>				// admin or user domain, causing it to be added to untrustedPemRoots. The
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>				// Go code will then clean this up.
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>				// Trust may be stored in any of the domains. According to Apple&#39;s
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>				// SecTrustServer.c, &#34;user trust settings overrule admin trust settings&#34;,
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>				// so take the last trust settings array we find.
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>				// Skip the system domain since it is always trusted.
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>				for (int k = 1; k &lt; numDomains; k++) {
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>					CFArrayRef domainTrustSettings = NULL;
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>					err = SecTrustSettingsCopyTrustSettings(cert, domains[k], &amp;domainTrustSettings);
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>					if (err == errSecSuccess &amp;&amp; domainTrustSettings != NULL) {
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>						if (trustSettings) {
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>							CFRelease(trustSettings);
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>						}
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>						trustSettings = domainTrustSettings;
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>					}
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>				}
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>				if (trustSettings == NULL) {
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>					// &#34;this certificate must be verified to a known trusted certificate&#34;; aka not a root.
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>					continue;
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>				}
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>				for (CFIndex k = 0; k &lt; CFArrayGetCount(trustSettings); k++) {
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>					CFNumberRef cfNum;
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>					CFDictionaryRef tSetting = (CFDictionaryRef)CFArrayGetValueAtIndex(trustSettings, k);
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>					if (CFDictionaryGetValueIfPresent(tSetting, policy, (const void**)&amp;cfNum)){
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>						SInt32 result = 0;
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>						CFNumberGetValue(cfNum, kCFNumberSInt32Type, &amp;result);
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>						// TODO: The rest of the dictionary specifies conditions for evaluation.
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>						if (result == kSecTrustSettingsResultDeny) {
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>							untrusted = 1;
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>						}
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>					}
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>				}
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>				CFRelease(trustSettings);
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>			}
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>			// We only want to add Root CAs, so make sure Subject and Issuer Name match
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>			CFDataRef subjectName = SecCertificateCopyNormalizedSubjectContent(cert, &amp;errRef);
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>			if (errRef != NULL) {
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>				CFRelease(errRef);
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>				continue;
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>			}
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>			CFDataRef issuerName = SecCertificateCopyNormalizedIssuerContent(cert, &amp;errRef);
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>			if (errRef != NULL) {
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>				CFRelease(subjectName);
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>				CFRelease(errRef);
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>				continue;
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>			}
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>			Boolean equal = CFEqual(subjectName, issuerName);
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>			CFRelease(subjectName);
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>			CFRelease(issuerName);
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>			if (!equal) {
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>				continue;
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>			}
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>			// Note: SecKeychainItemExport is deprecated as of 10.7 in favor of SecItemExport.
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>			// Once we support weak imports via cgo we should prefer that, and fall back to this
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>			// for older systems.
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>			err = SecKeychainItemExport(cert, kSecFormatX509Cert, kSecItemPemArmour, NULL, &amp;data);
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>			if (err != noErr) {
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>				continue;
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>			}
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>			if (data != NULL) {
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>				CFMutableDataRef appendTo = untrusted ? combinedUntrustedData : combinedData;
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>				CFDataAppendBytes(appendTo, CFDataGetBytePtr(data), CFDataGetLength(data));
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>				CFRelease(data);
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>			}
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>		}
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>		CFRelease(certs);
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	}
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	CFRelease(policy);
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	*pemRoots = combinedData;
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	*untrustedPemRoots = combinedUntrustedData;
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	return 0;
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>}
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>*/</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>import &#34;C&#34;
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>import (
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	&#34;unsafe&#34;
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>)
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>func loadSystemRoots() (*CertPool, error) {
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>	roots := NewCertPool()
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	var data C.CFDataRef = nil
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	var untrustedData C.CFDataRef = nil
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	err := C.FetchPEMRoots(&amp;data, &amp;untrustedData)
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	if err == -1 {
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>		<span class="comment">// TODO: better error message</span>
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;crypto/x509: failed to load darwin system roots with cgo&#34;)
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>	}
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	defer C.CFRelease(C.CFTypeRef(data))
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	buf := C.GoBytes(unsafe.Pointer(C.CFDataGetBytePtr(data)), C.int(C.CFDataGetLength(data)))
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	roots.AppendCertsFromPEM(buf)
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	if untrustedData == nil {
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>		return roots, nil
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	}
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	defer C.CFRelease(C.CFTypeRef(untrustedData))
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	buf = C.GoBytes(unsafe.Pointer(C.CFDataGetBytePtr(untrustedData)), C.int(C.CFDataGetLength(untrustedData)))
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	untrustedRoots := NewCertPool()
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	untrustedRoots.AppendCertsFromPEM(buf)
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	trustedRoots := NewCertPool()
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	for _, c := range roots.certs {
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>		if !untrustedRoots.contains(c) {
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>			trustedRoots.AddCert(c)
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>		}
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	}
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	return trustedRoots, nil
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>}
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>
+</pre><p><a href="root_cgo_darwin.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

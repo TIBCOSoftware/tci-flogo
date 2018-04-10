@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/hash/crc32/crc32_ppc64le.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="crc32_ppc64le.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/hash">hash</a>/<a href="../crc32.1.html">crc32</a>/<span class="text-muted">crc32_ppc64le.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/hash/crc32.1.html">hash/crc32</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2017 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	// The vectorized implementation found below is a derived work
+<span id="L6" class="ln">     6</span>	// from code written by Anton Blanchard &lt;anton@au.ibm.com&gt; found
+<span id="L7" class="ln">     7</span>	// at https://github.com/antonblanchard/crc32-vpmsum.  The original
+<span id="L8" class="ln">     8</span>	// is dual licensed under GPL and Apache 2.  As the copyright holder
+<span id="L9" class="ln">     9</span>	// for the work, IBM has contributed this new work under
+<span id="L10" class="ln">    10</span>	// the golang license.
+<span id="L11" class="ln">    11</span>	
+<span id="L12" class="ln">    12</span>	// Changes include porting to Go assembler with modifications for
+<span id="L13" class="ln">    13</span>	// the Go ABI for ppc64le.
+<span id="L14" class="ln">    14</span>	
+<span id="L15" class="ln">    15</span>	#include &#34;textflag.h&#34;
+<span id="L16" class="ln">    16</span>	
+<span id="L17" class="ln">    17</span>	#define POWER8_OFFSET 132
+<span id="L18" class="ln">    18</span>	
+<span id="L19" class="ln">    19</span>	#define off16	R16
+<span id="L20" class="ln">    20</span>	#define off32	R17
+<span id="L21" class="ln">    21</span>	#define off48	R18
+<span id="L22" class="ln">    22</span>	#define off64	R19
+<span id="L23" class="ln">    23</span>	#define off80	R20
+<span id="L24" class="ln">    24</span>	#define off96	R21
+<span id="L25" class="ln">    25</span>	#define	off112	R22
+<span id="L26" class="ln">    26</span>	
+<span id="L27" class="ln">    27</span>	#define const1	V24
+<span id="L28" class="ln">    28</span>	#define const2	V25
+<span id="L29" class="ln">    29</span>	
+<span id="L30" class="ln">    30</span>	#define byteswap	V26
+<span id="L31" class="ln">    31</span>	#define mask_32bit	V27
+<span id="L32" class="ln">    32</span>	#define mask_64bit	V28
+<span id="L33" class="ln">    33</span>	#define zeroes		V29
+<span id="L34" class="ln">    34</span>	
+<span id="L35" class="ln">    35</span>	#define MAX_SIZE	32*1024
+<span id="L36" class="ln">    36</span>	#define REFLECT
+<span id="L37" class="ln">    37</span>	
+<span id="L38" class="ln">    38</span>	TEXT ·ppc64SlicingUpdateBy8(SB), NOSPLIT|NOFRAME, $0-44
+<span id="L39" class="ln">    39</span>		MOVWZ	crc+0(FP), R3   // incoming crc
+<span id="L40" class="ln">    40</span>		MOVD    table8+8(FP), R4   // *Table
+<span id="L41" class="ln">    41</span>		MOVD    p+16(FP), R5
+<span id="L42" class="ln">    42</span>		MOVD    p_len+24(FP), R6 // p len
+<span id="L43" class="ln">    43</span>	
+<span id="L44" class="ln">    44</span>		CMP     $0,R6           // len == 0?
+<span id="L45" class="ln">    45</span>		BNE     start
+<span id="L46" class="ln">    46</span>		MOVW    R3,ret+40(FP)   // return crc
+<span id="L47" class="ln">    47</span>		RET
+<span id="L48" class="ln">    48</span>	
+<span id="L49" class="ln">    49</span>	start:
+<span id="L50" class="ln">    50</span>		NOR     R3,R3,R7        // ^crc
+<span id="L51" class="ln">    51</span>		MOVWZ	R7,R7		// 32 bits
+<span id="L52" class="ln">    52</span>		CMP	R6,$16
+<span id="L53" class="ln">    53</span>		MOVD	R6,CTR
+<span id="L54" class="ln">    54</span>		BLT	short
+<span id="L55" class="ln">    55</span>		SRAD    $3,R6,R8        // 8 byte chunks
+<span id="L56" class="ln">    56</span>		MOVD    R8,CTR
+<span id="L57" class="ln">    57</span>	
+<span id="L58" class="ln">    58</span>	loop:
+<span id="L59" class="ln">    59</span>		MOVWZ	0(R5),R8	// 0-3 bytes of p ?Endian?
+<span id="L60" class="ln">    60</span>		MOVWZ	4(R5),R9	// 4-7 bytes of p
+<span id="L61" class="ln">    61</span>		MOVD	R4,R10		// &amp;tab[0]
+<span id="L62" class="ln">    62</span>		XOR	R7,R8,R7	// crc ^= byte[0:3]
+<span id="L63" class="ln">    63</span>		RLDICL	$40,R9,$56,R17	// p[7]
+<span id="L64" class="ln">    64</span>		SLD	$2,R17,R17	// p[7]*4
+<span id="L65" class="ln">    65</span>		RLDICL	$40,R7,$56,R8	// crc&gt;&gt;24
+<span id="L66" class="ln">    66</span>		ADD	R17,R10,R17	// &amp;tab[0][p[7]]
+<span id="L67" class="ln">    67</span>		SLD	$2,R8,R8	// crc&gt;&gt;24*4
+<span id="L68" class="ln">    68</span>		RLDICL	$48,R9,$56,R18	// p[6]
+<span id="L69" class="ln">    69</span>		SLD	$2,R18,R18	// p[6]*4
+<span id="L70" class="ln">    70</span>		ADD	$1024,R10,R10	// tab[1]
+<span id="L71" class="ln">    71</span>		MOVWZ	0(R17),R21	// tab[0][p[7]]
+<span id="L72" class="ln">    72</span>		RLDICL	$56,R9,$56,R19	// p[5]
+<span id="L73" class="ln">    73</span>		ADD	R10,R18,R18	// &amp;tab[1][p[6]]
+<span id="L74" class="ln">    74</span>		SLD	$2,R19,R19	// p[5]*4:1
+<span id="L75" class="ln">    75</span>		MOVWZ	0(R18),R22	// tab[1][p[6]]
+<span id="L76" class="ln">    76</span>		ADD	$1024,R10,R10	// tab[2]
+<span id="L77" class="ln">    77</span>		XOR	R21,R22,R21	// xor done R22
+<span id="L78" class="ln">    78</span>		ADD	R19,R10,R19	// &amp;tab[2][p[5]]
+<span id="L79" class="ln">    79</span>		ANDCC	$255,R9,R20	// p[4] ??
+<span id="L80" class="ln">    80</span>		SLD	$2,R20,R20	// p[4]*4
+<span id="L81" class="ln">    81</span>		MOVWZ	0(R19),R23	// tab[2][p[5]]
+<span id="L82" class="ln">    82</span>		ADD	$1024,R10,R10	// &amp;tab[3]
+<span id="L83" class="ln">    83</span>		ADD	R20,R10,R20	// tab[3][p[4]]
+<span id="L84" class="ln">    84</span>		XOR	R21,R23,R21	// xor done R23
+<span id="L85" class="ln">    85</span>		ADD	$1024,R10,R10	// &amp;tab[4]
+<span id="L86" class="ln">    86</span>		MOVWZ	0(R20),R24	// tab[3][p[4]]
+<span id="L87" class="ln">    87</span>		ADD	R10,R8,R23	// &amp;tab[4][crc&gt;&gt;24]
+<span id="L88" class="ln">    88</span>		XOR	R21,R24,R21	// xor done R24
+<span id="L89" class="ln">    89</span>		MOVWZ	0(R23),R25	// tab[4][crc&gt;&gt;24]
+<span id="L90" class="ln">    90</span>		RLDICL	$48,R7,$56,R24	// crc&gt;&gt;16&amp;0xFF
+<span id="L91" class="ln">    91</span>		XOR	R21,R25,R21	// xor done R25
+<span id="L92" class="ln">    92</span>		ADD	$1024,R10,R10	// &amp;tab[5]
+<span id="L93" class="ln">    93</span>		SLD	$2,R24,R24	// crc&gt;&gt;16&amp;0xFF*4
+<span id="L94" class="ln">    94</span>		ADD	R24,R10,R24	// &amp;tab[5][crc&gt;&gt;16&amp;0xFF]
+<span id="L95" class="ln">    95</span>		MOVWZ	0(R24),R26	// tab[5][crc&gt;&gt;16&amp;0xFF]
+<span id="L96" class="ln">    96</span>		XOR	R21,R26,R21	// xor done R26
+<span id="L97" class="ln">    97</span>		RLDICL	$56,R7,$56,R25	// crc&gt;&gt;8
+<span id="L98" class="ln">    98</span>		ADD	$1024,R10,R10	// &amp;tab[6]
+<span id="L99" class="ln">    99</span>		SLD	$2,R25,R25	// crc&gt;&gt;8&amp;FF*2
+<span id="L100" class="ln">   100</span>		ADD	R25,R10,R25	// &amp;tab[6][crc&gt;&gt;8&amp;0xFF]
+<span id="L101" class="ln">   101</span>		MOVBZ   R7,R26          // crc&amp;0xFF
+<span id="L102" class="ln">   102</span>		ADD     $1024,R10,R10   // &amp;tab[7]
+<span id="L103" class="ln">   103</span>		MOVWZ	0(R25),R27	// tab[6][crc&gt;&gt;8&amp;0xFF]
+<span id="L104" class="ln">   104</span>		SLD	$2,R26,R26	// crc&amp;0xFF*2
+<span id="L105" class="ln">   105</span>		XOR	R21,R27,R21	// xor done R27
+<span id="L106" class="ln">   106</span>		ADD	R26,R10,R26	// &amp;tab[7][crc&amp;0xFF]
+<span id="L107" class="ln">   107</span>		ADD     $8,R5           // p = p[8:]
+<span id="L108" class="ln">   108</span>		MOVWZ	0(R26),R28	// tab[7][crc&amp;0xFF]
+<span id="L109" class="ln">   109</span>		XOR	R21,R28,R21	// xor done R28
+<span id="L110" class="ln">   110</span>		MOVWZ	R21,R7		// crc for next round
+<span id="L111" class="ln">   111</span>		BC	16,0,loop	// next 8 bytes
+<span id="L112" class="ln">   112</span>		ANDCC	$7,R6,R8	// any leftover bytes
+<span id="L113" class="ln">   113</span>		BEQ	done		// none --&gt; done
+<span id="L114" class="ln">   114</span>		MOVD	R8,CTR		// byte count
+<span id="L115" class="ln">   115</span>	
+<span id="L116" class="ln">   116</span>	short:
+<span id="L117" class="ln">   117</span>		MOVBZ   0(R5),R8        // get v
+<span id="L118" class="ln">   118</span>		MOVBZ   R7,R9           // byte(crc) -&gt; R8 BE vs LE?
+<span id="L119" class="ln">   119</span>		MOVWZ	R7,R14
+<span id="L120" class="ln">   120</span>		SRD	$8,R14,R14	// crc&gt;&gt;8
+<span id="L121" class="ln">   121</span>		XOR     R8,R9,R8        // byte(crc)^v -&gt; R8
+<span id="L122" class="ln">   122</span>		ADD	$1,R5		// ptr to next v
+<span id="L123" class="ln">   123</span>		SLD     $2,R8           // convert index-&gt; bytes
+<span id="L124" class="ln">   124</span>		ADD     R8,R4,R9        // &amp;tab[byte(crc)^v]
+<span id="L125" class="ln">   125</span>		MOVWZ   0(R9),R10       // tab[byte(crc)^v]
+<span id="L126" class="ln">   126</span>		XOR     R10,R14,R7       // loop crc in R7
+<span id="L127" class="ln">   127</span>		MOVWZ   R7,R7           // 32 bits
+<span id="L128" class="ln">   128</span>		BC      16,0,short
+<span id="L129" class="ln">   129</span>	done:
+<span id="L130" class="ln">   130</span>		NOR     R7,R7,R7        // ^crc
+<span id="L131" class="ln">   131</span>		MOVW    R7,ret+40(FP)   // return crc
+<span id="L132" class="ln">   132</span>		RET
+<span id="L133" class="ln">   133</span>	
+<span id="L134" class="ln">   134</span>	#ifdef BYTESWAP_DATA
+<span id="L135" class="ln">   135</span>	DATA ·byteswapcons+0(SB)/8,$0x0706050403020100
+<span id="L136" class="ln">   136</span>	DATA ·byteswapcons+8(SB)/8,$0x0f0e0d0c0b0a0908
+<span id="L137" class="ln">   137</span>	
+<span id="L138" class="ln">   138</span>	GLOBL ·byteswapcons+0(SB),RODATA,$16
+<span id="L139" class="ln">   139</span>	#endif
+<span id="L140" class="ln">   140</span>	
+<span id="L141" class="ln">   141</span>	TEXT ·vectorCrc32(SB), NOSPLIT|NOFRAME, $0-36
+<span id="L142" class="ln">   142</span>		MOVWZ	crc+0(FP), R3   // incoming crc
+<span id="L143" class="ln">   143</span>		MOVWZ	ctab+4(FP), R14   // crc poly id
+<span id="L144" class="ln">   144</span>		MOVD    p+8(FP), R4
+<span id="L145" class="ln">   145</span>		MOVD    p_len+16(FP), R5 // p len
+<span id="L146" class="ln">   146</span>	
+<span id="L147" class="ln">   147</span>		// R3 = incoming crc
+<span id="L148" class="ln">   148</span>		// R14 = constant table identifier
+<span id="L149" class="ln">   149</span>		// R5 = address of bytes
+<span id="L150" class="ln">   150</span>		// R6 = length of bytes
+<span id="L151" class="ln">   151</span>	
+<span id="L152" class="ln">   152</span>		// defines for index loads
+<span id="L153" class="ln">   153</span>	
+<span id="L154" class="ln">   154</span>		MOVD	$16,off16
+<span id="L155" class="ln">   155</span>		MOVD	$32,off32
+<span id="L156" class="ln">   156</span>		MOVD	$48,off48
+<span id="L157" class="ln">   157</span>		MOVD	$64,off64
+<span id="L158" class="ln">   158</span>		MOVD	$80,off80
+<span id="L159" class="ln">   159</span>		MOVD	$96,off96
+<span id="L160" class="ln">   160</span>		MOVD	$112,off112
+<span id="L161" class="ln">   161</span>		MOVD	$0,R15
+<span id="L162" class="ln">   162</span>	
+<span id="L163" class="ln">   163</span>		MOVD	R3,R10	// save initial crc
+<span id="L164" class="ln">   164</span>	
+<span id="L165" class="ln">   165</span>		NOR	R3,R3,R3  // ^crc
+<span id="L166" class="ln">   166</span>		MOVWZ	R3,R3	// 32 bits
+<span id="L167" class="ln">   167</span>		VXOR	zeroes,zeroes,zeroes  // clear the V reg
+<span id="L168" class="ln">   168</span>		VSPLTISW $-1,V0
+<span id="L169" class="ln">   169</span>		VSLDOI	$4,V29,V0,mask_32bit
+<span id="L170" class="ln">   170</span>		VSLDOI	$8,V29,V0,mask_64bit
+<span id="L171" class="ln">   171</span>	
+<span id="L172" class="ln">   172</span>		VXOR	V8,V8,V8
+<span id="L173" class="ln">   173</span>		MTVSRD	R3,VS40	// crc initial value VS40 = V8
+<span id="L174" class="ln">   174</span>	
+<span id="L175" class="ln">   175</span>	#ifdef REFLECT
+<span id="L176" class="ln">   176</span>		VSLDOI	$8,zeroes,V8,V8  // or: VSLDOI V29,V8,V27,4 for top 32 bits?
+<span id="L177" class="ln">   177</span>	#else
+<span id="L178" class="ln">   178</span>		VSLDOI	$4,V8,zeroes,V8
+<span id="L179" class="ln">   179</span>	#endif
+<span id="L180" class="ln">   180</span>	
+<span id="L181" class="ln">   181</span>	#ifdef BYTESWAP_DATA
+<span id="L182" class="ln">   182</span>		MOVD    $·byteswapcons(SB),R3
+<span id="L183" class="ln">   183</span>		LVX	(R3),byteswap
+<span id="L184" class="ln">   184</span>	#endif
+<span id="L185" class="ln">   185</span>	
+<span id="L186" class="ln">   186</span>		CMPU	R5,$256		// length of bytes
+<span id="L187" class="ln">   187</span>		BLT	short
+<span id="L188" class="ln">   188</span>	
+<span id="L189" class="ln">   189</span>		RLDICR	$0,R5,$56,R6 // chunk to process
+<span id="L190" class="ln">   190</span>	
+<span id="L191" class="ln">   191</span>		// First step for larger sizes
+<span id="L192" class="ln">   192</span>	l1:	MOVD	$32768,R7
+<span id="L193" class="ln">   193</span>		MOVD	R7,R9
+<span id="L194" class="ln">   194</span>		CMP	R6,R7   // compare R6, R7 (MAX SIZE)
+<span id="L195" class="ln">   195</span>		BGT	top	// less than MAX, just do remainder
+<span id="L196" class="ln">   196</span>		MOVD	R6,R7
+<span id="L197" class="ln">   197</span>	top:
+<span id="L198" class="ln">   198</span>		SUB	R7,R6,R6
+<span id="L199" class="ln">   199</span>	
+<span id="L200" class="ln">   200</span>		// mainloop does 128 bytes at a time
+<span id="L201" class="ln">   201</span>		SRD	$7,R7
+<span id="L202" class="ln">   202</span>	
+<span id="L203" class="ln">   203</span>		// determine the offset into the constants table to start with.
+<span id="L204" class="ln">   204</span>		// Each constant is 128 bytes, used against 16 bytes of data.
+<span id="L205" class="ln">   205</span>		SLD	$4,R7,R8
+<span id="L206" class="ln">   206</span>		SRD	$3,R9,R9
+<span id="L207" class="ln">   207</span>		SUB	R8,R9,R8
+<span id="L208" class="ln">   208</span>	
+<span id="L209" class="ln">   209</span>		// The last iteration is reduced in a separate step
+<span id="L210" class="ln">   210</span>		ADD	$-1,R7
+<span id="L211" class="ln">   211</span>		MOVD	R7,CTR
+<span id="L212" class="ln">   212</span>	
+<span id="L213" class="ln">   213</span>		// Determine which constant table (depends on poly)
+<span id="L214" class="ln">   214</span>		CMP	R14,$1
+<span id="L215" class="ln">   215</span>		BNE	castTable
+<span id="L216" class="ln">   216</span>		MOVD	$·IEEEConst(SB),R3
+<span id="L217" class="ln">   217</span>		BR	startConst
+<span id="L218" class="ln">   218</span>	castTable:
+<span id="L219" class="ln">   219</span>		MOVD	$·CastConst(SB),R3
+<span id="L220" class="ln">   220</span>	
+<span id="L221" class="ln">   221</span>	startConst:
+<span id="L222" class="ln">   222</span>		ADD	R3,R8,R3	// starting point in constants table
+<span id="L223" class="ln">   223</span>	
+<span id="L224" class="ln">   224</span>		VXOR	V0,V0,V0	// clear the V regs
+<span id="L225" class="ln">   225</span>		VXOR	V1,V1,V1
+<span id="L226" class="ln">   226</span>		VXOR	V2,V2,V2
+<span id="L227" class="ln">   227</span>		VXOR	V3,V3,V3
+<span id="L228" class="ln">   228</span>		VXOR	V4,V4,V4
+<span id="L229" class="ln">   229</span>		VXOR	V5,V5,V5
+<span id="L230" class="ln">   230</span>		VXOR	V6,V6,V6
+<span id="L231" class="ln">   231</span>		VXOR	V7,V7,V7
+<span id="L232" class="ln">   232</span>	
+<span id="L233" class="ln">   233</span>		LVX	(R3),const1	// loading constant values
+<span id="L234" class="ln">   234</span>	
+<span id="L235" class="ln">   235</span>		CMP	R15,$1		// Identify warm up pass
+<span id="L236" class="ln">   236</span>		BEQ	next
+<span id="L237" class="ln">   237</span>	
+<span id="L238" class="ln">   238</span>		// First warm up pass: load the bytes to process
+<span id="L239" class="ln">   239</span>		LVX	(R4),V16
+<span id="L240" class="ln">   240</span>		LVX	(R4+off16),V17
+<span id="L241" class="ln">   241</span>		LVX	(R4+off32),V18
+<span id="L242" class="ln">   242</span>		LVX	(R4+off48),V19
+<span id="L243" class="ln">   243</span>		LVX	(R4+off64),V20
+<span id="L244" class="ln">   244</span>		LVX	(R4+off80),V21
+<span id="L245" class="ln">   245</span>		LVX	(R4+off96),V22
+<span id="L246" class="ln">   246</span>		LVX	(R4+off112),V23
+<span id="L247" class="ln">   247</span>		ADD	$128,R4		// bump up to next 128 bytes in buffer
+<span id="L248" class="ln">   248</span>	
+<span id="L249" class="ln">   249</span>		VXOR	V16,V8,V16	// xor in initial CRC in V8
+<span id="L250" class="ln">   250</span>	
+<span id="L251" class="ln">   251</span>	next:
+<span id="L252" class="ln">   252</span>		BC	18,0,first_warm_up_done
+<span id="L253" class="ln">   253</span>	
+<span id="L254" class="ln">   254</span>		ADD	$16,R3		// bump up to next constants
+<span id="L255" class="ln">   255</span>		LVX	(R3),const2	// table values
+<span id="L256" class="ln">   256</span>	
+<span id="L257" class="ln">   257</span>		VPMSUMD	V16,const1,V8 // second warm up pass
+<span id="L258" class="ln">   258</span>		LVX	(R4),V16	// load from buffer
+<span id="L259" class="ln">   259</span>		OR	$0,R2,R2
+<span id="L260" class="ln">   260</span>	
+<span id="L261" class="ln">   261</span>		VPMSUMD	V17,const1,V9	// vpmsumd with constants
+<span id="L262" class="ln">   262</span>		LVX	(R4+off16),V17	// load next from buffer
+<span id="L263" class="ln">   263</span>		OR	$0,R2,R2
+<span id="L264" class="ln">   264</span>	
+<span id="L265" class="ln">   265</span>		VPMSUMD	V18,const1,V10	// vpmsumd with constants
+<span id="L266" class="ln">   266</span>		LVX	(R4+off32),V18	// load next from buffer
+<span id="L267" class="ln">   267</span>		OR	$0,R2,R2
+<span id="L268" class="ln">   268</span>	
+<span id="L269" class="ln">   269</span>		VPMSUMD	V19,const1,V11	// vpmsumd with constants
+<span id="L270" class="ln">   270</span>		LVX	(R4+off48),V19	// load next from buffer
+<span id="L271" class="ln">   271</span>		OR	$0,R2,R2
+<span id="L272" class="ln">   272</span>	
+<span id="L273" class="ln">   273</span>		VPMSUMD	V20,const1,V12	// vpmsumd with constants
+<span id="L274" class="ln">   274</span>		LVX	(R4+off64),V20	// load next from buffer
+<span id="L275" class="ln">   275</span>		OR	$0,R2,R2
+<span id="L276" class="ln">   276</span>	
+<span id="L277" class="ln">   277</span>		VPMSUMD	V21,const1,V13	// vpmsumd with constants
+<span id="L278" class="ln">   278</span>		LVX	(R4+off80),V21	// load next from buffer
+<span id="L279" class="ln">   279</span>		OR	$0,R2,R2
+<span id="L280" class="ln">   280</span>	
+<span id="L281" class="ln">   281</span>		VPMSUMD	V22,const1,V14	// vpmsumd with constants
+<span id="L282" class="ln">   282</span>		LVX	(R4+off96),V22	// load next from buffer
+<span id="L283" class="ln">   283</span>		OR	$0,R2,R2
+<span id="L284" class="ln">   284</span>	
+<span id="L285" class="ln">   285</span>		VPMSUMD	V23,const1,V15	// vpmsumd with constants
+<span id="L286" class="ln">   286</span>		LVX	(R4+off112),V23	// load next from buffer
+<span id="L287" class="ln">   287</span>	
+<span id="L288" class="ln">   288</span>		ADD	$128,R4		// bump up to next 128 bytes in buffer
+<span id="L289" class="ln">   289</span>	
+<span id="L290" class="ln">   290</span>		BC	18,0,first_cool_down
+<span id="L291" class="ln">   291</span>	
+<span id="L292" class="ln">   292</span>	cool_top:
+<span id="L293" class="ln">   293</span>		LVX	(R3),const1	// constants
+<span id="L294" class="ln">   294</span>		ADD	$16,R3		// inc to next constants
+<span id="L295" class="ln">   295</span>		OR	$0,R2,R2
+<span id="L296" class="ln">   296</span>	
+<span id="L297" class="ln">   297</span>		VXOR	V0,V8,V0	// xor in previous vpmsumd
+<span id="L298" class="ln">   298</span>		VPMSUMD	V16,const2,V8	// vpmsumd with constants
+<span id="L299" class="ln">   299</span>		LVX	(R4),V16	// buffer
+<span id="L300" class="ln">   300</span>		OR	$0,R2,R2
+<span id="L301" class="ln">   301</span>	
+<span id="L302" class="ln">   302</span>		VXOR	V1,V9,V1	// xor in previous
+<span id="L303" class="ln">   303</span>		VPMSUMD	V17,const2,V9	// vpmsumd with constants
+<span id="L304" class="ln">   304</span>		LVX	(R4+off16),V17	// next in buffer
+<span id="L305" class="ln">   305</span>		OR	$0,R2,R2
+<span id="L306" class="ln">   306</span>	
+<span id="L307" class="ln">   307</span>		VXOR	V2,V10,V2	// xor in previous
+<span id="L308" class="ln">   308</span>		VPMSUMD	V18,const2,V10	// vpmsumd with constants
+<span id="L309" class="ln">   309</span>		LVX	(R4+off32),V18	// next in buffer
+<span id="L310" class="ln">   310</span>		OR	$0,R2,R2
+<span id="L311" class="ln">   311</span>	
+<span id="L312" class="ln">   312</span>		VXOR	V3,V11,V3	// xor in previous
+<span id="L313" class="ln">   313</span>		VPMSUMD	V19,const2,V11	// vpmsumd with constants
+<span id="L314" class="ln">   314</span>		LVX	(R4+off48),V19	// next in buffer
+<span id="L315" class="ln">   315</span>		LVX	(R3),const2	// get next constant
+<span id="L316" class="ln">   316</span>		OR	$0,R2,R2
+<span id="L317" class="ln">   317</span>	
+<span id="L318" class="ln">   318</span>		VXOR	V4,V12,V4	// xor in previous
+<span id="L319" class="ln">   319</span>		VPMSUMD	V20,const1,V12	// vpmsumd with constants
+<span id="L320" class="ln">   320</span>		LVX	(R4+off64),V20	// next in buffer
+<span id="L321" class="ln">   321</span>		OR	$0,R2,R2
+<span id="L322" class="ln">   322</span>	
+<span id="L323" class="ln">   323</span>		VXOR	V5,V13,V5	// xor in previous
+<span id="L324" class="ln">   324</span>		VPMSUMD	V21,const1,V13	// vpmsumd with constants
+<span id="L325" class="ln">   325</span>		LVX	(R4+off80),V21	// next in buffer
+<span id="L326" class="ln">   326</span>		OR	$0,R2,R2
+<span id="L327" class="ln">   327</span>	
+<span id="L328" class="ln">   328</span>		VXOR	V6,V14,V6	// xor in previous
+<span id="L329" class="ln">   329</span>		VPMSUMD	V22,const1,V14	// vpmsumd with constants
+<span id="L330" class="ln">   330</span>		LVX	(R4+off96),V22	// next in buffer
+<span id="L331" class="ln">   331</span>		OR	$0,R2,R2
+<span id="L332" class="ln">   332</span>	
+<span id="L333" class="ln">   333</span>		VXOR	V7,V15,V7	// xor in previous
+<span id="L334" class="ln">   334</span>		VPMSUMD	V23,const1,V15	// vpmsumd with constants
+<span id="L335" class="ln">   335</span>		LVX	(R4+off112),V23	// next in buffer
+<span id="L336" class="ln">   336</span>	
+<span id="L337" class="ln">   337</span>		ADD	$128,R4		// bump up buffer pointer
+<span id="L338" class="ln">   338</span>		BC	16,0,cool_top	// are we done?
+<span id="L339" class="ln">   339</span>	
+<span id="L340" class="ln">   340</span>	first_cool_down:
+<span id="L341" class="ln">   341</span>	
+<span id="L342" class="ln">   342</span>		// load the constants
+<span id="L343" class="ln">   343</span>		// xor in the previous value
+<span id="L344" class="ln">   344</span>		// vpmsumd the result with constants
+<span id="L345" class="ln">   345</span>	
+<span id="L346" class="ln">   346</span>		LVX	(R3),const1
+<span id="L347" class="ln">   347</span>		ADD	$16,R3
+<span id="L348" class="ln">   348</span>	
+<span id="L349" class="ln">   349</span>		VXOR	V0,V8,V0
+<span id="L350" class="ln">   350</span>		VPMSUMD V16,const1,V8
+<span id="L351" class="ln">   351</span>		OR	$0,R2,R2
+<span id="L352" class="ln">   352</span>	
+<span id="L353" class="ln">   353</span>		VXOR	V1,V9,V1
+<span id="L354" class="ln">   354</span>		VPMSUMD	V17,const1,V9
+<span id="L355" class="ln">   355</span>		OR	$0,R2,R2
+<span id="L356" class="ln">   356</span>	
+<span id="L357" class="ln">   357</span>		VXOR	V2,V10,V2
+<span id="L358" class="ln">   358</span>		VPMSUMD	V18,const1,V10
+<span id="L359" class="ln">   359</span>		OR	$0,R2,R2
+<span id="L360" class="ln">   360</span>	
+<span id="L361" class="ln">   361</span>		VXOR	V3,V11,V3
+<span id="L362" class="ln">   362</span>		VPMSUMD	V19,const1,V11
+<span id="L363" class="ln">   363</span>		OR	$0,R2,R2
+<span id="L364" class="ln">   364</span>	
+<span id="L365" class="ln">   365</span>		VXOR	V4,V12,V4
+<span id="L366" class="ln">   366</span>		VPMSUMD	V20,const1,V12
+<span id="L367" class="ln">   367</span>		OR	$0,R2,R2
+<span id="L368" class="ln">   368</span>	
+<span id="L369" class="ln">   369</span>		VXOR	V5,V13,V5
+<span id="L370" class="ln">   370</span>		VPMSUMD	V21,const1,V13
+<span id="L371" class="ln">   371</span>		OR	$0,R2,R2
+<span id="L372" class="ln">   372</span>	
+<span id="L373" class="ln">   373</span>		VXOR	V6,V14,V6
+<span id="L374" class="ln">   374</span>		VPMSUMD	V22,const1,V14
+<span id="L375" class="ln">   375</span>		OR	$0,R2,R2
+<span id="L376" class="ln">   376</span>	
+<span id="L377" class="ln">   377</span>		VXOR	V7,V15,V7
+<span id="L378" class="ln">   378</span>		VPMSUMD	V23,const1,V15
+<span id="L379" class="ln">   379</span>		OR	$0,R2,R2
+<span id="L380" class="ln">   380</span>	
+<span id="L381" class="ln">   381</span>	second_cool_down:
+<span id="L382" class="ln">   382</span>	
+<span id="L383" class="ln">   383</span>		VXOR    V0,V8,V0
+<span id="L384" class="ln">   384</span>		VXOR    V1,V9,V1
+<span id="L385" class="ln">   385</span>		VXOR    V2,V10,V2
+<span id="L386" class="ln">   386</span>		VXOR    V3,V11,V3
+<span id="L387" class="ln">   387</span>		VXOR    V4,V12,V4
+<span id="L388" class="ln">   388</span>		VXOR    V5,V13,V5
+<span id="L389" class="ln">   389</span>		VXOR    V6,V14,V6
+<span id="L390" class="ln">   390</span>		VXOR    V7,V15,V7
+<span id="L391" class="ln">   391</span>	
+<span id="L392" class="ln">   392</span>	#ifdef REFLECT
+<span id="L393" class="ln">   393</span>		VSLDOI  $4,V0,zeroes,V0
+<span id="L394" class="ln">   394</span>		VSLDOI  $4,V1,zeroes,V1
+<span id="L395" class="ln">   395</span>		VSLDOI  $4,V2,zeroes,V2
+<span id="L396" class="ln">   396</span>		VSLDOI  $4,V3,zeroes,V3
+<span id="L397" class="ln">   397</span>		VSLDOI  $4,V4,zeroes,V4
+<span id="L398" class="ln">   398</span>		VSLDOI  $4,V5,zeroes,V5
+<span id="L399" class="ln">   399</span>		VSLDOI  $4,V6,zeroes,V6
+<span id="L400" class="ln">   400</span>		VSLDOI  $4,V7,zeroes,V7
+<span id="L401" class="ln">   401</span>	#endif
+<span id="L402" class="ln">   402</span>	
+<span id="L403" class="ln">   403</span>		LVX	(R4),V8
+<span id="L404" class="ln">   404</span>		LVX	(R4+off16),V9
+<span id="L405" class="ln">   405</span>		LVX	(R4+off32),V10
+<span id="L406" class="ln">   406</span>		LVX	(R4+off48),V11
+<span id="L407" class="ln">   407</span>		LVX	(R4+off64),V12
+<span id="L408" class="ln">   408</span>		LVX	(R4+off80),V13
+<span id="L409" class="ln">   409</span>		LVX	(R4+off96),V14
+<span id="L410" class="ln">   410</span>		LVX	(R4+off112),V15
+<span id="L411" class="ln">   411</span>	
+<span id="L412" class="ln">   412</span>		ADD	$128,R4
+<span id="L413" class="ln">   413</span>	
+<span id="L414" class="ln">   414</span>		VXOR	V0,V8,V16
+<span id="L415" class="ln">   415</span>		VXOR	V1,V9,V17
+<span id="L416" class="ln">   416</span>		VXOR	V2,V10,V18
+<span id="L417" class="ln">   417</span>		VXOR	V3,V11,V19
+<span id="L418" class="ln">   418</span>		VXOR	V4,V12,V20
+<span id="L419" class="ln">   419</span>		VXOR	V5,V13,V21
+<span id="L420" class="ln">   420</span>		VXOR	V6,V14,V22
+<span id="L421" class="ln">   421</span>		VXOR	V7,V15,V23
+<span id="L422" class="ln">   422</span>	
+<span id="L423" class="ln">   423</span>		MOVD    $1,R15
+<span id="L424" class="ln">   424</span>		CMP     $0,R6
+<span id="L425" class="ln">   425</span>		ADD     $128,R6
+<span id="L426" class="ln">   426</span>	
+<span id="L427" class="ln">   427</span>		BNE	l1
+<span id="L428" class="ln">   428</span>		ANDCC   $127,R5
+<span id="L429" class="ln">   429</span>		SUBC	R5,$128,R6
+<span id="L430" class="ln">   430</span>		ADD	R3,R6,R3
+<span id="L431" class="ln">   431</span>	
+<span id="L432" class="ln">   432</span>		SRD	$4,R5,R7
+<span id="L433" class="ln">   433</span>		MOVD	R7,CTR
+<span id="L434" class="ln">   434</span>		LVX	(R3),V0
+<span id="L435" class="ln">   435</span>		LVX	(R3+off16),V1
+<span id="L436" class="ln">   436</span>		LVX	(R3+off32),V2
+<span id="L437" class="ln">   437</span>		LVX	(R3+off48),V3
+<span id="L438" class="ln">   438</span>		LVX	(R3+off64),V4
+<span id="L439" class="ln">   439</span>		LVX	(R3+off80),V5
+<span id="L440" class="ln">   440</span>		LVX	(R3+off96),V6
+<span id="L441" class="ln">   441</span>		LVX	(R3+off112),V7
+<span id="L442" class="ln">   442</span>	
+<span id="L443" class="ln">   443</span>		ADD	$128,R3
+<span id="L444" class="ln">   444</span>	
+<span id="L445" class="ln">   445</span>		VPMSUMW	V16,V0,V0
+<span id="L446" class="ln">   446</span>		VPMSUMW	V17,V1,V1
+<span id="L447" class="ln">   447</span>		VPMSUMW	V18,V2,V2
+<span id="L448" class="ln">   448</span>		VPMSUMW	V19,V3,V3
+<span id="L449" class="ln">   449</span>		VPMSUMW	V20,V4,V4
+<span id="L450" class="ln">   450</span>		VPMSUMW	V21,V5,V5
+<span id="L451" class="ln">   451</span>		VPMSUMW	V22,V6,V6
+<span id="L452" class="ln">   452</span>		VPMSUMW	V23,V7,V7
+<span id="L453" class="ln">   453</span>	
+<span id="L454" class="ln">   454</span>		// now reduce the tail
+<span id="L455" class="ln">   455</span>	
+<span id="L456" class="ln">   456</span>		CMP	$0,R7
+<span id="L457" class="ln">   457</span>		BEQ	next1
+<span id="L458" class="ln">   458</span>	
+<span id="L459" class="ln">   459</span>		LVX	(R4),V16
+<span id="L460" class="ln">   460</span>		LVX	(R3),V17
+<span id="L461" class="ln">   461</span>		VPMSUMW	V16,V17,V16
+<span id="L462" class="ln">   462</span>		VXOR	V0,V16,V0
+<span id="L463" class="ln">   463</span>		BC	18,0,next1
+<span id="L464" class="ln">   464</span>	
+<span id="L465" class="ln">   465</span>		LVX	(R4+off16),V16
+<span id="L466" class="ln">   466</span>		LVX	(R3+off16),V17
+<span id="L467" class="ln">   467</span>		VPMSUMW	V16,V17,V16
+<span id="L468" class="ln">   468</span>		VXOR	V0,V16,V0
+<span id="L469" class="ln">   469</span>		BC	18,0,next1
+<span id="L470" class="ln">   470</span>	
+<span id="L471" class="ln">   471</span>		LVX	(R4+off32),V16
+<span id="L472" class="ln">   472</span>		LVX	(R3+off32),V17
+<span id="L473" class="ln">   473</span>		VPMSUMW	V16,V17,V16
+<span id="L474" class="ln">   474</span>		VXOR	V0,V16,V0
+<span id="L475" class="ln">   475</span>		BC	18,0,next1
+<span id="L476" class="ln">   476</span>	
+<span id="L477" class="ln">   477</span>		LVX	(R4+off48),V16
+<span id="L478" class="ln">   478</span>		LVX	(R3+off48),V17
+<span id="L479" class="ln">   479</span>		VPMSUMW	V16,V17,V16
+<span id="L480" class="ln">   480</span>		VXOR	V0,V16,V0
+<span id="L481" class="ln">   481</span>		BC	18,0,next1
+<span id="L482" class="ln">   482</span>	
+<span id="L483" class="ln">   483</span>		LVX	(R4+off64),V16
+<span id="L484" class="ln">   484</span>		LVX	(R3+off64),V17
+<span id="L485" class="ln">   485</span>		VPMSUMW	V16,V17,V16
+<span id="L486" class="ln">   486</span>		VXOR	V0,V16,V0
+<span id="L487" class="ln">   487</span>		BC	18,0,next1
+<span id="L488" class="ln">   488</span>	
+<span id="L489" class="ln">   489</span>		LVX	(R4+off80),V16
+<span id="L490" class="ln">   490</span>		LVX	(R3+off80),V17
+<span id="L491" class="ln">   491</span>		VPMSUMW	V16,V17,V16
+<span id="L492" class="ln">   492</span>		VXOR	V0,V16,V0
+<span id="L493" class="ln">   493</span>		BC	18,0,next1
+<span id="L494" class="ln">   494</span>	
+<span id="L495" class="ln">   495</span>		LVX	(R4+off96),V16
+<span id="L496" class="ln">   496</span>		LVX	(R3+off96),V17
+<span id="L497" class="ln">   497</span>		VPMSUMW	V16,V17,V16
+<span id="L498" class="ln">   498</span>		VXOR	V0,V16,V0
+<span id="L499" class="ln">   499</span>	
+<span id="L500" class="ln">   500</span>	next1:
+<span id="L501" class="ln">   501</span>		VXOR	V0,V1,V0
+<span id="L502" class="ln">   502</span>		VXOR	V2,V3,V2
+<span id="L503" class="ln">   503</span>		VXOR	V4,V5,V4
+<span id="L504" class="ln">   504</span>		VXOR	V6,V7,V6
+<span id="L505" class="ln">   505</span>		VXOR	V0,V2,V0
+<span id="L506" class="ln">   506</span>		VXOR	V4,V6,V4
+<span id="L507" class="ln">   507</span>		VXOR	V0,V4,V0
+<span id="L508" class="ln">   508</span>	
+<span id="L509" class="ln">   509</span>	barrett_reduction:
+<span id="L510" class="ln">   510</span>	
+<span id="L511" class="ln">   511</span>		CMP	R14,$1
+<span id="L512" class="ln">   512</span>		BNE	barcstTable
+<span id="L513" class="ln">   513</span>		MOVD	$·IEEEBarConst(SB),R3
+<span id="L514" class="ln">   514</span>		BR	startbarConst
+<span id="L515" class="ln">   515</span>	barcstTable:
+<span id="L516" class="ln">   516</span>		MOVD    $·CastBarConst(SB),R3
+<span id="L517" class="ln">   517</span>	
+<span id="L518" class="ln">   518</span>	startbarConst:
+<span id="L519" class="ln">   519</span>		LVX	(R3),const1
+<span id="L520" class="ln">   520</span>		LVX	(R3+off16),const2
+<span id="L521" class="ln">   521</span>	
+<span id="L522" class="ln">   522</span>		VSLDOI	$8,V0,V0,V1
+<span id="L523" class="ln">   523</span>		VXOR	V0,V1,V0
+<span id="L524" class="ln">   524</span>	
+<span id="L525" class="ln">   525</span>	#ifdef REFLECT
+<span id="L526" class="ln">   526</span>		VSPLTISB $1,V1
+<span id="L527" class="ln">   527</span>		VSL	V0,V1,V0
+<span id="L528" class="ln">   528</span>	#endif
+<span id="L529" class="ln">   529</span>	
+<span id="L530" class="ln">   530</span>		VAND	V0,mask_64bit,V0
+<span id="L531" class="ln">   531</span>	
+<span id="L532" class="ln">   532</span>	#ifndef	REFLECT
+<span id="L533" class="ln">   533</span>	
+<span id="L534" class="ln">   534</span>		VPMSUMD	V0,const1,V1
+<span id="L535" class="ln">   535</span>		VSLDOI	$8,zeroes,V1,V1
+<span id="L536" class="ln">   536</span>		VPMSUMD	V1,const2,V1
+<span id="L537" class="ln">   537</span>		VXOR	V0,V1,V0
+<span id="L538" class="ln">   538</span>		VSLDOI	$8,V0,zeroes,V0
+<span id="L539" class="ln">   539</span>	
+<span id="L540" class="ln">   540</span>	#else
+<span id="L541" class="ln">   541</span>	
+<span id="L542" class="ln">   542</span>		VAND	V0,mask_32bit,V1
+<span id="L543" class="ln">   543</span>		VPMSUMD	V1,const1,V1
+<span id="L544" class="ln">   544</span>		VAND	V1,mask_32bit,V1
+<span id="L545" class="ln">   545</span>		VPMSUMD	V1,const2,V1
+<span id="L546" class="ln">   546</span>		VXOR	V0,V1,V0
+<span id="L547" class="ln">   547</span>		VSLDOI  $4,V0,zeroes,V0
+<span id="L548" class="ln">   548</span>	
+<span id="L549" class="ln">   549</span>	#endif
+<span id="L550" class="ln">   550</span>	
+<span id="L551" class="ln">   551</span>		MFVSRD	VS32,R3 // VS32 = V0
+<span id="L552" class="ln">   552</span>	
+<span id="L553" class="ln">   553</span>		NOR	R3,R3,R3 // return ^crc
+<span id="L554" class="ln">   554</span>		MOVW	R3,ret+32(FP)
+<span id="L555" class="ln">   555</span>		RET
+<span id="L556" class="ln">   556</span>	
+<span id="L557" class="ln">   557</span>	first_warm_up_done:
+<span id="L558" class="ln">   558</span>	
+<span id="L559" class="ln">   559</span>		LVX	(R3),const1
+<span id="L560" class="ln">   560</span>		ADD	$16,R3
+<span id="L561" class="ln">   561</span>	
+<span id="L562" class="ln">   562</span>		VPMSUMD	V16,const1,V8
+<span id="L563" class="ln">   563</span>		VPMSUMD	V17,const1,V9
+<span id="L564" class="ln">   564</span>		VPMSUMD	V18,const1,V10
+<span id="L565" class="ln">   565</span>		VPMSUMD	V19,const1,V11
+<span id="L566" class="ln">   566</span>		VPMSUMD	V20,const1,V12
+<span id="L567" class="ln">   567</span>		VPMSUMD	V21,const1,V13
+<span id="L568" class="ln">   568</span>		VPMSUMD	V22,const1,V14
+<span id="L569" class="ln">   569</span>		VPMSUMD	V23,const1,V15
+<span id="L570" class="ln">   570</span>	
+<span id="L571" class="ln">   571</span>		BR	second_cool_down
+<span id="L572" class="ln">   572</span>	
+<span id="L573" class="ln">   573</span>	short:
+<span id="L574" class="ln">   574</span>		CMP	$0,R5
+<span id="L575" class="ln">   575</span>		BEQ	zero
+<span id="L576" class="ln">   576</span>	
+<span id="L577" class="ln">   577</span>		// compute short constants
+<span id="L578" class="ln">   578</span>	
+<span id="L579" class="ln">   579</span>		CMP     R14,$1
+<span id="L580" class="ln">   580</span>		BNE     castshTable
+<span id="L581" class="ln">   581</span>		MOVD    $·IEEEConst(SB),R3
+<span id="L582" class="ln">   582</span>		ADD	$4080,R3
+<span id="L583" class="ln">   583</span>		BR      startshConst
+<span id="L584" class="ln">   584</span>	castshTable:
+<span id="L585" class="ln">   585</span>		MOVD    $·CastConst(SB),R3
+<span id="L586" class="ln">   586</span>		ADD	$4080,R3
+<span id="L587" class="ln">   587</span>	
+<span id="L588" class="ln">   588</span>	startshConst:
+<span id="L589" class="ln">   589</span>		SUBC	R5,$256,R6	// sub from 256
+<span id="L590" class="ln">   590</span>		ADD	R3,R6,R3
+<span id="L591" class="ln">   591</span>	
+<span id="L592" class="ln">   592</span>		// calculate where to start
+<span id="L593" class="ln">   593</span>	
+<span id="L594" class="ln">   594</span>		SRD	$4,R5,R7
+<span id="L595" class="ln">   595</span>		MOVD	R7,CTR
+<span id="L596" class="ln">   596</span>	
+<span id="L597" class="ln">   597</span>		VXOR	V19,V19,V19
+<span id="L598" class="ln">   598</span>		VXOR	V20,V20,V20
+<span id="L599" class="ln">   599</span>	
+<span id="L600" class="ln">   600</span>		LVX	(R4),V0
+<span id="L601" class="ln">   601</span>		LVX	(R3),V16
+<span id="L602" class="ln">   602</span>		VXOR	V0,V8,V0
+<span id="L603" class="ln">   603</span>		VPMSUMW	V0,V16,V0
+<span id="L604" class="ln">   604</span>		BC	18,0,v0
+<span id="L605" class="ln">   605</span>	
+<span id="L606" class="ln">   606</span>		LVX	(R4+off16),V1
+<span id="L607" class="ln">   607</span>		LVX	(R3+off16),V17
+<span id="L608" class="ln">   608</span>		VPMSUMW	V1,V17,V1
+<span id="L609" class="ln">   609</span>		BC	18,0,v1
+<span id="L610" class="ln">   610</span>	
+<span id="L611" class="ln">   611</span>		LVX	(R4+off32),V2
+<span id="L612" class="ln">   612</span>		LVX	(R3+off32),V16
+<span id="L613" class="ln">   613</span>		VPMSUMW	V2,V16,V2
+<span id="L614" class="ln">   614</span>		BC	18,0,v2
+<span id="L615" class="ln">   615</span>	
+<span id="L616" class="ln">   616</span>		LVX	(R4+off48),V3
+<span id="L617" class="ln">   617</span>		LVX	(R3+off48),V17
+<span id="L618" class="ln">   618</span>		VPMSUMW	V3,V17,V3
+<span id="L619" class="ln">   619</span>		BC	18,0,v3
+<span id="L620" class="ln">   620</span>	
+<span id="L621" class="ln">   621</span>		LVX	(R4+off64),V4
+<span id="L622" class="ln">   622</span>		LVX	(R3+off64),V16
+<span id="L623" class="ln">   623</span>		VPMSUMW	V4,V16,V4
+<span id="L624" class="ln">   624</span>		BC	18,0,v4
+<span id="L625" class="ln">   625</span>	
+<span id="L626" class="ln">   626</span>		LVX	(R4+off80),V5
+<span id="L627" class="ln">   627</span>		LVX	(R3+off80),V17
+<span id="L628" class="ln">   628</span>		VPMSUMW	V5,V17,V5
+<span id="L629" class="ln">   629</span>		BC	18,0,v5
+<span id="L630" class="ln">   630</span>	
+<span id="L631" class="ln">   631</span>		LVX	(R4+off96),V6
+<span id="L632" class="ln">   632</span>		LVX	(R3+off96),V16
+<span id="L633" class="ln">   633</span>		VPMSUMW	V6,V16,V6
+<span id="L634" class="ln">   634</span>		BC	18,0,v6
+<span id="L635" class="ln">   635</span>	
+<span id="L636" class="ln">   636</span>		LVX	(R4+off112),V7
+<span id="L637" class="ln">   637</span>		LVX	(R3+off112),V17
+<span id="L638" class="ln">   638</span>		VPMSUMW	V7,V17,V7
+<span id="L639" class="ln">   639</span>		BC	18,0,v7
+<span id="L640" class="ln">   640</span>	
+<span id="L641" class="ln">   641</span>		ADD	$128,R3
+<span id="L642" class="ln">   642</span>		ADD	$128,R4
+<span id="L643" class="ln">   643</span>	
+<span id="L644" class="ln">   644</span>		LVX	(R4),V8
+<span id="L645" class="ln">   645</span>		LVX	(R3),V16
+<span id="L646" class="ln">   646</span>		VPMSUMW	V8,V16,V8
+<span id="L647" class="ln">   647</span>		BC	18,0,v8
+<span id="L648" class="ln">   648</span>	
+<span id="L649" class="ln">   649</span>		LVX	(R4+off16),V9
+<span id="L650" class="ln">   650</span>		LVX	(R3+off16),V17
+<span id="L651" class="ln">   651</span>		VPMSUMW	V9,V17,V9
+<span id="L652" class="ln">   652</span>		BC	18,0,v9
+<span id="L653" class="ln">   653</span>	
+<span id="L654" class="ln">   654</span>		LVX	(R4+off32),V10
+<span id="L655" class="ln">   655</span>		LVX	(R3+off32),V16
+<span id="L656" class="ln">   656</span>		VPMSUMW	V10,V16,V10
+<span id="L657" class="ln">   657</span>		BC	18,0,v10
+<span id="L658" class="ln">   658</span>	
+<span id="L659" class="ln">   659</span>		LVX	(R4+off48),V11
+<span id="L660" class="ln">   660</span>		LVX	(R3+off48),V17
+<span id="L661" class="ln">   661</span>		VPMSUMW	V11,V17,V11
+<span id="L662" class="ln">   662</span>		BC	18,0,v11
+<span id="L663" class="ln">   663</span>	
+<span id="L664" class="ln">   664</span>		LVX	(R4+off64),V12
+<span id="L665" class="ln">   665</span>		LVX	(R3+off64),V16
+<span id="L666" class="ln">   666</span>		VPMSUMW	V12,V16,V12
+<span id="L667" class="ln">   667</span>		BC	18,0,v12
+<span id="L668" class="ln">   668</span>	
+<span id="L669" class="ln">   669</span>		LVX	(R4+off80),V13
+<span id="L670" class="ln">   670</span>		LVX	(R3+off80),V17
+<span id="L671" class="ln">   671</span>		VPMSUMW	V13,V17,V13
+<span id="L672" class="ln">   672</span>		BC	18,0,v13
+<span id="L673" class="ln">   673</span>	
+<span id="L674" class="ln">   674</span>		LVX	(R4+off96),V14
+<span id="L675" class="ln">   675</span>		LVX	(R3+off96),V16
+<span id="L676" class="ln">   676</span>		VPMSUMW	V14,V16,V14
+<span id="L677" class="ln">   677</span>		BC	18,0,v14
+<span id="L678" class="ln">   678</span>	
+<span id="L679" class="ln">   679</span>		LVX	(R4+off112),V15
+<span id="L680" class="ln">   680</span>		LVX	(R3+off112),V17
+<span id="L681" class="ln">   681</span>		VPMSUMW	V15,V17,V15
+<span id="L682" class="ln">   682</span>	
+<span id="L683" class="ln">   683</span>		VXOR	V19,V15,V19
+<span id="L684" class="ln">   684</span>	v14:	VXOR	V20,V14,V20
+<span id="L685" class="ln">   685</span>	v13:	VXOR	V19,V13,V19
+<span id="L686" class="ln">   686</span>	v12:	VXOR	V20,V12,V20
+<span id="L687" class="ln">   687</span>	v11:	VXOR	V19,V11,V19
+<span id="L688" class="ln">   688</span>	v10:	VXOR	V20,V10,V20
+<span id="L689" class="ln">   689</span>	v9:	VXOR	V19,V9,V19
+<span id="L690" class="ln">   690</span>	v8:	VXOR	V20,V8,V20
+<span id="L691" class="ln">   691</span>	v7:	VXOR	V19,V7,V19
+<span id="L692" class="ln">   692</span>	v6:	VXOR	V20,V6,V20
+<span id="L693" class="ln">   693</span>	v5:	VXOR	V19,V5,V19
+<span id="L694" class="ln">   694</span>	v4:	VXOR	V20,V4,V20
+<span id="L695" class="ln">   695</span>	v3:	VXOR	V19,V3,V19
+<span id="L696" class="ln">   696</span>	v2:	VXOR	V20,V2,V20
+<span id="L697" class="ln">   697</span>	v1:	VXOR	V19,V1,V19
+<span id="L698" class="ln">   698</span>	v0:	VXOR	V20,V0,V20
+<span id="L699" class="ln">   699</span>	
+<span id="L700" class="ln">   700</span>		VXOR	V19,V20,V0
+<span id="L701" class="ln">   701</span>	
+<span id="L702" class="ln">   702</span>		BR	barrett_reduction
+<span id="L703" class="ln">   703</span>	
+<span id="L704" class="ln">   704</span>	zero:
+<span id="L705" class="ln">   705</span>		// This case is the original crc, so just return it
+<span id="L706" class="ln">   706</span>		MOVW    R10,ret+32(FP)
+<span id="L707" class="ln">   707</span>		RET
+</pre><p><a href="crc32_ppc64le.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

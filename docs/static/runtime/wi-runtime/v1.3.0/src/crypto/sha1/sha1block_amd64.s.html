@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/sha1/sha1block_amd64.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="sha1block_amd64.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../sha1.1.html">sha1</a>/<span class="text-muted">sha1block_amd64.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/sha1.1.html">crypto/sha1</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2013 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	// AVX2 version by Intel, same algorithm as code in Linux kernel:
+<span id="L6" class="ln">     6</span>	// https://github.com/torvalds/linux/blob/master/arch/x86/crypto/sha1_avx2_x86_64_asm.S
+<span id="L7" class="ln">     7</span>	// Authors:
+<span id="L8" class="ln">     8</span>	// Ilya Albrekht &lt;ilya.albrekht@intel.com&gt;
+<span id="L9" class="ln">     9</span>	// Maxim Locktyukhin &lt;maxim.locktyukhin@intel.com&gt;
+<span id="L10" class="ln">    10</span>	// Ronen Zohar &lt;ronen.zohar@intel.com&gt;
+<span id="L11" class="ln">    11</span>	// Chandramouli Narayanan &lt;mouli@linux.intel.com&gt;
+<span id="L12" class="ln">    12</span>	
+<span id="L13" class="ln">    13</span>	
+<span id="L14" class="ln">    14</span>	#include &#34;textflag.h&#34;
+<span id="L15" class="ln">    15</span>	
+<span id="L16" class="ln">    16</span>	// SHA-1 block routine. See sha1block.go for Go equivalent.
+<span id="L17" class="ln">    17</span>	//
+<span id="L18" class="ln">    18</span>	// There are 80 rounds of 4 types:
+<span id="L19" class="ln">    19</span>	//   - rounds 0-15 are type 1 and load data (ROUND1 macro).
+<span id="L20" class="ln">    20</span>	//   - rounds 16-19 are type 1 and do not load data (ROUND1x macro).
+<span id="L21" class="ln">    21</span>	//   - rounds 20-39 are type 2 and do not load data (ROUND2 macro).
+<span id="L22" class="ln">    22</span>	//   - rounds 40-59 are type 3 and do not load data (ROUND3 macro).
+<span id="L23" class="ln">    23</span>	//   - rounds 60-79 are type 4 and do not load data (ROUND4 macro).
+<span id="L24" class="ln">    24</span>	//
+<span id="L25" class="ln">    25</span>	// Each round loads or shuffles the data, then computes a per-round
+<span id="L26" class="ln">    26</span>	// function of b, c, d, and then mixes the result into and rotates the
+<span id="L27" class="ln">    27</span>	// five registers a, b, c, d, e holding the intermediate results.
+<span id="L28" class="ln">    28</span>	//
+<span id="L29" class="ln">    29</span>	// The register rotation is implemented by rotating the arguments to
+<span id="L30" class="ln">    30</span>	// the round macros instead of by explicit move instructions.
+<span id="L31" class="ln">    31</span>	
+<span id="L32" class="ln">    32</span>	#define LOAD(index) \
+<span id="L33" class="ln">    33</span>		MOVL	(index*4)(SI), R10; \
+<span id="L34" class="ln">    34</span>		BSWAPL	R10; \
+<span id="L35" class="ln">    35</span>		MOVL	R10, (index*4)(SP)
+<span id="L36" class="ln">    36</span>	
+<span id="L37" class="ln">    37</span>	#define SHUFFLE(index) \
+<span id="L38" class="ln">    38</span>		MOVL	(((index)&amp;0xf)*4)(SP), R10; \
+<span id="L39" class="ln">    39</span>		XORL	(((index-3)&amp;0xf)*4)(SP), R10; \
+<span id="L40" class="ln">    40</span>		XORL	(((index-8)&amp;0xf)*4)(SP), R10; \
+<span id="L41" class="ln">    41</span>		XORL	(((index-14)&amp;0xf)*4)(SP), R10; \
+<span id="L42" class="ln">    42</span>		ROLL	$1, R10; \
+<span id="L43" class="ln">    43</span>		MOVL	R10, (((index)&amp;0xf)*4)(SP)
+<span id="L44" class="ln">    44</span>	
+<span id="L45" class="ln">    45</span>	#define FUNC1(a, b, c, d, e) \
+<span id="L46" class="ln">    46</span>		MOVL	d, R9; \
+<span id="L47" class="ln">    47</span>		XORL	c, R9; \
+<span id="L48" class="ln">    48</span>		ANDL	b, R9; \
+<span id="L49" class="ln">    49</span>		XORL	d, R9
+<span id="L50" class="ln">    50</span>	
+<span id="L51" class="ln">    51</span>	#define FUNC2(a, b, c, d, e) \
+<span id="L52" class="ln">    52</span>		MOVL	b, R9; \
+<span id="L53" class="ln">    53</span>		XORL	c, R9; \
+<span id="L54" class="ln">    54</span>		XORL	d, R9
+<span id="L55" class="ln">    55</span>	
+<span id="L56" class="ln">    56</span>	#define FUNC3(a, b, c, d, e) \
+<span id="L57" class="ln">    57</span>		MOVL	b, R8; \
+<span id="L58" class="ln">    58</span>		ORL	c, R8; \
+<span id="L59" class="ln">    59</span>		ANDL	d, R8; \
+<span id="L60" class="ln">    60</span>		MOVL	b, R9; \
+<span id="L61" class="ln">    61</span>		ANDL	c, R9; \
+<span id="L62" class="ln">    62</span>		ORL	R8, R9
+<span id="L63" class="ln">    63</span>		
+<span id="L64" class="ln">    64</span>	#define FUNC4 FUNC2
+<span id="L65" class="ln">    65</span>	
+<span id="L66" class="ln">    66</span>	#define MIX(a, b, c, d, e, const) \
+<span id="L67" class="ln">    67</span>		ROLL	$30, b; \
+<span id="L68" class="ln">    68</span>		ADDL	R9, e; \
+<span id="L69" class="ln">    69</span>		MOVL	a, R8; \
+<span id="L70" class="ln">    70</span>		ROLL	$5, R8; \
+<span id="L71" class="ln">    71</span>		LEAL	const(e)(R10*1), e; \
+<span id="L72" class="ln">    72</span>		ADDL	R8, e
+<span id="L73" class="ln">    73</span>	
+<span id="L74" class="ln">    74</span>	#define ROUND1(a, b, c, d, e, index) \
+<span id="L75" class="ln">    75</span>		LOAD(index); \
+<span id="L76" class="ln">    76</span>		FUNC1(a, b, c, d, e); \
+<span id="L77" class="ln">    77</span>		MIX(a, b, c, d, e, 0x5A827999)
+<span id="L78" class="ln">    78</span>	
+<span id="L79" class="ln">    79</span>	#define ROUND1x(a, b, c, d, e, index) \
+<span id="L80" class="ln">    80</span>		SHUFFLE(index); \
+<span id="L81" class="ln">    81</span>		FUNC1(a, b, c, d, e); \
+<span id="L82" class="ln">    82</span>		MIX(a, b, c, d, e, 0x5A827999)
+<span id="L83" class="ln">    83</span>	
+<span id="L84" class="ln">    84</span>	#define ROUND2(a, b, c, d, e, index) \
+<span id="L85" class="ln">    85</span>		SHUFFLE(index); \
+<span id="L86" class="ln">    86</span>		FUNC2(a, b, c, d, e); \
+<span id="L87" class="ln">    87</span>		MIX(a, b, c, d, e, 0x6ED9EBA1)
+<span id="L88" class="ln">    88</span>	
+<span id="L89" class="ln">    89</span>	#define ROUND3(a, b, c, d, e, index) \
+<span id="L90" class="ln">    90</span>		SHUFFLE(index); \
+<span id="L91" class="ln">    91</span>		FUNC3(a, b, c, d, e); \
+<span id="L92" class="ln">    92</span>		MIX(a, b, c, d, e, 0x8F1BBCDC)
+<span id="L93" class="ln">    93</span>	
+<span id="L94" class="ln">    94</span>	#define ROUND4(a, b, c, d, e, index) \
+<span id="L95" class="ln">    95</span>		SHUFFLE(index); \
+<span id="L96" class="ln">    96</span>		FUNC4(a, b, c, d, e); \
+<span id="L97" class="ln">    97</span>		MIX(a, b, c, d, e, 0xCA62C1D6)
+<span id="L98" class="ln">    98</span>	
+<span id="L99" class="ln">    99</span>	TEXT ·blockAMD64(SB),NOSPLIT,$64-32
+<span id="L100" class="ln">   100</span>		MOVQ	dig+0(FP),	BP
+<span id="L101" class="ln">   101</span>		MOVQ	p_base+8(FP),	SI
+<span id="L102" class="ln">   102</span>		MOVQ	p_len+16(FP),	DX
+<span id="L103" class="ln">   103</span>		SHRQ	$6,		DX
+<span id="L104" class="ln">   104</span>		SHLQ	$6,		DX
+<span id="L105" class="ln">   105</span>		
+<span id="L106" class="ln">   106</span>		LEAQ	(SI)(DX*1),	DI
+<span id="L107" class="ln">   107</span>		MOVL	(0*4)(BP),	AX
+<span id="L108" class="ln">   108</span>		MOVL	(1*4)(BP),	BX
+<span id="L109" class="ln">   109</span>		MOVL	(2*4)(BP),	CX
+<span id="L110" class="ln">   110</span>		MOVL	(3*4)(BP),	DX
+<span id="L111" class="ln">   111</span>		MOVL	(4*4)(BP),	BP
+<span id="L112" class="ln">   112</span>	
+<span id="L113" class="ln">   113</span>		CMPQ	SI,		DI
+<span id="L114" class="ln">   114</span>		JEQ	end
+<span id="L115" class="ln">   115</span>	
+<span id="L116" class="ln">   116</span>	loop:
+<span id="L117" class="ln">   117</span>		MOVL	AX,	R11
+<span id="L118" class="ln">   118</span>		MOVL	BX,	R12
+<span id="L119" class="ln">   119</span>		MOVL	CX,	R13
+<span id="L120" class="ln">   120</span>		MOVL	DX,	R14
+<span id="L121" class="ln">   121</span>		MOVL	BP,	R15
+<span id="L122" class="ln">   122</span>	
+<span id="L123" class="ln">   123</span>		ROUND1(AX, BX, CX, DX, BP, 0)
+<span id="L124" class="ln">   124</span>		ROUND1(BP, AX, BX, CX, DX, 1)
+<span id="L125" class="ln">   125</span>		ROUND1(DX, BP, AX, BX, CX, 2)
+<span id="L126" class="ln">   126</span>		ROUND1(CX, DX, BP, AX, BX, 3)
+<span id="L127" class="ln">   127</span>		ROUND1(BX, CX, DX, BP, AX, 4)
+<span id="L128" class="ln">   128</span>		ROUND1(AX, BX, CX, DX, BP, 5)
+<span id="L129" class="ln">   129</span>		ROUND1(BP, AX, BX, CX, DX, 6)
+<span id="L130" class="ln">   130</span>		ROUND1(DX, BP, AX, BX, CX, 7)
+<span id="L131" class="ln">   131</span>		ROUND1(CX, DX, BP, AX, BX, 8)
+<span id="L132" class="ln">   132</span>		ROUND1(BX, CX, DX, BP, AX, 9)
+<span id="L133" class="ln">   133</span>		ROUND1(AX, BX, CX, DX, BP, 10)
+<span id="L134" class="ln">   134</span>		ROUND1(BP, AX, BX, CX, DX, 11)
+<span id="L135" class="ln">   135</span>		ROUND1(DX, BP, AX, BX, CX, 12)
+<span id="L136" class="ln">   136</span>		ROUND1(CX, DX, BP, AX, BX, 13)
+<span id="L137" class="ln">   137</span>		ROUND1(BX, CX, DX, BP, AX, 14)
+<span id="L138" class="ln">   138</span>		ROUND1(AX, BX, CX, DX, BP, 15)
+<span id="L139" class="ln">   139</span>	
+<span id="L140" class="ln">   140</span>		ROUND1x(BP, AX, BX, CX, DX, 16)
+<span id="L141" class="ln">   141</span>		ROUND1x(DX, BP, AX, BX, CX, 17)
+<span id="L142" class="ln">   142</span>		ROUND1x(CX, DX, BP, AX, BX, 18)
+<span id="L143" class="ln">   143</span>		ROUND1x(BX, CX, DX, BP, AX, 19)
+<span id="L144" class="ln">   144</span>		
+<span id="L145" class="ln">   145</span>		ROUND2(AX, BX, CX, DX, BP, 20)
+<span id="L146" class="ln">   146</span>		ROUND2(BP, AX, BX, CX, DX, 21)
+<span id="L147" class="ln">   147</span>		ROUND2(DX, BP, AX, BX, CX, 22)
+<span id="L148" class="ln">   148</span>		ROUND2(CX, DX, BP, AX, BX, 23)
+<span id="L149" class="ln">   149</span>		ROUND2(BX, CX, DX, BP, AX, 24)
+<span id="L150" class="ln">   150</span>		ROUND2(AX, BX, CX, DX, BP, 25)
+<span id="L151" class="ln">   151</span>		ROUND2(BP, AX, BX, CX, DX, 26)
+<span id="L152" class="ln">   152</span>		ROUND2(DX, BP, AX, BX, CX, 27)
+<span id="L153" class="ln">   153</span>		ROUND2(CX, DX, BP, AX, BX, 28)
+<span id="L154" class="ln">   154</span>		ROUND2(BX, CX, DX, BP, AX, 29)
+<span id="L155" class="ln">   155</span>		ROUND2(AX, BX, CX, DX, BP, 30)
+<span id="L156" class="ln">   156</span>		ROUND2(BP, AX, BX, CX, DX, 31)
+<span id="L157" class="ln">   157</span>		ROUND2(DX, BP, AX, BX, CX, 32)
+<span id="L158" class="ln">   158</span>		ROUND2(CX, DX, BP, AX, BX, 33)
+<span id="L159" class="ln">   159</span>		ROUND2(BX, CX, DX, BP, AX, 34)
+<span id="L160" class="ln">   160</span>		ROUND2(AX, BX, CX, DX, BP, 35)
+<span id="L161" class="ln">   161</span>		ROUND2(BP, AX, BX, CX, DX, 36)
+<span id="L162" class="ln">   162</span>		ROUND2(DX, BP, AX, BX, CX, 37)
+<span id="L163" class="ln">   163</span>		ROUND2(CX, DX, BP, AX, BX, 38)
+<span id="L164" class="ln">   164</span>		ROUND2(BX, CX, DX, BP, AX, 39)
+<span id="L165" class="ln">   165</span>		
+<span id="L166" class="ln">   166</span>		ROUND3(AX, BX, CX, DX, BP, 40)
+<span id="L167" class="ln">   167</span>		ROUND3(BP, AX, BX, CX, DX, 41)
+<span id="L168" class="ln">   168</span>		ROUND3(DX, BP, AX, BX, CX, 42)
+<span id="L169" class="ln">   169</span>		ROUND3(CX, DX, BP, AX, BX, 43)
+<span id="L170" class="ln">   170</span>		ROUND3(BX, CX, DX, BP, AX, 44)
+<span id="L171" class="ln">   171</span>		ROUND3(AX, BX, CX, DX, BP, 45)
+<span id="L172" class="ln">   172</span>		ROUND3(BP, AX, BX, CX, DX, 46)
+<span id="L173" class="ln">   173</span>		ROUND3(DX, BP, AX, BX, CX, 47)
+<span id="L174" class="ln">   174</span>		ROUND3(CX, DX, BP, AX, BX, 48)
+<span id="L175" class="ln">   175</span>		ROUND3(BX, CX, DX, BP, AX, 49)
+<span id="L176" class="ln">   176</span>		ROUND3(AX, BX, CX, DX, BP, 50)
+<span id="L177" class="ln">   177</span>		ROUND3(BP, AX, BX, CX, DX, 51)
+<span id="L178" class="ln">   178</span>		ROUND3(DX, BP, AX, BX, CX, 52)
+<span id="L179" class="ln">   179</span>		ROUND3(CX, DX, BP, AX, BX, 53)
+<span id="L180" class="ln">   180</span>		ROUND3(BX, CX, DX, BP, AX, 54)
+<span id="L181" class="ln">   181</span>		ROUND3(AX, BX, CX, DX, BP, 55)
+<span id="L182" class="ln">   182</span>		ROUND3(BP, AX, BX, CX, DX, 56)
+<span id="L183" class="ln">   183</span>		ROUND3(DX, BP, AX, BX, CX, 57)
+<span id="L184" class="ln">   184</span>		ROUND3(CX, DX, BP, AX, BX, 58)
+<span id="L185" class="ln">   185</span>		ROUND3(BX, CX, DX, BP, AX, 59)
+<span id="L186" class="ln">   186</span>		
+<span id="L187" class="ln">   187</span>		ROUND4(AX, BX, CX, DX, BP, 60)
+<span id="L188" class="ln">   188</span>		ROUND4(BP, AX, BX, CX, DX, 61)
+<span id="L189" class="ln">   189</span>		ROUND4(DX, BP, AX, BX, CX, 62)
+<span id="L190" class="ln">   190</span>		ROUND4(CX, DX, BP, AX, BX, 63)
+<span id="L191" class="ln">   191</span>		ROUND4(BX, CX, DX, BP, AX, 64)
+<span id="L192" class="ln">   192</span>		ROUND4(AX, BX, CX, DX, BP, 65)
+<span id="L193" class="ln">   193</span>		ROUND4(BP, AX, BX, CX, DX, 66)
+<span id="L194" class="ln">   194</span>		ROUND4(DX, BP, AX, BX, CX, 67)
+<span id="L195" class="ln">   195</span>		ROUND4(CX, DX, BP, AX, BX, 68)
+<span id="L196" class="ln">   196</span>		ROUND4(BX, CX, DX, BP, AX, 69)
+<span id="L197" class="ln">   197</span>		ROUND4(AX, BX, CX, DX, BP, 70)
+<span id="L198" class="ln">   198</span>		ROUND4(BP, AX, BX, CX, DX, 71)
+<span id="L199" class="ln">   199</span>		ROUND4(DX, BP, AX, BX, CX, 72)
+<span id="L200" class="ln">   200</span>		ROUND4(CX, DX, BP, AX, BX, 73)
+<span id="L201" class="ln">   201</span>		ROUND4(BX, CX, DX, BP, AX, 74)
+<span id="L202" class="ln">   202</span>		ROUND4(AX, BX, CX, DX, BP, 75)
+<span id="L203" class="ln">   203</span>		ROUND4(BP, AX, BX, CX, DX, 76)
+<span id="L204" class="ln">   204</span>		ROUND4(DX, BP, AX, BX, CX, 77)
+<span id="L205" class="ln">   205</span>		ROUND4(CX, DX, BP, AX, BX, 78)
+<span id="L206" class="ln">   206</span>		ROUND4(BX, CX, DX, BP, AX, 79)
+<span id="L207" class="ln">   207</span>	
+<span id="L208" class="ln">   208</span>		ADDL	R11, AX
+<span id="L209" class="ln">   209</span>		ADDL	R12, BX
+<span id="L210" class="ln">   210</span>		ADDL	R13, CX
+<span id="L211" class="ln">   211</span>		ADDL	R14, DX
+<span id="L212" class="ln">   212</span>		ADDL	R15, BP
+<span id="L213" class="ln">   213</span>	
+<span id="L214" class="ln">   214</span>		ADDQ	$64, SI
+<span id="L215" class="ln">   215</span>		CMPQ	SI, DI
+<span id="L216" class="ln">   216</span>		JB	loop
+<span id="L217" class="ln">   217</span>	
+<span id="L218" class="ln">   218</span>	end:
+<span id="L219" class="ln">   219</span>		MOVQ	dig+0(FP), DI
+<span id="L220" class="ln">   220</span>		MOVL	AX, (0*4)(DI)
+<span id="L221" class="ln">   221</span>		MOVL	BX, (1*4)(DI)
+<span id="L222" class="ln">   222</span>		MOVL	CX, (2*4)(DI)
+<span id="L223" class="ln">   223</span>		MOVL	DX, (3*4)(DI)
+<span id="L224" class="ln">   224</span>		MOVL	BP, (4*4)(DI)
+<span id="L225" class="ln">   225</span>		RET
+<span id="L226" class="ln">   226</span>	
+<span id="L227" class="ln">   227</span>	
+<span id="L228" class="ln">   228</span>	// This is the implementation using AVX2, BMI1 and BMI2. It is based on:
+<span id="L229" class="ln">   229</span>	// &#34;SHA-1 implementation with Intel(R) AVX2 instruction set extensions&#34;
+<span id="L230" class="ln">   230</span>	// From http://software.intel.com/en-us/articles
+<span id="L231" class="ln">   231</span>	// (look for improving-the-performance-of-the-secure-hash-algorithm-1)
+<span id="L232" class="ln">   232</span>	// This implementation is 2x unrolled, and interleaves vector instructions,
+<span id="L233" class="ln">   233</span>	// used to precompute W, with scalar computation of current round
+<span id="L234" class="ln">   234</span>	// for optimal scheduling.
+<span id="L235" class="ln">   235</span>	
+<span id="L236" class="ln">   236</span>	// Trivial helper macros.
+<span id="L237" class="ln">   237</span>	#define UPDATE_HASH(A,TB,C,D,E) \
+<span id="L238" class="ln">   238</span>		ADDL	(R9), A \
+<span id="L239" class="ln">   239</span>		MOVL	A, (R9) \
+<span id="L240" class="ln">   240</span>		ADDL	4(R9), TB \
+<span id="L241" class="ln">   241</span>		MOVL	TB, 4(R9) \
+<span id="L242" class="ln">   242</span>		ADDL	8(R9), C \
+<span id="L243" class="ln">   243</span>		MOVL	C, 8(R9) \
+<span id="L244" class="ln">   244</span>		ADDL	12(R9), D \
+<span id="L245" class="ln">   245</span>		MOVL	D, 12(R9) \
+<span id="L246" class="ln">   246</span>		ADDL	16(R9), E \
+<span id="L247" class="ln">   247</span>		MOVL	E, 16(R9)
+<span id="L248" class="ln">   248</span>	
+<span id="L249" class="ln">   249</span>	
+<span id="L250" class="ln">   250</span>	
+<span id="L251" class="ln">   251</span>	// Helper macros for PRECALC, which does precomputations
+<span id="L252" class="ln">   252</span>	#define PRECALC_0(OFFSET) \
+<span id="L253" class="ln">   253</span>		VMOVDQU   OFFSET(R10),X0
+<span id="L254" class="ln">   254</span>	
+<span id="L255" class="ln">   255</span>	#define PRECALC_1(OFFSET) \
+<span id="L256" class="ln">   256</span>		VINSERTI128 $1, OFFSET(R13), Y0, Y0
+<span id="L257" class="ln">   257</span>	
+<span id="L258" class="ln">   258</span>	#define PRECALC_2(YREG) \
+<span id="L259" class="ln">   259</span>		VPSHUFB Y10, Y0, YREG
+<span id="L260" class="ln">   260</span>	
+<span id="L261" class="ln">   261</span>	#define PRECALC_4(YREG,K_OFFSET) \
+<span id="L262" class="ln">   262</span>		VPADDD K_OFFSET(R8), YREG, Y0
+<span id="L263" class="ln">   263</span>	
+<span id="L264" class="ln">   264</span>	#define PRECALC_7(OFFSET) \
+<span id="L265" class="ln">   265</span>		VMOVDQU Y0, (OFFSET*2)(R14)
+<span id="L266" class="ln">   266</span>	
+<span id="L267" class="ln">   267</span>	
+<span id="L268" class="ln">   268</span>	// Message scheduling pre-compute for rounds 0-15
+<span id="L269" class="ln">   269</span>	// R13 is a pointer to even 64-byte block
+<span id="L270" class="ln">   270</span>	// R10 is a pointer to odd 64-byte block
+<span id="L271" class="ln">   271</span>	// R14 is a pointer to temp buffer
+<span id="L272" class="ln">   272</span>	// X0 is used as temp register
+<span id="L273" class="ln">   273</span>	// YREG is clobbered as part of computation
+<span id="L274" class="ln">   274</span>	// OFFSET chooses 16 byte chunk within a block
+<span id="L275" class="ln">   275</span>	// R8 is a pointer to constants block
+<span id="L276" class="ln">   276</span>	// K_OFFSET chooses K constants relevant to this round
+<span id="L277" class="ln">   277</span>	// X10 holds swap mask
+<span id="L278" class="ln">   278</span>	#define PRECALC_00_15(OFFSET,YREG) \
+<span id="L279" class="ln">   279</span>		PRECALC_0(OFFSET) \
+<span id="L280" class="ln">   280</span>		PRECALC_1(OFFSET) \
+<span id="L281" class="ln">   281</span>		PRECALC_2(YREG) \
+<span id="L282" class="ln">   282</span>		PRECALC_4(YREG,0x0) \
+<span id="L283" class="ln">   283</span>		PRECALC_7(OFFSET)
+<span id="L284" class="ln">   284</span>	
+<span id="L285" class="ln">   285</span>	
+<span id="L286" class="ln">   286</span>	// Helper macros for PRECALC_16_31
+<span id="L287" class="ln">   287</span>	#define PRECALC_16(REG_SUB_16,REG_SUB_12,REG_SUB_4,REG) \
+<span id="L288" class="ln">   288</span>		VPALIGNR $8, REG_SUB_16, REG_SUB_12, REG \  // w[i-14]
+<span id="L289" class="ln">   289</span>		VPSRLDQ $4, REG_SUB_4, Y0 // w[i-3]
+<span id="L290" class="ln">   290</span>	
+<span id="L291" class="ln">   291</span>	#define PRECALC_17(REG_SUB_16,REG_SUB_8,REG) \
+<span id="L292" class="ln">   292</span>		VPXOR  REG_SUB_8, REG, REG \
+<span id="L293" class="ln">   293</span>		VPXOR  REG_SUB_16, Y0, Y0
+<span id="L294" class="ln">   294</span>	
+<span id="L295" class="ln">   295</span>	#define PRECALC_18(REG) \
+<span id="L296" class="ln">   296</span>		VPXOR Y0, REG, REG \
+<span id="L297" class="ln">   297</span>		VPSLLDQ $12, REG, Y9
+<span id="L298" class="ln">   298</span>	
+<span id="L299" class="ln">   299</span>	#define PRECALC_19(REG) \
+<span id="L300" class="ln">   300</span>		VPSLLD $1, REG, Y0 \
+<span id="L301" class="ln">   301</span>		VPSRLD $31, REG, REG
+<span id="L302" class="ln">   302</span>	
+<span id="L303" class="ln">   303</span>	#define PRECALC_20(REG) \
+<span id="L304" class="ln">   304</span>		VPOR REG, Y0, Y0 \
+<span id="L305" class="ln">   305</span>		VPSLLD $2, Y9,  REG
+<span id="L306" class="ln">   306</span>	
+<span id="L307" class="ln">   307</span>	#define PRECALC_21(REG) \
+<span id="L308" class="ln">   308</span>		VPSRLD $30, Y9, Y9 \
+<span id="L309" class="ln">   309</span>		VPXOR REG, Y0, Y0
+<span id="L310" class="ln">   310</span>	
+<span id="L311" class="ln">   311</span>	#define PRECALC_23(REG,K_OFFSET,OFFSET) \
+<span id="L312" class="ln">   312</span>		VPXOR Y9, Y0, REG \
+<span id="L313" class="ln">   313</span>		VPADDD K_OFFSET(R8), REG, Y0 \
+<span id="L314" class="ln">   314</span>		VMOVDQU Y0, (OFFSET)(R14)
+<span id="L315" class="ln">   315</span>	
+<span id="L316" class="ln">   316</span>	// Message scheduling pre-compute for rounds 16-31
+<span id="L317" class="ln">   317</span>	// calculating last 32 w[i] values in 8 XMM registers
+<span id="L318" class="ln">   318</span>	// pre-calculate K+w[i] values and store to mem
+<span id="L319" class="ln">   319</span>	// for later load by ALU add instruction.
+<span id="L320" class="ln">   320</span>	// &#34;brute force&#34; vectorization for rounds 16-31 only
+<span id="L321" class="ln">   321</span>	// due to w[i]-&gt;w[i-3] dependency.
+<span id="L322" class="ln">   322</span>	// clobbers 5 input ymm registers REG_SUB*
+<span id="L323" class="ln">   323</span>	// uses X0 and X9 as temp registers
+<span id="L324" class="ln">   324</span>	// As always, R8 is a pointer to constants block
+<span id="L325" class="ln">   325</span>	// and R14 is a pointer to temp buffer
+<span id="L326" class="ln">   326</span>	#define PRECALC_16_31(REG,REG_SUB_4,REG_SUB_8,REG_SUB_12,REG_SUB_16,K_OFFSET,OFFSET) \
+<span id="L327" class="ln">   327</span>		PRECALC_16(REG_SUB_16,REG_SUB_12,REG_SUB_4,REG) \
+<span id="L328" class="ln">   328</span>		PRECALC_17(REG_SUB_16,REG_SUB_8,REG) \
+<span id="L329" class="ln">   329</span>		PRECALC_18(REG) \
+<span id="L330" class="ln">   330</span>		PRECALC_19(REG) \
+<span id="L331" class="ln">   331</span>		PRECALC_20(REG) \
+<span id="L332" class="ln">   332</span>		PRECALC_21(REG) \
+<span id="L333" class="ln">   333</span>		PRECALC_23(REG,K_OFFSET,OFFSET)
+<span id="L334" class="ln">   334</span>	
+<span id="L335" class="ln">   335</span>	
+<span id="L336" class="ln">   336</span>	// Helper macros for PRECALC_32_79
+<span id="L337" class="ln">   337</span>	#define PRECALC_32(REG_SUB_8,REG_SUB_4) \
+<span id="L338" class="ln">   338</span>		VPALIGNR $8, REG_SUB_8, REG_SUB_4, Y0
+<span id="L339" class="ln">   339</span>	
+<span id="L340" class="ln">   340</span>	#define PRECALC_33(REG_SUB_28,REG) \
+<span id="L341" class="ln">   341</span>		VPXOR REG_SUB_28, REG, REG
+<span id="L342" class="ln">   342</span>	
+<span id="L343" class="ln">   343</span>	#define PRECALC_34(REG_SUB_16) \
+<span id="L344" class="ln">   344</span>		VPXOR REG_SUB_16, Y0, Y0
+<span id="L345" class="ln">   345</span>	
+<span id="L346" class="ln">   346</span>	#define PRECALC_35(REG) \
+<span id="L347" class="ln">   347</span>		VPXOR Y0, REG, REG
+<span id="L348" class="ln">   348</span>	
+<span id="L349" class="ln">   349</span>	#define PRECALC_36(REG) \
+<span id="L350" class="ln">   350</span>		VPSLLD $2, REG, Y0
+<span id="L351" class="ln">   351</span>	
+<span id="L352" class="ln">   352</span>	#define PRECALC_37(REG) \
+<span id="L353" class="ln">   353</span>		VPSRLD $30, REG, REG \
+<span id="L354" class="ln">   354</span>		VPOR REG, Y0, REG
+<span id="L355" class="ln">   355</span>	
+<span id="L356" class="ln">   356</span>	#define PRECALC_39(REG,K_OFFSET,OFFSET) \
+<span id="L357" class="ln">   357</span>		VPADDD K_OFFSET(R8), REG, Y0 \
+<span id="L358" class="ln">   358</span>		VMOVDQU Y0, (OFFSET)(R14)
+<span id="L359" class="ln">   359</span>	
+<span id="L360" class="ln">   360</span>	// Message scheduling pre-compute for rounds 32-79
+<span id="L361" class="ln">   361</span>	// In SHA-1 specification we have:
+<span id="L362" class="ln">   362</span>	// w[i] = (w[i-3] ^ w[i-8]  ^ w[i-14] ^ w[i-16]) rol 1
+<span id="L363" class="ln">   363</span>	// Which is the same as:
+<span id="L364" class="ln">   364</span>	// w[i] = (w[i-6] ^ w[i-16] ^ w[i-28] ^ w[i-32]) rol 2
+<span id="L365" class="ln">   365</span>	// This allows for more efficient vectorization,
+<span id="L366" class="ln">   366</span>	// since w[i]-&gt;w[i-3] dependency is broken
+<span id="L367" class="ln">   367</span>	#define PRECALC_32_79(REG,REG_SUB_4,REG_SUB_8,REG_SUB_16,REG_SUB_28,K_OFFSET,OFFSET) \
+<span id="L368" class="ln">   368</span>		PRECALC_32(REG_SUB_8,REG_SUB_4) \
+<span id="L369" class="ln">   369</span>		PRECALC_33(REG_SUB_28,REG) \
+<span id="L370" class="ln">   370</span>		PRECALC_34(REG_SUB_16) \
+<span id="L371" class="ln">   371</span>		PRECALC_35(REG) \
+<span id="L372" class="ln">   372</span>		PRECALC_36(REG) \
+<span id="L373" class="ln">   373</span>		PRECALC_37(REG) \
+<span id="L374" class="ln">   374</span>		PRECALC_39(REG,K_OFFSET,OFFSET)
+<span id="L375" class="ln">   375</span>	
+<span id="L376" class="ln">   376</span>	#define PRECALC \
+<span id="L377" class="ln">   377</span>		PRECALC_00_15(0,Y15) \
+<span id="L378" class="ln">   378</span>		PRECALC_00_15(0x10,Y14) \
+<span id="L379" class="ln">   379</span>		PRECALC_00_15(0x20,Y13) \
+<span id="L380" class="ln">   380</span>		PRECALC_00_15(0x30,Y12) \
+<span id="L381" class="ln">   381</span>		PRECALC_16_31(Y8,Y12,Y13,Y14,Y15,0,0x80) \
+<span id="L382" class="ln">   382</span>		PRECALC_16_31(Y7,Y8,Y12,Y13,Y14,0x20,0xa0) \
+<span id="L383" class="ln">   383</span>		PRECALC_16_31(Y5,Y7,Y8,Y12,Y13,0x20,0xc0) \
+<span id="L384" class="ln">   384</span>		PRECALC_16_31(Y3,Y5,Y7,Y8,Y12,0x20,0xe0) \
+<span id="L385" class="ln">   385</span>		PRECALC_32_79(Y15,Y3,Y5,Y8,Y14,0x20,0x100) \
+<span id="L386" class="ln">   386</span>		PRECALC_32_79(Y14,Y15,Y3,Y7,Y13,0x20,0x120) \
+<span id="L387" class="ln">   387</span>		PRECALC_32_79(Y13,Y14,Y15,Y5,Y12,0x40,0x140) \
+<span id="L388" class="ln">   388</span>		PRECALC_32_79(Y12,Y13,Y14,Y3,Y8,0x40,0x160) \
+<span id="L389" class="ln">   389</span>		PRECALC_32_79(Y8,Y12,Y13,Y15,Y7,0x40,0x180) \
+<span id="L390" class="ln">   390</span>		PRECALC_32_79(Y7,Y8,Y12,Y14,Y5,0x40,0x1a0) \
+<span id="L391" class="ln">   391</span>		PRECALC_32_79(Y5,Y7,Y8,Y13,Y3,0x40,0x1c0) \
+<span id="L392" class="ln">   392</span>		PRECALC_32_79(Y3,Y5,Y7,Y12,Y15,0x60,0x1e0) \
+<span id="L393" class="ln">   393</span>		PRECALC_32_79(Y15,Y3,Y5,Y8,Y14,0x60,0x200) \
+<span id="L394" class="ln">   394</span>		PRECALC_32_79(Y14,Y15,Y3,Y7,Y13,0x60,0x220) \
+<span id="L395" class="ln">   395</span>		PRECALC_32_79(Y13,Y14,Y15,Y5,Y12,0x60,0x240) \
+<span id="L396" class="ln">   396</span>		PRECALC_32_79(Y12,Y13,Y14,Y3,Y8,0x60,0x260)
+<span id="L397" class="ln">   397</span>	
+<span id="L398" class="ln">   398</span>	// Macros calculating individual rounds have general forn
+<span id="L399" class="ln">   399</span>	// CALC_ROUND_PRE + PRECALC_ROUND + CALC_ROUND_POST
+<span id="L400" class="ln">   400</span>	// CALC_ROUND_{PRE,POST} macros follow
+<span id="L401" class="ln">   401</span>	
+<span id="L402" class="ln">   402</span>	#define CALC_F1_PRE(OFFSET,REG_A,REG_B,REG_C,REG_E) \
+<span id="L403" class="ln">   403</span>		ADDL OFFSET(R15),REG_E \
+<span id="L404" class="ln">   404</span>		ANDNL REG_C,REG_A,BP \
+<span id="L405" class="ln">   405</span>		LEAL (REG_E)(REG_B*1), REG_E \ // Add F from the previous round
+<span id="L406" class="ln">   406</span>		RORXL $0x1b, REG_A, R12 \
+<span id="L407" class="ln">   407</span>		RORXL $2, REG_A, REG_B         // for next round
+<span id="L408" class="ln">   408</span>	
+<span id="L409" class="ln">   409</span>	// Calculate F for the next round
+<span id="L410" class="ln">   410</span>	#define CALC_F1_POST(REG_A,REG_B,REG_E) \
+<span id="L411" class="ln">   411</span>		ANDL REG_B,REG_A \             // b&amp;c
+<span id="L412" class="ln">   412</span>		XORL BP, REG_A \               // F1 = (b&amp;c) ^ (~b&amp;d)
+<span id="L413" class="ln">   413</span>		LEAL (REG_E)(R12*1), REG_E     // E += A &gt;&gt;&gt; 5
+<span id="L414" class="ln">   414</span>	
+<span id="L415" class="ln">   415</span>	
+<span id="L416" class="ln">   416</span>	// Registers are cycleickly rotated DX -&gt; AX -&gt; DI -&gt; SI -&gt; BX -&gt; CX
+<span id="L417" class="ln">   417</span>	#define CALC_0 \
+<span id="L418" class="ln">   418</span>		MOVL SI, BX \ // Precalculating first round
+<span id="L419" class="ln">   419</span>		RORXL $2, SI, SI \
+<span id="L420" class="ln">   420</span>		ANDNL AX, BX, BP \
+<span id="L421" class="ln">   421</span>		ANDL DI, BX \
+<span id="L422" class="ln">   422</span>		XORL BP, BX \
+<span id="L423" class="ln">   423</span>		CALC_F1_PRE(0x0,CX,BX,DI,DX) \
+<span id="L424" class="ln">   424</span>		PRECALC_0(0x80) \
+<span id="L425" class="ln">   425</span>		CALC_F1_POST(CX,SI,DX)
+<span id="L426" class="ln">   426</span>	
+<span id="L427" class="ln">   427</span>	#define CALC_1 \
+<span id="L428" class="ln">   428</span>		CALC_F1_PRE(0x4,DX,CX,SI,AX) \
+<span id="L429" class="ln">   429</span>		PRECALC_1(0x80) \
+<span id="L430" class="ln">   430</span>		CALC_F1_POST(DX,BX,AX)
+<span id="L431" class="ln">   431</span>	
+<span id="L432" class="ln">   432</span>	#define CALC_2 \
+<span id="L433" class="ln">   433</span>		CALC_F1_PRE(0x8,AX,DX,BX,DI) \
+<span id="L434" class="ln">   434</span>		PRECALC_2(Y15) \
+<span id="L435" class="ln">   435</span>		CALC_F1_POST(AX,CX,DI)
+<span id="L436" class="ln">   436</span>	
+<span id="L437" class="ln">   437</span>	#define CALC_3 \
+<span id="L438" class="ln">   438</span>		CALC_F1_PRE(0xc,DI,AX,CX,SI) \
+<span id="L439" class="ln">   439</span>		CALC_F1_POST(DI,DX,SI)
+<span id="L440" class="ln">   440</span>	
+<span id="L441" class="ln">   441</span>	#define CALC_4 \
+<span id="L442" class="ln">   442</span>		CALC_F1_PRE(0x20,SI,DI,DX,BX) \
+<span id="L443" class="ln">   443</span>		PRECALC_4(Y15,0x0) \
+<span id="L444" class="ln">   444</span>		CALC_F1_POST(SI,AX,BX)
+<span id="L445" class="ln">   445</span>	
+<span id="L446" class="ln">   446</span>	#define CALC_5 \
+<span id="L447" class="ln">   447</span>		CALC_F1_PRE(0x24,BX,SI,AX,CX) \
+<span id="L448" class="ln">   448</span>		CALC_F1_POST(BX,DI,CX)
+<span id="L449" class="ln">   449</span>	
+<span id="L450" class="ln">   450</span>	#define CALC_6 \
+<span id="L451" class="ln">   451</span>		CALC_F1_PRE(0x28,CX,BX,DI,DX) \
+<span id="L452" class="ln">   452</span>		CALC_F1_POST(CX,SI,DX)
+<span id="L453" class="ln">   453</span>	
+<span id="L454" class="ln">   454</span>	#define CALC_7 \
+<span id="L455" class="ln">   455</span>		CALC_F1_PRE(0x2c,DX,CX,SI,AX) \
+<span id="L456" class="ln">   456</span>		PRECALC_7(0x0) \
+<span id="L457" class="ln">   457</span>		CALC_F1_POST(DX,BX,AX)
+<span id="L458" class="ln">   458</span>	
+<span id="L459" class="ln">   459</span>	#define CALC_8 \
+<span id="L460" class="ln">   460</span>		CALC_F1_PRE(0x40,AX,DX,BX,DI) \
+<span id="L461" class="ln">   461</span>		PRECALC_0(0x90) \
+<span id="L462" class="ln">   462</span>		CALC_F1_POST(AX,CX,DI)
+<span id="L463" class="ln">   463</span>	
+<span id="L464" class="ln">   464</span>	#define CALC_9 \
+<span id="L465" class="ln">   465</span>		CALC_F1_PRE(0x44,DI,AX,CX,SI) \
+<span id="L466" class="ln">   466</span>		PRECALC_1(0x90) \
+<span id="L467" class="ln">   467</span>		CALC_F1_POST(DI,DX,SI)
+<span id="L468" class="ln">   468</span>	
+<span id="L469" class="ln">   469</span>	#define CALC_10 \
+<span id="L470" class="ln">   470</span>		CALC_F1_PRE(0x48,SI,DI,DX,BX) \
+<span id="L471" class="ln">   471</span>		PRECALC_2(Y14) \
+<span id="L472" class="ln">   472</span>		CALC_F1_POST(SI,AX,BX)
+<span id="L473" class="ln">   473</span>	
+<span id="L474" class="ln">   474</span>	#define CALC_11 \
+<span id="L475" class="ln">   475</span>		CALC_F1_PRE(0x4c,BX,SI,AX,CX) \
+<span id="L476" class="ln">   476</span>		CALC_F1_POST(BX,DI,CX)
+<span id="L477" class="ln">   477</span>	
+<span id="L478" class="ln">   478</span>	#define CALC_12 \
+<span id="L479" class="ln">   479</span>		CALC_F1_PRE(0x60,CX,BX,DI,DX) \
+<span id="L480" class="ln">   480</span>		PRECALC_4(Y14,0x0) \
+<span id="L481" class="ln">   481</span>		CALC_F1_POST(CX,SI,DX)
+<span id="L482" class="ln">   482</span>	
+<span id="L483" class="ln">   483</span>	#define CALC_13 \
+<span id="L484" class="ln">   484</span>		CALC_F1_PRE(0x64,DX,CX,SI,AX) \
+<span id="L485" class="ln">   485</span>		CALC_F1_POST(DX,BX,AX)
+<span id="L486" class="ln">   486</span>	
+<span id="L487" class="ln">   487</span>	#define CALC_14 \
+<span id="L488" class="ln">   488</span>		CALC_F1_PRE(0x68,AX,DX,BX,DI) \
+<span id="L489" class="ln">   489</span>		CALC_F1_POST(AX,CX,DI)
+<span id="L490" class="ln">   490</span>	
+<span id="L491" class="ln">   491</span>	#define CALC_15 \
+<span id="L492" class="ln">   492</span>		CALC_F1_PRE(0x6c,DI,AX,CX,SI) \
+<span id="L493" class="ln">   493</span>		PRECALC_7(0x10) \
+<span id="L494" class="ln">   494</span>		CALC_F1_POST(DI,DX,SI)
+<span id="L495" class="ln">   495</span>	
+<span id="L496" class="ln">   496</span>	#define CALC_16 \
+<span id="L497" class="ln">   497</span>		CALC_F1_PRE(0x80,SI,DI,DX,BX) \
+<span id="L498" class="ln">   498</span>		PRECALC_0(0xa0) \
+<span id="L499" class="ln">   499</span>		CALC_F1_POST(SI,AX,BX)
+<span id="L500" class="ln">   500</span>	
+<span id="L501" class="ln">   501</span>	#define CALC_17 \
+<span id="L502" class="ln">   502</span>		CALC_F1_PRE(0x84,BX,SI,AX,CX) \
+<span id="L503" class="ln">   503</span>		PRECALC_1(0xa0) \
+<span id="L504" class="ln">   504</span>		CALC_F1_POST(BX,DI,CX)
+<span id="L505" class="ln">   505</span>	
+<span id="L506" class="ln">   506</span>	#define CALC_18 \
+<span id="L507" class="ln">   507</span>		CALC_F1_PRE(0x88,CX,BX,DI,DX) \
+<span id="L508" class="ln">   508</span>		PRECALC_2(Y13) \
+<span id="L509" class="ln">   509</span>		CALC_F1_POST(CX,SI,DX)
+<span id="L510" class="ln">   510</span>	
+<span id="L511" class="ln">   511</span>	
+<span id="L512" class="ln">   512</span>	#define CALC_F2_PRE(OFFSET,REG_A,REG_B,REG_E) \
+<span id="L513" class="ln">   513</span>		ADDL OFFSET(R15),REG_E \
+<span id="L514" class="ln">   514</span>		LEAL (REG_E)(REG_B*1), REG_E \ // Add F from the previous round
+<span id="L515" class="ln">   515</span>		RORXL $0x1b, REG_A, R12 \
+<span id="L516" class="ln">   516</span>		RORXL $2, REG_A, REG_B         // for next round
+<span id="L517" class="ln">   517</span>	
+<span id="L518" class="ln">   518</span>	#define CALC_F2_POST(REG_A,REG_B,REG_C,REG_E) \
+<span id="L519" class="ln">   519</span>		XORL REG_B, REG_A \
+<span id="L520" class="ln">   520</span>		ADDL R12, REG_E \
+<span id="L521" class="ln">   521</span>	        XORL REG_C, REG_A
+<span id="L522" class="ln">   522</span>	
+<span id="L523" class="ln">   523</span>	#define CALC_19 \
+<span id="L524" class="ln">   524</span>		CALC_F2_PRE(0x8c,DX,CX,AX) \
+<span id="L525" class="ln">   525</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L526" class="ln">   526</span>	
+<span id="L527" class="ln">   527</span>	#define CALC_20 \
+<span id="L528" class="ln">   528</span>		CALC_F2_PRE(0xa0,AX,DX,DI) \
+<span id="L529" class="ln">   529</span>		PRECALC_4(Y13,0x0) \
+<span id="L530" class="ln">   530</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L531" class="ln">   531</span>	
+<span id="L532" class="ln">   532</span>	#define CALC_21 \
+<span id="L533" class="ln">   533</span>		CALC_F2_PRE(0xa4,DI,AX,SI) \
+<span id="L534" class="ln">   534</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L535" class="ln">   535</span>	
+<span id="L536" class="ln">   536</span>	#define CALC_22 \
+<span id="L537" class="ln">   537</span>		CALC_F2_PRE(0xa8,SI,DI,BX) \
+<span id="L538" class="ln">   538</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L539" class="ln">   539</span>	
+<span id="L540" class="ln">   540</span>	#define CALC_23 \
+<span id="L541" class="ln">   541</span>		CALC_F2_PRE(0xac,BX,SI,CX) \
+<span id="L542" class="ln">   542</span>		PRECALC_7(0x20) \
+<span id="L543" class="ln">   543</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L544" class="ln">   544</span>	
+<span id="L545" class="ln">   545</span>	#define CALC_24 \
+<span id="L546" class="ln">   546</span>		CALC_F2_PRE(0xc0,CX,BX,DX) \
+<span id="L547" class="ln">   547</span>		PRECALC_0(0xb0) \
+<span id="L548" class="ln">   548</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L549" class="ln">   549</span>	
+<span id="L550" class="ln">   550</span>	#define CALC_25 \
+<span id="L551" class="ln">   551</span>		CALC_F2_PRE(0xc4,DX,CX,AX) \
+<span id="L552" class="ln">   552</span>		PRECALC_1(0xb0) \
+<span id="L553" class="ln">   553</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L554" class="ln">   554</span>	
+<span id="L555" class="ln">   555</span>	#define CALC_26 \
+<span id="L556" class="ln">   556</span>		CALC_F2_PRE(0xc8,AX,DX,DI) \
+<span id="L557" class="ln">   557</span>		PRECALC_2(Y12) \
+<span id="L558" class="ln">   558</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L559" class="ln">   559</span>	
+<span id="L560" class="ln">   560</span>	#define CALC_27 \
+<span id="L561" class="ln">   561</span>		CALC_F2_PRE(0xcc,DI,AX,SI) \
+<span id="L562" class="ln">   562</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L563" class="ln">   563</span>	
+<span id="L564" class="ln">   564</span>	#define CALC_28 \
+<span id="L565" class="ln">   565</span>		CALC_F2_PRE(0xe0,SI,DI,BX) \
+<span id="L566" class="ln">   566</span>		PRECALC_4(Y12,0x0) \
+<span id="L567" class="ln">   567</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L568" class="ln">   568</span>	
+<span id="L569" class="ln">   569</span>	#define CALC_29 \
+<span id="L570" class="ln">   570</span>		CALC_F2_PRE(0xe4,BX,SI,CX) \
+<span id="L571" class="ln">   571</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L572" class="ln">   572</span>	
+<span id="L573" class="ln">   573</span>	#define CALC_30 \
+<span id="L574" class="ln">   574</span>		CALC_F2_PRE(0xe8,CX,BX,DX) \
+<span id="L575" class="ln">   575</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L576" class="ln">   576</span>	
+<span id="L577" class="ln">   577</span>	#define CALC_31 \
+<span id="L578" class="ln">   578</span>		CALC_F2_PRE(0xec,DX,CX,AX) \
+<span id="L579" class="ln">   579</span>		PRECALC_7(0x30) \
+<span id="L580" class="ln">   580</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L581" class="ln">   581</span>	
+<span id="L582" class="ln">   582</span>	#define CALC_32 \
+<span id="L583" class="ln">   583</span>		CALC_F2_PRE(0x100,AX,DX,DI) \
+<span id="L584" class="ln">   584</span>		PRECALC_16(Y15,Y14,Y12,Y8) \
+<span id="L585" class="ln">   585</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L586" class="ln">   586</span>	
+<span id="L587" class="ln">   587</span>	#define CALC_33 \
+<span id="L588" class="ln">   588</span>		CALC_F2_PRE(0x104,DI,AX,SI) \
+<span id="L589" class="ln">   589</span>		PRECALC_17(Y15,Y13,Y8) \
+<span id="L590" class="ln">   590</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L591" class="ln">   591</span>	
+<span id="L592" class="ln">   592</span>	#define CALC_34 \
+<span id="L593" class="ln">   593</span>		CALC_F2_PRE(0x108,SI,DI,BX) \
+<span id="L594" class="ln">   594</span>		PRECALC_18(Y8) \
+<span id="L595" class="ln">   595</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L596" class="ln">   596</span>	
+<span id="L597" class="ln">   597</span>	#define CALC_35 \
+<span id="L598" class="ln">   598</span>		CALC_F2_PRE(0x10c,BX,SI,CX) \
+<span id="L599" class="ln">   599</span>		PRECALC_19(Y8) \
+<span id="L600" class="ln">   600</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L601" class="ln">   601</span>	
+<span id="L602" class="ln">   602</span>	#define CALC_36 \
+<span id="L603" class="ln">   603</span>		CALC_F2_PRE(0x120,CX,BX,DX) \
+<span id="L604" class="ln">   604</span>		PRECALC_20(Y8) \
+<span id="L605" class="ln">   605</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L606" class="ln">   606</span>	
+<span id="L607" class="ln">   607</span>	#define CALC_37 \
+<span id="L608" class="ln">   608</span>		CALC_F2_PRE(0x124,DX,CX,AX) \
+<span id="L609" class="ln">   609</span>		PRECALC_21(Y8) \
+<span id="L610" class="ln">   610</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L611" class="ln">   611</span>	
+<span id="L612" class="ln">   612</span>	#define CALC_38 \
+<span id="L613" class="ln">   613</span>		CALC_F2_PRE(0x128,AX,DX,DI) \
+<span id="L614" class="ln">   614</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L615" class="ln">   615</span>	
+<span id="L616" class="ln">   616</span>	
+<span id="L617" class="ln">   617</span>	#define CALC_F3_PRE(OFFSET,REG_E) \
+<span id="L618" class="ln">   618</span>		ADDL OFFSET(R15),REG_E
+<span id="L619" class="ln">   619</span>	
+<span id="L620" class="ln">   620</span>	#define CALC_F3_POST(REG_A,REG_B,REG_C,REG_E,REG_TB) \
+<span id="L621" class="ln">   621</span>		LEAL (REG_E)(REG_TB*1), REG_E \ // Add F from the previous round
+<span id="L622" class="ln">   622</span>		MOVL REG_B, BP \
+<span id="L623" class="ln">   623</span>		ORL  REG_A, BP \
+<span id="L624" class="ln">   624</span>		RORXL $0x1b, REG_A, R12 \
+<span id="L625" class="ln">   625</span>		RORXL $2, REG_A, REG_TB \
+<span id="L626" class="ln">   626</span>		ANDL REG_C, BP \		// Calculate F for the next round
+<span id="L627" class="ln">   627</span>		ANDL REG_B, REG_A \
+<span id="L628" class="ln">   628</span>		ORL  BP, REG_A \
+<span id="L629" class="ln">   629</span>		ADDL R12, REG_E
+<span id="L630" class="ln">   630</span>	
+<span id="L631" class="ln">   631</span>	#define CALC_39 \
+<span id="L632" class="ln">   632</span>		CALC_F3_PRE(0x12c,SI) \
+<span id="L633" class="ln">   633</span>		PRECALC_23(Y8,0x0,0x80) \
+<span id="L634" class="ln">   634</span>		CALC_F3_POST(DI,DX,CX,SI,AX)
+<span id="L635" class="ln">   635</span>	
+<span id="L636" class="ln">   636</span>	#define CALC_40 \
+<span id="L637" class="ln">   637</span>		CALC_F3_PRE(0x140,BX) \
+<span id="L638" class="ln">   638</span>		PRECALC_16(Y14,Y13,Y8,Y7) \
+<span id="L639" class="ln">   639</span>		CALC_F3_POST(SI,AX,DX,BX,DI)
+<span id="L640" class="ln">   640</span>	
+<span id="L641" class="ln">   641</span>	#define CALC_41 \
+<span id="L642" class="ln">   642</span>		CALC_F3_PRE(0x144,CX) \
+<span id="L643" class="ln">   643</span>		PRECALC_17(Y14,Y12,Y7) \
+<span id="L644" class="ln">   644</span>		CALC_F3_POST(BX,DI,AX,CX,SI)
+<span id="L645" class="ln">   645</span>	
+<span id="L646" class="ln">   646</span>	#define CALC_42 \
+<span id="L647" class="ln">   647</span>		CALC_F3_PRE(0x148,DX) \
+<span id="L648" class="ln">   648</span>		PRECALC_18(Y7) \
+<span id="L649" class="ln">   649</span>		CALC_F3_POST(CX,SI,DI,DX,BX)
+<span id="L650" class="ln">   650</span>	
+<span id="L651" class="ln">   651</span>	#define CALC_43 \
+<span id="L652" class="ln">   652</span>		CALC_F3_PRE(0x14c,AX) \
+<span id="L653" class="ln">   653</span>		PRECALC_19(Y7) \
+<span id="L654" class="ln">   654</span>		CALC_F3_POST(DX,BX,SI,AX,CX)
+<span id="L655" class="ln">   655</span>	
+<span id="L656" class="ln">   656</span>	#define CALC_44 \
+<span id="L657" class="ln">   657</span>		CALC_F3_PRE(0x160,DI) \
+<span id="L658" class="ln">   658</span>		PRECALC_20(Y7) \
+<span id="L659" class="ln">   659</span>		CALC_F3_POST(AX,CX,BX,DI,DX)
+<span id="L660" class="ln">   660</span>	
+<span id="L661" class="ln">   661</span>	#define CALC_45 \
+<span id="L662" class="ln">   662</span>		CALC_F3_PRE(0x164,SI) \
+<span id="L663" class="ln">   663</span>		PRECALC_21(Y7) \
+<span id="L664" class="ln">   664</span>		CALC_F3_POST(DI,DX,CX,SI,AX)
+<span id="L665" class="ln">   665</span>	
+<span id="L666" class="ln">   666</span>	#define CALC_46 \
+<span id="L667" class="ln">   667</span>		CALC_F3_PRE(0x168,BX) \
+<span id="L668" class="ln">   668</span>		CALC_F3_POST(SI,AX,DX,BX,DI)
+<span id="L669" class="ln">   669</span>	
+<span id="L670" class="ln">   670</span>	#define CALC_47 \
+<span id="L671" class="ln">   671</span>		CALC_F3_PRE(0x16c,CX) \
+<span id="L672" class="ln">   672</span>		VPXOR Y9, Y0, Y7 \
+<span id="L673" class="ln">   673</span>		VPADDD 0x20(R8), Y7, Y0 \
+<span id="L674" class="ln">   674</span>		VMOVDQU Y0, 0xa0(R14) \
+<span id="L675" class="ln">   675</span>		CALC_F3_POST(BX,DI,AX,CX,SI)
+<span id="L676" class="ln">   676</span>	
+<span id="L677" class="ln">   677</span>	#define CALC_48 \
+<span id="L678" class="ln">   678</span>		CALC_F3_PRE(0x180,DX) \
+<span id="L679" class="ln">   679</span>		PRECALC_16(Y13,Y12,Y7,Y5) \
+<span id="L680" class="ln">   680</span>		CALC_F3_POST(CX,SI,DI,DX,BX)
+<span id="L681" class="ln">   681</span>	
+<span id="L682" class="ln">   682</span>	#define CALC_49 \
+<span id="L683" class="ln">   683</span>		CALC_F3_PRE(0x184,AX) \
+<span id="L684" class="ln">   684</span>		PRECALC_17(Y13,Y8,Y5) \
+<span id="L685" class="ln">   685</span>		CALC_F3_POST(DX,BX,SI,AX,CX)
+<span id="L686" class="ln">   686</span>	
+<span id="L687" class="ln">   687</span>	#define CALC_50 \
+<span id="L688" class="ln">   688</span>		CALC_F3_PRE(0x188,DI) \
+<span id="L689" class="ln">   689</span>		PRECALC_18(Y5) \
+<span id="L690" class="ln">   690</span>		CALC_F3_POST(AX,CX,BX,DI,DX)
+<span id="L691" class="ln">   691</span>	
+<span id="L692" class="ln">   692</span>	#define CALC_51 \
+<span id="L693" class="ln">   693</span>		CALC_F3_PRE(0x18c,SI) \
+<span id="L694" class="ln">   694</span>		PRECALC_19(Y5) \
+<span id="L695" class="ln">   695</span>		CALC_F3_POST(DI,DX,CX,SI,AX)
+<span id="L696" class="ln">   696</span>	
+<span id="L697" class="ln">   697</span>	#define CALC_52 \
+<span id="L698" class="ln">   698</span>		CALC_F3_PRE(0x1a0,BX) \
+<span id="L699" class="ln">   699</span>		PRECALC_20(Y5) \
+<span id="L700" class="ln">   700</span>		CALC_F3_POST(SI,AX,DX,BX,DI)
+<span id="L701" class="ln">   701</span>	
+<span id="L702" class="ln">   702</span>	#define CALC_53 \
+<span id="L703" class="ln">   703</span>		CALC_F3_PRE(0x1a4,CX) \
+<span id="L704" class="ln">   704</span>		PRECALC_21(Y5) \
+<span id="L705" class="ln">   705</span>		CALC_F3_POST(BX,DI,AX,CX,SI)
+<span id="L706" class="ln">   706</span>	
+<span id="L707" class="ln">   707</span>	#define CALC_54 \
+<span id="L708" class="ln">   708</span>		CALC_F3_PRE(0x1a8,DX) \
+<span id="L709" class="ln">   709</span>		CALC_F3_POST(CX,SI,DI,DX,BX)
+<span id="L710" class="ln">   710</span>	
+<span id="L711" class="ln">   711</span>	#define CALC_55 \
+<span id="L712" class="ln">   712</span>		CALC_F3_PRE(0x1ac,AX) \
+<span id="L713" class="ln">   713</span>		PRECALC_23(Y5,0x20,0xc0) \
+<span id="L714" class="ln">   714</span>		CALC_F3_POST(DX,BX,SI,AX,CX)
+<span id="L715" class="ln">   715</span>	
+<span id="L716" class="ln">   716</span>	#define CALC_56 \
+<span id="L717" class="ln">   717</span>		CALC_F3_PRE(0x1c0,DI) \
+<span id="L718" class="ln">   718</span>		PRECALC_16(Y12,Y8,Y5,Y3) \
+<span id="L719" class="ln">   719</span>		CALC_F3_POST(AX,CX,BX,DI,DX)
+<span id="L720" class="ln">   720</span>	
+<span id="L721" class="ln">   721</span>	#define CALC_57 \
+<span id="L722" class="ln">   722</span>		CALC_F3_PRE(0x1c4,SI) \
+<span id="L723" class="ln">   723</span>		PRECALC_17(Y12,Y7,Y3) \
+<span id="L724" class="ln">   724</span>		CALC_F3_POST(DI,DX,CX,SI,AX)
+<span id="L725" class="ln">   725</span>	
+<span id="L726" class="ln">   726</span>	#define CALC_58 \
+<span id="L727" class="ln">   727</span>		CALC_F3_PRE(0x1c8,BX) \
+<span id="L728" class="ln">   728</span>		PRECALC_18(Y3) \
+<span id="L729" class="ln">   729</span>		CALC_F3_POST(SI,AX,DX,BX,DI)
+<span id="L730" class="ln">   730</span>	
+<span id="L731" class="ln">   731</span>	#define CALC_59 \
+<span id="L732" class="ln">   732</span>		CALC_F2_PRE(0x1cc,BX,SI,CX) \
+<span id="L733" class="ln">   733</span>		PRECALC_19(Y3) \
+<span id="L734" class="ln">   734</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L735" class="ln">   735</span>	
+<span id="L736" class="ln">   736</span>	#define CALC_60 \
+<span id="L737" class="ln">   737</span>		CALC_F2_PRE(0x1e0,CX,BX,DX) \
+<span id="L738" class="ln">   738</span>		PRECALC_20(Y3) \
+<span id="L739" class="ln">   739</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L740" class="ln">   740</span>	
+<span id="L741" class="ln">   741</span>	#define CALC_61 \
+<span id="L742" class="ln">   742</span>		CALC_F2_PRE(0x1e4,DX,CX,AX) \
+<span id="L743" class="ln">   743</span>		PRECALC_21(Y3) \
+<span id="L744" class="ln">   744</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L745" class="ln">   745</span>	
+<span id="L746" class="ln">   746</span>	#define CALC_62 \
+<span id="L747" class="ln">   747</span>		CALC_F2_PRE(0x1e8,AX,DX,DI) \
+<span id="L748" class="ln">   748</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L749" class="ln">   749</span>	
+<span id="L750" class="ln">   750</span>	#define CALC_63 \
+<span id="L751" class="ln">   751</span>		CALC_F2_PRE(0x1ec,DI,AX,SI) \
+<span id="L752" class="ln">   752</span>		PRECALC_23(Y3,0x20,0xe0) \
+<span id="L753" class="ln">   753</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L754" class="ln">   754</span>	
+<span id="L755" class="ln">   755</span>	#define CALC_64 \
+<span id="L756" class="ln">   756</span>		CALC_F2_PRE(0x200,SI,DI,BX) \
+<span id="L757" class="ln">   757</span>		PRECALC_32(Y5,Y3) \
+<span id="L758" class="ln">   758</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L759" class="ln">   759</span>	
+<span id="L760" class="ln">   760</span>	#define CALC_65 \
+<span id="L761" class="ln">   761</span>		CALC_F2_PRE(0x204,BX,SI,CX) \
+<span id="L762" class="ln">   762</span>		PRECALC_33(Y14,Y15) \
+<span id="L763" class="ln">   763</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L764" class="ln">   764</span>	
+<span id="L765" class="ln">   765</span>	#define CALC_66 \
+<span id="L766" class="ln">   766</span>		CALC_F2_PRE(0x208,CX,BX,DX) \
+<span id="L767" class="ln">   767</span>		PRECALC_34(Y8) \
+<span id="L768" class="ln">   768</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L769" class="ln">   769</span>	
+<span id="L770" class="ln">   770</span>	#define CALC_67 \
+<span id="L771" class="ln">   771</span>		CALC_F2_PRE(0x20c,DX,CX,AX) \
+<span id="L772" class="ln">   772</span>		PRECALC_35(Y15) \
+<span id="L773" class="ln">   773</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L774" class="ln">   774</span>	
+<span id="L775" class="ln">   775</span>	#define CALC_68 \
+<span id="L776" class="ln">   776</span>		CALC_F2_PRE(0x220,AX,DX,DI) \
+<span id="L777" class="ln">   777</span>		PRECALC_36(Y15) \
+<span id="L778" class="ln">   778</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L779" class="ln">   779</span>	
+<span id="L780" class="ln">   780</span>	#define CALC_69 \
+<span id="L781" class="ln">   781</span>		CALC_F2_PRE(0x224,DI,AX,SI) \
+<span id="L782" class="ln">   782</span>		PRECALC_37(Y15) \
+<span id="L783" class="ln">   783</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L784" class="ln">   784</span>	
+<span id="L785" class="ln">   785</span>	#define CALC_70 \
+<span id="L786" class="ln">   786</span>		CALC_F2_PRE(0x228,SI,DI,BX) \
+<span id="L787" class="ln">   787</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L788" class="ln">   788</span>	
+<span id="L789" class="ln">   789</span>	#define CALC_71 \
+<span id="L790" class="ln">   790</span>		CALC_F2_PRE(0x22c,BX,SI,CX) \
+<span id="L791" class="ln">   791</span>		PRECALC_39(Y15,0x20,0x100) \
+<span id="L792" class="ln">   792</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L793" class="ln">   793</span>	
+<span id="L794" class="ln">   794</span>	#define CALC_72 \
+<span id="L795" class="ln">   795</span>		CALC_F2_PRE(0x240,CX,BX,DX) \
+<span id="L796" class="ln">   796</span>		PRECALC_32(Y3,Y15) \
+<span id="L797" class="ln">   797</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L798" class="ln">   798</span>	
+<span id="L799" class="ln">   799</span>	#define CALC_73 \
+<span id="L800" class="ln">   800</span>		CALC_F2_PRE(0x244,DX,CX,AX) \
+<span id="L801" class="ln">   801</span>		PRECALC_33(Y13,Y14) \
+<span id="L802" class="ln">   802</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L803" class="ln">   803</span>	
+<span id="L804" class="ln">   804</span>	#define CALC_74 \
+<span id="L805" class="ln">   805</span>		CALC_F2_PRE(0x248,AX,DX,DI) \
+<span id="L806" class="ln">   806</span>		PRECALC_34(Y7) \
+<span id="L807" class="ln">   807</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L808" class="ln">   808</span>	
+<span id="L809" class="ln">   809</span>	#define CALC_75 \
+<span id="L810" class="ln">   810</span>		CALC_F2_PRE(0x24c,DI,AX,SI) \
+<span id="L811" class="ln">   811</span>		PRECALC_35(Y14) \
+<span id="L812" class="ln">   812</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L813" class="ln">   813</span>	
+<span id="L814" class="ln">   814</span>	#define CALC_76 \
+<span id="L815" class="ln">   815</span>		CALC_F2_PRE(0x260,SI,DI,BX) \
+<span id="L816" class="ln">   816</span>		PRECALC_36(Y14) \
+<span id="L817" class="ln">   817</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L818" class="ln">   818</span>	
+<span id="L819" class="ln">   819</span>	#define CALC_77 \
+<span id="L820" class="ln">   820</span>		CALC_F2_PRE(0x264,BX,SI,CX) \
+<span id="L821" class="ln">   821</span>		PRECALC_37(Y14) \
+<span id="L822" class="ln">   822</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L823" class="ln">   823</span>	
+<span id="L824" class="ln">   824</span>	#define CALC_78 \
+<span id="L825" class="ln">   825</span>		CALC_F2_PRE(0x268,CX,BX,DX) \
+<span id="L826" class="ln">   826</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L827" class="ln">   827</span>	
+<span id="L828" class="ln">   828</span>	#define CALC_79 \
+<span id="L829" class="ln">   829</span>		ADDL 0x26c(R15), AX \
+<span id="L830" class="ln">   830</span>		LEAL (AX)(CX*1), AX \
+<span id="L831" class="ln">   831</span>		RORXL $0x1b, DX, R12 \
+<span id="L832" class="ln">   832</span>		PRECALC_39(Y14,0x20,0x120) \
+<span id="L833" class="ln">   833</span>		ADDL R12, AX
+<span id="L834" class="ln">   834</span>	
+<span id="L835" class="ln">   835</span>	// Similar to CALC_0
+<span id="L836" class="ln">   836</span>	#define CALC_80 \
+<span id="L837" class="ln">   837</span>		MOVL CX, DX \
+<span id="L838" class="ln">   838</span>		RORXL $2, CX, CX \
+<span id="L839" class="ln">   839</span>		ANDNL SI, DX, BP \
+<span id="L840" class="ln">   840</span>		ANDL BX, DX \
+<span id="L841" class="ln">   841</span>		XORL BP, DX \
+<span id="L842" class="ln">   842</span>		CALC_F1_PRE(0x10,AX,DX,BX,DI) \
+<span id="L843" class="ln">   843</span>		PRECALC_32(Y15,Y14) \
+<span id="L844" class="ln">   844</span>		CALC_F1_POST(AX,CX,DI)
+<span id="L845" class="ln">   845</span>	
+<span id="L846" class="ln">   846</span>	#define CALC_81 \
+<span id="L847" class="ln">   847</span>		CALC_F1_PRE(0x14,DI,AX,CX,SI) \
+<span id="L848" class="ln">   848</span>		PRECALC_33(Y12,Y13) \
+<span id="L849" class="ln">   849</span>		CALC_F1_POST(DI,DX,SI)
+<span id="L850" class="ln">   850</span>	
+<span id="L851" class="ln">   851</span>	#define CALC_82 \
+<span id="L852" class="ln">   852</span>		CALC_F1_PRE(0x18,SI,DI,DX,BX) \
+<span id="L853" class="ln">   853</span>		PRECALC_34(Y5) \
+<span id="L854" class="ln">   854</span>		CALC_F1_POST(SI,AX,BX)
+<span id="L855" class="ln">   855</span>	
+<span id="L856" class="ln">   856</span>	#define CALC_83 \
+<span id="L857" class="ln">   857</span>		CALC_F1_PRE(0x1c,BX,SI,AX,CX) \
+<span id="L858" class="ln">   858</span>		PRECALC_35(Y13) \
+<span id="L859" class="ln">   859</span>		CALC_F1_POST(BX,DI,CX)
+<span id="L860" class="ln">   860</span>	
+<span id="L861" class="ln">   861</span>	#define CALC_84 \
+<span id="L862" class="ln">   862</span>		CALC_F1_PRE(0x30,CX,BX,DI,DX) \
+<span id="L863" class="ln">   863</span>		PRECALC_36(Y13) \
+<span id="L864" class="ln">   864</span>		CALC_F1_POST(CX,SI,DX)
+<span id="L865" class="ln">   865</span>	
+<span id="L866" class="ln">   866</span>	#define CALC_85 \
+<span id="L867" class="ln">   867</span>		CALC_F1_PRE(0x34,DX,CX,SI,AX) \
+<span id="L868" class="ln">   868</span>		PRECALC_37(Y13) \
+<span id="L869" class="ln">   869</span>		CALC_F1_POST(DX,BX,AX)
+<span id="L870" class="ln">   870</span>	
+<span id="L871" class="ln">   871</span>	#define CALC_86 \
+<span id="L872" class="ln">   872</span>		CALC_F1_PRE(0x38,AX,DX,BX,DI) \
+<span id="L873" class="ln">   873</span>		CALC_F1_POST(AX,CX,DI)
+<span id="L874" class="ln">   874</span>	
+<span id="L875" class="ln">   875</span>	#define CALC_87 \
+<span id="L876" class="ln">   876</span>		CALC_F1_PRE(0x3c,DI,AX,CX,SI) \
+<span id="L877" class="ln">   877</span>		PRECALC_39(Y13,0x40,0x140) \
+<span id="L878" class="ln">   878</span>		CALC_F1_POST(DI,DX,SI)
+<span id="L879" class="ln">   879</span>	
+<span id="L880" class="ln">   880</span>	#define CALC_88 \
+<span id="L881" class="ln">   881</span>		CALC_F1_PRE(0x50,SI,DI,DX,BX) \
+<span id="L882" class="ln">   882</span>		PRECALC_32(Y14,Y13) \
+<span id="L883" class="ln">   883</span>		CALC_F1_POST(SI,AX,BX)
+<span id="L884" class="ln">   884</span>	
+<span id="L885" class="ln">   885</span>	#define CALC_89 \
+<span id="L886" class="ln">   886</span>		CALC_F1_PRE(0x54,BX,SI,AX,CX) \
+<span id="L887" class="ln">   887</span>		PRECALC_33(Y8,Y12) \
+<span id="L888" class="ln">   888</span>		CALC_F1_POST(BX,DI,CX)
+<span id="L889" class="ln">   889</span>	
+<span id="L890" class="ln">   890</span>	#define CALC_90 \
+<span id="L891" class="ln">   891</span>		CALC_F1_PRE(0x58,CX,BX,DI,DX) \
+<span id="L892" class="ln">   892</span>		PRECALC_34(Y3) \
+<span id="L893" class="ln">   893</span>		CALC_F1_POST(CX,SI,DX)
+<span id="L894" class="ln">   894</span>	
+<span id="L895" class="ln">   895</span>	#define CALC_91 \
+<span id="L896" class="ln">   896</span>		CALC_F1_PRE(0x5c,DX,CX,SI,AX) \
+<span id="L897" class="ln">   897</span>		PRECALC_35(Y12) \
+<span id="L898" class="ln">   898</span>		CALC_F1_POST(DX,BX,AX)
+<span id="L899" class="ln">   899</span>	
+<span id="L900" class="ln">   900</span>	#define CALC_92 \
+<span id="L901" class="ln">   901</span>		CALC_F1_PRE(0x70,AX,DX,BX,DI) \
+<span id="L902" class="ln">   902</span>		PRECALC_36(Y12) \
+<span id="L903" class="ln">   903</span>		CALC_F1_POST(AX,CX,DI)
+<span id="L904" class="ln">   904</span>	
+<span id="L905" class="ln">   905</span>	#define CALC_93 \
+<span id="L906" class="ln">   906</span>		CALC_F1_PRE(0x74,DI,AX,CX,SI) \
+<span id="L907" class="ln">   907</span>		PRECALC_37(Y12) \
+<span id="L908" class="ln">   908</span>		CALC_F1_POST(DI,DX,SI)
+<span id="L909" class="ln">   909</span>	
+<span id="L910" class="ln">   910</span>	#define CALC_94 \
+<span id="L911" class="ln">   911</span>		CALC_F1_PRE(0x78,SI,DI,DX,BX) \
+<span id="L912" class="ln">   912</span>		CALC_F1_POST(SI,AX,BX)
+<span id="L913" class="ln">   913</span>	
+<span id="L914" class="ln">   914</span>	#define CALC_95 \
+<span id="L915" class="ln">   915</span>		CALC_F1_PRE(0x7c,BX,SI,AX,CX) \
+<span id="L916" class="ln">   916</span>		PRECALC_39(Y12,0x40,0x160) \
+<span id="L917" class="ln">   917</span>		CALC_F1_POST(BX,DI,CX)
+<span id="L918" class="ln">   918</span>	
+<span id="L919" class="ln">   919</span>	#define CALC_96 \
+<span id="L920" class="ln">   920</span>		CALC_F1_PRE(0x90,CX,BX,DI,DX) \
+<span id="L921" class="ln">   921</span>		PRECALC_32(Y13,Y12) \
+<span id="L922" class="ln">   922</span>		CALC_F1_POST(CX,SI,DX)
+<span id="L923" class="ln">   923</span>	
+<span id="L924" class="ln">   924</span>	#define CALC_97 \
+<span id="L925" class="ln">   925</span>		CALC_F1_PRE(0x94,DX,CX,SI,AX) \
+<span id="L926" class="ln">   926</span>		PRECALC_33(Y7,Y8) \
+<span id="L927" class="ln">   927</span>		CALC_F1_POST(DX,BX,AX)
+<span id="L928" class="ln">   928</span>	
+<span id="L929" class="ln">   929</span>	#define CALC_98 \
+<span id="L930" class="ln">   930</span>		CALC_F1_PRE(0x98,AX,DX,BX,DI) \
+<span id="L931" class="ln">   931</span>		PRECALC_34(Y15) \
+<span id="L932" class="ln">   932</span>		CALC_F1_POST(AX,CX,DI)
+<span id="L933" class="ln">   933</span>	
+<span id="L934" class="ln">   934</span>	#define CALC_99 \
+<span id="L935" class="ln">   935</span>		CALC_F2_PRE(0x9c,DI,AX,SI) \
+<span id="L936" class="ln">   936</span>		PRECALC_35(Y8) \
+<span id="L937" class="ln">   937</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L938" class="ln">   938</span>	
+<span id="L939" class="ln">   939</span>	#define CALC_100 \
+<span id="L940" class="ln">   940</span>		CALC_F2_PRE(0xb0,SI,DI,BX) \
+<span id="L941" class="ln">   941</span>		PRECALC_36(Y8) \
+<span id="L942" class="ln">   942</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L943" class="ln">   943</span>	
+<span id="L944" class="ln">   944</span>	#define CALC_101 \
+<span id="L945" class="ln">   945</span>		CALC_F2_PRE(0xb4,BX,SI,CX) \
+<span id="L946" class="ln">   946</span>		PRECALC_37(Y8) \
+<span id="L947" class="ln">   947</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L948" class="ln">   948</span>	
+<span id="L949" class="ln">   949</span>	#define CALC_102 \
+<span id="L950" class="ln">   950</span>		CALC_F2_PRE(0xb8,CX,BX,DX) \
+<span id="L951" class="ln">   951</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L952" class="ln">   952</span>	
+<span id="L953" class="ln">   953</span>	#define CALC_103 \
+<span id="L954" class="ln">   954</span>		CALC_F2_PRE(0xbc,DX,CX,AX) \
+<span id="L955" class="ln">   955</span>		PRECALC_39(Y8,0x40,0x180) \
+<span id="L956" class="ln">   956</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L957" class="ln">   957</span>	
+<span id="L958" class="ln">   958</span>	#define CALC_104 \
+<span id="L959" class="ln">   959</span>		CALC_F2_PRE(0xd0,AX,DX,DI) \
+<span id="L960" class="ln">   960</span>		PRECALC_32(Y12,Y8) \
+<span id="L961" class="ln">   961</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L962" class="ln">   962</span>	
+<span id="L963" class="ln">   963</span>	#define CALC_105 \
+<span id="L964" class="ln">   964</span>		CALC_F2_PRE(0xd4,DI,AX,SI) \
+<span id="L965" class="ln">   965</span>		PRECALC_33(Y5,Y7) \
+<span id="L966" class="ln">   966</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L967" class="ln">   967</span>	
+<span id="L968" class="ln">   968</span>	#define CALC_106 \
+<span id="L969" class="ln">   969</span>		CALC_F2_PRE(0xd8,SI,DI,BX) \
+<span id="L970" class="ln">   970</span>		PRECALC_34(Y14) \
+<span id="L971" class="ln">   971</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L972" class="ln">   972</span>	
+<span id="L973" class="ln">   973</span>	#define CALC_107 \
+<span id="L974" class="ln">   974</span>		CALC_F2_PRE(0xdc,BX,SI,CX) \
+<span id="L975" class="ln">   975</span>		PRECALC_35(Y7) \
+<span id="L976" class="ln">   976</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L977" class="ln">   977</span>	
+<span id="L978" class="ln">   978</span>	#define CALC_108 \
+<span id="L979" class="ln">   979</span>		CALC_F2_PRE(0xf0,CX,BX,DX) \
+<span id="L980" class="ln">   980</span>		PRECALC_36(Y7) \
+<span id="L981" class="ln">   981</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L982" class="ln">   982</span>	
+<span id="L983" class="ln">   983</span>	#define CALC_109 \
+<span id="L984" class="ln">   984</span>		CALC_F2_PRE(0xf4,DX,CX,AX) \
+<span id="L985" class="ln">   985</span>		PRECALC_37(Y7) \
+<span id="L986" class="ln">   986</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L987" class="ln">   987</span>	
+<span id="L988" class="ln">   988</span>	#define CALC_110 \
+<span id="L989" class="ln">   989</span>		CALC_F2_PRE(0xf8,AX,DX,DI) \
+<span id="L990" class="ln">   990</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L991" class="ln">   991</span>	
+<span id="L992" class="ln">   992</span>	#define CALC_111 \
+<span id="L993" class="ln">   993</span>		CALC_F2_PRE(0xfc,DI,AX,SI) \
+<span id="L994" class="ln">   994</span>		PRECALC_39(Y7,0x40,0x1a0) \
+<span id="L995" class="ln">   995</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L996" class="ln">   996</span>	
+<span id="L997" class="ln">   997</span>	#define CALC_112 \
+<span id="L998" class="ln">   998</span>		CALC_F2_PRE(0x110,SI,DI,BX) \
+<span id="L999" class="ln">   999</span>		PRECALC_32(Y8,Y7) \
+<span id="L1000" class="ln">  1000</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L1001" class="ln">  1001</span>	
+<span id="L1002" class="ln">  1002</span>	#define CALC_113 \
+<span id="L1003" class="ln">  1003</span>		CALC_F2_PRE(0x114,BX,SI,CX) \
+<span id="L1004" class="ln">  1004</span>		PRECALC_33(Y3,Y5) \
+<span id="L1005" class="ln">  1005</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L1006" class="ln">  1006</span>	
+<span id="L1007" class="ln">  1007</span>	#define CALC_114 \
+<span id="L1008" class="ln">  1008</span>		CALC_F2_PRE(0x118,CX,BX,DX) \
+<span id="L1009" class="ln">  1009</span>		PRECALC_34(Y13) \
+<span id="L1010" class="ln">  1010</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L1011" class="ln">  1011</span>	
+<span id="L1012" class="ln">  1012</span>	#define CALC_115 \
+<span id="L1013" class="ln">  1013</span>		CALC_F2_PRE(0x11c,DX,CX,AX) \
+<span id="L1014" class="ln">  1014</span>		PRECALC_35(Y5) \
+<span id="L1015" class="ln">  1015</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L1016" class="ln">  1016</span>	
+<span id="L1017" class="ln">  1017</span>	#define CALC_116 \
+<span id="L1018" class="ln">  1018</span>		CALC_F2_PRE(0x130,AX,DX,DI) \
+<span id="L1019" class="ln">  1019</span>		PRECALC_36(Y5) \
+<span id="L1020" class="ln">  1020</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L1021" class="ln">  1021</span>	
+<span id="L1022" class="ln">  1022</span>	#define CALC_117 \
+<span id="L1023" class="ln">  1023</span>		CALC_F2_PRE(0x134,DI,AX,SI) \
+<span id="L1024" class="ln">  1024</span>		PRECALC_37(Y5) \
+<span id="L1025" class="ln">  1025</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L1026" class="ln">  1026</span>	
+<span id="L1027" class="ln">  1027</span>	#define CALC_118 \
+<span id="L1028" class="ln">  1028</span>		CALC_F2_PRE(0x138,SI,DI,BX) \
+<span id="L1029" class="ln">  1029</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L1030" class="ln">  1030</span>	
+<span id="L1031" class="ln">  1031</span>	#define CALC_119 \
+<span id="L1032" class="ln">  1032</span>		CALC_F3_PRE(0x13c,CX) \
+<span id="L1033" class="ln">  1033</span>		PRECALC_39(Y5,0x40,0x1c0) \
+<span id="L1034" class="ln">  1034</span>		CALC_F3_POST(BX,DI,AX,CX,SI)
+<span id="L1035" class="ln">  1035</span>	
+<span id="L1036" class="ln">  1036</span>	#define CALC_120 \
+<span id="L1037" class="ln">  1037</span>		CALC_F3_PRE(0x150,DX) \
+<span id="L1038" class="ln">  1038</span>		PRECALC_32(Y7,Y5) \
+<span id="L1039" class="ln">  1039</span>		CALC_F3_POST(CX,SI,DI,DX,BX)
+<span id="L1040" class="ln">  1040</span>	
+<span id="L1041" class="ln">  1041</span>	#define CALC_121 \
+<span id="L1042" class="ln">  1042</span>		CALC_F3_PRE(0x154,AX) \
+<span id="L1043" class="ln">  1043</span>		PRECALC_33(Y15,Y3) \
+<span id="L1044" class="ln">  1044</span>		CALC_F3_POST(DX,BX,SI,AX,CX)
+<span id="L1045" class="ln">  1045</span>	
+<span id="L1046" class="ln">  1046</span>	#define CALC_122 \
+<span id="L1047" class="ln">  1047</span>		CALC_F3_PRE(0x158,DI) \
+<span id="L1048" class="ln">  1048</span>		PRECALC_34(Y12) \
+<span id="L1049" class="ln">  1049</span>		CALC_F3_POST(AX,CX,BX,DI,DX)
+<span id="L1050" class="ln">  1050</span>	
+<span id="L1051" class="ln">  1051</span>	#define CALC_123 \
+<span id="L1052" class="ln">  1052</span>		CALC_F3_PRE(0x15c,SI) \
+<span id="L1053" class="ln">  1053</span>		PRECALC_35(Y3) \
+<span id="L1054" class="ln">  1054</span>		CALC_F3_POST(DI,DX,CX,SI,AX)
+<span id="L1055" class="ln">  1055</span>	
+<span id="L1056" class="ln">  1056</span>	#define CALC_124 \
+<span id="L1057" class="ln">  1057</span>		CALC_F3_PRE(0x170,BX) \
+<span id="L1058" class="ln">  1058</span>		PRECALC_36(Y3) \
+<span id="L1059" class="ln">  1059</span>		CALC_F3_POST(SI,AX,DX,BX,DI)
+<span id="L1060" class="ln">  1060</span>	
+<span id="L1061" class="ln">  1061</span>	#define CALC_125 \
+<span id="L1062" class="ln">  1062</span>		CALC_F3_PRE(0x174,CX) \
+<span id="L1063" class="ln">  1063</span>		PRECALC_37(Y3) \
+<span id="L1064" class="ln">  1064</span>		CALC_F3_POST(BX,DI,AX,CX,SI)
+<span id="L1065" class="ln">  1065</span>	
+<span id="L1066" class="ln">  1066</span>	#define CALC_126 \
+<span id="L1067" class="ln">  1067</span>		CALC_F3_PRE(0x178,DX) \
+<span id="L1068" class="ln">  1068</span>		CALC_F3_POST(CX,SI,DI,DX,BX)
+<span id="L1069" class="ln">  1069</span>	
+<span id="L1070" class="ln">  1070</span>	#define CALC_127 \
+<span id="L1071" class="ln">  1071</span>		CALC_F3_PRE(0x17c,AX) \
+<span id="L1072" class="ln">  1072</span>		PRECALC_39(Y3,0x60,0x1e0) \
+<span id="L1073" class="ln">  1073</span>		CALC_F3_POST(DX,BX,SI,AX,CX)
+<span id="L1074" class="ln">  1074</span>	
+<span id="L1075" class="ln">  1075</span>	#define CALC_128 \
+<span id="L1076" class="ln">  1076</span>		CALC_F3_PRE(0x190,DI) \
+<span id="L1077" class="ln">  1077</span>		PRECALC_32(Y5,Y3) \
+<span id="L1078" class="ln">  1078</span>		CALC_F3_POST(AX,CX,BX,DI,DX)
+<span id="L1079" class="ln">  1079</span>	
+<span id="L1080" class="ln">  1080</span>	#define CALC_129 \
+<span id="L1081" class="ln">  1081</span>		CALC_F3_PRE(0x194,SI) \
+<span id="L1082" class="ln">  1082</span>		PRECALC_33(Y14,Y15) \
+<span id="L1083" class="ln">  1083</span>		CALC_F3_POST(DI,DX,CX,SI,AX)
+<span id="L1084" class="ln">  1084</span>	
+<span id="L1085" class="ln">  1085</span>	#define CALC_130 \
+<span id="L1086" class="ln">  1086</span>		CALC_F3_PRE(0x198,BX) \
+<span id="L1087" class="ln">  1087</span>		PRECALC_34(Y8) \
+<span id="L1088" class="ln">  1088</span>		CALC_F3_POST(SI,AX,DX,BX,DI)
+<span id="L1089" class="ln">  1089</span>	
+<span id="L1090" class="ln">  1090</span>	#define CALC_131 \
+<span id="L1091" class="ln">  1091</span>		CALC_F3_PRE(0x19c,CX) \
+<span id="L1092" class="ln">  1092</span>		PRECALC_35(Y15) \
+<span id="L1093" class="ln">  1093</span>		CALC_F3_POST(BX,DI,AX,CX,SI)
+<span id="L1094" class="ln">  1094</span>	
+<span id="L1095" class="ln">  1095</span>	#define CALC_132 \
+<span id="L1096" class="ln">  1096</span>		CALC_F3_PRE(0x1b0,DX) \
+<span id="L1097" class="ln">  1097</span>		PRECALC_36(Y15) \
+<span id="L1098" class="ln">  1098</span>		CALC_F3_POST(CX,SI,DI,DX,BX)
+<span id="L1099" class="ln">  1099</span>	
+<span id="L1100" class="ln">  1100</span>	#define CALC_133 \
+<span id="L1101" class="ln">  1101</span>		CALC_F3_PRE(0x1b4,AX) \
+<span id="L1102" class="ln">  1102</span>		PRECALC_37(Y15) \
+<span id="L1103" class="ln">  1103</span>		CALC_F3_POST(DX,BX,SI,AX,CX)
+<span id="L1104" class="ln">  1104</span>	
+<span id="L1105" class="ln">  1105</span>	#define CALC_134 \
+<span id="L1106" class="ln">  1106</span>		CALC_F3_PRE(0x1b8,DI) \
+<span id="L1107" class="ln">  1107</span>		CALC_F3_POST(AX,CX,BX,DI,DX)
+<span id="L1108" class="ln">  1108</span>	
+<span id="L1109" class="ln">  1109</span>	#define CALC_135 \
+<span id="L1110" class="ln">  1110</span>		CALC_F3_PRE(0x1bc,SI) \
+<span id="L1111" class="ln">  1111</span>		PRECALC_39(Y15,0x60,0x200) \
+<span id="L1112" class="ln">  1112</span>		CALC_F3_POST(DI,DX,CX,SI,AX)
+<span id="L1113" class="ln">  1113</span>	
+<span id="L1114" class="ln">  1114</span>	#define CALC_136 \
+<span id="L1115" class="ln">  1115</span>		CALC_F3_PRE(0x1d0,BX) \
+<span id="L1116" class="ln">  1116</span>		PRECALC_32(Y3,Y15) \
+<span id="L1117" class="ln">  1117</span>		CALC_F3_POST(SI,AX,DX,BX,DI)
+<span id="L1118" class="ln">  1118</span>	
+<span id="L1119" class="ln">  1119</span>	#define CALC_137 \
+<span id="L1120" class="ln">  1120</span>		CALC_F3_PRE(0x1d4,CX) \
+<span id="L1121" class="ln">  1121</span>		PRECALC_33(Y13,Y14) \
+<span id="L1122" class="ln">  1122</span>		CALC_F3_POST(BX,DI,AX,CX,SI)
+<span id="L1123" class="ln">  1123</span>	
+<span id="L1124" class="ln">  1124</span>	#define CALC_138 \
+<span id="L1125" class="ln">  1125</span>		CALC_F3_PRE(0x1d8,DX) \
+<span id="L1126" class="ln">  1126</span>		PRECALC_34(Y7) \
+<span id="L1127" class="ln">  1127</span>		CALC_F3_POST(CX,SI,DI,DX,BX)
+<span id="L1128" class="ln">  1128</span>	
+<span id="L1129" class="ln">  1129</span>	#define CALC_139 \
+<span id="L1130" class="ln">  1130</span>		CALC_F2_PRE(0x1dc,DX,CX,AX) \
+<span id="L1131" class="ln">  1131</span>		PRECALC_35(Y14) \
+<span id="L1132" class="ln">  1132</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L1133" class="ln">  1133</span>	
+<span id="L1134" class="ln">  1134</span>	#define CALC_140 \
+<span id="L1135" class="ln">  1135</span>		CALC_F2_PRE(0x1f0,AX,DX,DI) \
+<span id="L1136" class="ln">  1136</span>		PRECALC_36(Y14) \
+<span id="L1137" class="ln">  1137</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L1138" class="ln">  1138</span>	
+<span id="L1139" class="ln">  1139</span>	#define CALC_141 \
+<span id="L1140" class="ln">  1140</span>		CALC_F2_PRE(0x1f4,DI,AX,SI) \
+<span id="L1141" class="ln">  1141</span>		PRECALC_37(Y14) \
+<span id="L1142" class="ln">  1142</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L1143" class="ln">  1143</span>	
+<span id="L1144" class="ln">  1144</span>	#define CALC_142 \
+<span id="L1145" class="ln">  1145</span>		CALC_F2_PRE(0x1f8,SI,DI,BX) \
+<span id="L1146" class="ln">  1146</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L1147" class="ln">  1147</span>	
+<span id="L1148" class="ln">  1148</span>	#define CALC_143 \
+<span id="L1149" class="ln">  1149</span>		CALC_F2_PRE(0x1fc,BX,SI,CX) \
+<span id="L1150" class="ln">  1150</span>		PRECALC_39(Y14,0x60,0x220) \
+<span id="L1151" class="ln">  1151</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L1152" class="ln">  1152</span>	
+<span id="L1153" class="ln">  1153</span>	#define CALC_144 \
+<span id="L1154" class="ln">  1154</span>		CALC_F2_PRE(0x210,CX,BX,DX) \
+<span id="L1155" class="ln">  1155</span>		PRECALC_32(Y15,Y14) \
+<span id="L1156" class="ln">  1156</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L1157" class="ln">  1157</span>	
+<span id="L1158" class="ln">  1158</span>	#define CALC_145 \
+<span id="L1159" class="ln">  1159</span>		CALC_F2_PRE(0x214,DX,CX,AX) \
+<span id="L1160" class="ln">  1160</span>		PRECALC_33(Y12,Y13) \
+<span id="L1161" class="ln">  1161</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L1162" class="ln">  1162</span>	
+<span id="L1163" class="ln">  1163</span>	#define CALC_146 \
+<span id="L1164" class="ln">  1164</span>		CALC_F2_PRE(0x218,AX,DX,DI) \
+<span id="L1165" class="ln">  1165</span>		PRECALC_34(Y5) \
+<span id="L1166" class="ln">  1166</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L1167" class="ln">  1167</span>	
+<span id="L1168" class="ln">  1168</span>	#define CALC_147 \
+<span id="L1169" class="ln">  1169</span>		CALC_F2_PRE(0x21c,DI,AX,SI) \
+<span id="L1170" class="ln">  1170</span>		PRECALC_35(Y13) \
+<span id="L1171" class="ln">  1171</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L1172" class="ln">  1172</span>	
+<span id="L1173" class="ln">  1173</span>	#define CALC_148 \
+<span id="L1174" class="ln">  1174</span>		CALC_F2_PRE(0x230,SI,DI,BX) \
+<span id="L1175" class="ln">  1175</span>		PRECALC_36(Y13) \
+<span id="L1176" class="ln">  1176</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L1177" class="ln">  1177</span>	
+<span id="L1178" class="ln">  1178</span>	#define CALC_149 \
+<span id="L1179" class="ln">  1179</span>		CALC_F2_PRE(0x234,BX,SI,CX) \
+<span id="L1180" class="ln">  1180</span>		PRECALC_37(Y13) \
+<span id="L1181" class="ln">  1181</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L1182" class="ln">  1182</span>	
+<span id="L1183" class="ln">  1183</span>	#define CALC_150 \
+<span id="L1184" class="ln">  1184</span>		CALC_F2_PRE(0x238,CX,BX,DX) \
+<span id="L1185" class="ln">  1185</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L1186" class="ln">  1186</span>	
+<span id="L1187" class="ln">  1187</span>	#define CALC_151 \
+<span id="L1188" class="ln">  1188</span>		CALC_F2_PRE(0x23c,DX,CX,AX) \
+<span id="L1189" class="ln">  1189</span>		PRECALC_39(Y13,0x60,0x240) \
+<span id="L1190" class="ln">  1190</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L1191" class="ln">  1191</span>	
+<span id="L1192" class="ln">  1192</span>	#define CALC_152 \
+<span id="L1193" class="ln">  1193</span>		CALC_F2_PRE(0x250,AX,DX,DI) \
+<span id="L1194" class="ln">  1194</span>		PRECALC_32(Y14,Y13) \
+<span id="L1195" class="ln">  1195</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L1196" class="ln">  1196</span>	
+<span id="L1197" class="ln">  1197</span>	#define CALC_153 \
+<span id="L1198" class="ln">  1198</span>		CALC_F2_PRE(0x254,DI,AX,SI) \
+<span id="L1199" class="ln">  1199</span>		PRECALC_33(Y8,Y12) \
+<span id="L1200" class="ln">  1200</span>		CALC_F2_POST(DI,DX,CX,SI)
+<span id="L1201" class="ln">  1201</span>	
+<span id="L1202" class="ln">  1202</span>	#define CALC_154 \
+<span id="L1203" class="ln">  1203</span>		CALC_F2_PRE(0x258,SI,DI,BX) \
+<span id="L1204" class="ln">  1204</span>		PRECALC_34(Y3) \
+<span id="L1205" class="ln">  1205</span>		CALC_F2_POST(SI,AX,DX,BX)
+<span id="L1206" class="ln">  1206</span>	
+<span id="L1207" class="ln">  1207</span>	#define CALC_155 \
+<span id="L1208" class="ln">  1208</span>		CALC_F2_PRE(0x25c,BX,SI,CX) \
+<span id="L1209" class="ln">  1209</span>		PRECALC_35(Y12) \
+<span id="L1210" class="ln">  1210</span>		CALC_F2_POST(BX,DI,AX,CX)
+<span id="L1211" class="ln">  1211</span>	
+<span id="L1212" class="ln">  1212</span>	#define CALC_156 \
+<span id="L1213" class="ln">  1213</span>		CALC_F2_PRE(0x270,CX,BX,DX) \
+<span id="L1214" class="ln">  1214</span>		PRECALC_36(Y12) \
+<span id="L1215" class="ln">  1215</span>		CALC_F2_POST(CX,SI,DI,DX)
+<span id="L1216" class="ln">  1216</span>	
+<span id="L1217" class="ln">  1217</span>	#define CALC_157 \
+<span id="L1218" class="ln">  1218</span>		CALC_F2_PRE(0x274,DX,CX,AX) \
+<span id="L1219" class="ln">  1219</span>		PRECALC_37(Y12) \
+<span id="L1220" class="ln">  1220</span>		CALC_F2_POST(DX,BX,SI,AX)
+<span id="L1221" class="ln">  1221</span>	
+<span id="L1222" class="ln">  1222</span>	#define CALC_158 \
+<span id="L1223" class="ln">  1223</span>		CALC_F2_PRE(0x278,AX,DX,DI) \
+<span id="L1224" class="ln">  1224</span>		CALC_F2_POST(AX,CX,BX,DI)
+<span id="L1225" class="ln">  1225</span>	
+<span id="L1226" class="ln">  1226</span>	#define CALC_159 \
+<span id="L1227" class="ln">  1227</span>		ADDL 0x27c(R15),SI \
+<span id="L1228" class="ln">  1228</span>		LEAL (SI)(AX*1), SI \
+<span id="L1229" class="ln">  1229</span>		RORXL $0x1b, DI, R12 \
+<span id="L1230" class="ln">  1230</span>		PRECALC_39(Y12,0x60,0x260) \
+<span id="L1231" class="ln">  1231</span>		ADDL R12, SI
+<span id="L1232" class="ln">  1232</span>	
+<span id="L1233" class="ln">  1233</span>	
+<span id="L1234" class="ln">  1234</span>	
+<span id="L1235" class="ln">  1235</span>	#define CALC \
+<span id="L1236" class="ln">  1236</span>		MOVL	(R9), CX \
+<span id="L1237" class="ln">  1237</span>		MOVL	4(R9), SI \
+<span id="L1238" class="ln">  1238</span>		MOVL	8(R9), DI \
+<span id="L1239" class="ln">  1239</span>		MOVL	12(R9), AX \
+<span id="L1240" class="ln">  1240</span>		MOVL	16(R9), DX \
+<span id="L1241" class="ln">  1241</span>		MOVQ    SP, R14 \
+<span id="L1242" class="ln">  1242</span>		LEAQ    (2*4*80+32)(SP), R15 \
+<span id="L1243" class="ln">  1243</span>		PRECALC \ // Precalc WK for first 2 blocks
+<span id="L1244" class="ln">  1244</span>		XCHGQ   R15, R14 \
+<span id="L1245" class="ln">  1245</span>	loop: \  // this loops is unrolled
+<span id="L1246" class="ln">  1246</span>		CMPQ    R10, R8 \ // we use R8 value (set below) as a signal of a last block
+<span id="L1247" class="ln">  1247</span>		JNE	begin \
+<span id="L1248" class="ln">  1248</span>		VZEROUPPER \
+<span id="L1249" class="ln">  1249</span>		RET \
+<span id="L1250" class="ln">  1250</span>	begin: \
+<span id="L1251" class="ln">  1251</span>		CALC_0 \
+<span id="L1252" class="ln">  1252</span>		CALC_1 \
+<span id="L1253" class="ln">  1253</span>		CALC_2 \
+<span id="L1254" class="ln">  1254</span>		CALC_3 \
+<span id="L1255" class="ln">  1255</span>		CALC_4 \
+<span id="L1256" class="ln">  1256</span>		CALC_5 \
+<span id="L1257" class="ln">  1257</span>		CALC_6 \
+<span id="L1258" class="ln">  1258</span>		CALC_7 \
+<span id="L1259" class="ln">  1259</span>		CALC_8 \
+<span id="L1260" class="ln">  1260</span>		CALC_9 \
+<span id="L1261" class="ln">  1261</span>		CALC_10 \
+<span id="L1262" class="ln">  1262</span>		CALC_11 \
+<span id="L1263" class="ln">  1263</span>		CALC_12 \
+<span id="L1264" class="ln">  1264</span>		CALC_13 \
+<span id="L1265" class="ln">  1265</span>		CALC_14 \
+<span id="L1266" class="ln">  1266</span>		CALC_15 \
+<span id="L1267" class="ln">  1267</span>		CALC_16 \
+<span id="L1268" class="ln">  1268</span>		CALC_17 \
+<span id="L1269" class="ln">  1269</span>		CALC_18 \
+<span id="L1270" class="ln">  1270</span>		CALC_19 \
+<span id="L1271" class="ln">  1271</span>		CALC_20 \
+<span id="L1272" class="ln">  1272</span>		CALC_21 \
+<span id="L1273" class="ln">  1273</span>		CALC_22 \
+<span id="L1274" class="ln">  1274</span>		CALC_23 \
+<span id="L1275" class="ln">  1275</span>		CALC_24 \
+<span id="L1276" class="ln">  1276</span>		CALC_25 \
+<span id="L1277" class="ln">  1277</span>		CALC_26 \
+<span id="L1278" class="ln">  1278</span>		CALC_27 \
+<span id="L1279" class="ln">  1279</span>		CALC_28 \
+<span id="L1280" class="ln">  1280</span>		CALC_29 \
+<span id="L1281" class="ln">  1281</span>		CALC_30 \
+<span id="L1282" class="ln">  1282</span>		CALC_31 \
+<span id="L1283" class="ln">  1283</span>		CALC_32 \
+<span id="L1284" class="ln">  1284</span>		CALC_33 \
+<span id="L1285" class="ln">  1285</span>		CALC_34 \
+<span id="L1286" class="ln">  1286</span>		CALC_35 \
+<span id="L1287" class="ln">  1287</span>		CALC_36 \
+<span id="L1288" class="ln">  1288</span>		CALC_37 \
+<span id="L1289" class="ln">  1289</span>		CALC_38 \
+<span id="L1290" class="ln">  1290</span>		CALC_39 \
+<span id="L1291" class="ln">  1291</span>		CALC_40 \
+<span id="L1292" class="ln">  1292</span>		CALC_41 \
+<span id="L1293" class="ln">  1293</span>		CALC_42 \
+<span id="L1294" class="ln">  1294</span>		CALC_43 \
+<span id="L1295" class="ln">  1295</span>		CALC_44 \
+<span id="L1296" class="ln">  1296</span>		CALC_45 \
+<span id="L1297" class="ln">  1297</span>		CALC_46 \
+<span id="L1298" class="ln">  1298</span>		CALC_47 \
+<span id="L1299" class="ln">  1299</span>		CALC_48 \
+<span id="L1300" class="ln">  1300</span>		CALC_49 \
+<span id="L1301" class="ln">  1301</span>		CALC_50 \
+<span id="L1302" class="ln">  1302</span>		CALC_51 \
+<span id="L1303" class="ln">  1303</span>		CALC_52 \
+<span id="L1304" class="ln">  1304</span>		CALC_53 \
+<span id="L1305" class="ln">  1305</span>		CALC_54 \
+<span id="L1306" class="ln">  1306</span>		CALC_55 \
+<span id="L1307" class="ln">  1307</span>		CALC_56 \
+<span id="L1308" class="ln">  1308</span>		CALC_57 \
+<span id="L1309" class="ln">  1309</span>		CALC_58 \
+<span id="L1310" class="ln">  1310</span>		CALC_59 \
+<span id="L1311" class="ln">  1311</span>		ADDQ $128, R10 \ // move to next even-64-byte block
+<span id="L1312" class="ln">  1312</span>		CMPQ R10, R11 \ // is current block the last one?
+<span id="L1313" class="ln">  1313</span>		CMOVQCC R8, R10 \ // signal the last iteration smartly
+<span id="L1314" class="ln">  1314</span>		CALC_60 \
+<span id="L1315" class="ln">  1315</span>		CALC_61 \
+<span id="L1316" class="ln">  1316</span>		CALC_62 \
+<span id="L1317" class="ln">  1317</span>		CALC_63 \
+<span id="L1318" class="ln">  1318</span>		CALC_64 \
+<span id="L1319" class="ln">  1319</span>		CALC_65 \
+<span id="L1320" class="ln">  1320</span>		CALC_66 \
+<span id="L1321" class="ln">  1321</span>		CALC_67 \
+<span id="L1322" class="ln">  1322</span>		CALC_68 \
+<span id="L1323" class="ln">  1323</span>		CALC_69 \
+<span id="L1324" class="ln">  1324</span>		CALC_70 \
+<span id="L1325" class="ln">  1325</span>		CALC_71 \
+<span id="L1326" class="ln">  1326</span>		CALC_72 \
+<span id="L1327" class="ln">  1327</span>		CALC_73 \
+<span id="L1328" class="ln">  1328</span>		CALC_74 \
+<span id="L1329" class="ln">  1329</span>		CALC_75 \
+<span id="L1330" class="ln">  1330</span>		CALC_76 \
+<span id="L1331" class="ln">  1331</span>		CALC_77 \
+<span id="L1332" class="ln">  1332</span>		CALC_78 \
+<span id="L1333" class="ln">  1333</span>		CALC_79 \
+<span id="L1334" class="ln">  1334</span>		UPDATE_HASH(AX,DX,BX,SI,DI) \
+<span id="L1335" class="ln">  1335</span>		CMPQ R10, R8 \ // is current block the last one?
+<span id="L1336" class="ln">  1336</span>		JE loop\
+<span id="L1337" class="ln">  1337</span>		MOVL DX, CX \
+<span id="L1338" class="ln">  1338</span>		CALC_80 \
+<span id="L1339" class="ln">  1339</span>		CALC_81 \
+<span id="L1340" class="ln">  1340</span>		CALC_82 \
+<span id="L1341" class="ln">  1341</span>		CALC_83 \
+<span id="L1342" class="ln">  1342</span>		CALC_84 \
+<span id="L1343" class="ln">  1343</span>		CALC_85 \
+<span id="L1344" class="ln">  1344</span>		CALC_86 \
+<span id="L1345" class="ln">  1345</span>		CALC_87 \
+<span id="L1346" class="ln">  1346</span>		CALC_88 \
+<span id="L1347" class="ln">  1347</span>		CALC_89 \
+<span id="L1348" class="ln">  1348</span>		CALC_90 \
+<span id="L1349" class="ln">  1349</span>		CALC_91 \
+<span id="L1350" class="ln">  1350</span>		CALC_92 \
+<span id="L1351" class="ln">  1351</span>		CALC_93 \
+<span id="L1352" class="ln">  1352</span>		CALC_94 \
+<span id="L1353" class="ln">  1353</span>		CALC_95 \
+<span id="L1354" class="ln">  1354</span>		CALC_96 \
+<span id="L1355" class="ln">  1355</span>		CALC_97 \
+<span id="L1356" class="ln">  1356</span>		CALC_98 \
+<span id="L1357" class="ln">  1357</span>		CALC_99 \
+<span id="L1358" class="ln">  1358</span>		CALC_100 \
+<span id="L1359" class="ln">  1359</span>		CALC_101 \
+<span id="L1360" class="ln">  1360</span>		CALC_102 \
+<span id="L1361" class="ln">  1361</span>		CALC_103 \
+<span id="L1362" class="ln">  1362</span>		CALC_104 \
+<span id="L1363" class="ln">  1363</span>		CALC_105 \
+<span id="L1364" class="ln">  1364</span>		CALC_106 \
+<span id="L1365" class="ln">  1365</span>		CALC_107 \
+<span id="L1366" class="ln">  1366</span>		CALC_108 \
+<span id="L1367" class="ln">  1367</span>		CALC_109 \
+<span id="L1368" class="ln">  1368</span>		CALC_110 \
+<span id="L1369" class="ln">  1369</span>		CALC_111 \
+<span id="L1370" class="ln">  1370</span>		CALC_112 \
+<span id="L1371" class="ln">  1371</span>		CALC_113 \
+<span id="L1372" class="ln">  1372</span>		CALC_114 \
+<span id="L1373" class="ln">  1373</span>		CALC_115 \
+<span id="L1374" class="ln">  1374</span>		CALC_116 \
+<span id="L1375" class="ln">  1375</span>		CALC_117 \
+<span id="L1376" class="ln">  1376</span>		CALC_118 \
+<span id="L1377" class="ln">  1377</span>		CALC_119 \
+<span id="L1378" class="ln">  1378</span>		CALC_120 \
+<span id="L1379" class="ln">  1379</span>		CALC_121 \
+<span id="L1380" class="ln">  1380</span>		CALC_122 \
+<span id="L1381" class="ln">  1381</span>		CALC_123 \
+<span id="L1382" class="ln">  1382</span>		CALC_124 \
+<span id="L1383" class="ln">  1383</span>		CALC_125 \
+<span id="L1384" class="ln">  1384</span>		CALC_126 \
+<span id="L1385" class="ln">  1385</span>		CALC_127 \
+<span id="L1386" class="ln">  1386</span>		CALC_128 \
+<span id="L1387" class="ln">  1387</span>		CALC_129 \
+<span id="L1388" class="ln">  1388</span>		CALC_130 \
+<span id="L1389" class="ln">  1389</span>		CALC_131 \
+<span id="L1390" class="ln">  1390</span>		CALC_132 \
+<span id="L1391" class="ln">  1391</span>		CALC_133 \
+<span id="L1392" class="ln">  1392</span>		CALC_134 \
+<span id="L1393" class="ln">  1393</span>		CALC_135 \
+<span id="L1394" class="ln">  1394</span>		CALC_136 \
+<span id="L1395" class="ln">  1395</span>		CALC_137 \
+<span id="L1396" class="ln">  1396</span>		CALC_138 \
+<span id="L1397" class="ln">  1397</span>		CALC_139 \
+<span id="L1398" class="ln">  1398</span>		ADDQ $128, R13 \ //move to next even-64-byte block
+<span id="L1399" class="ln">  1399</span>		CMPQ R13, R11 \ //is current block the last one?
+<span id="L1400" class="ln">  1400</span>		CMOVQCC R8, R10 \
+<span id="L1401" class="ln">  1401</span>		CALC_140 \
+<span id="L1402" class="ln">  1402</span>		CALC_141 \
+<span id="L1403" class="ln">  1403</span>		CALC_142 \
+<span id="L1404" class="ln">  1404</span>		CALC_143 \
+<span id="L1405" class="ln">  1405</span>		CALC_144 \
+<span id="L1406" class="ln">  1406</span>		CALC_145 \
+<span id="L1407" class="ln">  1407</span>		CALC_146 \
+<span id="L1408" class="ln">  1408</span>		CALC_147 \
+<span id="L1409" class="ln">  1409</span>		CALC_148 \
+<span id="L1410" class="ln">  1410</span>		CALC_149 \
+<span id="L1411" class="ln">  1411</span>		CALC_150 \
+<span id="L1412" class="ln">  1412</span>		CALC_151 \
+<span id="L1413" class="ln">  1413</span>		CALC_152 \
+<span id="L1414" class="ln">  1414</span>		CALC_153 \
+<span id="L1415" class="ln">  1415</span>		CALC_154 \
+<span id="L1416" class="ln">  1416</span>		CALC_155 \
+<span id="L1417" class="ln">  1417</span>		CALC_156 \
+<span id="L1418" class="ln">  1418</span>		CALC_157 \
+<span id="L1419" class="ln">  1419</span>		CALC_158 \
+<span id="L1420" class="ln">  1420</span>		CALC_159 \
+<span id="L1421" class="ln">  1421</span>		UPDATE_HASH(SI,DI,DX,CX,BX) \
+<span id="L1422" class="ln">  1422</span>		MOVL	SI, R12 \ //Reset state for  AVX2 reg permutation
+<span id="L1423" class="ln">  1423</span>		MOVL	DI, SI \
+<span id="L1424" class="ln">  1424</span>		MOVL	DX, DI \
+<span id="L1425" class="ln">  1425</span>		MOVL	BX, DX \
+<span id="L1426" class="ln">  1426</span>		MOVL	CX, AX \
+<span id="L1427" class="ln">  1427</span>		MOVL	R12, CX \
+<span id="L1428" class="ln">  1428</span>		XCHGQ   R15, R14 \
+<span id="L1429" class="ln">  1429</span>		JMP     loop
+<span id="L1430" class="ln">  1430</span>	
+<span id="L1431" class="ln">  1431</span>	
+<span id="L1432" class="ln">  1432</span>	
+<span id="L1433" class="ln">  1433</span>	TEXT ·blockAVX2(SB),$1408-32
+<span id="L1434" class="ln">  1434</span>	
+<span id="L1435" class="ln">  1435</span>		MOVQ	dig+0(FP),	DI
+<span id="L1436" class="ln">  1436</span>		MOVQ	p_base+8(FP),	SI
+<span id="L1437" class="ln">  1437</span>		MOVQ	p_len+16(FP),	DX
+<span id="L1438" class="ln">  1438</span>		SHRQ	$6,		DX
+<span id="L1439" class="ln">  1439</span>		SHLQ	$6,		DX
+<span id="L1440" class="ln">  1440</span>	
+<span id="L1441" class="ln">  1441</span>		MOVQ	$K_XMM_AR&lt;&gt;(SB), R8
+<span id="L1442" class="ln">  1442</span>	
+<span id="L1443" class="ln">  1443</span>		MOVQ	DI, R9
+<span id="L1444" class="ln">  1444</span>		MOVQ	SI, R10
+<span id="L1445" class="ln">  1445</span>		LEAQ	64(SI), R13
+<span id="L1446" class="ln">  1446</span>	
+<span id="L1447" class="ln">  1447</span>		ADDQ	SI, DX
+<span id="L1448" class="ln">  1448</span>		ADDQ	$64, DX
+<span id="L1449" class="ln">  1449</span>		MOVQ	DX, R11
+<span id="L1450" class="ln">  1450</span>	
+<span id="L1451" class="ln">  1451</span>		CMPQ	R13, R11
+<span id="L1452" class="ln">  1452</span>		CMOVQCC	R8, R13
+<span id="L1453" class="ln">  1453</span>	
+<span id="L1454" class="ln">  1454</span>		MOVQ    $BSWAP_SHUFB_CTL&lt;&gt;(SB), R8
+<span id="L1455" class="ln">  1455</span>		VMOVDQU (R8), Y10
+<span id="L1456" class="ln">  1456</span>		MOVQ	$K_XMM_AR&lt;&gt;(SB), R8 //restore R8
+<span id="L1457" class="ln">  1457</span>	
+<span id="L1458" class="ln">  1458</span>		CALC // RET is inside macros
+<span id="L1459" class="ln">  1459</span>	
+<span id="L1460" class="ln">  1460</span>	DATA K_XMM_AR&lt;&gt;+0x00(SB)/4,$0x5a827999
+<span id="L1461" class="ln">  1461</span>	DATA K_XMM_AR&lt;&gt;+0x04(SB)/4,$0x5a827999
+<span id="L1462" class="ln">  1462</span>	DATA K_XMM_AR&lt;&gt;+0x08(SB)/4,$0x5a827999
+<span id="L1463" class="ln">  1463</span>	DATA K_XMM_AR&lt;&gt;+0x0c(SB)/4,$0x5a827999
+<span id="L1464" class="ln">  1464</span>	DATA K_XMM_AR&lt;&gt;+0x10(SB)/4,$0x5a827999
+<span id="L1465" class="ln">  1465</span>	DATA K_XMM_AR&lt;&gt;+0x14(SB)/4,$0x5a827999
+<span id="L1466" class="ln">  1466</span>	DATA K_XMM_AR&lt;&gt;+0x18(SB)/4,$0x5a827999
+<span id="L1467" class="ln">  1467</span>	DATA K_XMM_AR&lt;&gt;+0x1c(SB)/4,$0x5a827999
+<span id="L1468" class="ln">  1468</span>	DATA K_XMM_AR&lt;&gt;+0x20(SB)/4,$0x6ed9eba1
+<span id="L1469" class="ln">  1469</span>	DATA K_XMM_AR&lt;&gt;+0x24(SB)/4,$0x6ed9eba1
+<span id="L1470" class="ln">  1470</span>	DATA K_XMM_AR&lt;&gt;+0x28(SB)/4,$0x6ed9eba1
+<span id="L1471" class="ln">  1471</span>	DATA K_XMM_AR&lt;&gt;+0x2c(SB)/4,$0x6ed9eba1
+<span id="L1472" class="ln">  1472</span>	DATA K_XMM_AR&lt;&gt;+0x30(SB)/4,$0x6ed9eba1
+<span id="L1473" class="ln">  1473</span>	DATA K_XMM_AR&lt;&gt;+0x34(SB)/4,$0x6ed9eba1
+<span id="L1474" class="ln">  1474</span>	DATA K_XMM_AR&lt;&gt;+0x38(SB)/4,$0x6ed9eba1
+<span id="L1475" class="ln">  1475</span>	DATA K_XMM_AR&lt;&gt;+0x3c(SB)/4,$0x6ed9eba1
+<span id="L1476" class="ln">  1476</span>	DATA K_XMM_AR&lt;&gt;+0x40(SB)/4,$0x8f1bbcdc
+<span id="L1477" class="ln">  1477</span>	DATA K_XMM_AR&lt;&gt;+0x44(SB)/4,$0x8f1bbcdc
+<span id="L1478" class="ln">  1478</span>	DATA K_XMM_AR&lt;&gt;+0x48(SB)/4,$0x8f1bbcdc
+<span id="L1479" class="ln">  1479</span>	DATA K_XMM_AR&lt;&gt;+0x4c(SB)/4,$0x8f1bbcdc
+<span id="L1480" class="ln">  1480</span>	DATA K_XMM_AR&lt;&gt;+0x50(SB)/4,$0x8f1bbcdc
+<span id="L1481" class="ln">  1481</span>	DATA K_XMM_AR&lt;&gt;+0x54(SB)/4,$0x8f1bbcdc
+<span id="L1482" class="ln">  1482</span>	DATA K_XMM_AR&lt;&gt;+0x58(SB)/4,$0x8f1bbcdc
+<span id="L1483" class="ln">  1483</span>	DATA K_XMM_AR&lt;&gt;+0x5c(SB)/4,$0x8f1bbcdc
+<span id="L1484" class="ln">  1484</span>	DATA K_XMM_AR&lt;&gt;+0x60(SB)/4,$0xca62c1d6
+<span id="L1485" class="ln">  1485</span>	DATA K_XMM_AR&lt;&gt;+0x64(SB)/4,$0xca62c1d6
+<span id="L1486" class="ln">  1486</span>	DATA K_XMM_AR&lt;&gt;+0x68(SB)/4,$0xca62c1d6
+<span id="L1487" class="ln">  1487</span>	DATA K_XMM_AR&lt;&gt;+0x6c(SB)/4,$0xca62c1d6
+<span id="L1488" class="ln">  1488</span>	DATA K_XMM_AR&lt;&gt;+0x70(SB)/4,$0xca62c1d6
+<span id="L1489" class="ln">  1489</span>	DATA K_XMM_AR&lt;&gt;+0x74(SB)/4,$0xca62c1d6
+<span id="L1490" class="ln">  1490</span>	DATA K_XMM_AR&lt;&gt;+0x78(SB)/4,$0xca62c1d6
+<span id="L1491" class="ln">  1491</span>	DATA K_XMM_AR&lt;&gt;+0x7c(SB)/4,$0xca62c1d6
+<span id="L1492" class="ln">  1492</span>	GLOBL K_XMM_AR&lt;&gt;(SB),RODATA,$128
+<span id="L1493" class="ln">  1493</span>	
+<span id="L1494" class="ln">  1494</span>	DATA BSWAP_SHUFB_CTL&lt;&gt;+0x00(SB)/4,$0x00010203
+<span id="L1495" class="ln">  1495</span>	DATA BSWAP_SHUFB_CTL&lt;&gt;+0x04(SB)/4,$0x04050607
+<span id="L1496" class="ln">  1496</span>	DATA BSWAP_SHUFB_CTL&lt;&gt;+0x08(SB)/4,$0x08090a0b
+<span id="L1497" class="ln">  1497</span>	DATA BSWAP_SHUFB_CTL&lt;&gt;+0x0c(SB)/4,$0x0c0d0e0f
+<span id="L1498" class="ln">  1498</span>	DATA BSWAP_SHUFB_CTL&lt;&gt;+0x10(SB)/4,$0x00010203
+<span id="L1499" class="ln">  1499</span>	DATA BSWAP_SHUFB_CTL&lt;&gt;+0x14(SB)/4,$0x04050607
+<span id="L1500" class="ln">  1500</span>	DATA BSWAP_SHUFB_CTL&lt;&gt;+0x18(SB)/4,$0x08090a0b
+<span id="L1501" class="ln">  1501</span>	DATA BSWAP_SHUFB_CTL&lt;&gt;+0x1c(SB)/4,$0x0c0d0e0f
+<span id="L1502" class="ln">  1502</span>	GLOBL BSWAP_SHUFB_CTL&lt;&gt;(SB),RODATA,$32
+</pre><p><a href="sha1block_amd64.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

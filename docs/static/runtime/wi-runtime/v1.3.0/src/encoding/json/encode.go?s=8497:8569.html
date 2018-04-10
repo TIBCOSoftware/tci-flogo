@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/encoding/json/encode.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./encode.go%3Fs=8497:8569.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/encoding">encoding</a>/<a href="../json.1.html">json</a>/<span class="text-muted">encode.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/encoding/json.1.html">encoding/json</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// Package json implements encoding and decoding of JSON as defined in</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// RFC 4627. The mapping between JSON and Go values is described</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">// in the documentation for the Marshal and Unmarshal functions.</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span><span class="comment">// See &#34;JSON and Go&#34; for an introduction to this package:</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span><span class="comment">// https://golang.org/doc/articles/json_and_go.html</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>package json
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>import (
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;encoding&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;encoding/base64&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;math&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	&#34;runtime&#34;
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;sort&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	&#34;strconv&#34;
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	&#34;sync&#34;
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	&#34;sync/atomic&#34;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	&#34;unicode&#34;
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	&#34;unicode/utf8&#34;
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>)
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span><span class="comment">// Marshal returns the JSON encoding of v.</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span><span class="comment">// Marshal traverses the value v recursively.</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span><span class="comment">// If an encountered value implements the Marshaler interface</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span><span class="comment">// and is not a nil pointer, Marshal calls its MarshalJSON method</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span><span class="comment">// to produce JSON. If no MarshalJSON method is present but the</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span><span class="comment">// value implements encoding.TextMarshaler instead, Marshal calls</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span><span class="comment">// its MarshalText method and encodes the result as a JSON string.</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span><span class="comment">// The nil pointer exception is not strictly necessary</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span><span class="comment">// but mimics a similar, necessary exception in the behavior of</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span><span class="comment">// UnmarshalJSON.</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span><span class="comment">// Otherwise, Marshal uses the following type-dependent default encodings:</span>
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span><span class="comment">// Boolean values encode as JSON booleans.</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span><span class="comment">// Floating point, integer, and Number values encode as JSON numbers.</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span><span class="comment">// String values encode as JSON strings coerced to valid UTF-8,</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span><span class="comment">// replacing invalid bytes with the Unicode replacement rune.</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span><span class="comment">// The angle brackets &#34;&lt;&#34; and &#34;&gt;&#34; are escaped to &#34;\u003c&#34; and &#34;\u003e&#34;</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span><span class="comment">// to keep some browsers from misinterpreting JSON output as HTML.</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span><span class="comment">// Ampersand &#34;&amp;&#34; is also escaped to &#34;\u0026&#34; for the same reason.</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span><span class="comment">// This escaping can be disabled using an Encoder that had SetEscapeHTML(false)</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span><span class="comment">// called on it.</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span><span class="comment">// Array and slice values encode as JSON arrays, except that</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span><span class="comment">// []byte encodes as a base64-encoded string, and a nil slice</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span><span class="comment">// encodes as the null JSON value.</span>
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span><span class="comment">// Struct values encode as JSON objects.</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span><span class="comment">// Each exported struct field becomes a member of the object, using the</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span><span class="comment">// field name as the object key, unless the field is omitted for one of the</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span><span class="comment">// reasons given below.</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span><span class="comment">// The encoding of each struct field can be customized by the format string</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span><span class="comment">// stored under the &#34;json&#34; key in the struct field&#39;s tag.</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span><span class="comment">// The format string gives the name of the field, possibly followed by a</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span><span class="comment">// comma-separated list of options. The name may be empty in order to</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span><span class="comment">// specify options without overriding the default field name.</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span><span class="comment">// The &#34;omitempty&#34; option specifies that the field should be omitted</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span><span class="comment">// from the encoding if the field has an empty value, defined as</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span><span class="comment">// false, 0, a nil pointer, a nil interface value, and any empty array,</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span><span class="comment">// slice, map, or string.</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span><span class="comment">// As a special case, if the field tag is &#34;-&#34;, the field is always omitted.</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span><span class="comment">// Note that a field with name &#34;-&#34; can still be generated using the tag &#34;-,&#34;.</span>
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span><span class="comment">// Examples of struct field tags and their meanings:</span>
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span><span class="comment">//   // Field appears in JSON as key &#34;myName&#34;.</span>
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span><span class="comment">//   Field int `json:&#34;myName&#34;`</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span><span class="comment">//   // Field appears in JSON as key &#34;myName&#34; and</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span><span class="comment">//   // the field is omitted from the object if its value is empty,</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span><span class="comment">//   // as defined above.</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span><span class="comment">//   Field int `json:&#34;myName,omitempty&#34;`</span>
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span><span class="comment">//   // Field appears in JSON as key &#34;Field&#34; (the default), but</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span><span class="comment">//   // the field is skipped if empty.</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span><span class="comment">//   // Note the leading comma.</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span><span class="comment">//   Field int `json:&#34;,omitempty&#34;`</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span><span class="comment">//   // Field is ignored by this package.</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span><span class="comment">//   Field int `json:&#34;-&#34;`</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span><span class="comment">//   // Field appears in JSON as key &#34;-&#34;.</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span><span class="comment">//   Field int `json:&#34;-,&#34;`</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span><span class="comment">// The &#34;string&#34; option signals that a field is stored as JSON inside a</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span><span class="comment">// JSON-encoded string. It applies only to fields of string, floating point,</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span><span class="comment">// integer, or boolean types. This extra level of encoding is sometimes used</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span><span class="comment">// when communicating with JavaScript programs:</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span><span class="comment">//    Int64String int64 `json:&#34;,string&#34;`</span>
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span><span class="comment">// The key name will be used if it&#39;s a non-empty string consisting of</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span><span class="comment">// only Unicode letters, digits, and ASCII punctuation except quotation</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span><span class="comment">// marks, backslash, and comma.</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span><span class="comment">// Anonymous struct fields are usually marshaled as if their inner exported fields</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span><span class="comment">// were fields in the outer struct, subject to the usual Go visibility rules amended</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span><span class="comment">// as described in the next paragraph.</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span><span class="comment">// An anonymous struct field with a name given in its JSON tag is treated as</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span><span class="comment">// having that name, rather than being anonymous.</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span><span class="comment">// An anonymous struct field of interface type is treated the same as having</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span><span class="comment">// that type as its name, rather than being anonymous.</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span><span class="comment">// The Go visibility rules for struct fields are amended for JSON when</span>
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span><span class="comment">// deciding which field to marshal or unmarshal. If there are</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span><span class="comment">// multiple fields at the same level, and that level is the least</span>
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span><span class="comment">// nested (and would therefore be the nesting level selected by the</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span><span class="comment">// usual Go rules), the following extra rules apply:</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span><span class="comment">// 1) Of those fields, if any are JSON-tagged, only tagged fields are considered,</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span><span class="comment">// even if there are multiple untagged fields that would otherwise conflict.</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span><span class="comment">// 2) If there is exactly one field (tagged or not according to the first rule), that is selected.</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span><span class="comment">// 3) Otherwise there are multiple fields, and all are ignored; no error occurs.</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span><span class="comment">// Handling of anonymous struct fields is new in Go 1.1.</span>
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span><span class="comment">// Prior to Go 1.1, anonymous struct fields were ignored. To force ignoring of</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span><span class="comment">// an anonymous struct field in both current and earlier versions, give the field</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span><span class="comment">// a JSON tag of &#34;-&#34;.</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span><span class="comment">// Map values encode as JSON objects. The map&#39;s key type must either be a</span>
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span><span class="comment">// string, an integer type, or implement encoding.TextMarshaler. The map keys</span>
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span><span class="comment">// are sorted and used as JSON object keys by applying the following rules,</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span><span class="comment">// subject to the UTF-8 coercion described for string values above:</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span><span class="comment">//   - string keys are used directly</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span><span class="comment">//   - encoding.TextMarshalers are marshaled</span>
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span><span class="comment">//   - integer keys are converted to strings</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span><span class="comment">// Pointer values encode as the value pointed to.</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span><span class="comment">// A nil pointer encodes as the null JSON value.</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span><span class="comment">// Interface values encode as the value contained in the interface.</span>
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span><span class="comment">// A nil interface value encodes as the null JSON value.</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span><span class="comment">// Channel, complex, and function values cannot be encoded in JSON.</span>
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span><span class="comment">// Attempting to encode such a value causes Marshal to return</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span><span class="comment">// an UnsupportedTypeError.</span>
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span><span class="comment">// JSON cannot represent cyclic data structures and Marshal does not</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span><span class="comment">// handle them. Passing cyclic structures to Marshal will result in</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span><span class="comment">// an infinite recursion.</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>func Marshal(v interface{}) ([]byte, error) {
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	e := &amp;encodeState{}
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	err := e.marshal(v, encOpts{escapeHTML: true})
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		return nil, err
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>	}
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>	return e.Bytes(), nil
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>}
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span><span class="comment">// MarshalIndent is like Marshal but applies Indent to format the output.</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>func MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	b, err := Marshal(v)
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		return nil, err
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	}
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>	var buf bytes.Buffer
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>	err = Indent(&amp;buf, b, prefix, indent)
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		return nil, err
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	}
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>	return buf.Bytes(), nil
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>}
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span><span class="comment">// HTMLEscape appends to dst the JSON-encoded src with &lt;, &gt;, &amp;, U+2028 and U+2029</span>
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span><span class="comment">// characters inside string literals changed to \u003c, \u003e, \u0026, \u2028, \u2029</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span><span class="comment">// so that the JSON will be safe to embed inside HTML &lt;script&gt; tags.</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span><span class="comment">// For historical reasons, web browsers don&#39;t honor standard HTML</span>
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span><span class="comment">// escaping within &lt;script&gt; tags, so an alternative JSON encoding must</span>
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span><span class="comment">// be used.</span>
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>func HTMLEscape(dst *bytes.Buffer, src []byte) {
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	<span class="comment">// The characters can only appear in string literals,</span>
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	<span class="comment">// so just scan the string one byte at a time.</span>
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	start := 0
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>	for i, c := range src {
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>		if c == &#39;&lt;&#39; || c == &#39;&gt;&#39; || c == &#39;&amp;&#39; {
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>			if start &lt; i {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>				dst.Write(src[start:i])
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>			}
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>			dst.WriteString(`\u00`)
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>			dst.WriteByte(hex[c&gt;&gt;4])
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>			dst.WriteByte(hex[c&amp;0xF])
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>			start = i + 1
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		}
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>		<span class="comment">// Convert U+2028 and U+2029 (E2 80 A8 and E2 80 A9).</span>
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		if c == 0xE2 &amp;&amp; i+2 &lt; len(src) &amp;&amp; src[i+1] == 0x80 &amp;&amp; src[i+2]&amp;^1 == 0xA8 {
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>			if start &lt; i {
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>				dst.Write(src[start:i])
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>			}
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>			dst.WriteString(`\u202`)
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>			dst.WriteByte(hex[src[i+2]&amp;0xF])
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>			start = i + 3
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		}
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	}
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	if start &lt; len(src) {
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>		dst.Write(src[start:])
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	}
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>}
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span><span class="comment">// Marshaler is the interface implemented by types that</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span><span class="comment">// can marshal themselves into valid JSON.</span>
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>type Marshaler interface {
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	MarshalJSON() ([]byte, error)
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>}
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span><span class="comment">// An UnsupportedTypeError is returned by Marshal when attempting</span>
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span><span class="comment">// to encode an unsupported value type.</span>
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>type UnsupportedTypeError struct {
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	Type reflect.Type
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>}
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>func (e *UnsupportedTypeError) Error() string {
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	return &#34;json: unsupported type: &#34; + e.Type.String()
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>}
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span><span class="selection">type UnsupportedValueError struct {
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	Value reflect.Value
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	Str   string
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>}</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>func (e *UnsupportedValueError) Error() string {
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	return &#34;json: unsupported value: &#34; + e.Str
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>}
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span><span class="comment">// Before Go 1.2, an InvalidUTF8Error was returned by Marshal when</span>
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span><span class="comment">// attempting to encode a string value with invalid UTF-8 sequences.</span>
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span><span class="comment">// As of Go 1.2, Marshal instead coerces the string to valid UTF-8 by</span>
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span><span class="comment">// replacing invalid bytes with the Unicode replacement rune U+FFFD.</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span><span class="comment">// This error is no longer generated but is kept for backwards compatibility</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span><span class="comment">// with programs that might mention it.</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>type InvalidUTF8Error struct {
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	S string <span class="comment">// the whole string value that caused the error</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>}
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>func (e *InvalidUTF8Error) Error() string {
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	return &#34;json: invalid UTF-8 in string: &#34; + strconv.Quote(e.S)
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>}
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>type MarshalerError struct {
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	Type reflect.Type
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	Err  error
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>}
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>func (e *MarshalerError) Error() string {
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	return &#34;json: error calling MarshalJSON for type &#34; + e.Type.String() + &#34;: &#34; + e.Err.Error()
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>}
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>var hex = &#34;0123456789abcdef&#34;
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span><span class="comment">// An encodeState encodes JSON into a bytes.Buffer.</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>type encodeState struct {
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>	bytes.Buffer <span class="comment">// accumulated output</span>
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	scratch      [64]byte
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>}
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>var encodeStatePool sync.Pool
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>func newEncodeState() *encodeState {
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	if v := encodeStatePool.Get(); v != nil {
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>		e := v.(*encodeState)
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		e.Reset()
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>		return e
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	}
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	return new(encodeState)
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>}
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>func (e *encodeState) marshal(v interface{}, opts encOpts) (err error) {
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	defer func() {
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>		if r := recover(); r != nil {
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>			if _, ok := r.(runtime.Error); ok {
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>				panic(r)
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>			}
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>			if s, ok := r.(string); ok {
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>				panic(s)
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>			}
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>			err = r.(error)
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>		}
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	}()
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	e.reflectValue(reflect.ValueOf(v), opts)
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	return nil
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>}
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>func (e *encodeState) error(err error) {
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>	panic(err)
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>}
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>func isEmptyValue(v reflect.Value) bool {
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>	switch v.Kind() {
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>		return v.Len() == 0
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>	case reflect.Bool:
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>		return !v.Bool()
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>		return v.Int() == 0
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		return v.Uint() == 0
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	case reflect.Float32, reflect.Float64:
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		return v.Float() == 0
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>	case reflect.Interface, reflect.Ptr:
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>		return v.IsNil()
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>	}
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>	return false
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>}
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>func (e *encodeState) reflectValue(v reflect.Value, opts encOpts) {
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	valueEncoder(v)(e, v, opts)
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>}
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>type encOpts struct {
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>	<span class="comment">// quoted causes primitive fields to be encoded inside JSON strings.</span>
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>	quoted bool
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>	<span class="comment">// escapeHTML causes &#39;&lt;&#39;, &#39;&gt;&#39;, and &#39;&amp;&#39; to be escaped in JSON strings.</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	escapeHTML bool
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>}
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>type encoderFunc func(e *encodeState, v reflect.Value, opts encOpts)
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>var encoderCache sync.Map <span class="comment">// map[reflect.Type]encoderFunc</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>func valueEncoder(v reflect.Value) encoderFunc {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>	if !v.IsValid() {
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		return invalidValueEncoder
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	}
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	return typeEncoder(v.Type())
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>}
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>func typeEncoder(t reflect.Type) encoderFunc {
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	if fi, ok := encoderCache.Load(t); ok {
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>		return fi.(encoderFunc)
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	}
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>	<span class="comment">// To deal with recursive types, populate the map with an</span>
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	<span class="comment">// indirect func before we build it. This type waits on the</span>
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>	<span class="comment">// real func (f) to be ready and then calls it. This indirect</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>	<span class="comment">// func is only used for recursive types.</span>
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	var (
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>		wg sync.WaitGroup
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>		f  encoderFunc
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	)
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	wg.Add(1)
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	fi, loaded := encoderCache.LoadOrStore(t, encoderFunc(func(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>		wg.Wait()
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>		f(e, v, opts)
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	}))
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	if loaded {
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		return fi.(encoderFunc)
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	}
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>	<span class="comment">// Compute the real encoder and replace the indirect func with it.</span>
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	f = newTypeEncoder(t, true)
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	wg.Done()
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	encoderCache.Store(t, f)
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	return f
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>}
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>var (
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	marshalerType     = reflect.TypeOf(new(Marshaler)).Elem()
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>)
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span><span class="comment">// newTypeEncoder constructs an encoderFunc for a type.</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span><span class="comment">// The returned encoder only checks CanAddr when allowAddr is true.</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>func newTypeEncoder(t reflect.Type, allowAddr bool) encoderFunc {
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>	if t.Implements(marshalerType) {
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>		return marshalerEncoder
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>	}
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>	if t.Kind() != reflect.Ptr &amp;&amp; allowAddr {
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>		if reflect.PtrTo(t).Implements(marshalerType) {
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>			return newCondAddrEncoder(addrMarshalerEncoder, newTypeEncoder(t, false))
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>		}
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	}
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>	if t.Implements(textMarshalerType) {
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>		return textMarshalerEncoder
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	}
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>	if t.Kind() != reflect.Ptr &amp;&amp; allowAddr {
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>		if reflect.PtrTo(t).Implements(textMarshalerType) {
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>			return newCondAddrEncoder(addrTextMarshalerEncoder, newTypeEncoder(t, false))
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>		}
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>	}
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>	switch t.Kind() {
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	case reflect.Bool:
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>		return boolEncoder
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>		return intEncoder
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>		return uintEncoder
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>	case reflect.Float32:
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>		return float32Encoder
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>	case reflect.Float64:
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>		return float64Encoder
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>	case reflect.String:
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>		return stringEncoder
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	case reflect.Interface:
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>		return interfaceEncoder
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>	case reflect.Struct:
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		return newStructEncoder(t)
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>	case reflect.Map:
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>		return newMapEncoder(t)
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>	case reflect.Slice:
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>		return newSliceEncoder(t)
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>	case reflect.Array:
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>		return newArrayEncoder(t)
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	case reflect.Ptr:
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>		return newPtrEncoder(t)
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	default:
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>		return unsupportedTypeEncoder
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>	}
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>}
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>func invalidValueEncoder(e *encodeState, v reflect.Value, _ encOpts) {
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	e.WriteString(&#34;null&#34;)
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>}
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>func marshalerEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>	if v.Kind() == reflect.Ptr &amp;&amp; v.IsNil() {
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>		return
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>	}
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>	m, ok := v.Interface().(Marshaler)
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>	if !ok {
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>		return
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>	}
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	b, err := m.MarshalJSON()
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	if err == nil {
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>		<span class="comment">// copy JSON into buffer, checking validity.</span>
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>		err = compact(&amp;e.Buffer, b, opts.escapeHTML)
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>	}
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>		e.error(&amp;MarshalerError{v.Type(), err})
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>	}
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>}
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>func addrMarshalerEncoder(e *encodeState, v reflect.Value, _ encOpts) {
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>	va := v.Addr()
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>	if va.IsNil() {
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>		return
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>	}
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>	m := va.Interface().(Marshaler)
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>	b, err := m.MarshalJSON()
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>	if err == nil {
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>		<span class="comment">// copy JSON into buffer, checking validity.</span>
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>		err = compact(&amp;e.Buffer, b, true)
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>	}
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>		e.error(&amp;MarshalerError{v.Type(), err})
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>	}
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>}
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>func textMarshalerEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>	if v.Kind() == reflect.Ptr &amp;&amp; v.IsNil() {
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>		return
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	}
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>	m := v.Interface().(encoding.TextMarshaler)
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>	b, err := m.MarshalText()
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>		e.error(&amp;MarshalerError{v.Type(), err})
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	}
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	e.stringBytes(b, opts.escapeHTML)
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>}
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>func addrTextMarshalerEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>	va := v.Addr()
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>	if va.IsNil() {
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>		return
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>	}
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>	m := va.Interface().(encoding.TextMarshaler)
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>	b, err := m.MarshalText()
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>		e.error(&amp;MarshalerError{v.Type(), err})
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>	}
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>	e.stringBytes(b, opts.escapeHTML)
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>}
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>func boolEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>		e.WriteByte(&#39;&#34;&#39;)
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>	}
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>	if v.Bool() {
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>		e.WriteString(&#34;true&#34;)
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>	} else {
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>		e.WriteString(&#34;false&#34;)
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>	}
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>		e.WriteByte(&#39;&#34;&#39;)
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>	}
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>}
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>func intEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>	b := strconv.AppendInt(e.scratch[:0], v.Int(), 10)
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>		e.WriteByte(&#39;&#34;&#39;)
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>	}
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>	e.Write(b)
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>		e.WriteByte(&#39;&#34;&#39;)
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>	}
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>}
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>func uintEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>	b := strconv.AppendUint(e.scratch[:0], v.Uint(), 10)
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>		e.WriteByte(&#39;&#34;&#39;)
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>	}
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>	e.Write(b)
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		e.WriteByte(&#39;&#34;&#39;)
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>	}
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>}
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>type floatEncoder int <span class="comment">// number of bits</span>
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>func (bits floatEncoder) encode(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>	f := v.Float()
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>	if math.IsInf(f, 0) || math.IsNaN(f) {
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>		e.error(&amp;UnsupportedValueError{v, strconv.FormatFloat(f, &#39;g&#39;, -1, int(bits))})
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	}
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>	<span class="comment">// Convert as if by ES6 number to string conversion.</span>
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>	<span class="comment">// This matches most other JSON generators.</span>
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	<span class="comment">// See golang.org/issue/6384 and golang.org/issue/14135.</span>
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>	<span class="comment">// Like fmt %g, but the exponent cutoffs are different</span>
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>	<span class="comment">// and exponents themselves are not padded to two digits.</span>
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>	b := e.scratch[:0]
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>	abs := math.Abs(f)
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>	fmt := byte(&#39;f&#39;)
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>	<span class="comment">// Note: Must use float32 comparisons for underlying float32 value to get precise cutoffs right.</span>
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>	if abs != 0 {
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>		if bits == 64 &amp;&amp; (abs &lt; 1e-6 || abs &gt;= 1e21) || bits == 32 &amp;&amp; (float32(abs) &lt; 1e-6 || float32(abs) &gt;= 1e21) {
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>			fmt = &#39;e&#39;
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>		}
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>	}
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>	b = strconv.AppendFloat(b, f, fmt, -1, int(bits))
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>	if fmt == &#39;e&#39; {
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>		<span class="comment">// clean up e-09 to e-9</span>
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>		n := len(b)
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>		if n &gt;= 4 &amp;&amp; b[n-4] == &#39;e&#39; &amp;&amp; b[n-3] == &#39;-&#39; &amp;&amp; b[n-2] == &#39;0&#39; {
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>			b[n-2] = b[n-1]
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>			b = b[:n-1]
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>		}
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>	}
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>		e.WriteByte(&#39;&#34;&#39;)
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>	}
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>	e.Write(b)
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>		e.WriteByte(&#39;&#34;&#39;)
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>	}
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>}
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>var (
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>	float32Encoder = (floatEncoder(32)).encode
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>	float64Encoder = (floatEncoder(64)).encode
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>)
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>func stringEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>	if v.Type() == numberType {
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>		numStr := v.String()
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>		<span class="comment">// In Go1.5 the empty string encodes to &#34;0&#34;, while this is not a valid number literal</span>
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>		<span class="comment">// we keep compatibility so check validity after this.</span>
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>		if numStr == &#34;&#34; {
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>			numStr = &#34;0&#34; <span class="comment">// Number&#39;s zero-val</span>
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>		}
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>		if !isValidNumber(numStr) {
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>			e.error(fmt.Errorf(&#34;json: invalid number literal %q&#34;, numStr))
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>		}
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>		e.WriteString(numStr)
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>		return
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>	}
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>	if opts.quoted {
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>		sb, err := Marshal(v.String())
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>			e.error(err)
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>		}
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>		e.string(string(sb), opts.escapeHTML)
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>	} else {
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>		e.string(v.String(), opts.escapeHTML)
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>	}
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>}
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>func interfaceEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>	if v.IsNil() {
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>		return
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>	}
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>	e.reflectValue(v.Elem(), opts)
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>}
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>func unsupportedTypeEncoder(e *encodeState, v reflect.Value, _ encOpts) {
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>	e.error(&amp;UnsupportedTypeError{v.Type()})
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>}
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>type structEncoder struct {
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>	fields    []field
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>	fieldEncs []encoderFunc
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>}
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>func (se *structEncoder) encode(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>	e.WriteByte(&#39;{&#39;)
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>	first := true
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>	for i, f := range se.fields {
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>		fv := fieldByIndex(v, f.index)
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>		if !fv.IsValid() || f.omitEmpty &amp;&amp; isEmptyValue(fv) {
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>			continue
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>		}
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>		if first {
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>			first = false
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>		} else {
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>			e.WriteByte(&#39;,&#39;)
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>		}
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>		e.string(f.name, opts.escapeHTML)
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>		e.WriteByte(&#39;:&#39;)
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>		opts.quoted = f.quoted
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>		se.fieldEncs[i](e, fv, opts)
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>	}
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>	e.WriteByte(&#39;}&#39;)
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>}
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>func newStructEncoder(t reflect.Type) encoderFunc {
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>	fields := cachedTypeFields(t)
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>	se := &amp;structEncoder{
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>		fields:    fields,
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>		fieldEncs: make([]encoderFunc, len(fields)),
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>	}
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>	for i, f := range fields {
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>		se.fieldEncs[i] = typeEncoder(typeByIndex(t, f.index))
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>	}
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>	return se.encode
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>}
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>type mapEncoder struct {
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>	elemEnc encoderFunc
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>}
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>func (me *mapEncoder) encode(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>	if v.IsNil() {
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>		return
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>	}
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>	e.WriteByte(&#39;{&#39;)
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>	<span class="comment">// Extract and sort the keys.</span>
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>	keys := v.MapKeys()
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>	sv := make([]reflectWithString, len(keys))
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>	for i, v := range keys {
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>		sv[i].v = v
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>		if err := sv[i].resolve(); err != nil {
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>			e.error(&amp;MarshalerError{v.Type(), err})
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>		}
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>	}
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	sort.Slice(sv, func(i, j int) bool { return sv[i].s &lt; sv[j].s })
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>	for i, kv := range sv {
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>		if i &gt; 0 {
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>			e.WriteByte(&#39;,&#39;)
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>		}
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>		e.string(kv.s, opts.escapeHTML)
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>		e.WriteByte(&#39;:&#39;)
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>		me.elemEnc(e, v.MapIndex(kv.v), opts)
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>	}
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>	e.WriteByte(&#39;}&#39;)
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>}
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>func newMapEncoder(t reflect.Type) encoderFunc {
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	switch t.Key().Kind() {
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>	case reflect.String,
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>	default:
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>		if !t.Key().Implements(textMarshalerType) {
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>			return unsupportedTypeEncoder
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>		}
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>	}
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>	me := &amp;mapEncoder{typeEncoder(t.Elem())}
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>	return me.encode
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>}
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>func encodeByteSlice(e *encodeState, v reflect.Value, _ encOpts) {
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>	if v.IsNil() {
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>		return
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>	}
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>	s := v.Bytes()
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>	e.WriteByte(&#39;&#34;&#39;)
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>	if len(s) &lt; 1024 {
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>		<span class="comment">// for small buffers, using Encode directly is much faster.</span>
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>		dst := make([]byte, base64.StdEncoding.EncodedLen(len(s)))
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>		base64.StdEncoding.Encode(dst, s)
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>		e.Write(dst)
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>	} else {
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>		<span class="comment">// for large buffers, avoid unnecessary extra temporary</span>
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>		<span class="comment">// buffer space.</span>
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>		enc := base64.NewEncoder(base64.StdEncoding, e)
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>		enc.Write(s)
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>		enc.Close()
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>	}
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>	e.WriteByte(&#39;&#34;&#39;)
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>}
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span><span class="comment">// sliceEncoder just wraps an arrayEncoder, checking to make sure the value isn&#39;t nil.</span>
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>type sliceEncoder struct {
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>	arrayEnc encoderFunc
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>}
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>func (se *sliceEncoder) encode(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>	if v.IsNil() {
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>		return
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>	}
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>	se.arrayEnc(e, v, opts)
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>}
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>func newSliceEncoder(t reflect.Type) encoderFunc {
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>	<span class="comment">// Byte slices get special treatment; arrays don&#39;t.</span>
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>	if t.Elem().Kind() == reflect.Uint8 {
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>		p := reflect.PtrTo(t.Elem())
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>		if !p.Implements(marshalerType) &amp;&amp; !p.Implements(textMarshalerType) {
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>			return encodeByteSlice
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>		}
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>	}
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>	enc := &amp;sliceEncoder{newArrayEncoder(t)}
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>	return enc.encode
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>}
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>type arrayEncoder struct {
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>	elemEnc encoderFunc
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>}
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>func (ae *arrayEncoder) encode(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>	e.WriteByte(&#39;[&#39;)
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>	n := v.Len()
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>	for i := 0; i &lt; n; i++ {
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>		if i &gt; 0 {
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>			e.WriteByte(&#39;,&#39;)
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>		}
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>		ae.elemEnc(e, v.Index(i), opts)
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>	}
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>	e.WriteByte(&#39;]&#39;)
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>}
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>func newArrayEncoder(t reflect.Type) encoderFunc {
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>	enc := &amp;arrayEncoder{typeEncoder(t.Elem())}
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>	return enc.encode
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>}
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>type ptrEncoder struct {
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>	elemEnc encoderFunc
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>}
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>func (pe *ptrEncoder) encode(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>	if v.IsNil() {
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>		e.WriteString(&#34;null&#34;)
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>		return
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>	}
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>	pe.elemEnc(e, v.Elem(), opts)
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>}
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>func newPtrEncoder(t reflect.Type) encoderFunc {
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>	enc := &amp;ptrEncoder{typeEncoder(t.Elem())}
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>	return enc.encode
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>}
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>type condAddrEncoder struct {
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>	canAddrEnc, elseEnc encoderFunc
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>}
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>func (ce *condAddrEncoder) encode(e *encodeState, v reflect.Value, opts encOpts) {
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>	if v.CanAddr() {
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>		ce.canAddrEnc(e, v, opts)
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>	} else {
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>		ce.elseEnc(e, v, opts)
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>	}
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>}
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span><span class="comment">// newCondAddrEncoder returns an encoder that checks whether its value</span>
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span><span class="comment">// CanAddr and delegates to canAddrEnc if so, else to elseEnc.</span>
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>func newCondAddrEncoder(canAddrEnc, elseEnc encoderFunc) encoderFunc {
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>	enc := &amp;condAddrEncoder{canAddrEnc: canAddrEnc, elseEnc: elseEnc}
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>	return enc.encode
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>}
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>func isValidTag(s string) bool {
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>	if s == &#34;&#34; {
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>		return false
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>	}
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>	for _, c := range s {
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>		switch {
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>		case strings.ContainsRune(&#34;!#$%&amp;()*+-./:&lt;=&gt;?@[]^_{|}~ &#34;, c):
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>			<span class="comment">// Backslash and quote chars are reserved, but</span>
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>			<span class="comment">// otherwise any punctuation chars are allowed</span>
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>			<span class="comment">// in a tag name.</span>
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>		default:
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>			if !unicode.IsLetter(c) &amp;&amp; !unicode.IsDigit(c) {
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>				return false
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>			}
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>		}
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>	}
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>	return true
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>}
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>func fieldByIndex(v reflect.Value, index []int) reflect.Value {
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>	for _, i := range index {
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>		if v.Kind() == reflect.Ptr {
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>			if v.IsNil() {
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>				return reflect.Value{}
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>			}
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>			v = v.Elem()
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>		}
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>		v = v.Field(i)
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>	}
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>	return v
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>}
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>func typeByIndex(t reflect.Type, index []int) reflect.Type {
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>	for _, i := range index {
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>		if t.Kind() == reflect.Ptr {
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>			t = t.Elem()
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>		}
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>		t = t.Field(i).Type
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>	}
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>	return t
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>}
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>type reflectWithString struct {
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>	v reflect.Value
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>	s string
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>}
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>func (w *reflectWithString) resolve() error {
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>	if w.v.Kind() == reflect.String {
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>		w.s = w.v.String()
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>		return nil
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>	}
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>	if tm, ok := w.v.Interface().(encoding.TextMarshaler); ok {
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>		buf, err := tm.MarshalText()
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>		w.s = string(buf)
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>		return err
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>	}
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>	switch w.v.Kind() {
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>		w.s = strconv.FormatInt(w.v.Int(), 10)
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>		return nil
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>		w.s = strconv.FormatUint(w.v.Uint(), 10)
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>		return nil
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>	}
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>	panic(&#34;unexpected map key type&#34;)
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>}
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span><span class="comment">// NOTE: keep in sync with stringBytes below.</span>
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>func (e *encodeState) string(s string, escapeHTML bool) int {
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>	len0 := e.Len()
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>	e.WriteByte(&#39;&#34;&#39;)
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>	start := 0
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); {
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>		if b := s[i]; b &lt; utf8.RuneSelf {
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>			if htmlSafeSet[b] || (!escapeHTML &amp;&amp; safeSet[b]) {
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>				i++
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span>				continue
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>			}
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>			if start &lt; i {
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>				e.WriteString(s[start:i])
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>			}
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>			switch b {
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>			case &#39;\\&#39;, &#39;&#34;&#39;:
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>				e.WriteByte(&#39;\\&#39;)
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>				e.WriteByte(b)
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>			case &#39;\n&#39;:
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>				e.WriteByte(&#39;\\&#39;)
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>				e.WriteByte(&#39;n&#39;)
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>			case &#39;\r&#39;:
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>				e.WriteByte(&#39;\\&#39;)
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>				e.WriteByte(&#39;r&#39;)
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>			case &#39;\t&#39;:
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>				e.WriteByte(&#39;\\&#39;)
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>				e.WriteByte(&#39;t&#39;)
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>			default:
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>				<span class="comment">// This encodes bytes &lt; 0x20 except for \t, \n and \r.</span>
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>				<span class="comment">// If escapeHTML is set, it also escapes &lt;, &gt;, and &amp;</span>
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>				<span class="comment">// because they can lead to security holes when</span>
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>				<span class="comment">// user-controlled strings are rendered into JSON</span>
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>				<span class="comment">// and served to some browsers.</span>
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>				e.WriteString(`\u00`)
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>				e.WriteByte(hex[b&gt;&gt;4])
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>				e.WriteByte(hex[b&amp;0xF])
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>			}
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>			i++
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>			start = i
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>			continue
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>		}
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>		c, size := utf8.DecodeRuneInString(s[i:])
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>		if c == utf8.RuneError &amp;&amp; size == 1 {
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>			if start &lt; i {
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>				e.WriteString(s[start:i])
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>			}
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>			e.WriteString(`\ufffd`)
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>			i += size
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>			start = i
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>			continue
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>		}
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>		<span class="comment">// U+2028 is LINE SEPARATOR.</span>
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>		<span class="comment">// U+2029 is PARAGRAPH SEPARATOR.</span>
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>		<span class="comment">// They are both technically valid characters in JSON strings,</span>
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>		<span class="comment">// but don&#39;t work in JSONP, which has to be evaluated as JavaScript,</span>
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>		<span class="comment">// and can lead to security holes there. It is valid JSON to</span>
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>		<span class="comment">// escape them, so we do so unconditionally.</span>
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>		<span class="comment">// See http://timelessrepo.com/json-isnt-a-javascript-subset for discussion.</span>
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>		if c == &#39;\u2028&#39; || c == &#39;\u2029&#39; {
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>			if start &lt; i {
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>				e.WriteString(s[start:i])
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>			}
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>			e.WriteString(`\u202`)
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>			e.WriteByte(hex[c&amp;0xF])
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>			i += size
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>			start = i
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>			continue
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>		}
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>		i += size
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span>	}
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>	if start &lt; len(s) {
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>		e.WriteString(s[start:])
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>	}
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>	e.WriteByte(&#39;&#34;&#39;)
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>	return e.Len() - len0
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>}
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span><span class="comment">// NOTE: keep in sync with string above.</span>
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>func (e *encodeState) stringBytes(s []byte, escapeHTML bool) int {
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>	len0 := e.Len()
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>	e.WriteByte(&#39;&#34;&#39;)
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>	start := 0
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); {
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>		if b := s[i]; b &lt; utf8.RuneSelf {
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>			if htmlSafeSet[b] || (!escapeHTML &amp;&amp; safeSet[b]) {
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>				i++
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>				continue
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>			}
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>			if start &lt; i {
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>				e.Write(s[start:i])
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>			}
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>			switch b {
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>			case &#39;\\&#39;, &#39;&#34;&#39;:
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>				e.WriteByte(&#39;\\&#39;)
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>				e.WriteByte(b)
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>			case &#39;\n&#39;:
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>				e.WriteByte(&#39;\\&#39;)
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>				e.WriteByte(&#39;n&#39;)
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>			case &#39;\r&#39;:
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>				e.WriteByte(&#39;\\&#39;)
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span>				e.WriteByte(&#39;r&#39;)
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span>			case &#39;\t&#39;:
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span>				e.WriteByte(&#39;\\&#39;)
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span>				e.WriteByte(&#39;t&#39;)
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span>			default:
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span>				<span class="comment">// This encodes bytes &lt; 0x20 except for \t, \n and \r.</span>
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span>				<span class="comment">// If escapeHTML is set, it also escapes &lt;, &gt;, and &amp;</span>
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span>				<span class="comment">// because they can lead to security holes when</span>
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span>				<span class="comment">// user-controlled strings are rendered into JSON</span>
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span>				<span class="comment">// and served to some browsers.</span>
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span>				e.WriteString(`\u00`)
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span>				e.WriteByte(hex[b&gt;&gt;4])
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span>				e.WriteByte(hex[b&amp;0xF])
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span>			}
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span>			i++
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span>			start = i
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span>			continue
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span>		}
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span>		c, size := utf8.DecodeRune(s[i:])
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span>		if c == utf8.RuneError &amp;&amp; size == 1 {
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span>			if start &lt; i {
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span>				e.Write(s[start:i])
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span>			}
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span>			e.WriteString(`\ufffd`)
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span>			i += size
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span>			start = i
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span>			continue
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span>		}
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span>		<span class="comment">// U+2028 is LINE SEPARATOR.</span>
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span>		<span class="comment">// U+2029 is PARAGRAPH SEPARATOR.</span>
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span>		<span class="comment">// They are both technically valid characters in JSON strings,</span>
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span>		<span class="comment">// but don&#39;t work in JSONP, which has to be evaluated as JavaScript,</span>
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span>		<span class="comment">// and can lead to security holes there. It is valid JSON to</span>
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span>		<span class="comment">// escape them, so we do so unconditionally.</span>
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span>		<span class="comment">// See http://timelessrepo.com/json-isnt-a-javascript-subset for discussion.</span>
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span>		if c == &#39;\u2028&#39; || c == &#39;\u2029&#39; {
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span>			if start &lt; i {
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span>				e.Write(s[start:i])
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span>			}
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span>			e.WriteString(`\u202`)
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>			e.WriteByte(hex[c&amp;0xF])
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>			i += size
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span>			start = i
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span>			continue
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>		}
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>		i += size
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>	}
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>	if start &lt; len(s) {
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>		e.Write(s[start:])
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>	}
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span>	e.WriteByte(&#39;&#34;&#39;)
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>	return e.Len() - len0
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>}
+<span id="L1026" class="ln" data-content="  1026">&nbsp;&nbsp;</span>
+<span id="L1027" class="ln" data-content="  1027">&nbsp;&nbsp;</span><span class="comment">// A field represents a single field found in a struct.</span>
+<span id="L1028" class="ln" data-content="  1028">&nbsp;&nbsp;</span>type field struct {
+<span id="L1029" class="ln" data-content="  1029">&nbsp;&nbsp;</span>	name      string
+<span id="L1030" class="ln" data-content="  1030">&nbsp;&nbsp;</span>	nameBytes []byte                 <span class="comment">// []byte(name)</span>
+<span id="L1031" class="ln" data-content="  1031">&nbsp;&nbsp;</span>	equalFold func(s, t []byte) bool <span class="comment">// bytes.EqualFold or equivalent</span>
+<span id="L1032" class="ln" data-content="  1032">&nbsp;&nbsp;</span>
+<span id="L1033" class="ln" data-content="  1033">&nbsp;&nbsp;</span>	tag       bool
+<span id="L1034" class="ln" data-content="  1034">&nbsp;&nbsp;</span>	index     []int
+<span id="L1035" class="ln" data-content="  1035">&nbsp;&nbsp;</span>	typ       reflect.Type
+<span id="L1036" class="ln" data-content="  1036">&nbsp;&nbsp;</span>	omitEmpty bool
+<span id="L1037" class="ln" data-content="  1037">&nbsp;&nbsp;</span>	quoted    bool
+<span id="L1038" class="ln" data-content="  1038">&nbsp;&nbsp;</span>}
+<span id="L1039" class="ln" data-content="  1039">&nbsp;&nbsp;</span>
+<span id="L1040" class="ln" data-content="  1040">&nbsp;&nbsp;</span>func fillField(f field) field {
+<span id="L1041" class="ln" data-content="  1041">&nbsp;&nbsp;</span>	f.nameBytes = []byte(f.name)
+<span id="L1042" class="ln" data-content="  1042">&nbsp;&nbsp;</span>	f.equalFold = foldFunc(f.nameBytes)
+<span id="L1043" class="ln" data-content="  1043">&nbsp;&nbsp;</span>	return f
+<span id="L1044" class="ln" data-content="  1044">&nbsp;&nbsp;</span>}
+<span id="L1045" class="ln" data-content="  1045">&nbsp;&nbsp;</span>
+<span id="L1046" class="ln" data-content="  1046">&nbsp;&nbsp;</span><span class="comment">// byIndex sorts field by index sequence.</span>
+<span id="L1047" class="ln" data-content="  1047">&nbsp;&nbsp;</span>type byIndex []field
+<span id="L1048" class="ln" data-content="  1048">&nbsp;&nbsp;</span>
+<span id="L1049" class="ln" data-content="  1049">&nbsp;&nbsp;</span>func (x byIndex) Len() int { return len(x) }
+<span id="L1050" class="ln" data-content="  1050">&nbsp;&nbsp;</span>
+<span id="L1051" class="ln" data-content="  1051">&nbsp;&nbsp;</span>func (x byIndex) Swap(i, j int) { x[i], x[j] = x[j], x[i] }
+<span id="L1052" class="ln" data-content="  1052">&nbsp;&nbsp;</span>
+<span id="L1053" class="ln" data-content="  1053">&nbsp;&nbsp;</span>func (x byIndex) Less(i, j int) bool {
+<span id="L1054" class="ln" data-content="  1054">&nbsp;&nbsp;</span>	for k, xik := range x[i].index {
+<span id="L1055" class="ln" data-content="  1055">&nbsp;&nbsp;</span>		if k &gt;= len(x[j].index) {
+<span id="L1056" class="ln" data-content="  1056">&nbsp;&nbsp;</span>			return false
+<span id="L1057" class="ln" data-content="  1057">&nbsp;&nbsp;</span>		}
+<span id="L1058" class="ln" data-content="  1058">&nbsp;&nbsp;</span>		if xik != x[j].index[k] {
+<span id="L1059" class="ln" data-content="  1059">&nbsp;&nbsp;</span>			return xik &lt; x[j].index[k]
+<span id="L1060" class="ln" data-content="  1060">&nbsp;&nbsp;</span>		}
+<span id="L1061" class="ln" data-content="  1061">&nbsp;&nbsp;</span>	}
+<span id="L1062" class="ln" data-content="  1062">&nbsp;&nbsp;</span>	return len(x[i].index) &lt; len(x[j].index)
+<span id="L1063" class="ln" data-content="  1063">&nbsp;&nbsp;</span>}
+<span id="L1064" class="ln" data-content="  1064">&nbsp;&nbsp;</span>
+<span id="L1065" class="ln" data-content="  1065">&nbsp;&nbsp;</span><span class="comment">// typeFields returns a list of fields that JSON should recognize for the given type.</span>
+<span id="L1066" class="ln" data-content="  1066">&nbsp;&nbsp;</span><span class="comment">// The algorithm is breadth-first search over the set of structs to include - the top struct</span>
+<span id="L1067" class="ln" data-content="  1067">&nbsp;&nbsp;</span><span class="comment">// and then any reachable anonymous structs.</span>
+<span id="L1068" class="ln" data-content="  1068">&nbsp;&nbsp;</span>func typeFields(t reflect.Type) []field {
+<span id="L1069" class="ln" data-content="  1069">&nbsp;&nbsp;</span>	<span class="comment">// Anonymous fields to explore at the current level and the next.</span>
+<span id="L1070" class="ln" data-content="  1070">&nbsp;&nbsp;</span>	current := []field{}
+<span id="L1071" class="ln" data-content="  1071">&nbsp;&nbsp;</span>	next := []field{{typ: t}}
+<span id="L1072" class="ln" data-content="  1072">&nbsp;&nbsp;</span>
+<span id="L1073" class="ln" data-content="  1073">&nbsp;&nbsp;</span>	<span class="comment">// Count of queued names for current level and the next.</span>
+<span id="L1074" class="ln" data-content="  1074">&nbsp;&nbsp;</span>	count := map[reflect.Type]int{}
+<span id="L1075" class="ln" data-content="  1075">&nbsp;&nbsp;</span>	nextCount := map[reflect.Type]int{}
+<span id="L1076" class="ln" data-content="  1076">&nbsp;&nbsp;</span>
+<span id="L1077" class="ln" data-content="  1077">&nbsp;&nbsp;</span>	<span class="comment">// Types already visited at an earlier level.</span>
+<span id="L1078" class="ln" data-content="  1078">&nbsp;&nbsp;</span>	visited := map[reflect.Type]bool{}
+<span id="L1079" class="ln" data-content="  1079">&nbsp;&nbsp;</span>
+<span id="L1080" class="ln" data-content="  1080">&nbsp;&nbsp;</span>	<span class="comment">// Fields found.</span>
+<span id="L1081" class="ln" data-content="  1081">&nbsp;&nbsp;</span>	var fields []field
+<span id="L1082" class="ln" data-content="  1082">&nbsp;&nbsp;</span>
+<span id="L1083" class="ln" data-content="  1083">&nbsp;&nbsp;</span>	for len(next) &gt; 0 {
+<span id="L1084" class="ln" data-content="  1084">&nbsp;&nbsp;</span>		current, next = next, current[:0]
+<span id="L1085" class="ln" data-content="  1085">&nbsp;&nbsp;</span>		count, nextCount = nextCount, map[reflect.Type]int{}
+<span id="L1086" class="ln" data-content="  1086">&nbsp;&nbsp;</span>
+<span id="L1087" class="ln" data-content="  1087">&nbsp;&nbsp;</span>		for _, f := range current {
+<span id="L1088" class="ln" data-content="  1088">&nbsp;&nbsp;</span>			if visited[f.typ] {
+<span id="L1089" class="ln" data-content="  1089">&nbsp;&nbsp;</span>				continue
+<span id="L1090" class="ln" data-content="  1090">&nbsp;&nbsp;</span>			}
+<span id="L1091" class="ln" data-content="  1091">&nbsp;&nbsp;</span>			visited[f.typ] = true
+<span id="L1092" class="ln" data-content="  1092">&nbsp;&nbsp;</span>
+<span id="L1093" class="ln" data-content="  1093">&nbsp;&nbsp;</span>			<span class="comment">// Scan f.typ for fields to include.</span>
+<span id="L1094" class="ln" data-content="  1094">&nbsp;&nbsp;</span>			for i := 0; i &lt; f.typ.NumField(); i++ {
+<span id="L1095" class="ln" data-content="  1095">&nbsp;&nbsp;</span>				sf := f.typ.Field(i)
+<span id="L1096" class="ln" data-content="  1096">&nbsp;&nbsp;</span>				if sf.Anonymous {
+<span id="L1097" class="ln" data-content="  1097">&nbsp;&nbsp;</span>					t := sf.Type
+<span id="L1098" class="ln" data-content="  1098">&nbsp;&nbsp;</span>					if t.Kind() == reflect.Ptr {
+<span id="L1099" class="ln" data-content="  1099">&nbsp;&nbsp;</span>						t = t.Elem()
+<span id="L1100" class="ln" data-content="  1100">&nbsp;&nbsp;</span>					}
+<span id="L1101" class="ln" data-content="  1101">&nbsp;&nbsp;</span>					<span class="comment">// If embedded, StructField.PkgPath is not a reliable</span>
+<span id="L1102" class="ln" data-content="  1102">&nbsp;&nbsp;</span>					<span class="comment">// indicator of whether the field is exported.</span>
+<span id="L1103" class="ln" data-content="  1103">&nbsp;&nbsp;</span>					<span class="comment">// See https://golang.org/issue/21122</span>
+<span id="L1104" class="ln" data-content="  1104">&nbsp;&nbsp;</span>					if !isExported(t.Name()) &amp;&amp; t.Kind() != reflect.Struct {
+<span id="L1105" class="ln" data-content="  1105">&nbsp;&nbsp;</span>						<span class="comment">// Ignore embedded fields of unexported non-struct types.</span>
+<span id="L1106" class="ln" data-content="  1106">&nbsp;&nbsp;</span>						<span class="comment">// Do not ignore embedded fields of unexported struct types</span>
+<span id="L1107" class="ln" data-content="  1107">&nbsp;&nbsp;</span>						<span class="comment">// since they may have exported fields.</span>
+<span id="L1108" class="ln" data-content="  1108">&nbsp;&nbsp;</span>						continue
+<span id="L1109" class="ln" data-content="  1109">&nbsp;&nbsp;</span>					}
+<span id="L1110" class="ln" data-content="  1110">&nbsp;&nbsp;</span>				} else if sf.PkgPath != &#34;&#34; {
+<span id="L1111" class="ln" data-content="  1111">&nbsp;&nbsp;</span>					<span class="comment">// Ignore unexported non-embedded fields.</span>
+<span id="L1112" class="ln" data-content="  1112">&nbsp;&nbsp;</span>					continue
+<span id="L1113" class="ln" data-content="  1113">&nbsp;&nbsp;</span>				}
+<span id="L1114" class="ln" data-content="  1114">&nbsp;&nbsp;</span>				tag := sf.Tag.Get(&#34;json&#34;)
+<span id="L1115" class="ln" data-content="  1115">&nbsp;&nbsp;</span>				if tag == &#34;-&#34; {
+<span id="L1116" class="ln" data-content="  1116">&nbsp;&nbsp;</span>					continue
+<span id="L1117" class="ln" data-content="  1117">&nbsp;&nbsp;</span>				}
+<span id="L1118" class="ln" data-content="  1118">&nbsp;&nbsp;</span>				name, opts := parseTag(tag)
+<span id="L1119" class="ln" data-content="  1119">&nbsp;&nbsp;</span>				if !isValidTag(name) {
+<span id="L1120" class="ln" data-content="  1120">&nbsp;&nbsp;</span>					name = &#34;&#34;
+<span id="L1121" class="ln" data-content="  1121">&nbsp;&nbsp;</span>				}
+<span id="L1122" class="ln" data-content="  1122">&nbsp;&nbsp;</span>				index := make([]int, len(f.index)+1)
+<span id="L1123" class="ln" data-content="  1123">&nbsp;&nbsp;</span>				copy(index, f.index)
+<span id="L1124" class="ln" data-content="  1124">&nbsp;&nbsp;</span>				index[len(f.index)] = i
+<span id="L1125" class="ln" data-content="  1125">&nbsp;&nbsp;</span>
+<span id="L1126" class="ln" data-content="  1126">&nbsp;&nbsp;</span>				ft := sf.Type
+<span id="L1127" class="ln" data-content="  1127">&nbsp;&nbsp;</span>				if ft.Name() == &#34;&#34; &amp;&amp; ft.Kind() == reflect.Ptr {
+<span id="L1128" class="ln" data-content="  1128">&nbsp;&nbsp;</span>					<span class="comment">// Follow pointer.</span>
+<span id="L1129" class="ln" data-content="  1129">&nbsp;&nbsp;</span>					ft = ft.Elem()
+<span id="L1130" class="ln" data-content="  1130">&nbsp;&nbsp;</span>				}
+<span id="L1131" class="ln" data-content="  1131">&nbsp;&nbsp;</span>
+<span id="L1132" class="ln" data-content="  1132">&nbsp;&nbsp;</span>				<span class="comment">// Only strings, floats, integers, and booleans can be quoted.</span>
+<span id="L1133" class="ln" data-content="  1133">&nbsp;&nbsp;</span>				quoted := false
+<span id="L1134" class="ln" data-content="  1134">&nbsp;&nbsp;</span>				if opts.Contains(&#34;string&#34;) {
+<span id="L1135" class="ln" data-content="  1135">&nbsp;&nbsp;</span>					switch ft.Kind() {
+<span id="L1136" class="ln" data-content="  1136">&nbsp;&nbsp;</span>					case reflect.Bool,
+<span id="L1137" class="ln" data-content="  1137">&nbsp;&nbsp;</span>						reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+<span id="L1138" class="ln" data-content="  1138">&nbsp;&nbsp;</span>						reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+<span id="L1139" class="ln" data-content="  1139">&nbsp;&nbsp;</span>						reflect.Float32, reflect.Float64,
+<span id="L1140" class="ln" data-content="  1140">&nbsp;&nbsp;</span>						reflect.String:
+<span id="L1141" class="ln" data-content="  1141">&nbsp;&nbsp;</span>						quoted = true
+<span id="L1142" class="ln" data-content="  1142">&nbsp;&nbsp;</span>					}
+<span id="L1143" class="ln" data-content="  1143">&nbsp;&nbsp;</span>				}
+<span id="L1144" class="ln" data-content="  1144">&nbsp;&nbsp;</span>
+<span id="L1145" class="ln" data-content="  1145">&nbsp;&nbsp;</span>				<span class="comment">// Record found field and index sequence.</span>
+<span id="L1146" class="ln" data-content="  1146">&nbsp;&nbsp;</span>				if name != &#34;&#34; || !sf.Anonymous || ft.Kind() != reflect.Struct {
+<span id="L1147" class="ln" data-content="  1147">&nbsp;&nbsp;</span>					tagged := name != &#34;&#34;
+<span id="L1148" class="ln" data-content="  1148">&nbsp;&nbsp;</span>					if name == &#34;&#34; {
+<span id="L1149" class="ln" data-content="  1149">&nbsp;&nbsp;</span>						name = sf.Name
+<span id="L1150" class="ln" data-content="  1150">&nbsp;&nbsp;</span>					}
+<span id="L1151" class="ln" data-content="  1151">&nbsp;&nbsp;</span>					fields = append(fields, fillField(field{
+<span id="L1152" class="ln" data-content="  1152">&nbsp;&nbsp;</span>						name:      name,
+<span id="L1153" class="ln" data-content="  1153">&nbsp;&nbsp;</span>						tag:       tagged,
+<span id="L1154" class="ln" data-content="  1154">&nbsp;&nbsp;</span>						index:     index,
+<span id="L1155" class="ln" data-content="  1155">&nbsp;&nbsp;</span>						typ:       ft,
+<span id="L1156" class="ln" data-content="  1156">&nbsp;&nbsp;</span>						omitEmpty: opts.Contains(&#34;omitempty&#34;),
+<span id="L1157" class="ln" data-content="  1157">&nbsp;&nbsp;</span>						quoted:    quoted,
+<span id="L1158" class="ln" data-content="  1158">&nbsp;&nbsp;</span>					}))
+<span id="L1159" class="ln" data-content="  1159">&nbsp;&nbsp;</span>					if count[f.typ] &gt; 1 {
+<span id="L1160" class="ln" data-content="  1160">&nbsp;&nbsp;</span>						<span class="comment">// If there were multiple instances, add a second,</span>
+<span id="L1161" class="ln" data-content="  1161">&nbsp;&nbsp;</span>						<span class="comment">// so that the annihilation code will see a duplicate.</span>
+<span id="L1162" class="ln" data-content="  1162">&nbsp;&nbsp;</span>						<span class="comment">// It only cares about the distinction between 1 or 2,</span>
+<span id="L1163" class="ln" data-content="  1163">&nbsp;&nbsp;</span>						<span class="comment">// so don&#39;t bother generating any more copies.</span>
+<span id="L1164" class="ln" data-content="  1164">&nbsp;&nbsp;</span>						fields = append(fields, fields[len(fields)-1])
+<span id="L1165" class="ln" data-content="  1165">&nbsp;&nbsp;</span>					}
+<span id="L1166" class="ln" data-content="  1166">&nbsp;&nbsp;</span>					continue
+<span id="L1167" class="ln" data-content="  1167">&nbsp;&nbsp;</span>				}
+<span id="L1168" class="ln" data-content="  1168">&nbsp;&nbsp;</span>
+<span id="L1169" class="ln" data-content="  1169">&nbsp;&nbsp;</span>				<span class="comment">// Record new anonymous struct to explore in next round.</span>
+<span id="L1170" class="ln" data-content="  1170">&nbsp;&nbsp;</span>				nextCount[ft]++
+<span id="L1171" class="ln" data-content="  1171">&nbsp;&nbsp;</span>				if nextCount[ft] == 1 {
+<span id="L1172" class="ln" data-content="  1172">&nbsp;&nbsp;</span>					next = append(next, fillField(field{name: ft.Name(), index: index, typ: ft}))
+<span id="L1173" class="ln" data-content="  1173">&nbsp;&nbsp;</span>				}
+<span id="L1174" class="ln" data-content="  1174">&nbsp;&nbsp;</span>			}
+<span id="L1175" class="ln" data-content="  1175">&nbsp;&nbsp;</span>		}
+<span id="L1176" class="ln" data-content="  1176">&nbsp;&nbsp;</span>	}
+<span id="L1177" class="ln" data-content="  1177">&nbsp;&nbsp;</span>
+<span id="L1178" class="ln" data-content="  1178">&nbsp;&nbsp;</span>	sort.Slice(fields, func(i, j int) bool {
+<span id="L1179" class="ln" data-content="  1179">&nbsp;&nbsp;</span>		x := fields
+<span id="L1180" class="ln" data-content="  1180">&nbsp;&nbsp;</span>		<span class="comment">// sort field by name, breaking ties with depth, then</span>
+<span id="L1181" class="ln" data-content="  1181">&nbsp;&nbsp;</span>		<span class="comment">// breaking ties with &#34;name came from json tag&#34;, then</span>
+<span id="L1182" class="ln" data-content="  1182">&nbsp;&nbsp;</span>		<span class="comment">// breaking ties with index sequence.</span>
+<span id="L1183" class="ln" data-content="  1183">&nbsp;&nbsp;</span>		if x[i].name != x[j].name {
+<span id="L1184" class="ln" data-content="  1184">&nbsp;&nbsp;</span>			return x[i].name &lt; x[j].name
+<span id="L1185" class="ln" data-content="  1185">&nbsp;&nbsp;</span>		}
+<span id="L1186" class="ln" data-content="  1186">&nbsp;&nbsp;</span>		if len(x[i].index) != len(x[j].index) {
+<span id="L1187" class="ln" data-content="  1187">&nbsp;&nbsp;</span>			return len(x[i].index) &lt; len(x[j].index)
+<span id="L1188" class="ln" data-content="  1188">&nbsp;&nbsp;</span>		}
+<span id="L1189" class="ln" data-content="  1189">&nbsp;&nbsp;</span>		if x[i].tag != x[j].tag {
+<span id="L1190" class="ln" data-content="  1190">&nbsp;&nbsp;</span>			return x[i].tag
+<span id="L1191" class="ln" data-content="  1191">&nbsp;&nbsp;</span>		}
+<span id="L1192" class="ln" data-content="  1192">&nbsp;&nbsp;</span>		return byIndex(x).Less(i, j)
+<span id="L1193" class="ln" data-content="  1193">&nbsp;&nbsp;</span>	})
+<span id="L1194" class="ln" data-content="  1194">&nbsp;&nbsp;</span>
+<span id="L1195" class="ln" data-content="  1195">&nbsp;&nbsp;</span>	<span class="comment">// Delete all fields that are hidden by the Go rules for embedded fields,</span>
+<span id="L1196" class="ln" data-content="  1196">&nbsp;&nbsp;</span>	<span class="comment">// except that fields with JSON tags are promoted.</span>
+<span id="L1197" class="ln" data-content="  1197">&nbsp;&nbsp;</span>
+<span id="L1198" class="ln" data-content="  1198">&nbsp;&nbsp;</span>	<span class="comment">// The fields are sorted in primary order of name, secondary order</span>
+<span id="L1199" class="ln" data-content="  1199">&nbsp;&nbsp;</span>	<span class="comment">// of field index length. Loop over names; for each name, delete</span>
+<span id="L1200" class="ln" data-content="  1200">&nbsp;&nbsp;</span>	<span class="comment">// hidden fields by choosing the one dominant field that survives.</span>
+<span id="L1201" class="ln" data-content="  1201">&nbsp;&nbsp;</span>	out := fields[:0]
+<span id="L1202" class="ln" data-content="  1202">&nbsp;&nbsp;</span>	for advance, i := 0, 0; i &lt; len(fields); i += advance {
+<span id="L1203" class="ln" data-content="  1203">&nbsp;&nbsp;</span>		<span class="comment">// One iteration per name.</span>
+<span id="L1204" class="ln" data-content="  1204">&nbsp;&nbsp;</span>		<span class="comment">// Find the sequence of fields with the name of this first field.</span>
+<span id="L1205" class="ln" data-content="  1205">&nbsp;&nbsp;</span>		fi := fields[i]
+<span id="L1206" class="ln" data-content="  1206">&nbsp;&nbsp;</span>		name := fi.name
+<span id="L1207" class="ln" data-content="  1207">&nbsp;&nbsp;</span>		for advance = 1; i+advance &lt; len(fields); advance++ {
+<span id="L1208" class="ln" data-content="  1208">&nbsp;&nbsp;</span>			fj := fields[i+advance]
+<span id="L1209" class="ln" data-content="  1209">&nbsp;&nbsp;</span>			if fj.name != name {
+<span id="L1210" class="ln" data-content="  1210">&nbsp;&nbsp;</span>				break
+<span id="L1211" class="ln" data-content="  1211">&nbsp;&nbsp;</span>			}
+<span id="L1212" class="ln" data-content="  1212">&nbsp;&nbsp;</span>		}
+<span id="L1213" class="ln" data-content="  1213">&nbsp;&nbsp;</span>		if advance == 1 { <span class="comment">// Only one field with this name</span>
+<span id="L1214" class="ln" data-content="  1214">&nbsp;&nbsp;</span>			out = append(out, fi)
+<span id="L1215" class="ln" data-content="  1215">&nbsp;&nbsp;</span>			continue
+<span id="L1216" class="ln" data-content="  1216">&nbsp;&nbsp;</span>		}
+<span id="L1217" class="ln" data-content="  1217">&nbsp;&nbsp;</span>		dominant, ok := dominantField(fields[i : i+advance])
+<span id="L1218" class="ln" data-content="  1218">&nbsp;&nbsp;</span>		if ok {
+<span id="L1219" class="ln" data-content="  1219">&nbsp;&nbsp;</span>			out = append(out, dominant)
+<span id="L1220" class="ln" data-content="  1220">&nbsp;&nbsp;</span>		}
+<span id="L1221" class="ln" data-content="  1221">&nbsp;&nbsp;</span>	}
+<span id="L1222" class="ln" data-content="  1222">&nbsp;&nbsp;</span>
+<span id="L1223" class="ln" data-content="  1223">&nbsp;&nbsp;</span>	fields = out
+<span id="L1224" class="ln" data-content="  1224">&nbsp;&nbsp;</span>	sort.Sort(byIndex(fields))
+<span id="L1225" class="ln" data-content="  1225">&nbsp;&nbsp;</span>
+<span id="L1226" class="ln" data-content="  1226">&nbsp;&nbsp;</span>	return fields
+<span id="L1227" class="ln" data-content="  1227">&nbsp;&nbsp;</span>}
+<span id="L1228" class="ln" data-content="  1228">&nbsp;&nbsp;</span>
+<span id="L1229" class="ln" data-content="  1229">&nbsp;&nbsp;</span><span class="comment">// isExported reports whether the identifier is exported.</span>
+<span id="L1230" class="ln" data-content="  1230">&nbsp;&nbsp;</span>func isExported(id string) bool {
+<span id="L1231" class="ln" data-content="  1231">&nbsp;&nbsp;</span>	r, _ := utf8.DecodeRuneInString(id)
+<span id="L1232" class="ln" data-content="  1232">&nbsp;&nbsp;</span>	return unicode.IsUpper(r)
+<span id="L1233" class="ln" data-content="  1233">&nbsp;&nbsp;</span>}
+<span id="L1234" class="ln" data-content="  1234">&nbsp;&nbsp;</span>
+<span id="L1235" class="ln" data-content="  1235">&nbsp;&nbsp;</span><span class="comment">// dominantField looks through the fields, all of which are known to</span>
+<span id="L1236" class="ln" data-content="  1236">&nbsp;&nbsp;</span><span class="comment">// have the same name, to find the single field that dominates the</span>
+<span id="L1237" class="ln" data-content="  1237">&nbsp;&nbsp;</span><span class="comment">// others using Go&#39;s embedding rules, modified by the presence of</span>
+<span id="L1238" class="ln" data-content="  1238">&nbsp;&nbsp;</span><span class="comment">// JSON tags. If there are multiple top-level fields, the boolean</span>
+<span id="L1239" class="ln" data-content="  1239">&nbsp;&nbsp;</span><span class="comment">// will be false: This condition is an error in Go and we skip all</span>
+<span id="L1240" class="ln" data-content="  1240">&nbsp;&nbsp;</span><span class="comment">// the fields.</span>
+<span id="L1241" class="ln" data-content="  1241">&nbsp;&nbsp;</span>func dominantField(fields []field) (field, bool) {
+<span id="L1242" class="ln" data-content="  1242">&nbsp;&nbsp;</span>	<span class="comment">// The fields are sorted in increasing index-length order. The winner</span>
+<span id="L1243" class="ln" data-content="  1243">&nbsp;&nbsp;</span>	<span class="comment">// must therefore be one with the shortest index length. Drop all</span>
+<span id="L1244" class="ln" data-content="  1244">&nbsp;&nbsp;</span>	<span class="comment">// longer entries, which is easy: just truncate the slice.</span>
+<span id="L1245" class="ln" data-content="  1245">&nbsp;&nbsp;</span>	length := len(fields[0].index)
+<span id="L1246" class="ln" data-content="  1246">&nbsp;&nbsp;</span>	tagged := -1 <span class="comment">// Index of first tagged field.</span>
+<span id="L1247" class="ln" data-content="  1247">&nbsp;&nbsp;</span>	for i, f := range fields {
+<span id="L1248" class="ln" data-content="  1248">&nbsp;&nbsp;</span>		if len(f.index) &gt; length {
+<span id="L1249" class="ln" data-content="  1249">&nbsp;&nbsp;</span>			fields = fields[:i]
+<span id="L1250" class="ln" data-content="  1250">&nbsp;&nbsp;</span>			break
+<span id="L1251" class="ln" data-content="  1251">&nbsp;&nbsp;</span>		}
+<span id="L1252" class="ln" data-content="  1252">&nbsp;&nbsp;</span>		if f.tag {
+<span id="L1253" class="ln" data-content="  1253">&nbsp;&nbsp;</span>			if tagged &gt;= 0 {
+<span id="L1254" class="ln" data-content="  1254">&nbsp;&nbsp;</span>				<span class="comment">// Multiple tagged fields at the same level: conflict.</span>
+<span id="L1255" class="ln" data-content="  1255">&nbsp;&nbsp;</span>				<span class="comment">// Return no field.</span>
+<span id="L1256" class="ln" data-content="  1256">&nbsp;&nbsp;</span>				return field{}, false
+<span id="L1257" class="ln" data-content="  1257">&nbsp;&nbsp;</span>			}
+<span id="L1258" class="ln" data-content="  1258">&nbsp;&nbsp;</span>			tagged = i
+<span id="L1259" class="ln" data-content="  1259">&nbsp;&nbsp;</span>		}
+<span id="L1260" class="ln" data-content="  1260">&nbsp;&nbsp;</span>	}
+<span id="L1261" class="ln" data-content="  1261">&nbsp;&nbsp;</span>	if tagged &gt;= 0 {
+<span id="L1262" class="ln" data-content="  1262">&nbsp;&nbsp;</span>		return fields[tagged], true
+<span id="L1263" class="ln" data-content="  1263">&nbsp;&nbsp;</span>	}
+<span id="L1264" class="ln" data-content="  1264">&nbsp;&nbsp;</span>	<span class="comment">// All remaining fields have the same length. If there&#39;s more than one,</span>
+<span id="L1265" class="ln" data-content="  1265">&nbsp;&nbsp;</span>	<span class="comment">// we have a conflict (two fields named &#34;X&#34; at the same level) and we</span>
+<span id="L1266" class="ln" data-content="  1266">&nbsp;&nbsp;</span>	<span class="comment">// return no field.</span>
+<span id="L1267" class="ln" data-content="  1267">&nbsp;&nbsp;</span>	if len(fields) &gt; 1 {
+<span id="L1268" class="ln" data-content="  1268">&nbsp;&nbsp;</span>		return field{}, false
+<span id="L1269" class="ln" data-content="  1269">&nbsp;&nbsp;</span>	}
+<span id="L1270" class="ln" data-content="  1270">&nbsp;&nbsp;</span>	return fields[0], true
+<span id="L1271" class="ln" data-content="  1271">&nbsp;&nbsp;</span>}
+<span id="L1272" class="ln" data-content="  1272">&nbsp;&nbsp;</span>
+<span id="L1273" class="ln" data-content="  1273">&nbsp;&nbsp;</span>var fieldCache struct {
+<span id="L1274" class="ln" data-content="  1274">&nbsp;&nbsp;</span>	value atomic.Value <span class="comment">// map[reflect.Type][]field</span>
+<span id="L1275" class="ln" data-content="  1275">&nbsp;&nbsp;</span>	mu    sync.Mutex   <span class="comment">// used only by writers</span>
+<span id="L1276" class="ln" data-content="  1276">&nbsp;&nbsp;</span>}
+<span id="L1277" class="ln" data-content="  1277">&nbsp;&nbsp;</span>
+<span id="L1278" class="ln" data-content="  1278">&nbsp;&nbsp;</span><span class="comment">// cachedTypeFields is like typeFields but uses a cache to avoid repeated work.</span>
+<span id="L1279" class="ln" data-content="  1279">&nbsp;&nbsp;</span>func cachedTypeFields(t reflect.Type) []field {
+<span id="L1280" class="ln" data-content="  1280">&nbsp;&nbsp;</span>	m, _ := fieldCache.value.Load().(map[reflect.Type][]field)
+<span id="L1281" class="ln" data-content="  1281">&nbsp;&nbsp;</span>	f := m[t]
+<span id="L1282" class="ln" data-content="  1282">&nbsp;&nbsp;</span>	if f != nil {
+<span id="L1283" class="ln" data-content="  1283">&nbsp;&nbsp;</span>		return f
+<span id="L1284" class="ln" data-content="  1284">&nbsp;&nbsp;</span>	}
+<span id="L1285" class="ln" data-content="  1285">&nbsp;&nbsp;</span>
+<span id="L1286" class="ln" data-content="  1286">&nbsp;&nbsp;</span>	<span class="comment">// Compute fields without lock.</span>
+<span id="L1287" class="ln" data-content="  1287">&nbsp;&nbsp;</span>	<span class="comment">// Might duplicate effort but won&#39;t hold other computations back.</span>
+<span id="L1288" class="ln" data-content="  1288">&nbsp;&nbsp;</span>	f = typeFields(t)
+<span id="L1289" class="ln" data-content="  1289">&nbsp;&nbsp;</span>	if f == nil {
+<span id="L1290" class="ln" data-content="  1290">&nbsp;&nbsp;</span>		f = []field{}
+<span id="L1291" class="ln" data-content="  1291">&nbsp;&nbsp;</span>	}
+<span id="L1292" class="ln" data-content="  1292">&nbsp;&nbsp;</span>
+<span id="L1293" class="ln" data-content="  1293">&nbsp;&nbsp;</span>	fieldCache.mu.Lock()
+<span id="L1294" class="ln" data-content="  1294">&nbsp;&nbsp;</span>	m, _ = fieldCache.value.Load().(map[reflect.Type][]field)
+<span id="L1295" class="ln" data-content="  1295">&nbsp;&nbsp;</span>	newM := make(map[reflect.Type][]field, len(m)+1)
+<span id="L1296" class="ln" data-content="  1296">&nbsp;&nbsp;</span>	for k, v := range m {
+<span id="L1297" class="ln" data-content="  1297">&nbsp;&nbsp;</span>		newM[k] = v
+<span id="L1298" class="ln" data-content="  1298">&nbsp;&nbsp;</span>	}
+<span id="L1299" class="ln" data-content="  1299">&nbsp;&nbsp;</span>	newM[t] = f
+<span id="L1300" class="ln" data-content="  1300">&nbsp;&nbsp;</span>	fieldCache.value.Store(newM)
+<span id="L1301" class="ln" data-content="  1301">&nbsp;&nbsp;</span>	fieldCache.mu.Unlock()
+<span id="L1302" class="ln" data-content="  1302">&nbsp;&nbsp;</span>	return f
+<span id="L1303" class="ln" data-content="  1303">&nbsp;&nbsp;</span>}
+<span id="L1304" class="ln" data-content="  1304">&nbsp;&nbsp;</span>
+</pre><p><a href="encode.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

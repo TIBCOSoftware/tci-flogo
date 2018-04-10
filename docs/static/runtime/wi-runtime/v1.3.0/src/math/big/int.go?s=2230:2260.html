@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/int.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./int.go%3Fs=2230:2260.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">int.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// This file implements signed multi-precision integers.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>package big
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>import (
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;math/rand&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>)
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// An Int represents a signed multi-precision integer.</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// The zero value for an Int represents the value 0.</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>type Int struct {
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	neg bool <span class="comment">// sign</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	abs nat  <span class="comment">// absolute value of the integer</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>}
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>var intOne = &amp;Int{false, natOne}
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span><span class="comment">// Sign returns:</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span><span class="comment">//	-1 if x &lt;  0</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span><span class="comment">//	 0 if x == 0</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span><span class="comment">//	+1 if x &gt;  0</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>func (x *Int) Sign() int {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	if len(x.abs) == 0 {
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>		return 0
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	}
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>		return -1
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	}
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	return 1
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>}
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span><span class="comment">// SetInt64 sets z to x and returns z.</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>func (z *Int) SetInt64(x int64) *Int {
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	neg := false
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	if x &lt; 0 {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>		neg = true
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>		x = -x
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	}
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	z.abs = z.abs.setUint64(uint64(x))
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	z.neg = neg
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	return z
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>}
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span><span class="comment">// SetUint64 sets z to x and returns z.</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>func (z *Int) SetUint64(x uint64) *Int {
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	z.abs = z.abs.setUint64(x)
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	return z
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>}
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span><span class="comment">// NewInt allocates and returns a new Int set to x.</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>func NewInt(x int64) *Int {
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	return new(Int).SetInt64(x)
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>}
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span><span class="comment">// Set sets z to x and returns z.</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>func (z *Int) Set(x *Int) *Int {
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	if z != x {
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		z.abs = z.abs.set(x.abs)
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>		z.neg = x.neg
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	}
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>	return z
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>}
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span><span class="comment">// Bits provides raw (unchecked but fast) access to x by returning its</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span><span class="comment">// absolute value as a little-endian Word slice. The result and x share</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span><span class="comment">// the same underlying array.</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span><span class="comment">// Bits is intended to support implementation of missing low-level Int</span>
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span><span class="comment">// functionality outside this package; it should be avoided otherwise.</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>func (x *Int) Bits() []Word {
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	return x.abs
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>}
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span><span class="comment">// SetBits provides raw (unchecked but fast) access to z by setting its</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span><span class="comment">// value to abs, interpreted as a little-endian Word slice, and returning</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span><span class="comment">// z. The result and abs share the same underlying array.</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span><span class="comment">// SetBits is intended to support implementation of missing low-level Int</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span><span class="comment">// functionality outside this package; it should be avoided otherwise.</span>
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>func (z *Int) SetBits(abs []Word) *Int {
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	z.abs = nat(abs).norm()
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	return z
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>}
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span><span class="comment">// Abs sets z to |x| (the absolute value of x) and returns z.</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>func (z *Int) Abs(x *Int) *Int {
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	z.Set(x)
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	return z
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>}
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span><span class="comment">// Neg sets z to -x and returns z.</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span><span class="selection">func (z *Int) Neg(x *Int) *Int</span> {
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	z.Set(x)
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	z.neg = len(z.abs) &gt; 0 &amp;&amp; !z.neg <span class="comment">// 0 has no sign</span>
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	return z
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>}
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span><span class="comment">// Add sets z to the sum x+y and returns z.</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>func (z *Int) Add(x, y *Int) *Int {
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>	neg := x.neg
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	if x.neg == y.neg {
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		<span class="comment">// x + y == x + y</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>		<span class="comment">// (-x) + (-y) == -(x + y)</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		z.abs = z.abs.add(x.abs, y.abs)
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>	} else {
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>		<span class="comment">// x + (-y) == x - y == -(y - x)</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		<span class="comment">// (-x) + y == y - x == -(x - y)</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>		if x.abs.cmp(y.abs) &gt;= 0 {
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>			z.abs = z.abs.sub(x.abs, y.abs)
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>		} else {
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>			neg = !neg
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>			z.abs = z.abs.sub(y.abs, x.abs)
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>		}
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	}
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	z.neg = len(z.abs) &gt; 0 &amp;&amp; neg <span class="comment">// 0 has no sign</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	return z
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>}
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span><span class="comment">// Sub sets z to the difference x-y and returns z.</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>func (z *Int) Sub(x, y *Int) *Int {
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	neg := x.neg
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	if x.neg != y.neg {
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>		<span class="comment">// x - (-y) == x + y</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>		<span class="comment">// (-x) - y == -(x + y)</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>		z.abs = z.abs.add(x.abs, y.abs)
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	} else {
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>		<span class="comment">// x - y == x - y == -(y - x)</span>
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>		<span class="comment">// (-x) - (-y) == y - x == -(x - y)</span>
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>		if x.abs.cmp(y.abs) &gt;= 0 {
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>			z.abs = z.abs.sub(x.abs, y.abs)
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>		} else {
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>			neg = !neg
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>			z.abs = z.abs.sub(y.abs, x.abs)
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		}
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	}
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	z.neg = len(z.abs) &gt; 0 &amp;&amp; neg <span class="comment">// 0 has no sign</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>	return z
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>}
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span><span class="comment">// Mul sets z to the product x*y and returns z.</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>func (z *Int) Mul(x, y *Int) *Int {
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	<span class="comment">// x * y == x * y</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>	<span class="comment">// x * (-y) == -(x * y)</span>
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	<span class="comment">// (-x) * y == -(x * y)</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	<span class="comment">// (-x) * (-y) == x * y</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>	z.abs = z.abs.mul(x.abs, y.abs)
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>	z.neg = len(z.abs) &gt; 0 &amp;&amp; x.neg != y.neg <span class="comment">// 0 has no sign</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>	return z
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>}
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span><span class="comment">// MulRange sets z to the product of all integers</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span><span class="comment">// in the range [a, b] inclusively and returns z.</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span><span class="comment">// If a &gt; b (empty range), the result is 1.</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>func (z *Int) MulRange(a, b int64) *Int {
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>	switch {
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	case a &gt; b:
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>		return z.SetInt64(1) <span class="comment">// empty range</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	case a &lt;= 0 &amp;&amp; b &gt;= 0:
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>		return z.SetInt64(0) <span class="comment">// range includes 0</span>
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	}
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	<span class="comment">// a &lt;= b &amp;&amp; (b &lt; 0 || a &gt; 0)</span>
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	neg := false
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>	if a &lt; 0 {
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		neg = (b-a)&amp;1 == 0
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		a, b = -b, -a
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	}
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>	z.abs = z.abs.mulRange(uint64(a), uint64(b))
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	z.neg = neg
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	return z
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span><span class="comment">// Binomial sets z to the binomial coefficient of (n, k) and returns z.</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>func (z *Int) Binomial(n, k int64) *Int {
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	<span class="comment">// reduce the number of multiplications by reducing k</span>
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	if n/2 &lt; k &amp;&amp; k &lt;= n {
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>		k = n - k <span class="comment">// Binomial(n, k) == Binomial(n, n-k)</span>
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	}
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	var a, b Int
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	a.MulRange(n-k+1, n)
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>	b.MulRange(1, k)
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>	return z.Quo(&amp;a, &amp;b)
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>}
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span><span class="comment">// Quo sets z to the quotient x/y for y != 0 and returns z.</span>
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span><span class="comment">// If y == 0, a division-by-zero run-time panic occurs.</span>
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span><span class="comment">// Quo implements truncated division (like Go); see QuoRem for more details.</span>
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>func (z *Int) Quo(x, y *Int) *Int {
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	z.abs, _ = z.abs.div(nil, x.abs, y.abs)
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	z.neg = len(z.abs) &gt; 0 &amp;&amp; x.neg != y.neg <span class="comment">// 0 has no sign</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	return z
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>}
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span><span class="comment">// Rem sets z to the remainder x%y for y != 0 and returns z.</span>
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span><span class="comment">// If y == 0, a division-by-zero run-time panic occurs.</span>
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span><span class="comment">// Rem implements truncated modulus (like Go); see QuoRem for more details.</span>
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>func (z *Int) Rem(x, y *Int) *Int {
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	_, z.abs = nat(nil).div(z.abs, x.abs, y.abs)
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	z.neg = len(z.abs) &gt; 0 &amp;&amp; x.neg <span class="comment">// 0 has no sign</span>
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	return z
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>}
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span><span class="comment">// QuoRem sets z to the quotient x/y and r to the remainder x%y</span>
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span><span class="comment">// and returns the pair (z, r) for y != 0.</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span><span class="comment">// If y == 0, a division-by-zero run-time panic occurs.</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span><span class="comment">// QuoRem implements T-division and modulus (like Go):</span>
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span><span class="comment">//	q = x/y      with the result truncated to zero</span>
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span><span class="comment">//	r = x - y*q</span>
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span><span class="comment">// (See Daan Leijen, ``Division and Modulus for Computer Scientists&#39;&#39;.)</span>
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span><span class="comment">// See DivMod for Euclidean division and modulus (unlike Go).</span>
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>func (z *Int) QuoRem(x, y, r *Int) (*Int, *Int) {
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	z.abs, r.abs = z.abs.div(r.abs, x.abs, y.abs)
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	z.neg, r.neg = len(z.abs) &gt; 0 &amp;&amp; x.neg != y.neg, len(r.abs) &gt; 0 &amp;&amp; x.neg <span class="comment">// 0 has no sign</span>
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	return z, r
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>}
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span><span class="comment">// Div sets z to the quotient x/y for y != 0 and returns z.</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span><span class="comment">// If y == 0, a division-by-zero run-time panic occurs.</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span><span class="comment">// Div implements Euclidean division (unlike Go); see DivMod for more details.</span>
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>func (z *Int) Div(x, y *Int) *Int {
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	y_neg := y.neg <span class="comment">// z may be an alias for y</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	var r Int
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	z.QuoRem(x, y, &amp;r)
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	if r.neg {
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>		if y_neg {
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>			z.Add(z, intOne)
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>		} else {
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>			z.Sub(z, intOne)
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>		}
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	}
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	return z
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>}
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span><span class="comment">// Mod sets z to the modulus x%y for y != 0 and returns z.</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span><span class="comment">// If y == 0, a division-by-zero run-time panic occurs.</span>
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span><span class="comment">// Mod implements Euclidean modulus (unlike Go); see DivMod for more details.</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>func (z *Int) Mod(x, y *Int) *Int {
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	y0 := y <span class="comment">// save y</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	if z == y || alias(z.abs, y.abs) {
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>		y0 = new(Int).Set(y)
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	}
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	var q Int
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	q.QuoRem(x, y, z)
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	if z.neg {
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>		if y0.neg {
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>			z.Sub(z, y0)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>		} else {
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>			z.Add(z, y0)
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>		}
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	}
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	return z
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>}
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span><span class="comment">// DivMod sets z to the quotient x div y and m to the modulus x mod y</span>
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span><span class="comment">// and returns the pair (z, m) for y != 0.</span>
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span><span class="comment">// If y == 0, a division-by-zero run-time panic occurs.</span>
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span><span class="comment">// DivMod implements Euclidean division and modulus (unlike Go):</span>
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span><span class="comment">//	q = x div y  such that</span>
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span><span class="comment">//	m = x - y*q  with 0 &lt;= m &lt; |y|</span>
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span><span class="comment">// (See Raymond T. Boute, ``The Euclidean definition of the functions</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span><span class="comment">// div and mod&#39;&#39;. ACM Transactions on Programming Languages and</span>
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span><span class="comment">// Systems (TOPLAS), 14(2):127-144, New York, NY, USA, 4/1992.</span>
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span><span class="comment">// ACM press.)</span>
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span><span class="comment">// See QuoRem for T-division and modulus (like Go).</span>
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>func (z *Int) DivMod(x, y, m *Int) (*Int, *Int) {
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	y0 := y <span class="comment">// save y</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	if z == y || alias(z.abs, y.abs) {
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		y0 = new(Int).Set(y)
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>	}
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>	z.QuoRem(x, y, m)
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>	if m.neg {
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>		if y0.neg {
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>			z.Add(z, intOne)
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>			m.Sub(m, y0)
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>		} else {
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>			z.Sub(z, intOne)
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>			m.Add(m, y0)
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		}
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	}
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	return z, m
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>}
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span><span class="comment">// Cmp compares x and y and returns:</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span><span class="comment">//   -1 if x &lt;  y</span>
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span><span class="comment">//    0 if x == y</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span><span class="comment">//   +1 if x &gt;  y</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>func (x *Int) Cmp(y *Int) (r int) {
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	<span class="comment">// x cmp y == x cmp y</span>
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	<span class="comment">// x cmp (-y) == x</span>
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	<span class="comment">// (-x) cmp y == y</span>
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	<span class="comment">// (-x) cmp (-y) == -(x cmp y)</span>
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>	switch {
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	case x.neg == y.neg:
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		r = x.abs.cmp(y.abs)
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>			r = -r
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		}
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>	case x.neg:
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>		r = -1
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	default:
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>		r = 1
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	}
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>	return
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>}
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span><span class="comment">// low32 returns the least significant 32 bits of x.</span>
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>func low32(x nat) uint32 {
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>	if len(x) == 0 {
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>		return 0
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	}
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	return uint32(x[0])
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>}
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span><span class="comment">// low64 returns the least significant 64 bits of x.</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>func low64(x nat) uint64 {
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	if len(x) == 0 {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		return 0
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	}
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	v := uint64(x[0])
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	if _W == 32 &amp;&amp; len(x) &gt; 1 {
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>		return uint64(x[1])&lt;&lt;32 | v
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	}
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>	return v
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>}
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span><span class="comment">// Int64 returns the int64 representation of x.</span>
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span><span class="comment">// If x cannot be represented in an int64, the result is undefined.</span>
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>func (x *Int) Int64() int64 {
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	v := int64(low64(x.abs))
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		v = -v
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	}
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>	return v
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>}
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span><span class="comment">// Uint64 returns the uint64 representation of x.</span>
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span><span class="comment">// If x cannot be represented in a uint64, the result is undefined.</span>
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>func (x *Int) Uint64() uint64 {
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	return low64(x.abs)
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>}
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span><span class="comment">// IsInt64 reports whether x can be represented as an int64.</span>
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>func (x *Int) IsInt64() bool {
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	if len(x.abs) &lt;= 64/_W {
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>		w := int64(low64(x.abs))
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>		return w &gt;= 0 || x.neg &amp;&amp; w == -w
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	}
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	return false
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>}
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span><span class="comment">// IsUint64 reports whether x can be represented as a uint64.</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>func (x *Int) IsUint64() bool {
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	return !x.neg &amp;&amp; len(x.abs) &lt;= 64/_W
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>}
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span><span class="comment">// SetString sets z to the value of s, interpreted in the given base,</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span><span class="comment">// and returns z and a boolean indicating success. The entire string</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span><span class="comment">// (not just a prefix) must be valid for success. If SetString fails,</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span><span class="comment">// the value of z is undefined but the returned value is nil.</span>
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span><span class="comment">// The base argument must be 0 or a value between 2 and MaxBase. If the base</span>
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span><span class="comment">// is 0, the string prefix determines the actual conversion base. A prefix of</span>
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span><span class="comment">// ``0x&#39;&#39; or ``0X&#39;&#39; selects base 16; the ``0&#39;&#39; prefix selects base 8, and a</span>
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span><span class="comment">// ``0b&#39;&#39; or ``0B&#39;&#39; prefix selects base 2. Otherwise the selected base is 10.</span>
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>func (z *Int) SetString(s string, base int) (*Int, bool) {
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	r := strings.NewReader(s)
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>	if _, _, err := z.scan(r, base); err != nil {
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>		return nil, false
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>	}
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	<span class="comment">// entire string must have been consumed</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>	if _, err := r.ReadByte(); err != io.EOF {
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>		return nil, false
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>	}
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>	return z, true <span class="comment">// err == io.EOF =&gt; scan consumed all of s</span>
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>}
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span><span class="comment">// SetBytes interprets buf as the bytes of a big-endian unsigned</span>
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span><span class="comment">// integer, sets z to that value, and returns z.</span>
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>func (z *Int) SetBytes(buf []byte) *Int {
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	z.abs = z.abs.setBytes(buf)
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>	return z
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>}
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span><span class="comment">// Bytes returns the absolute value of x as a big-endian byte slice.</span>
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>func (x *Int) Bytes() []byte {
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>	buf := make([]byte, len(x.abs)*_S)
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>	return buf[x.abs.bytes(buf):]
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>}
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span><span class="comment">// BitLen returns the length of the absolute value of x in bits.</span>
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span><span class="comment">// The bit length of 0 is 0.</span>
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>func (x *Int) BitLen() int {
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>	return x.abs.bitLen()
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>}
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span><span class="comment">// Exp sets z = x**y mod |m| (i.e. the sign of m is ignored), and returns z.</span>
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span><span class="comment">// If y &lt;= 0, the result is 1 mod |m|; if m == nil or m == 0, z = x**y.</span>
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span><span class="comment">// Modular exponentation of inputs of a particular size is not a</span>
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span><span class="comment">// cryptographically constant-time operation.</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>func (z *Int) Exp(x, y, m *Int) *Int {
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>	<span class="comment">// See Knuth, volume 2, section 4.6.3.</span>
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>	var yWords nat
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>	if !y.neg {
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>		yWords = y.abs
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>	}
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	<span class="comment">// y &gt;= 0</span>
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>	var mWords nat
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	if m != nil {
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>		mWords = m.abs <span class="comment">// m.abs may be nil for m == 0</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	}
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>	z.abs = z.abs.expNN(x.abs, yWords, mWords)
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>	z.neg = len(z.abs) &gt; 0 &amp;&amp; x.neg &amp;&amp; len(yWords) &gt; 0 &amp;&amp; yWords[0]&amp;1 == 1 <span class="comment">// 0 has no sign</span>
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>	if z.neg &amp;&amp; len(mWords) &gt; 0 {
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>		<span class="comment">// make modulus result positive</span>
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>		z.abs = z.abs.sub(mWords, z.abs) <span class="comment">// z == x**y mod |m| &amp;&amp; 0 &lt;= z &lt; |m|</span>
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	}
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	return z
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>}
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span><span class="comment">// GCD sets z to the greatest common divisor of a and b, which both must</span>
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span><span class="comment">// be &gt; 0, and returns z.</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span><span class="comment">// If x and y are not nil, GCD sets x and y such that z = a*x + b*y.</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span><span class="comment">// If either a or b is &lt;= 0, GCD sets z = x = y = 0.</span>
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>func (z *Int) GCD(x, y, a, b *Int) *Int {
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>	if a.Sign() &lt;= 0 || b.Sign() &lt;= 0 {
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>		z.SetInt64(0)
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>		if x != nil {
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>			x.SetInt64(0)
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>		}
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>		if y != nil {
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>			y.SetInt64(0)
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>		}
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>		return z
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>	}
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>	if x == nil &amp;&amp; y == nil {
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>		return z.binaryGCD(a, b)
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>	}
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>	A := new(Int).Set(a)
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>	B := new(Int).Set(b)
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>	X := new(Int)
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>	Y := new(Int).SetInt64(1)
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>	lastX := new(Int).SetInt64(1)
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	lastY := new(Int)
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>	q := new(Int)
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>	temp := new(Int)
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	r := new(Int)
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	for len(B.abs) &gt; 0 {
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		q, r = q.QuoRem(A, B, r)
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>		A, B, r = B, r, A
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>		temp.Set(X)
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		X.Mul(X, q)
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>		X.neg = !X.neg
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>		X.Add(X, lastX)
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>		lastX.Set(temp)
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>		temp.Set(Y)
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>		Y.Mul(Y, q)
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>		Y.neg = !Y.neg
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>		Y.Add(Y, lastY)
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>		lastY.Set(temp)
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>	}
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>	if x != nil {
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>		*x = *lastX
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>	}
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>	if y != nil {
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>		*y = *lastY
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>	}
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>	*z = *A
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>	return z
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>}
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span><span class="comment">// binaryGCD sets z to the greatest common divisor of a and b, which both must</span>
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span><span class="comment">// be &gt; 0, and returns z.</span>
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span><span class="comment">// See Knuth, The Art of Computer Programming, Vol. 2, Section 4.5.2, Algorithm B.</span>
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>func (z *Int) binaryGCD(a, b *Int) *Int {
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>	u := z
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>	v := new(Int)
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>	<span class="comment">// use one Euclidean iteration to ensure that u and v are approx. the same size</span>
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>	switch {
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>	case len(a.abs) &gt; len(b.abs):
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>		<span class="comment">// must set v before u since u may be alias for a or b (was issue #11284)</span>
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>		v.Rem(a, b)
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>		u.Set(b)
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>	case len(a.abs) &lt; len(b.abs):
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>		v.Rem(b, a)
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>		u.Set(a)
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>	default:
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>		v.Set(b)
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>		u.Set(a)
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>	}
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>	<span class="comment">// a, b must not be used anymore (may be aliases with u)</span>
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>	<span class="comment">// v might be 0 now</span>
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>	if len(v.abs) == 0 {
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>		return u
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>	}
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>	<span class="comment">// u &gt; 0 &amp;&amp; v &gt; 0</span>
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>	<span class="comment">// determine largest k such that u = u&#39; &lt;&lt; k, v = v&#39; &lt;&lt; k</span>
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	k := u.abs.trailingZeroBits()
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	if vk := v.abs.trailingZeroBits(); vk &lt; k {
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>		k = vk
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>	}
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	u.Rsh(u, k)
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>	v.Rsh(v, k)
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>	<span class="comment">// determine t (we know that u &gt; 0)</span>
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>	t := new(Int)
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>	if u.abs[0]&amp;1 != 0 {
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>		<span class="comment">// u is odd</span>
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>		t.Neg(v)
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>	} else {
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>		t.Set(u)
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>	}
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>	for len(t.abs) &gt; 0 {
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>		<span class="comment">// reduce t</span>
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>		t.Rsh(t, t.abs.trailingZeroBits())
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>		if t.neg {
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>			v, t = t, v
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>			v.neg = len(v.abs) &gt; 0 &amp;&amp; !v.neg <span class="comment">// 0 has no sign</span>
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>		} else {
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>			u, t = t, u
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>		}
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>		t.Sub(u, v)
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	}
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>	return z.Lsh(u, k)
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>}
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span><span class="comment">// Rand sets z to a pseudo-random number in [0, n) and returns z.</span>
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>func (z *Int) Rand(rnd *rand.Rand, n *Int) *Int {
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>	if n.neg || len(n.abs) == 0 {
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		z.abs = nil
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>		return z
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>	}
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>	z.abs = z.abs.random(rnd, n.abs, n.abs.bitLen())
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>	return z
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>}
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span><span class="comment">// ModInverse sets z to the multiplicative inverse of g in the ring ℤ/nℤ</span>
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span><span class="comment">// and returns z. If g and n are not relatively prime, the result is undefined.</span>
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>func (z *Int) ModInverse(g, n *Int) *Int {
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>	if g.neg {
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>		<span class="comment">// GCD expects parameters a and b to be &gt; 0.</span>
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>		var g2 Int
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>		g = g2.Mod(g, n)
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>	}
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>	var d Int
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>	d.GCD(z, nil, g, n)
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>	<span class="comment">// x and y are such that g*x + n*y = d. Since g and n are</span>
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>	<span class="comment">// relatively prime, d = 1. Taking that modulo n results in</span>
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>	<span class="comment">// g*x = 1, therefore x is the inverse element.</span>
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>	if z.neg {
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>		z.Add(z, n)
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>	}
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>	return z
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>}
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span><span class="comment">// Jacobi returns the Jacobi symbol (x/y), either +1, -1, or 0.</span>
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span><span class="comment">// The y argument must be an odd integer.</span>
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>func Jacobi(x, y *Int) int {
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>	if len(y.abs) == 0 || y.abs[0]&amp;1 == 0 {
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>		panic(fmt.Sprintf(&#34;big: invalid 2nd argument to Int.Jacobi: need odd integer but got %s&#34;, y))
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>	}
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>	<span class="comment">// We use the formulation described in chapter 2, section 2.4,</span>
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>	<span class="comment">// &#34;The Yacas Book of Algorithms&#34;:</span>
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>	<span class="comment">// http://yacas.sourceforge.net/Algo.book.pdf</span>
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>	var a, b, c Int
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>	a.Set(x)
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>	b.Set(y)
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>	j := 1
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>	if b.neg {
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>		if a.neg {
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>			j = -1
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>		}
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>		b.neg = false
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>	}
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>	for {
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>		if b.Cmp(intOne) == 0 {
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>			return j
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>		}
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>		if len(a.abs) == 0 {
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>			return 0
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>		}
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>		a.Mod(&amp;a, &amp;b)
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>		if len(a.abs) == 0 {
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>			return 0
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>		}
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>		<span class="comment">// a &gt; 0</span>
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>		<span class="comment">// handle factors of 2 in &#39;a&#39;</span>
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>		s := a.abs.trailingZeroBits()
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>		if s&amp;1 != 0 {
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>			bmod8 := b.abs[0] &amp; 7
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>			if bmod8 == 3 || bmod8 == 5 {
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>				j = -j
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>			}
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>		}
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>		c.Rsh(&amp;a, s) <span class="comment">// a = 2^s*c</span>
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>		<span class="comment">// swap numerator and denominator</span>
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>		if b.abs[0]&amp;3 == 3 &amp;&amp; c.abs[0]&amp;3 == 3 {
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>			j = -j
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>		}
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>		a.Set(&amp;b)
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>		b.Set(&amp;c)
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>	}
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>}
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span><span class="comment">// modSqrt3Mod4 uses the identity</span>
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span><span class="comment">//      (a^((p+1)/4))^2  mod p</span>
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span><span class="comment">//   == u^(p+1)          mod p</span>
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span><span class="comment">//   == u^2              mod p</span>
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span><span class="comment">// to calculate the square root of any quadratic residue mod p quickly for 3</span>
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span><span class="comment">// mod 4 primes.</span>
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>func (z *Int) modSqrt3Mod4Prime(x, p *Int) *Int {
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>	z.Set(p)         <span class="comment">// z = p</span>
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>	z.Add(z, intOne) <span class="comment">// z = p + 1</span>
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>	z.Rsh(z, 2)      <span class="comment">// z = (p + 1) / 4</span>
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>	z.Exp(x, z, p)   <span class="comment">// z = x^z mod p</span>
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>	return z
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>}
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span><span class="comment">// modSqrtTonelliShanks uses the Tonelli-Shanks algorithm to find the square</span>
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span><span class="comment">// root of a quadratic residue modulo any prime.</span>
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>func (z *Int) modSqrtTonelliShanks(x, p *Int) *Int {
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>	<span class="comment">// Break p-1 into s*2^e such that s is odd.</span>
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>	var s Int
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	s.Sub(p, intOne)
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>	e := s.abs.trailingZeroBits()
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>	s.Rsh(&amp;s, e)
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>	<span class="comment">// find some non-square n</span>
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>	var n Int
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>	n.SetInt64(2)
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>	for Jacobi(&amp;n, p) != -1 {
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>		n.Add(&amp;n, intOne)
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>	}
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>	<span class="comment">// Core of the Tonelli-Shanks algorithm. Follows the description in</span>
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>	<span class="comment">// section 6 of &#34;Square roots from 1; 24, 51, 10 to Dan Shanks&#34; by Ezra</span>
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>	<span class="comment">// Brown:</span>
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	<span class="comment">// https://www.maa.org/sites/default/files/pdf/upload_library/22/Polya/07468342.di020786.02p0470a.pdf</span>
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>	var y, b, g, t Int
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>	y.Add(&amp;s, intOne)
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>	y.Rsh(&amp;y, 1)
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>	y.Exp(x, &amp;y, p)  <span class="comment">// y = x^((s+1)/2)</span>
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>	b.Exp(x, &amp;s, p)  <span class="comment">// b = x^s</span>
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>	g.Exp(&amp;n, &amp;s, p) <span class="comment">// g = n^s</span>
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>	r := e
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>	for {
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>		<span class="comment">// find the least m such that ord_p(b) = 2^m</span>
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>		var m uint
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>		t.Set(&amp;b)
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>		for t.Cmp(intOne) != 0 {
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>			t.Mul(&amp;t, &amp;t).Mod(&amp;t, p)
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>			m++
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>		}
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>		if m == 0 {
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>			return z.Set(&amp;y)
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>		}
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>		t.SetInt64(0).SetBit(&amp;t, int(r-m-1), 1).Exp(&amp;g, &amp;t, p)
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>		<span class="comment">// t = g^(2^(r-m-1)) mod p</span>
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>		g.Mul(&amp;t, &amp;t).Mod(&amp;g, p) <span class="comment">// g = g^(2^(r-m)) mod p</span>
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>		y.Mul(&amp;y, &amp;t).Mod(&amp;y, p)
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>		b.Mul(&amp;b, &amp;g).Mod(&amp;b, p)
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>		r = m
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>	}
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>}
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span><span class="comment">// ModSqrt sets z to a square root of x mod p if such a square root exists, and</span>
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span><span class="comment">// returns z. The modulus p must be an odd prime. If x is not a square mod p,</span>
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span><span class="comment">// ModSqrt leaves z unchanged and returns nil. This function panics if p is</span>
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span><span class="comment">// not an odd integer.</span>
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>func (z *Int) ModSqrt(x, p *Int) *Int {
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>	switch Jacobi(x, p) {
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>	case -1:
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>		return nil <span class="comment">// x is not a square mod p</span>
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>	case 0:
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>		return z.SetInt64(0) <span class="comment">// sqrt(0) mod p = 0</span>
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>	case 1:
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>		break
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>	}
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>	if x.neg || x.Cmp(p) &gt;= 0 { <span class="comment">// ensure 0 &lt;= x &lt; p</span>
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>		x = new(Int).Mod(x, p)
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>	}
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>	<span class="comment">// Check whether p is 3 mod 4, and if so, use the faster algorithm.</span>
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>	if len(p.abs) &gt; 0 &amp;&amp; p.abs[0]%4 == 3 {
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>		return z.modSqrt3Mod4Prime(x, p)
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>	}
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>	<span class="comment">// Otherwise, use Tonelli-Shanks.</span>
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>	return z.modSqrtTonelliShanks(x, p)
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>}
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span><span class="comment">// Lsh sets z = x &lt;&lt; n and returns z.</span>
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>func (z *Int) Lsh(x *Int, n uint) *Int {
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>	z.abs = z.abs.shl(x.abs, n)
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>	z.neg = x.neg
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>	return z
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>}
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span><span class="comment">// Rsh sets z = x &gt;&gt; n and returns z.</span>
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>func (z *Int) Rsh(x *Int, n uint) *Int {
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>		<span class="comment">// (-x) &gt;&gt; s == ^(x-1) &gt;&gt; s == ^((x-1) &gt;&gt; s) == -(((x-1) &gt;&gt; s) + 1)</span>
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>		t := z.abs.sub(x.abs, natOne) <span class="comment">// no underflow because |x| &gt; 0</span>
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>		t = t.shr(t, n)
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>		z.abs = t.add(t, natOne)
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>		z.neg = true <span class="comment">// z cannot be zero if x is negative</span>
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>		return z
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>	}
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>	z.abs = z.abs.shr(x.abs, n)
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>	return z
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>}
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span><span class="comment">// Bit returns the value of the i&#39;th bit of x. That is, it</span>
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span><span class="comment">// returns (x&gt;&gt;i)&amp;1. The bit index i must be &gt;= 0.</span>
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>func (x *Int) Bit(i int) uint {
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>	if i == 0 {
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>		<span class="comment">// optimization for common case: odd/even test of x</span>
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>		if len(x.abs) &gt; 0 {
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>			return uint(x.abs[0] &amp; 1) <span class="comment">// bit 0 is same for -x</span>
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>		}
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>		return 0
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>	}
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>	if i &lt; 0 {
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>		panic(&#34;negative bit index&#34;)
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>	}
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>		t := nat(nil).sub(x.abs, natOne)
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>		return t.bit(uint(i)) ^ 1
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>	}
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>	return x.abs.bit(uint(i))
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>}
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span><span class="comment">// SetBit sets z to x, with x&#39;s i&#39;th bit set to b (0 or 1).</span>
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span><span class="comment">// That is, if b is 1 SetBit sets z = x | (1 &lt;&lt; i);</span>
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span><span class="comment">// if b is 0 SetBit sets z = x &amp;^ (1 &lt;&lt; i). If b is not 0 or 1,</span>
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span><span class="comment">// SetBit will panic.</span>
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>func (z *Int) SetBit(x *Int, i int, b uint) *Int {
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>	if i &lt; 0 {
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>		panic(&#34;negative bit index&#34;)
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>	}
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>		t := z.abs.sub(x.abs, natOne)
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>		t = t.setBit(t, uint(i), b^1)
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>		z.abs = t.add(t, natOne)
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>		z.neg = len(z.abs) &gt; 0
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>		return z
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>	}
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>	z.abs = z.abs.setBit(x.abs, uint(i), b)
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>	return z
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>}
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span><span class="comment">// And sets z = x &amp; y and returns z.</span>
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>func (z *Int) And(x, y *Int) *Int {
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>	if x.neg == y.neg {
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>			<span class="comment">// (-x) &amp; (-y) == ^(x-1) &amp; ^(y-1) == ^((x-1) | (y-1)) == -(((x-1) | (y-1)) + 1)</span>
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>			x1 := nat(nil).sub(x.abs, natOne)
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>			y1 := nat(nil).sub(y.abs, natOne)
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>			z.abs = z.abs.add(z.abs.or(x1, y1), natOne)
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>			z.neg = true <span class="comment">// z cannot be zero if x and y are negative</span>
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>			return z
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>		}
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>		<span class="comment">// x &amp; y == x &amp; y</span>
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>		z.abs = z.abs.and(x.abs, y.abs)
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>		return z
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>	}
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>	<span class="comment">// x.neg != y.neg</span>
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>		x, y = y, x <span class="comment">// &amp; is symmetric</span>
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>	}
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>	<span class="comment">// x &amp; (-y) == x &amp; ^(y-1) == x &amp;^ (y-1)</span>
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>	y1 := nat(nil).sub(y.abs, natOne)
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>	z.abs = z.abs.andNot(x.abs, y1)
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>	return z
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>}
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span><span class="comment">// AndNot sets z = x &amp;^ y and returns z.</span>
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>func (z *Int) AndNot(x, y *Int) *Int {
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>	if x.neg == y.neg {
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>			<span class="comment">// (-x) &amp;^ (-y) == ^(x-1) &amp;^ ^(y-1) == ^(x-1) &amp; (y-1) == (y-1) &amp;^ (x-1)</span>
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>			x1 := nat(nil).sub(x.abs, natOne)
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>			y1 := nat(nil).sub(y.abs, natOne)
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>			z.abs = z.abs.andNot(y1, x1)
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>			z.neg = false
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>			return z
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>		}
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>		<span class="comment">// x &amp;^ y == x &amp;^ y</span>
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>		z.abs = z.abs.andNot(x.abs, y.abs)
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>		return z
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>	}
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>		<span class="comment">// (-x) &amp;^ y == ^(x-1) &amp;^ y == ^(x-1) &amp; ^y == ^((x-1) | y) == -(((x-1) | y) + 1)</span>
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>		x1 := nat(nil).sub(x.abs, natOne)
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>		z.abs = z.abs.add(z.abs.or(x1, y.abs), natOne)
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>		z.neg = true <span class="comment">// z cannot be zero if x is negative and y is positive</span>
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>		return z
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>	}
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>	<span class="comment">// x &amp;^ (-y) == x &amp;^ ^(y-1) == x &amp; (y-1)</span>
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>	y1 := nat(nil).sub(y.abs, natOne)
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>	z.abs = z.abs.and(x.abs, y1)
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>	return z
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>}
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span><span class="comment">// Or sets z = x | y and returns z.</span>
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>func (z *Int) Or(x, y *Int) *Int {
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>	if x.neg == y.neg {
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>			<span class="comment">// (-x) | (-y) == ^(x-1) | ^(y-1) == ^((x-1) &amp; (y-1)) == -(((x-1) &amp; (y-1)) + 1)</span>
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>			x1 := nat(nil).sub(x.abs, natOne)
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>			y1 := nat(nil).sub(y.abs, natOne)
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>			z.abs = z.abs.add(z.abs.and(x1, y1), natOne)
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>			z.neg = true <span class="comment">// z cannot be zero if x and y are negative</span>
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>			return z
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>		}
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span>		<span class="comment">// x | y == x | y</span>
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>		z.abs = z.abs.or(x.abs, y.abs)
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>		return z
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>	}
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>	<span class="comment">// x.neg != y.neg</span>
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>		x, y = y, x <span class="comment">// | is symmetric</span>
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>	}
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>	<span class="comment">// x | (-y) == x | ^(y-1) == ^((y-1) &amp;^ x) == -(^((y-1) &amp;^ x) + 1)</span>
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>	y1 := nat(nil).sub(y.abs, natOne)
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>	z.abs = z.abs.add(z.abs.andNot(y1, x.abs), natOne)
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>	z.neg = true <span class="comment">// z cannot be zero if one of x or y is negative</span>
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>	return z
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>}
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span><span class="comment">// Xor sets z = x ^ y and returns z.</span>
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>func (z *Int) Xor(x, y *Int) *Int {
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>	if x.neg == y.neg {
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>		if x.neg {
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>			<span class="comment">// (-x) ^ (-y) == ^(x-1) ^ ^(y-1) == (x-1) ^ (y-1)</span>
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>			x1 := nat(nil).sub(x.abs, natOne)
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>			y1 := nat(nil).sub(y.abs, natOne)
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>			z.abs = z.abs.xor(x1, y1)
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>			z.neg = false
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>			return z
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>		}
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>		<span class="comment">// x ^ y == x ^ y</span>
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>		z.abs = z.abs.xor(x.abs, y.abs)
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>		return z
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>	}
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>	<span class="comment">// x.neg != y.neg</span>
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>		x, y = y, x <span class="comment">// ^ is symmetric</span>
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>	}
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>	<span class="comment">// x ^ (-y) == x ^ ^(y-1) == ^(x ^ (y-1)) == -((x ^ (y-1)) + 1)</span>
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>	y1 := nat(nil).sub(y.abs, natOne)
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>	z.abs = z.abs.add(z.abs.xor(x.abs, y1), natOne)
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>	z.neg = true <span class="comment">// z cannot be zero if only one of x or y is negative</span>
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>	return z
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>}
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span><span class="comment">// Not sets z = ^x and returns z.</span>
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>func (z *Int) Not(x *Int) *Int {
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>		<span class="comment">// ^(-x) == ^(^(x-1)) == x-1</span>
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>		z.abs = z.abs.sub(x.abs, natOne)
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>		z.neg = false
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>		return z
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>	}
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>	<span class="comment">// ^x == -x-1 == -(x+1)</span>
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>	z.abs = z.abs.add(x.abs, natOne)
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>	z.neg = true <span class="comment">// z cannot be zero if x is positive</span>
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span>	return z
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>}
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span><span class="comment">// Sqrt sets z to ⌊√x⌋, the largest integer such that z² ≤ x, and returns z.</span>
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span><span class="comment">// It panics if x is negative.</span>
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>func (z *Int) Sqrt(x *Int) *Int {
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>		panic(&#34;square root of negative number&#34;)
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>	}
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>	z.neg = false
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>	z.abs = z.abs.sqrt(x.abs)
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>	return z
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>}
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>
+</pre><p><a href="int.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

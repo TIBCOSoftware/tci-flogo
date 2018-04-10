@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/aes/asm_ppc64le.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="asm_ppc64le.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../aes.1.html">aes</a>/<span class="text-muted">asm_ppc64le.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/aes.1.html">crypto/aes</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2016 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	// This is a derived work from OpenSSL of AES using assembly optimizations. The
+<span id="L6" class="ln">     6</span>	// original code was written by Andy Polyakov &lt;appro@openssl.org&gt; and it&#39;s dual
+<span id="L7" class="ln">     7</span>	// licensed under OpenSSL and CRYPTOGAMS licenses depending on where you obtain
+<span id="L8" class="ln">     8</span>	// it. For further details see http://www.openssl.org/~appro/cryptogams/.
+<span id="L9" class="ln">     9</span>	
+<span id="L10" class="ln">    10</span>	// Original code can be found at the link below:
+<span id="L11" class="ln">    11</span>	// https://git.openssl.org/?p=openssl.git;a=blob;f=crypto/aes/asm/aesp8-ppc.pl
+<span id="L12" class="ln">    12</span>	
+<span id="L13" class="ln">    13</span>	// The code is based on 627c953376 from 4 Jun 2016. I changed some function
+<span id="L14" class="ln">    14</span>	// names in order to be more likely to go standards. For instance, function
+<span id="L15" class="ln">    15</span>	// aes_p8_set_{en,de}crypt_key become set{En,De}cryptKeyAsm. I also split
+<span id="L16" class="ln">    16</span>	// setEncryptKeyAsm in two parts and a new session was created
+<span id="L17" class="ln">    17</span>	// (doEncryptKeyAsm). This was necessary to avoid arguments overwriting when
+<span id="L18" class="ln">    18</span>	// setDecryptKeyAsm calls setEncryptKeyAsm. There were other modifications as
+<span id="L19" class="ln">    19</span>	// well but kept the same functionality.
+<span id="L20" class="ln">    20</span>	
+<span id="L21" class="ln">    21</span>	#include &#34;textflag.h&#34;
+<span id="L22" class="ln">    22</span>	
+<span id="L23" class="ln">    23</span>	// For set{En,De}cryptKeyAsm
+<span id="L24" class="ln">    24</span>	#define INP     R3
+<span id="L25" class="ln">    25</span>	#define BITS    R4
+<span id="L26" class="ln">    26</span>	#define OUT     R5
+<span id="L27" class="ln">    27</span>	#define PTR     R6
+<span id="L28" class="ln">    28</span>	#define CNT     R7
+<span id="L29" class="ln">    29</span>	#define ROUNDS  R8
+<span id="L30" class="ln">    30</span>	#define TEMP    R19
+<span id="L31" class="ln">    31</span>	#define ZERO    V0
+<span id="L32" class="ln">    32</span>	#define IN0     V1
+<span id="L33" class="ln">    33</span>	#define IN1     V2
+<span id="L34" class="ln">    34</span>	#define KEY     V3
+<span id="L35" class="ln">    35</span>	#define RCON    V4
+<span id="L36" class="ln">    36</span>	#define MASK    V5
+<span id="L37" class="ln">    37</span>	#define TMP     V6
+<span id="L38" class="ln">    38</span>	#define STAGE   V7
+<span id="L39" class="ln">    39</span>	#define OUTPERM V8
+<span id="L40" class="ln">    40</span>	#define OUTMASK V9
+<span id="L41" class="ln">    41</span>	#define OUTHEAD V10
+<span id="L42" class="ln">    42</span>	#define OUTTAIL V11
+<span id="L43" class="ln">    43</span>	
+<span id="L44" class="ln">    44</span>	// For {en,de}cryptBlockAsm
+<span id="L45" class="ln">    45</span>	#define BLK_INP    R3
+<span id="L46" class="ln">    46</span>	#define BLK_OUT    R4
+<span id="L47" class="ln">    47</span>	#define BLK_KEY    R5
+<span id="L48" class="ln">    48</span>	#define BLK_ROUNDS R6
+<span id="L49" class="ln">    49</span>	#define BLK_IDX    R7
+<span id="L50" class="ln">    50</span>	
+<span id="L51" class="ln">    51</span>	DATA  ·rcon+0x00(SB)/8, $0x0100000001000000 // RCON
+<span id="L52" class="ln">    52</span>	DATA  ·rcon+0x08(SB)/8, $0x0100000001000000 // RCON
+<span id="L53" class="ln">    53</span>	DATA  ·rcon+0x10(SB)/8, $0x1b0000001b000000
+<span id="L54" class="ln">    54</span>	DATA  ·rcon+0x18(SB)/8, $0x1b0000001b000000
+<span id="L55" class="ln">    55</span>	DATA  ·rcon+0x20(SB)/8, $0x0d0e0f0c0d0e0f0c // MASK
+<span id="L56" class="ln">    56</span>	DATA  ·rcon+0x28(SB)/8, $0x0d0e0f0c0d0e0f0c // MASK
+<span id="L57" class="ln">    57</span>	DATA  ·rcon+0x30(SB)/8, $0x0000000000000000
+<span id="L58" class="ln">    58</span>	DATA  ·rcon+0x38(SB)/8, $0x0000000000000000
+<span id="L59" class="ln">    59</span>	GLOBL ·rcon(SB), RODATA, $64
+<span id="L60" class="ln">    60</span>	
+<span id="L61" class="ln">    61</span>	// func setEncryptKeyAsm(key *byte, keylen int, enc *uint32) int
+<span id="L62" class="ln">    62</span>	TEXT ·setEncryptKeyAsm(SB),NOSPLIT|NOFRAME,$0
+<span id="L63" class="ln">    63</span>		// Load the arguments inside the registers
+<span id="L64" class="ln">    64</span>		MOVD key+0(FP), INP
+<span id="L65" class="ln">    65</span>		MOVD keylen+8(FP), BITS
+<span id="L66" class="ln">    66</span>		MOVD enc+16(FP), OUT
+<span id="L67" class="ln">    67</span>		JMP ·doEncryptKeyAsm(SB)
+<span id="L68" class="ln">    68</span>	
+<span id="L69" class="ln">    69</span>	// This text is used both setEncryptKeyAsm and setDecryptKeyAsm
+<span id="L70" class="ln">    70</span>	TEXT ·doEncryptKeyAsm(SB),NOSPLIT|NOFRAME,$0
+<span id="L71" class="ln">    71</span>		// Do not change R10 since it&#39;s storing the LR value in setDecryptKeyAsm
+<span id="L72" class="ln">    72</span>	
+<span id="L73" class="ln">    73</span>		// Check arguments
+<span id="L74" class="ln">    74</span>		MOVD $-1, PTR                  // li    6,-1       exit code to -1 (255)
+<span id="L75" class="ln">    75</span>		CMPU INP, $0                   // cmpldi r3,0      input key pointer set?
+<span id="L76" class="ln">    76</span>		BC 0x0E, 2, enc_key_abort      // beq-  .Lenc_key_abort
+<span id="L77" class="ln">    77</span>		CMPU OUT, $0                   // cmpldi r5,0      output key pointer set?
+<span id="L78" class="ln">    78</span>		BC 0x0E, 2, enc_key_abort      // beq-  .Lenc_key_abort
+<span id="L79" class="ln">    79</span>		MOVD $-2, PTR                  // li    6,-2       exit code to -2 (254)
+<span id="L80" class="ln">    80</span>		CMPW BITS, $128                // cmpwi 4,128      greater or equal to 128
+<span id="L81" class="ln">    81</span>		BC 0x0E, 0, enc_key_abort      // blt-  .Lenc_key_abort
+<span id="L82" class="ln">    82</span>		CMPW BITS, $256                // cmpwi 4,256      lesser or equal to 256
+<span id="L83" class="ln">    83</span>		BC 0x0E, 1, enc_key_abort      // bgt-  .Lenc_key_abort
+<span id="L84" class="ln">    84</span>		ANDCC $0x3f, BITS, TEMP        // andi. 0,4,0x3f   multiple of 64
+<span id="L85" class="ln">    85</span>		BC 0x06, 2, enc_key_abort      // bne-  .Lenc_key_abort
+<span id="L86" class="ln">    86</span>	
+<span id="L87" class="ln">    87</span>		MOVD $·rcon(SB), PTR           // PTR point to rcon addr
+<span id="L88" class="ln">    88</span>	
+<span id="L89" class="ln">    89</span>		// Get key from memory and write aligned into VR
+<span id="L90" class="ln">    90</span>		NEG INP, R9                    // neg   9,3        R9 is ~INP + 1
+<span id="L91" class="ln">    91</span>		LVX (INP)(R0), IN0             // lvx   1,0,3      Load key inside IN0
+<span id="L92" class="ln">    92</span>		ADD $15, INP, INP              // addi  3,3,15     Add 15B to INP addr
+<span id="L93" class="ln">    93</span>		LVSR (R9)(R0), KEY             // lvsr  3,0,9
+<span id="L94" class="ln">    94</span>		MOVD $0x20, R8                 // li    8,0x20     R8 = 32
+<span id="L95" class="ln">    95</span>		CMPW BITS, $192                // cmpwi 4,192      Key size == 192?
+<span id="L96" class="ln">    96</span>		LVX (INP)(R0), IN1             // lvx   2,0,3
+<span id="L97" class="ln">    97</span>		VSPLTISB $0x0f, MASK           // vspltisb 5,0x0f  0x0f0f0f0f... mask
+<span id="L98" class="ln">    98</span>		LVX (PTR)(R0), RCON            // lvx   4,0,6      Load first 16 bytes into RCON
+<span id="L99" class="ln">    99</span>		VXOR KEY, MASK, KEY            // vxor  3,3,5      Adjust for byte swap
+<span id="L100" class="ln">   100</span>		LVX (PTR)(R8), MASK            // lvx   5,8,6
+<span id="L101" class="ln">   101</span>		ADD $0x10, PTR, PTR            // addi  6,6,0x10   PTR to next 16 bytes of RCON
+<span id="L102" class="ln">   102</span>		VPERM IN0, IN1, KEY, IN0       // vperm 1,1,2,3    Align
+<span id="L103" class="ln">   103</span>		MOVD $8, CNT                   // li    7,8        CNT = 8
+<span id="L104" class="ln">   104</span>		VXOR ZERO, ZERO, ZERO          // vxor  0,0,0      Zero to be zero :)
+<span id="L105" class="ln">   105</span>		MOVD CNT, CTR                  // mtctr 7          Set the counter to 8 (rounds)
+<span id="L106" class="ln">   106</span>	
+<span id="L107" class="ln">   107</span>		LVSL (OUT)(R0), OUTPERM        // lvsl  8,0,5
+<span id="L108" class="ln">   108</span>		VSPLTISB $-1, OUTMASK          // vspltisb      9,-1
+<span id="L109" class="ln">   109</span>		LVX (OUT)(R0), OUTHEAD         // lvx   10,0,5
+<span id="L110" class="ln">   110</span>		VPERM OUTMASK, ZERO, OUTPERM, OUTMASK  // vperm 9,9,0,8
+<span id="L111" class="ln">   111</span>	
+<span id="L112" class="ln">   112</span>		BLT loop128                    // blt   .Loop128
+<span id="L113" class="ln">   113</span>		ADD $8, INP, INP               // addi  3,3,8
+<span id="L114" class="ln">   114</span>		BEQ l192                       // beq   .L192
+<span id="L115" class="ln">   115</span>		ADD $8, INP, INP               // addi  3,3,8
+<span id="L116" class="ln">   116</span>		JMP l256                       // b     .L256
+<span id="L117" class="ln">   117</span>	
+<span id="L118" class="ln">   118</span>	loop128:
+<span id="L119" class="ln">   119</span>		// Key schedule (Round 1 to 8)
+<span id="L120" class="ln">   120</span>		VPERM IN0, IN0, MASK, KEY      // vperm 3,1,1,5         Rotate-n-splat
+<span id="L121" class="ln">   121</span>		VSLDOI $12, ZERO, IN0, TMP     // vsldoi 6,0,1,12
+<span id="L122" class="ln">   122</span>		VPERM IN0, IN0, OUTPERM, OUTTAIL // vperm 11,1,1,8    Rotate
+<span id="L123" class="ln">   123</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L124" class="ln">   124</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L125" class="ln">   125</span>		VCIPHERLAST KEY, RCON, KEY     // vcipherlast 3,3,4
+<span id="L126" class="ln">   126</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5        Write to output
+<span id="L127" class="ln">   127</span>		ADD $16, OUT, OUT              // addi 5,5,16       Point to the next round
+<span id="L128" class="ln">   128</span>	
+<span id="L129" class="ln">   129</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L130" class="ln">   130</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L131" class="ln">   131</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L132" class="ln">   132</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L133" class="ln">   133</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L134" class="ln">   134</span>		VADDUWM RCON, RCON, RCON       // vadduwm 4,4,4
+<span id="L135" class="ln">   135</span>		VXOR IN0, KEY, IN0             // vxor 1,1,3
+<span id="L136" class="ln">   136</span>		BC 0x10, 0, loop128            // bdnz .Loop128
+<span id="L137" class="ln">   137</span>	
+<span id="L138" class="ln">   138</span>		LVX (PTR)(R0), RCON            // lvx 4,0,6     Last two round keys
+<span id="L139" class="ln">   139</span>	
+<span id="L140" class="ln">   140</span>		// Key schedule (Round 9)
+<span id="L141" class="ln">   141</span>		VPERM IN0, IN0, MASK, KEY      // vperm 3,1,1,5   Rotate-n-spat
+<span id="L142" class="ln">   142</span>		VSLDOI $12, ZERO, IN0, TMP     // vsldoi 6,0,1,12
+<span id="L143" class="ln">   143</span>		VPERM IN0, IN0, OUTPERM, OUTTAIL // vperm 11,1,1,8  Rotate
+<span id="L144" class="ln">   144</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L145" class="ln">   145</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L146" class="ln">   146</span>		VCIPHERLAST KEY, RCON, KEY     // vcipherlast 3,3,4
+<span id="L147" class="ln">   147</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5   Round 9
+<span id="L148" class="ln">   148</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L149" class="ln">   149</span>	
+<span id="L150" class="ln">   150</span>		// Key schedule (Round 10)
+<span id="L151" class="ln">   151</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L152" class="ln">   152</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L153" class="ln">   153</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L154" class="ln">   154</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L155" class="ln">   155</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L156" class="ln">   156</span>		VADDUWM RCON, RCON, RCON       // vadduwm 4,4,4
+<span id="L157" class="ln">   157</span>		VXOR IN0, KEY, IN0             // vxor 1,1,3
+<span id="L158" class="ln">   158</span>	
+<span id="L159" class="ln">   159</span>		VPERM IN0, IN0, MASK, KEY      // vperm 3,1,1,5   Rotate-n-splat
+<span id="L160" class="ln">   160</span>		VSLDOI $12, ZERO, IN0, TMP     // vsldoi 6,0,1,12
+<span id="L161" class="ln">   161</span>		VPERM IN0, IN0, OUTPERM, OUTTAIL // vperm 11,1,1,8  Rotate
+<span id="L162" class="ln">   162</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L163" class="ln">   163</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L164" class="ln">   164</span>		VCIPHERLAST KEY, RCON, KEY     // vcipherlast 3,3,4
+<span id="L165" class="ln">   165</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5    Round 10
+<span id="L166" class="ln">   166</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L167" class="ln">   167</span>	
+<span id="L168" class="ln">   168</span>		// Key schedule (Round 11)
+<span id="L169" class="ln">   169</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L170" class="ln">   170</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L171" class="ln">   171</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L172" class="ln">   172</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L173" class="ln">   173</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L174" class="ln">   174</span>		VXOR IN0, KEY, IN0             // vxor 1,1,3
+<span id="L175" class="ln">   175</span>		VPERM IN0, IN0, OUTPERM, OUTTAIL // vperm 11,1,1,8
+<span id="L176" class="ln">   176</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L177" class="ln">   177</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L178" class="ln">   178</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5  Round 11
+<span id="L179" class="ln">   179</span>	
+<span id="L180" class="ln">   180</span>		ADD $15, OUT, INP              // addi  3,5,15
+<span id="L181" class="ln">   181</span>		ADD $0x50, OUT, OUT            // addi  5,5,0x50
+<span id="L182" class="ln">   182</span>	
+<span id="L183" class="ln">   183</span>		MOVD $10, ROUNDS               // li    8,10
+<span id="L184" class="ln">   184</span>		JMP done                       // b     .Ldone
+<span id="L185" class="ln">   185</span>	
+<span id="L186" class="ln">   186</span>	l192:
+<span id="L187" class="ln">   187</span>		LVX (INP)(R0), TMP             // lvx 6,0,3
+<span id="L188" class="ln">   188</span>		MOVD $4, CNT                   // li 7,4
+<span id="L189" class="ln">   189</span>		VPERM IN0, IN0, OUTPERM, OUTTAIL // vperm 11,1,1,8
+<span id="L190" class="ln">   190</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L191" class="ln">   191</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L192" class="ln">   192</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5
+<span id="L193" class="ln">   193</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L194" class="ln">   194</span>		VPERM IN1, TMP, KEY, IN1       // vperm 2,2,6,3
+<span id="L195" class="ln">   195</span>		VSPLTISB $8, KEY               // vspltisb 3,8
+<span id="L196" class="ln">   196</span>		MOVD CNT, CTR                  // mtctr 7
+<span id="L197" class="ln">   197</span>		VSUBUBM MASK, KEY, MASK        // vsububm 5,5,3
+<span id="L198" class="ln">   198</span>	
+<span id="L199" class="ln">   199</span>	loop192:
+<span id="L200" class="ln">   200</span>		VPERM IN1, IN1, MASK, KEY      // vperm 3,2,2,5
+<span id="L201" class="ln">   201</span>		VSLDOI $12, ZERO, IN0, TMP     // vsldoi 6,0,1,12
+<span id="L202" class="ln">   202</span>		VCIPHERLAST KEY, RCON, KEY     // vcipherlast 3,3,4
+<span id="L203" class="ln">   203</span>	
+<span id="L204" class="ln">   204</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L205" class="ln">   205</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L206" class="ln">   206</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L207" class="ln">   207</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L208" class="ln">   208</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L209" class="ln">   209</span>	
+<span id="L210" class="ln">   210</span>		VSLDOI $8, ZERO, IN1, STAGE    // vsldoi 7,0,2,8
+<span id="L211" class="ln">   211</span>		VSPLTW $3, IN0, TMP            // vspltw 6,1,3
+<span id="L212" class="ln">   212</span>		VXOR TMP, IN1, TMP             // vxor 6,6,2
+<span id="L213" class="ln">   213</span>		VSLDOI $12, ZERO, IN1, IN1     // vsldoi 2,0,2,12
+<span id="L214" class="ln">   214</span>		VADDUWM RCON, RCON, RCON       // vadduwm 4,4,4
+<span id="L215" class="ln">   215</span>		VXOR IN1, TMP, IN1             // vxor 2,2,6
+<span id="L216" class="ln">   216</span>		VXOR IN0, KEY, IN0             // vxor 1,1,3
+<span id="L217" class="ln">   217</span>		VXOR IN1, KEY, IN1             // vxor 2,2,3
+<span id="L218" class="ln">   218</span>		VSLDOI $8, STAGE, IN0, STAGE   // vsldoi 7,7,1,8
+<span id="L219" class="ln">   219</span>	
+<span id="L220" class="ln">   220</span>		VPERM IN1, IN1, MASK, KEY      // vperm 3,2,2,5
+<span id="L221" class="ln">   221</span>		VSLDOI $12, ZERO, IN0, TMP     // vsldoi 6,0,1,12
+<span id="L222" class="ln">   222</span>		VPERM STAGE, STAGE, OUTPERM, OUTTAIL // vperm 11,7,7,8
+<span id="L223" class="ln">   223</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L224" class="ln">   224</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L225" class="ln">   225</span>		VCIPHERLAST KEY, RCON, KEY     // vcipherlast 3,3,4
+<span id="L226" class="ln">   226</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5
+<span id="L227" class="ln">   227</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L228" class="ln">   228</span>	
+<span id="L229" class="ln">   229</span>		VSLDOI $8, IN0, IN1, STAGE     // vsldoi 7,1,2,8
+<span id="L230" class="ln">   230</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L231" class="ln">   231</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L232" class="ln">   232</span>		VPERM STAGE, STAGE, OUTPERM, OUTTAIL // vperm 11,7,7,8
+<span id="L233" class="ln">   233</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L234" class="ln">   234</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L235" class="ln">   235</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L236" class="ln">   236</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L237" class="ln">   237</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L238" class="ln">   238</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5
+<span id="L239" class="ln">   239</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L240" class="ln">   240</span>	
+<span id="L241" class="ln">   241</span>		VSPLTW $3, IN0, TMP            // vspltw 6,1,3
+<span id="L242" class="ln">   242</span>		VXOR TMP, IN1, TMP             // vxor 6,6,2
+<span id="L243" class="ln">   243</span>		VSLDOI $12, ZERO, IN1, IN1     // vsldoi 2,0,2,12
+<span id="L244" class="ln">   244</span>		VADDUWM RCON, RCON, RCON       // vadduwm 4,4,4
+<span id="L245" class="ln">   245</span>		VXOR IN1, TMP, IN1             // vxor 2,2,6
+<span id="L246" class="ln">   246</span>		VXOR IN0, KEY, IN0             // vxor 1,1,3
+<span id="L247" class="ln">   247</span>		VXOR IN1, KEY, IN1             // vxor 2,2,3
+<span id="L248" class="ln">   248</span>		VPERM IN0, IN0, OUTPERM, OUTTAIL // vperm 11,1,1,8
+<span id="L249" class="ln">   249</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L250" class="ln">   250</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L251" class="ln">   251</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5
+<span id="L252" class="ln">   252</span>		ADD $15, OUT, INP              // addi 3,5,15
+<span id="L253" class="ln">   253</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L254" class="ln">   254</span>		BC 0x10, 0, loop192           // bdnz .Loop192
+<span id="L255" class="ln">   255</span>	
+<span id="L256" class="ln">   256</span>		MOVD $12, ROUNDS               // li 8,12
+<span id="L257" class="ln">   257</span>		ADD $0x20, OUT, OUT            // addi 5,5,0x20
+<span id="L258" class="ln">   258</span>		JMP done                       // b .Ldone
+<span id="L259" class="ln">   259</span>	
+<span id="L260" class="ln">   260</span>	l256:
+<span id="L261" class="ln">   261</span>		LVX (INP)(R0), TMP             // lvx 6,0,3
+<span id="L262" class="ln">   262</span>		MOVD $7, CNT                   // li 7,7
+<span id="L263" class="ln">   263</span>		MOVD $14, ROUNDS               // li 8,14
+<span id="L264" class="ln">   264</span>		VPERM IN0, IN0, OUTPERM, OUTTAIL // vperm 11,1,1,8
+<span id="L265" class="ln">   265</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L266" class="ln">   266</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L267" class="ln">   267</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5
+<span id="L268" class="ln">   268</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L269" class="ln">   269</span>		VPERM IN1, TMP, KEY, IN1       // vperm 2,2,6,3
+<span id="L270" class="ln">   270</span>		MOVD CNT, CTR                  // mtctr 7
+<span id="L271" class="ln">   271</span>	
+<span id="L272" class="ln">   272</span>	loop256:
+<span id="L273" class="ln">   273</span>		VPERM IN1, IN1, MASK, KEY      // vperm 3,2,2,5
+<span id="L274" class="ln">   274</span>		VSLDOI $12, ZERO, IN0, TMP     // vsldoi 6,0,1,12
+<span id="L275" class="ln">   275</span>		VPERM IN1, IN1, OUTPERM, OUTTAIL // vperm 11,2,2,8
+<span id="L276" class="ln">   276</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L277" class="ln">   277</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L278" class="ln">   278</span>		VCIPHERLAST KEY, RCON, KEY     // vcipherlast 3,3,4
+<span id="L279" class="ln">   279</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5
+<span id="L280" class="ln">   280</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L281" class="ln">   281</span>	
+<span id="L282" class="ln">   282</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L283" class="ln">   283</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L284" class="ln">   284</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L285" class="ln">   285</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L286" class="ln">   286</span>		VXOR IN0, TMP, IN0             // vxor 1,1,6
+<span id="L287" class="ln">   287</span>		VADDUWM RCON, RCON, RCON       // vadduwm 4,4,4
+<span id="L288" class="ln">   288</span>		VXOR IN0, KEY, IN0             // vxor 1,1,3
+<span id="L289" class="ln">   289</span>		VPERM IN0, IN0, OUTPERM, OUTTAIL // vperm 11,1,1,8
+<span id="L290" class="ln">   290</span>		VSEL OUTHEAD, OUTTAIL, OUTMASK, STAGE // vsel 7,10,11,9
+<span id="L291" class="ln">   291</span>		VOR OUTTAIL, OUTTAIL, OUTHEAD  // vor 10,11,11
+<span id="L292" class="ln">   292</span>		STVX STAGE, (OUT+R0)           // stvx 7,0,5
+<span id="L293" class="ln">   293</span>		ADD $15, OUT, INP              // addi 3,5,15
+<span id="L294" class="ln">   294</span>		ADD $16, OUT, OUT              // addi 5,5,16
+<span id="L295" class="ln">   295</span>		BC 0x12, 0, done               // bdz .Ldone
+<span id="L296" class="ln">   296</span>	
+<span id="L297" class="ln">   297</span>		VSPLTW $3, IN0, KEY            // vspltw 3,1,3
+<span id="L298" class="ln">   298</span>		VSLDOI $12, ZERO, IN1, TMP     // vsldoi 6,0,2,12
+<span id="L299" class="ln">   299</span>		VSBOX KEY, KEY                 // vsbox 3,3
+<span id="L300" class="ln">   300</span>	
+<span id="L301" class="ln">   301</span>		VXOR IN1, TMP, IN1             // vxor 2,2,6
+<span id="L302" class="ln">   302</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L303" class="ln">   303</span>		VXOR IN1, TMP, IN1             // vxor 2,2,6
+<span id="L304" class="ln">   304</span>		VSLDOI $12, ZERO, TMP, TMP     // vsldoi 6,0,6,12
+<span id="L305" class="ln">   305</span>		VXOR IN1, TMP, IN1             // vxor 2,2,6
+<span id="L306" class="ln">   306</span>	
+<span id="L307" class="ln">   307</span>		VXOR IN1, KEY, IN1             // vxor 2,2,3
+<span id="L308" class="ln">   308</span>		JMP loop256                    // b .Loop256
+<span id="L309" class="ln">   309</span>	
+<span id="L310" class="ln">   310</span>	done:
+<span id="L311" class="ln">   311</span>		LVX (INP)(R0), IN1             // lvx   2,0,3
+<span id="L312" class="ln">   312</span>		VSEL OUTHEAD, IN1, OUTMASK, IN1 // vsel 2,10,2,9
+<span id="L313" class="ln">   313</span>		STVX IN1, (INP+R0)             // stvx  2,0,3
+<span id="L314" class="ln">   314</span>		MOVD $0, PTR                   // li    6,0    set PTR to 0 (exit code 0)
+<span id="L315" class="ln">   315</span>		MOVW ROUNDS, 0(OUT)            // stw   8,0(5)
+<span id="L316" class="ln">   316</span>	
+<span id="L317" class="ln">   317</span>	enc_key_abort:
+<span id="L318" class="ln">   318</span>		MOVD PTR, INP                  // mr    3,6    set exit code with PTR value
+<span id="L319" class="ln">   319</span>		MOVD INP, ret+24(FP)           // Put return value into the FP
+<span id="L320" class="ln">   320</span>		RET                            // blr
+<span id="L321" class="ln">   321</span>	
+<span id="L322" class="ln">   322</span>	// func setDecryptKeyAsm(key *byte, keylen int, dec *uint32) int
+<span id="L323" class="ln">   323</span>	TEXT ·setDecryptKeyAsm(SB),NOSPLIT|NOFRAME,$0
+<span id="L324" class="ln">   324</span>		// Load the arguments inside the registers
+<span id="L325" class="ln">   325</span>		MOVD key+0(FP), INP
+<span id="L326" class="ln">   326</span>		MOVD keylen+8(FP), BITS
+<span id="L327" class="ln">   327</span>		MOVD dec+16(FP), OUT
+<span id="L328" class="ln">   328</span>	
+<span id="L329" class="ln">   329</span>		MOVD LR, R10                   // mflr 10
+<span id="L330" class="ln">   330</span>		CALL ·doEncryptKeyAsm(SB)
+<span id="L331" class="ln">   331</span>		MOVD R10, LR                   // mtlr 10
+<span id="L332" class="ln">   332</span>	
+<span id="L333" class="ln">   333</span>		CMPW INP, $0                   // cmpwi 3,0  exit 0 = ok
+<span id="L334" class="ln">   334</span>		BC 0x06, 2, dec_key_abort      // bne- .Ldec_key_abort
+<span id="L335" class="ln">   335</span>	
+<span id="L336" class="ln">   336</span>		// doEncryptKeyAsm set ROUNDS (R8) with the proper value for each mode
+<span id="L337" class="ln">   337</span>		SLW $4, ROUNDS, CNT            // slwi 7,8,4
+<span id="L338" class="ln">   338</span>		SUB $240, OUT, INP             // subi 3,5,240
+<span id="L339" class="ln">   339</span>		SRW $1, ROUNDS, ROUNDS         // srwi 8,8,1
+<span id="L340" class="ln">   340</span>		ADD R7, INP, OUT               // add 5,3,7
+<span id="L341" class="ln">   341</span>		MOVD ROUNDS, CTR               // mtctr 8
+<span id="L342" class="ln">   342</span>	
+<span id="L343" class="ln">   343</span>	// dec_key will invert the key sequence in order to be used for decrypt
+<span id="L344" class="ln">   344</span>	dec_key:
+<span id="L345" class="ln">   345</span>		MOVWZ 0(INP), TEMP             // lwz 0, 0(3)
+<span id="L346" class="ln">   346</span>		MOVWZ 4(INP), R6               // lwz 6, 4(3)
+<span id="L347" class="ln">   347</span>		MOVWZ 8(INP), R7               // lwz 7, 8(3)
+<span id="L348" class="ln">   348</span>		MOVWZ 12(INP), R8              // lwz 8, 12(3)
+<span id="L349" class="ln">   349</span>		ADD $16, INP, INP              // addi 3,3,16
+<span id="L350" class="ln">   350</span>		MOVWZ 0(OUT), R9               // lwz 9, 0(5)
+<span id="L351" class="ln">   351</span>		MOVWZ 4(OUT), R10              // lwz 10,4(5)
+<span id="L352" class="ln">   352</span>		MOVWZ 8(OUT), R11              // lwz 11,8(5)
+<span id="L353" class="ln">   353</span>		MOVWZ 12(OUT), R12             // lwz 12,12(5)
+<span id="L354" class="ln">   354</span>		MOVW TEMP, 0(OUT)              // stw 0, 0(5)
+<span id="L355" class="ln">   355</span>		MOVW R6, 4(OUT)                // stw 6, 4(5)
+<span id="L356" class="ln">   356</span>		MOVW R7, 8(OUT)                // stw 7, 8(5)
+<span id="L357" class="ln">   357</span>		MOVW R8, 12(OUT)               // stw 8, 12(5)
+<span id="L358" class="ln">   358</span>		SUB $16, OUT, OUT              // subi 5,5,16
+<span id="L359" class="ln">   359</span>		MOVW R9, -16(INP)              // stw 9, -16(3)
+<span id="L360" class="ln">   360</span>		MOVW R10, -12(INP)             // stw 10,-12(3)
+<span id="L361" class="ln">   361</span>		MOVW R11, -8(INP)              // stw 11,-8(3)
+<span id="L362" class="ln">   362</span>		MOVW R12, -4(INP)              // stw 12,-4(3)
+<span id="L363" class="ln">   363</span>		BC 0x10, 0, dec_key            // bdnz .Ldeckey
+<span id="L364" class="ln">   364</span>	
+<span id="L365" class="ln">   365</span>		XOR R3, R3, R3                 // xor 3,3,3      Clean R3
+<span id="L366" class="ln">   366</span>	
+<span id="L367" class="ln">   367</span>	dec_key_abort:
+<span id="L368" class="ln">   368</span>		MOVD R3, ret+24(FP)            // Put return value into the FP
+<span id="L369" class="ln">   369</span>		RET                            // blr
+<span id="L370" class="ln">   370</span>	
+<span id="L371" class="ln">   371</span>	
+<span id="L372" class="ln">   372</span>	// func encryptBlockAsm(dst, src *byte, enc *uint32)
+<span id="L373" class="ln">   373</span>	TEXT ·encryptBlockAsm(SB),NOSPLIT|NOFRAME,$0
+<span id="L374" class="ln">   374</span>		// Load the arguments inside the registers
+<span id="L375" class="ln">   375</span>		MOVD dst+0(FP), BLK_OUT
+<span id="L376" class="ln">   376</span>		MOVD src+8(FP), BLK_INP
+<span id="L377" class="ln">   377</span>		MOVD enc+16(FP), BLK_KEY
+<span id="L378" class="ln">   378</span>	
+<span id="L379" class="ln">   379</span>		MOVWZ 240(BLK_KEY), BLK_ROUNDS // lwz 6,240(5)
+<span id="L380" class="ln">   380</span>		MOVD $15, BLK_IDX              // li 7,15
+<span id="L381" class="ln">   381</span>	
+<span id="L382" class="ln">   382</span>		LVX (BLK_INP)(R0), ZERO        // lvx 0,0,3
+<span id="L383" class="ln">   383</span>		NEG BLK_OUT, R11               // neg 11,4
+<span id="L384" class="ln">   384</span>		LVX (BLK_INP)(BLK_IDX), IN0    // lvx 1,7,3
+<span id="L385" class="ln">   385</span>		LVSL (BLK_INP)(R0), IN1        // lvsl 2,0,3
+<span id="L386" class="ln">   386</span>		VSPLTISB $0x0f, RCON           // vspltisb 4,0x0f
+<span id="L387" class="ln">   387</span>		LVSR (R11)(R0), KEY            // lvsr 3,0,11
+<span id="L388" class="ln">   388</span>		VXOR IN1, RCON, IN1            // vxor 2,2,4
+<span id="L389" class="ln">   389</span>		MOVD $16, BLK_IDX              // li 7,16
+<span id="L390" class="ln">   390</span>		VPERM ZERO, IN0, IN1, ZERO     // vperm 0,0,1,2
+<span id="L391" class="ln">   391</span>		LVX (BLK_KEY)(R0), IN0         // lvx 1,0,5
+<span id="L392" class="ln">   392</span>		LVSR (BLK_KEY)(R0), MASK       // lvsr 5,0,5
+<span id="L393" class="ln">   393</span>		SRW $1, BLK_ROUNDS, BLK_ROUNDS // srwi 6,6,1
+<span id="L394" class="ln">   394</span>		LVX (BLK_KEY)(BLK_IDX), IN1    // lvx 2,7,5
+<span id="L395" class="ln">   395</span>		ADD $16, BLK_IDX, BLK_IDX      // addi 7,7,16
+<span id="L396" class="ln">   396</span>		SUB $1, BLK_ROUNDS, BLK_ROUNDS // subi 6,6,1
+<span id="L397" class="ln">   397</span>		VPERM IN1, IN0, MASK, IN0      // vperm 1,2,1,5
+<span id="L398" class="ln">   398</span>	
+<span id="L399" class="ln">   399</span>		VXOR ZERO, IN0, ZERO           // vxor 0,0,1
+<span id="L400" class="ln">   400</span>		LVX (BLK_KEY)(BLK_IDX), IN0    // lvx 1,7,5
+<span id="L401" class="ln">   401</span>		ADD $16, BLK_IDX, BLK_IDX      // addi 7,7,16
+<span id="L402" class="ln">   402</span>		MOVD BLK_ROUNDS, CTR           // mtctr 6
+<span id="L403" class="ln">   403</span>	
+<span id="L404" class="ln">   404</span>	loop_enc:
+<span id="L405" class="ln">   405</span>		VPERM IN0, IN1, MASK, IN1      // vperm 2,1,2,5
+<span id="L406" class="ln">   406</span>		VCIPHER ZERO, IN1, ZERO        // vcipher 0,0,2
+<span id="L407" class="ln">   407</span>		LVX (BLK_KEY)(BLK_IDX), IN1    // lvx 2,7,5
+<span id="L408" class="ln">   408</span>		ADD $16, BLK_IDX, BLK_IDX      // addi 7,7,16
+<span id="L409" class="ln">   409</span>		VPERM IN1, IN0, MASK, IN0      // vperm 1,2,1,5
+<span id="L410" class="ln">   410</span>		VCIPHER ZERO, IN0, ZERO        // vcipher 0,0,1
+<span id="L411" class="ln">   411</span>		LVX (BLK_KEY)(BLK_IDX), IN0    // lvx 1,7,5
+<span id="L412" class="ln">   412</span>		ADD $16, BLK_IDX, BLK_IDX      // addi 7,7,16
+<span id="L413" class="ln">   413</span>		BC 0x10, 0, loop_enc           // bdnz .Loop_enc
+<span id="L414" class="ln">   414</span>	
+<span id="L415" class="ln">   415</span>		VPERM IN0, IN1, MASK, IN1      // vperm 2,1,2,5
+<span id="L416" class="ln">   416</span>		VCIPHER ZERO, IN1, ZERO        // vcipher 0,0,2
+<span id="L417" class="ln">   417</span>		LVX (BLK_KEY)(BLK_IDX), IN1    // lvx 2,7,5
+<span id="L418" class="ln">   418</span>		VPERM IN1, IN0, MASK, IN0      // vperm 1,2,1,5
+<span id="L419" class="ln">   419</span>		VCIPHERLAST ZERO, IN0, ZERO    // vcipherlast 0,0,1
+<span id="L420" class="ln">   420</span>	
+<span id="L421" class="ln">   421</span>		VSPLTISB $-1, IN1              // vspltisb 2,-1
+<span id="L422" class="ln">   422</span>		VXOR IN0, IN0, IN0             // vxor 1,1,1
+<span id="L423" class="ln">   423</span>		MOVD $15, BLK_IDX              // li 7,15
+<span id="L424" class="ln">   424</span>		VPERM IN1, IN0, KEY, IN1       // vperm 2,2,1,3
+<span id="L425" class="ln">   425</span>		VXOR KEY, RCON, KEY            // vxor 3,3,4
+<span id="L426" class="ln">   426</span>		LVX (BLK_OUT)(R0), IN0         // lvx 1,0,4
+<span id="L427" class="ln">   427</span>		VPERM ZERO, ZERO, KEY, ZERO    // vperm 0,0,0,3
+<span id="L428" class="ln">   428</span>		VSEL IN0, ZERO, IN1, IN0       // vsel 1,1,0,2
+<span id="L429" class="ln">   429</span>		LVX (BLK_OUT)(BLK_IDX), RCON   // lvx 4,7,4
+<span id="L430" class="ln">   430</span>		STVX IN0, (BLK_OUT+R0)         // stvx 1,0,4
+<span id="L431" class="ln">   431</span>		VSEL ZERO, RCON, IN1, ZERO     // vsel 0,0,4,2
+<span id="L432" class="ln">   432</span>		STVX ZERO, (BLK_OUT+BLK_IDX)   // stvx 0,7,4
+<span id="L433" class="ln">   433</span>	
+<span id="L434" class="ln">   434</span>		RET                            // blr
+<span id="L435" class="ln">   435</span>	
+<span id="L436" class="ln">   436</span>	
+<span id="L437" class="ln">   437</span>	// func decryptBlockAsm(dst, src *byte, dec *uint32)
+<span id="L438" class="ln">   438</span>	TEXT ·decryptBlockAsm(SB),NOSPLIT|NOFRAME,$0
+<span id="L439" class="ln">   439</span>		// Load the arguments inside the registers
+<span id="L440" class="ln">   440</span>		MOVD dst+0(FP), BLK_OUT
+<span id="L441" class="ln">   441</span>		MOVD src+8(FP), BLK_INP
+<span id="L442" class="ln">   442</span>		MOVD dec+16(FP), BLK_KEY
+<span id="L443" class="ln">   443</span>	
+<span id="L444" class="ln">   444</span>		MOVWZ 240(BLK_KEY), BLK_ROUNDS // lwz 6,240(5)
+<span id="L445" class="ln">   445</span>		MOVD $15, BLK_IDX              // li 7,15
+<span id="L446" class="ln">   446</span>	
+<span id="L447" class="ln">   447</span>		LVX (BLK_INP)(R0), ZERO        // lvx 0,0,3
+<span id="L448" class="ln">   448</span>		NEG BLK_OUT, R11               // neg 11,4
+<span id="L449" class="ln">   449</span>		LVX (BLK_INP)(BLK_IDX), IN0    // lvx 1,7,3
+<span id="L450" class="ln">   450</span>		LVSL (BLK_INP)(R0), IN1        // lvsl 2,0,3
+<span id="L451" class="ln">   451</span>		VSPLTISB $0x0f, RCON           // vspltisb 4,0x0f
+<span id="L452" class="ln">   452</span>		LVSR (R11)(R0), KEY            // lvsr 3,0,11
+<span id="L453" class="ln">   453</span>		VXOR IN1, RCON, IN1            // vxor 2,2,4
+<span id="L454" class="ln">   454</span>		MOVD $16, BLK_IDX              // li 7,16
+<span id="L455" class="ln">   455</span>		VPERM ZERO, IN0, IN1, ZERO     // vperm 0,0,1,2
+<span id="L456" class="ln">   456</span>		LVX (BLK_KEY)(R0), IN0         // lvx 1,0,5
+<span id="L457" class="ln">   457</span>		LVSR (BLK_KEY)(R0), MASK       // lvsr 5,0,5
+<span id="L458" class="ln">   458</span>		SRW $1, BLK_ROUNDS, BLK_ROUNDS // srwi 6,6,1
+<span id="L459" class="ln">   459</span>		LVX (BLK_KEY)(BLK_IDX), IN1    // lvx 2,7,5
+<span id="L460" class="ln">   460</span>		ADD $16, BLK_IDX, BLK_IDX      // addi 7,7,16
+<span id="L461" class="ln">   461</span>		SUB $1, BLK_ROUNDS, BLK_ROUNDS // subi 6,6,1
+<span id="L462" class="ln">   462</span>		VPERM IN1, IN0, MASK, IN0      // vperm 1,2,1,5
+<span id="L463" class="ln">   463</span>	
+<span id="L464" class="ln">   464</span>		VXOR ZERO, IN0, ZERO           // vxor 0,0,1
+<span id="L465" class="ln">   465</span>		LVX (BLK_KEY)(BLK_IDX), IN0    // lvx 1,7,5
+<span id="L466" class="ln">   466</span>		ADD $16, BLK_IDX, BLK_IDX      // addi 7,7,16
+<span id="L467" class="ln">   467</span>		MOVD BLK_ROUNDS, CTR           // mtctr 6
+<span id="L468" class="ln">   468</span>	
+<span id="L469" class="ln">   469</span>	loop_dec:
+<span id="L470" class="ln">   470</span>		VPERM IN0, IN1, MASK, IN1      // vperm 2,1,2,5
+<span id="L471" class="ln">   471</span>		VNCIPHER ZERO, IN1, ZERO       // vncipher 0,0,2
+<span id="L472" class="ln">   472</span>		LVX (BLK_KEY)(BLK_IDX), IN1    // lvx 2,7,5
+<span id="L473" class="ln">   473</span>		ADD $16, BLK_IDX, BLK_IDX      // addi 7,7,16
+<span id="L474" class="ln">   474</span>		VPERM IN1, IN0, MASK, IN0      // vperm 1,2,1,5
+<span id="L475" class="ln">   475</span>		VNCIPHER ZERO, IN0, ZERO       // vncipher 0,0,1
+<span id="L476" class="ln">   476</span>		LVX (BLK_KEY)(BLK_IDX), IN0    // lvx 1,7,5
+<span id="L477" class="ln">   477</span>		ADD $16, BLK_IDX, BLK_IDX      // addi 7,7,16
+<span id="L478" class="ln">   478</span>		BC 0x10, 0, loop_dec           // bdnz .Loop_dec
+<span id="L479" class="ln">   479</span>	
+<span id="L480" class="ln">   480</span>		VPERM IN0, IN1, MASK, IN1      // vperm 2,1,2,5
+<span id="L481" class="ln">   481</span>		VNCIPHER ZERO, IN1, ZERO       // vncipher 0,0,2
+<span id="L482" class="ln">   482</span>		LVX (BLK_KEY)(BLK_IDX), IN1    // lvx 2,7,5
+<span id="L483" class="ln">   483</span>		VPERM IN1, IN0, MASK, IN0      // vperm 1,2,1,5
+<span id="L484" class="ln">   484</span>		VNCIPHERLAST ZERO, IN0, ZERO   // vncipherlast 0,0,1
+<span id="L485" class="ln">   485</span>	
+<span id="L486" class="ln">   486</span>		VSPLTISB $-1, IN1              // vspltisb 2,-1
+<span id="L487" class="ln">   487</span>		VXOR IN0, IN0, IN0             // vxor 1,1,1
+<span id="L488" class="ln">   488</span>		MOVD $15, BLK_IDX              // li 7,15
+<span id="L489" class="ln">   489</span>		VPERM IN1, IN0, KEY, IN1       // vperm 2,2,1,3
+<span id="L490" class="ln">   490</span>		VXOR KEY, RCON, KEY            // vxor 3,3,4
+<span id="L491" class="ln">   491</span>		LVX (BLK_OUT)(R0), IN0         // lvx 1,0,4
+<span id="L492" class="ln">   492</span>		VPERM ZERO, ZERO, KEY, ZERO    // vperm 0,0,0,3
+<span id="L493" class="ln">   493</span>		VSEL IN0, ZERO, IN1, IN0       // vsel 1,1,0,2
+<span id="L494" class="ln">   494</span>		LVX (BLK_OUT)(BLK_IDX), RCON   // lvx 4,7,4
+<span id="L495" class="ln">   495</span>		STVX IN0, (BLK_OUT+R0)         // stvx 1,0,4
+<span id="L496" class="ln">   496</span>		VSEL ZERO, RCON, IN1, ZERO     // vsel 0,0,4,2
+<span id="L497" class="ln">   497</span>		STVX ZERO, (BLK_OUT+BLK_IDX)   // stvx 0,7,4
+<span id="L498" class="ln">   498</span>	
+<span id="L499" class="ln">   499</span>		RET                            // blr
+</pre><p><a href="asm_ppc64le.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

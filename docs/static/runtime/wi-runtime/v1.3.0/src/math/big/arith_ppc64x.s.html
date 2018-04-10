@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/arith_ppc64x.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="arith_ppc64x.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">arith_ppc64x.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2013 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	// +build !math_big_pure_go,ppc64 !math_big_pure_go,ppc64le
+<span id="L6" class="ln">     6</span>	
+<span id="L7" class="ln">     7</span>	#include &#34;textflag.h&#34;
+<span id="L8" class="ln">     8</span>	
+<span id="L9" class="ln">     9</span>	// This file provides fast assembly versions for the elementary
+<span id="L10" class="ln">    10</span>	// arithmetic operations on vectors implemented in arith.go.
+<span id="L11" class="ln">    11</span>	
+<span id="L12" class="ln">    12</span>	// func mulWW(x, y Word) (z1, z0 Word)
+<span id="L13" class="ln">    13</span>	TEXT ·mulWW(SB), NOSPLIT, $0
+<span id="L14" class="ln">    14</span>		MOVD   x+0(FP), R4
+<span id="L15" class="ln">    15</span>		MOVD   y+8(FP), R5
+<span id="L16" class="ln">    16</span>		MULHDU R4, R5, R6
+<span id="L17" class="ln">    17</span>		MULLD  R4, R5, R7
+<span id="L18" class="ln">    18</span>		MOVD   R6, z1+16(FP)
+<span id="L19" class="ln">    19</span>		MOVD   R7, z0+24(FP)
+<span id="L20" class="ln">    20</span>		RET
+<span id="L21" class="ln">    21</span>	
+<span id="L22" class="ln">    22</span>	// func addVV(z, y, y []Word) (c Word)
+<span id="L23" class="ln">    23</span>	// z[i] = x[i] + y[i] for all i, carrying
+<span id="L24" class="ln">    24</span>	TEXT ·addVV(SB), NOSPLIT, $0
+<span id="L25" class="ln">    25</span>		MOVD  z_len+8(FP), R7
+<span id="L26" class="ln">    26</span>		MOVD  x+24(FP), R8
+<span id="L27" class="ln">    27</span>		MOVD  y+48(FP), R9
+<span id="L28" class="ln">    28</span>		MOVD  z+0(FP), R10
+<span id="L29" class="ln">    29</span>	
+<span id="L30" class="ln">    30</span>		MOVD  R0, R4
+<span id="L31" class="ln">    31</span>		MOVD  R0, R6  // R6 will be the address index
+<span id="L32" class="ln">    32</span>		ADDC R4, R4   // clear CA
+<span id="L33" class="ln">    33</span>		MOVD  R7, CTR
+<span id="L34" class="ln">    34</span>	
+<span id="L35" class="ln">    35</span>		CMP   R0, R7
+<span id="L36" class="ln">    36</span>		BEQ   done
+<span id="L37" class="ln">    37</span>	
+<span id="L38" class="ln">    38</span>	loop:
+<span id="L39" class="ln">    39</span>		MOVD  (R8)(R6), R11   // x[i]
+<span id="L40" class="ln">    40</span>		MOVD  (R9)(R6), R12   // y[i]
+<span id="L41" class="ln">    41</span>		ADDE  R12, R11, R15   // x[i] + y[i] + CA
+<span id="L42" class="ln">    42</span>		MOVD  R15, (R10)(R6)  // z[i]
+<span id="L43" class="ln">    43</span>	
+<span id="L44" class="ln">    44</span>		ADD $8, R6
+<span id="L45" class="ln">    45</span>		BC  16, 0, loop	// bdnz
+<span id="L46" class="ln">    46</span>	
+<span id="L47" class="ln">    47</span>	done:
+<span id="L48" class="ln">    48</span>		ADDZE R4
+<span id="L49" class="ln">    49</span>		MOVD  R4, c+72(FP)
+<span id="L50" class="ln">    50</span>		RET
+<span id="L51" class="ln">    51</span>	
+<span id="L52" class="ln">    52</span>	// func subVV(z, x, y []Word) (c Word)
+<span id="L53" class="ln">    53</span>	// z[i] = x[i] - y[i] for all i, carrying
+<span id="L54" class="ln">    54</span>	TEXT ·subVV(SB), NOSPLIT, $0
+<span id="L55" class="ln">    55</span>		MOVD z_len+8(FP), R7
+<span id="L56" class="ln">    56</span>		MOVD x+24(FP), R8
+<span id="L57" class="ln">    57</span>		MOVD y+48(FP), R9
+<span id="L58" class="ln">    58</span>		MOVD z+0(FP), R10
+<span id="L59" class="ln">    59</span>	
+<span id="L60" class="ln">    60</span>		MOVD  R0, R4  // c = 0
+<span id="L61" class="ln">    61</span>		MOVD  R0, R6
+<span id="L62" class="ln">    62</span>		SUBC R0, R0  // clear CA
+<span id="L63" class="ln">    63</span>		MOVD  R7, CTR
+<span id="L64" class="ln">    64</span>	
+<span id="L65" class="ln">    65</span>		CMP R0, R7
+<span id="L66" class="ln">    66</span>		BEQ  sublend
+<span id="L67" class="ln">    67</span>	
+<span id="L68" class="ln">    68</span>	// amd64 saves and restores CF, but I believe they only have to do that because all of
+<span id="L69" class="ln">    69</span>	// their math operations clobber it - we should just be able to recover it at the end.
+<span id="L70" class="ln">    70</span>	subloop:
+<span id="L71" class="ln">    71</span>		MOVD  (R8)(R6), R11 // x[i]
+<span id="L72" class="ln">    72</span>		MOVD  (R9)(R6), R12 // y[i]
+<span id="L73" class="ln">    73</span>	
+<span id="L74" class="ln">    74</span>		SUBE R12, R11, R15
+<span id="L75" class="ln">    75</span>		MOVD R15, (R10)(R6)
+<span id="L76" class="ln">    76</span>	
+<span id="L77" class="ln">    77</span>		ADD $8, R6
+<span id="L78" class="ln">    78</span>		BC  16, 0, subloop  // bdnz
+<span id="L79" class="ln">    79</span>	
+<span id="L80" class="ln">    80</span>	sublend:
+<span id="L81" class="ln">    81</span>	
+<span id="L82" class="ln">    82</span>		ADDZE R4
+<span id="L83" class="ln">    83</span>		XOR   $1, R4
+<span id="L84" class="ln">    84</span>		MOVD  R4, c+72(FP)
+<span id="L85" class="ln">    85</span>		RET
+<span id="L86" class="ln">    86</span>	
+<span id="L87" class="ln">    87</span>	TEXT ·addVW(SB), NOSPLIT, $0
+<span id="L88" class="ln">    88</span>		BR ·addVW_g(SB)
+<span id="L89" class="ln">    89</span>	
+<span id="L90" class="ln">    90</span>	TEXT ·subVW(SB), NOSPLIT, $0
+<span id="L91" class="ln">    91</span>		BR ·subVW_g(SB)
+<span id="L92" class="ln">    92</span>	
+<span id="L93" class="ln">    93</span>	TEXT ·shlVU(SB), NOSPLIT, $0
+<span id="L94" class="ln">    94</span>		BR ·shlVU_g(SB)
+<span id="L95" class="ln">    95</span>	
+<span id="L96" class="ln">    96</span>	TEXT ·shrVU(SB), NOSPLIT, $0
+<span id="L97" class="ln">    97</span>		BR ·shrVU_g(SB)
+<span id="L98" class="ln">    98</span>	
+<span id="L99" class="ln">    99</span>	// func mulAddVWW(z, x []Word, y, r Word) (c Word)
+<span id="L100" class="ln">   100</span>	TEXT ·mulAddVWW(SB), NOSPLIT, $0
+<span id="L101" class="ln">   101</span>		MOVD z+0(FP), R10
+<span id="L102" class="ln">   102</span>		MOVD x+24(FP), R8
+<span id="L103" class="ln">   103</span>		MOVD y+48(FP), R9
+<span id="L104" class="ln">   104</span>		MOVD r+56(FP), R4     // c = r
+<span id="L105" class="ln">   105</span>		MOVD z_len+8(FP), R11
+<span id="L106" class="ln">   106</span>		MOVD $0, R3           // i = 0
+<span id="L107" class="ln">   107</span>		MOVD $8, R18
+<span id="L108" class="ln">   108</span>		MOVD $1, R19
+<span id="L109" class="ln">   109</span>	
+<span id="L110" class="ln">   110</span>		JMP e5
+<span id="L111" class="ln">   111</span>	
+<span id="L112" class="ln">   112</span>	l5:
+<span id="L113" class="ln">   113</span>		MULLD  R18, R3, R5
+<span id="L114" class="ln">   114</span>		MOVD   (R8)(R5), R20
+<span id="L115" class="ln">   115</span>		MULLD  R9, R20, R6
+<span id="L116" class="ln">   116</span>		MULHDU R9, R20, R7
+<span id="L117" class="ln">   117</span>		ADDC   R4, R6
+<span id="L118" class="ln">   118</span>		ADDZE  R7
+<span id="L119" class="ln">   119</span>		MOVD   R6, (R10)(R5)
+<span id="L120" class="ln">   120</span>		MOVD   R7, R4
+<span id="L121" class="ln">   121</span>		ADD    R19, R3
+<span id="L122" class="ln">   122</span>	
+<span id="L123" class="ln">   123</span>	e5:
+<span id="L124" class="ln">   124</span>		CMP R3, R11
+<span id="L125" class="ln">   125</span>		BLT l5
+<span id="L126" class="ln">   126</span>	
+<span id="L127" class="ln">   127</span>		MOVD R4, c+64(FP)
+<span id="L128" class="ln">   128</span>		RET
+<span id="L129" class="ln">   129</span>	
+<span id="L130" class="ln">   130</span>	// func addMulVVW(z, x []Word, y Word) (c Word)
+<span id="L131" class="ln">   131</span>	TEXT ·addMulVVW(SB), NOSPLIT, $0
+<span id="L132" class="ln">   132</span>		MOVD z+0(FP), R10
+<span id="L133" class="ln">   133</span>		MOVD x+24(FP), R8
+<span id="L134" class="ln">   134</span>		MOVD y+48(FP), R9
+<span id="L135" class="ln">   135</span>		MOVD z_len+8(FP), R22
+<span id="L136" class="ln">   136</span>	
+<span id="L137" class="ln">   137</span>		MOVD $0, R5   // i = 0
+<span id="L138" class="ln">   138</span>		MOVD $0, R4   // c = 0
+<span id="L139" class="ln">   139</span>		MOVD $8, R28
+<span id="L140" class="ln">   140</span>		MOVD $-2, R23
+<span id="L141" class="ln">   141</span>		AND  R22, R23 // mask the last bit of z.len
+<span id="L142" class="ln">   142</span>		MOVD $2, R24
+<span id="L143" class="ln">   143</span>		CMP  R23, R24
+<span id="L144" class="ln">   144</span>		BGE  unrolled
+<span id="L145" class="ln">   145</span>		JMP  end
+<span id="L146" class="ln">   146</span>	
+<span id="L147" class="ln">   147</span>	unrolled:
+<span id="L148" class="ln">   148</span>		MOVD  $8, R19         // no (RA)(RB*8) on power
+<span id="L149" class="ln">   149</span>		MULLD R5, R19
+<span id="L150" class="ln">   150</span>		MOVD  (R10)(R19), R11 // R11 = z[i]
+<span id="L151" class="ln">   151</span>		MOVD  (R8)(R19), R16  // R16 = x[i]
+<span id="L152" class="ln">   152</span>		ADD   R28, R19, R25
+<span id="L153" class="ln">   153</span>		MOVD  (R10)(R25), R17
+<span id="L154" class="ln">   154</span>		MOVD  (R8)(R25), R18
+<span id="L155" class="ln">   155</span>	
+<span id="L156" class="ln">   156</span>		MULLD  R9, R16, R12
+<span id="L157" class="ln">   157</span>		MULHDU R9, R16, R14
+<span id="L158" class="ln">   158</span>		MULLD  R9, R18, R6
+<span id="L159" class="ln">   159</span>		MULHDU R9, R18, R7
+<span id="L160" class="ln">   160</span>		ADDC   R4, R12
+<span id="L161" class="ln">   161</span>		ADDZE  R14
+<span id="L162" class="ln">   162</span>		ADDC   R11, R12        // z[i] = (x[i]*y) + z[i] + carry
+<span id="L163" class="ln">   163</span>		ADDZE  R14             // carry = high order bits + add carry
+<span id="L164" class="ln">   164</span>		MOVD   R12, (R10)(R19)
+<span id="L165" class="ln">   165</span>		ADDC   R14, R6
+<span id="L166" class="ln">   166</span>		ADDZE  R7
+<span id="L167" class="ln">   167</span>		ADDC   R17, R6
+<span id="L168" class="ln">   168</span>		ADDZE  R7
+<span id="L169" class="ln">   169</span>		MOVD   R6, (R10)(R25)
+<span id="L170" class="ln">   170</span>		MOVD   R7, R4
+<span id="L171" class="ln">   171</span>	
+<span id="L172" class="ln">   172</span>		ADD R24, R5
+<span id="L173" class="ln">   173</span>		CMP R5, R23
+<span id="L174" class="ln">   174</span>		BLT unrolled
+<span id="L175" class="ln">   175</span>		JMP end
+<span id="L176" class="ln">   176</span>	
+<span id="L177" class="ln">   177</span>	loop:
+<span id="L178" class="ln">   178</span>		MOVD   $8, R19
+<span id="L179" class="ln">   179</span>		MULLD  R5, R19
+<span id="L180" class="ln">   180</span>		MOVD   (R10)(R19), R11
+<span id="L181" class="ln">   181</span>		MOVD   (R8)(R19), R16
+<span id="L182" class="ln">   182</span>		MULLD  R9, R16, R12
+<span id="L183" class="ln">   183</span>		MULHDU R9, R16, R14
+<span id="L184" class="ln">   184</span>		ADDC   R4, R12
+<span id="L185" class="ln">   185</span>		ADDZE  R14
+<span id="L186" class="ln">   186</span>		ADDC   R11, R12
+<span id="L187" class="ln">   187</span>		ADDZE  R14
+<span id="L188" class="ln">   188</span>		MOVD   R12, (R10)(R19)
+<span id="L189" class="ln">   189</span>		MOVD   R14, R4
+<span id="L190" class="ln">   190</span>	
+<span id="L191" class="ln">   191</span>		MOVD $1, R15
+<span id="L192" class="ln">   192</span>		ADD  R15, R5
+<span id="L193" class="ln">   193</span>	
+<span id="L194" class="ln">   194</span>	end:
+<span id="L195" class="ln">   195</span>		CMP R5, R22
+<span id="L196" class="ln">   196</span>		BLT loop
+<span id="L197" class="ln">   197</span>	
+<span id="L198" class="ln">   198</span>		MOVD R4, c+56(FP)
+<span id="L199" class="ln">   199</span>		RET
+<span id="L200" class="ln">   200</span>	
+<span id="L201" class="ln">   201</span>	// func divWW(x1, x0, y Word) (q, r Word)
+<span id="L202" class="ln">   202</span>	TEXT ·divWW(SB), NOSPLIT, $0
+<span id="L203" class="ln">   203</span>		MOVD x1+0(FP), R4
+<span id="L204" class="ln">   204</span>		MOVD x0+8(FP), R5
+<span id="L205" class="ln">   205</span>		MOVD y+16(FP), R6
+<span id="L206" class="ln">   206</span>	
+<span id="L207" class="ln">   207</span>		CMPU R4, R6
+<span id="L208" class="ln">   208</span>		BGE  divbigger
+<span id="L209" class="ln">   209</span>	
+<span id="L210" class="ln">   210</span>		// from the programmer&#39;s note in ch. 3 of the ISA manual, p.74
+<span id="L211" class="ln">   211</span>		DIVDEU R6, R4, R3
+<span id="L212" class="ln">   212</span>		DIVDU  R6, R5, R7
+<span id="L213" class="ln">   213</span>		MULLD  R6, R3, R8
+<span id="L214" class="ln">   214</span>		MULLD  R6, R7, R20
+<span id="L215" class="ln">   215</span>		SUB    R20, R5, R10
+<span id="L216" class="ln">   216</span>		ADD    R7, R3, R3
+<span id="L217" class="ln">   217</span>		SUB    R8, R10, R4
+<span id="L218" class="ln">   218</span>		CMPU   R4, R10
+<span id="L219" class="ln">   219</span>		BLT    adjust
+<span id="L220" class="ln">   220</span>		CMPU   R4, R6
+<span id="L221" class="ln">   221</span>		BLT    end
+<span id="L222" class="ln">   222</span>	
+<span id="L223" class="ln">   223</span>	adjust:
+<span id="L224" class="ln">   224</span>		MOVD $1, R21
+<span id="L225" class="ln">   225</span>		ADD  R21, R3, R3
+<span id="L226" class="ln">   226</span>		SUB  R6, R4, R4
+<span id="L227" class="ln">   227</span>	
+<span id="L228" class="ln">   228</span>	end:
+<span id="L229" class="ln">   229</span>		MOVD R3, q+24(FP)
+<span id="L230" class="ln">   230</span>		MOVD R4, r+32(FP)
+<span id="L231" class="ln">   231</span>	
+<span id="L232" class="ln">   232</span>		RET
+<span id="L233" class="ln">   233</span>	
+<span id="L234" class="ln">   234</span>	divbigger:
+<span id="L235" class="ln">   235</span>		MOVD $-1, R7
+<span id="L236" class="ln">   236</span>		MOVD R7, q+24(FP)
+<span id="L237" class="ln">   237</span>		MOVD R7, r+32(FP)
+<span id="L238" class="ln">   238</span>		RET
+<span id="L239" class="ln">   239</span>	
+<span id="L240" class="ln">   240</span>	TEXT ·divWVW(SB), NOSPLIT, $0
+<span id="L241" class="ln">   241</span>		BR ·divWVW_g(SB)
+</pre><p><a href="arith_ppc64x.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

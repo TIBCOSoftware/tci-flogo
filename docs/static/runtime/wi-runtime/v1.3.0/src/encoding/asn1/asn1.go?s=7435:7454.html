@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/encoding/asn1/asn1.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./asn1.go%3Fs=7435:7454.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/encoding">encoding</a>/<a href="../asn1.1.html">asn1</a>/<span class="text-muted">asn1.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/encoding/asn1.1.html">encoding/asn1</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// Package asn1 implements parsing of DER-encoded ASN.1 data structures,</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// as defined in ITU-T Rec X.690.</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span><span class="comment">// See also ``A Layman&#39;s Guide to a Subset of ASN.1, BER, and DER,&#39;&#39;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span><span class="comment">// http://luca.ntop.org/Teaching/Appunti/asn1.html.</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>package asn1
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span><span class="comment">// ASN.1 is a syntax for specifying abstract objects and BER, DER, PER, XER etc</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span><span class="comment">// are different encoding formats for those objects. Here, we&#39;ll be dealing</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// with DER, the Distinguished Encoding Rules. DER is used in X.509 because</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">// it&#39;s fast to parse and, unlike BER, has a unique encoding for every object.</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// When calculating hashes over objects, it&#39;s important that the resulting</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// bytes be the same at both ends and DER removes this margin of error.</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span><span class="comment">// ASN.1 is very complex and this package doesn&#39;t attempt to implement</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span><span class="comment">// everything by any means.</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>import (
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	&#34;math&#34;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	&#34;math/big&#34;
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	&#34;strconv&#34;
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	&#34;unicode/utf8&#34;
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>)
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span><span class="comment">// A StructuralError suggests that the ASN.1 data is valid, but the Go type</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span><span class="comment">// which is receiving it doesn&#39;t match.</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>type StructuralError struct {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	Msg string
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>}
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>func (e StructuralError) Error() string { return &#34;asn1: structure error: &#34; + e.Msg }
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span><span class="comment">// A SyntaxError suggests that the ASN.1 data is invalid.</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>type SyntaxError struct {
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	Msg string
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>}
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>func (e SyntaxError) Error() string { return &#34;asn1: syntax error: &#34; + e.Msg }
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span><span class="comment">// We start by dealing with each of the primitive types in turn.</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span><span class="comment">// BOOLEAN</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>func parseBool(bytes []byte) (ret bool, err error) {
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	if len(bytes) != 1 {
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>		err = SyntaxError{&#34;invalid boolean&#34;}
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>		return
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	}
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	<span class="comment">// DER demands that &#34;If the encoding represents the boolean value TRUE,</span>
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	<span class="comment">// its single contents octet shall have all eight bits set to one.&#34;</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	<span class="comment">// Thus only 0 and 255 are valid encoded values.</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	switch bytes[0] {
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	case 0:
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>		ret = false
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	case 0xff:
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>		ret = true
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>	default:
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>		err = SyntaxError{&#34;invalid boolean&#34;}
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>	}
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	return
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>}
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span><span class="comment">// INTEGER</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span><span class="comment">// checkInteger returns nil if the given bytes are a valid DER-encoded</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span><span class="comment">// INTEGER and an error otherwise.</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>func checkInteger(bytes []byte) error {
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	if len(bytes) == 0 {
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		return StructuralError{&#34;empty integer&#34;}
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	}
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	if len(bytes) == 1 {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		return nil
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	}
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	if (bytes[0] == 0 &amp;&amp; bytes[1]&amp;0x80 == 0) || (bytes[0] == 0xff &amp;&amp; bytes[1]&amp;0x80 == 0x80) {
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>		return StructuralError{&#34;integer not minimally-encoded&#34;}
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	}
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	return nil
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>}
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span><span class="comment">// parseInt64 treats the given bytes as a big-endian, signed integer and</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span><span class="comment">// returns the result.</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>func parseInt64(bytes []byte) (ret int64, err error) {
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	err = checkInteger(bytes)
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>		return
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	}
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	if len(bytes) &gt; 8 {
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>		<span class="comment">// We&#39;ll overflow an int64 in this case.</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>		err = StructuralError{&#34;integer too large&#34;}
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>		return
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	}
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	for bytesRead := 0; bytesRead &lt; len(bytes); bytesRead++ {
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>		ret &lt;&lt;= 8
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		ret |= int64(bytes[bytesRead])
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	}
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	<span class="comment">// Shift up and down in order to sign extend the result.</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	ret &lt;&lt;= 64 - uint8(len(bytes))*8
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	ret &gt;&gt;= 64 - uint8(len(bytes))*8
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>	return
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>}
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span><span class="comment">// parseInt treats the given bytes as a big-endian, signed integer and returns</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span><span class="comment">// the result.</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>func parseInt32(bytes []byte) (int32, error) {
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	if err := checkInteger(bytes); err != nil {
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		return 0, err
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	}
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	ret64, err := parseInt64(bytes)
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		return 0, err
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	}
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	if ret64 != int64(int32(ret64)) {
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>		return 0, StructuralError{&#34;integer too large&#34;}
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	}
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	return int32(ret64), nil
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>}
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>var bigOne = big.NewInt(1)
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span><span class="comment">// parseBigInt treats the given bytes as a big-endian, signed integer and returns</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span><span class="comment">// the result.</span>
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>func parseBigInt(bytes []byte) (*big.Int, error) {
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	if err := checkInteger(bytes); err != nil {
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>		return nil, err
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	}
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	ret := new(big.Int)
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	if len(bytes) &gt; 0 &amp;&amp; bytes[0]&amp;0x80 == 0x80 {
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>		<span class="comment">// This is a negative number.</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>		notBytes := make([]byte, len(bytes))
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>		for i := range notBytes {
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>			notBytes[i] = ^bytes[i]
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>		}
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		ret.SetBytes(notBytes)
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>		ret.Add(ret, bigOne)
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>		ret.Neg(ret)
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>		return ret, nil
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	}
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	ret.SetBytes(bytes)
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	return ret, nil
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>}
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span><span class="comment">// BIT STRING</span>
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span><span class="comment">// BitString is the structure to use when you want an ASN.1 BIT STRING type. A</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span><span class="comment">// bit string is padded up to the nearest byte in memory and the number of</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span><span class="comment">// valid bits is recorded. Padding bits will be zero.</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>type BitString struct {
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	Bytes     []byte <span class="comment">// bits packed into bytes.</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	BitLength int    <span class="comment">// length in bits.</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>}
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span><span class="comment">// At returns the bit at the given index. If the index is out of range it</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span><span class="comment">// returns false.</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>func (b BitString) At(i int) int {
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	if i &lt; 0 || i &gt;= b.BitLength {
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>		return 0
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	}
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	x := i / 8
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	y := 7 - uint(i%8)
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	return int(b.Bytes[x]&gt;&gt;y) &amp; 1
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>}
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span><span class="comment">// RightAlign returns a slice where the padding bits are at the beginning. The</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span><span class="comment">// slice may share memory with the BitString.</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>func (b BitString) RightAlign() []byte {
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	shift := uint(8 - (b.BitLength % 8))
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	if shift == 8 || len(b.Bytes) == 0 {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		return b.Bytes
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	}
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	a := make([]byte, len(b.Bytes))
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	a[0] = b.Bytes[0] &gt;&gt; shift
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>	for i := 1; i &lt; len(b.Bytes); i++ {
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		a[i] = b.Bytes[i-1] &lt;&lt; (8 - shift)
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		a[i] |= b.Bytes[i] &gt;&gt; shift
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	}
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	return a
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>}
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span><span class="comment">// parseBitString parses an ASN.1 bit string from the given byte slice and returns it.</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>func parseBitString(bytes []byte) (ret BitString, err error) {
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	if len(bytes) == 0 {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>		err = SyntaxError{&#34;zero length BIT STRING&#34;}
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>		return
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	}
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	paddingBits := int(bytes[0])
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	if paddingBits &gt; 7 ||
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>		len(bytes) == 1 &amp;&amp; paddingBits &gt; 0 ||
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		bytes[len(bytes)-1]&amp;((1&lt;&lt;bytes[0])-1) != 0 {
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>		err = SyntaxError{&#34;invalid padding bits in BIT STRING&#34;}
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		return
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	}
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	ret.BitLength = (len(bytes)-1)*8 - paddingBits
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>	ret.Bytes = bytes[1:]
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	return
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>}
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span><span class="comment">// NULL</span>
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span><span class="comment">// NullRawValue is a RawValue with its Tag set to the ASN.1 NULL type tag (5).</span>
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>var NullRawValue = RawValue{Tag: TagNull}
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span><span class="comment">// NullBytes contains bytes representing the DER-encoded ASN.1 NULL type.</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>var NullBytes = []byte{TagNull, 0}
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span><span class="comment">// OBJECT IDENTIFIER</span>
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span><span class="comment">// An ObjectIdentifier represents an ASN.1 OBJECT IDENTIFIER.</span>
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>type ObjectIdentifier []int
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span><span class="comment">// Equal reports whether oi and other represent the same identifier.</span>
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>func (oi ObjectIdentifier) Equal(other ObjectIdentifier) bool {
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	if len(oi) != len(other) {
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>		return false
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	}
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(oi); i++ {
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>		if oi[i] != other[i] {
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>			return false
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>		}
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	}
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	return true
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>}
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>func (oi ObjectIdentifier) String() string {
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	var s string
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>	for i, v := range oi {
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>		if i &gt; 0 {
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>			s += &#34;.&#34;
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>		}
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>		s += strconv.Itoa(v)
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	}
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	return s
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>}
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span><span class="comment">// parseObjectIdentifier parses an OBJECT IDENTIFIER from the given bytes and</span>
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span><span class="comment">// returns it. An object identifier is a sequence of variable length integers</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span><span class="comment">// that are assigned in a hierarchy.</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>func parseObjectIdentifier(bytes []byte) (s []int, err error) {
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	if len(bytes) == 0 {
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>		err = SyntaxError{&#34;zero length OBJECT IDENTIFIER&#34;}
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>		return
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	}
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	<span class="comment">// In the worst case, we get two elements from the first byte (which is</span>
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>	<span class="comment">// encoded differently) and then every varint is a single byte long.</span>
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>	s = make([]int, len(bytes)+1)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>	<span class="comment">// The first varint is 40*value1 + value2:</span>
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	<span class="comment">// According to this packing, value1 can take the values 0, 1 and 2 only.</span>
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	<span class="comment">// When value1 = 0 or value1 = 1, then value2 is &lt;= 39. When value1 = 2,</span>
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	<span class="comment">// then there are no restrictions on value2.</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>	v, offset, err := parseBase128Int(bytes, 0)
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>		return
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	}
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	if v &lt; 80 {
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>		s[0] = v / 40
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>		s[1] = v % 40
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	} else {
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>		s[0] = 2
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		s[1] = v - 80
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	}
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	i := 2
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	for ; offset &lt; len(bytes); i++ {
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>		v, offset, err = parseBase128Int(bytes, offset)
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>			return
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>		}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>		s[i] = v
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	}
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>	s = s[0:i]
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>	return
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>}
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span><span class="comment">// ENUMERATED</span>
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span><span class="comment">// An Enumerated is represented as a plain int.</span>
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span><span class="selection">type Enumerated int</span>
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span><span class="comment">// FLAG</span>
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span><span class="comment">// A Flag accepts any data and is set to true if present.</span>
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>type Flag bool
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span><span class="comment">// parseBase128Int parses a base-128 encoded int from the given offset in the</span>
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span><span class="comment">// given byte slice. It returns the value and the new offset.</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>func parseBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) {
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	offset = initOffset
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>	var ret64 int64
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>	for shifted := 0; offset &lt; len(bytes); shifted++ {
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>		<span class="comment">// 5 * 7 bits per byte == 35 bits of data</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>		<span class="comment">// Thus the representation is either non-minimal or too large for an int32</span>
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>		if shifted == 5 {
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>			err = StructuralError{&#34;base 128 integer too large&#34;}
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>			return
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>		}
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		ret64 &lt;&lt;= 7
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		b := bytes[offset]
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		ret64 |= int64(b &amp; 0x7f)
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>		offset++
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>		if b&amp;0x80 == 0 {
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>			ret = int(ret64)
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>			<span class="comment">// Ensure that the returned value fits in an int on all platforms</span>
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>			if ret64 &gt; math.MaxInt32 {
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>				err = StructuralError{&#34;base 128 integer too large&#34;}
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>			}
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>			return
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>		}
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>	}
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	err = SyntaxError{&#34;truncated base 128 integer&#34;}
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>	return
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>}
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span><span class="comment">// UTCTime</span>
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>func parseUTCTime(bytes []byte) (ret time.Time, err error) {
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>	s := string(bytes)
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	formatStr := &#34;0601021504Z0700&#34;
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>	ret, err = time.Parse(formatStr, s)
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		formatStr = &#34;060102150405Z0700&#34;
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		ret, err = time.Parse(formatStr, s)
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	}
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>		return
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	}
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	if serialized := ret.Format(formatStr); serialized != s {
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>		err = fmt.Errorf(&#34;asn1: time did not serialize back to the original value and may be invalid: given %q, but serialized as %q&#34;, s, serialized)
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>		return
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	}
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	if ret.Year() &gt;= 2050 {
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>		<span class="comment">// UTCTime only encodes times prior to 2050. See https://tools.ietf.org/html/rfc5280#section-4.1.2.5.1</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		ret = ret.AddDate(-100, 0, 0)
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	}
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	return
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>}
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span><span class="comment">// parseGeneralizedTime parses the GeneralizedTime from the given byte slice</span>
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span><span class="comment">// and returns the resulting time.</span>
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>func parseGeneralizedTime(bytes []byte) (ret time.Time, err error) {
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	const formatStr = &#34;20060102150405Z0700&#34;
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	s := string(bytes)
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	if ret, err = time.Parse(formatStr, s); err != nil {
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>		return
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>	}
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	if serialized := ret.Format(formatStr); serialized != s {
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>		err = fmt.Errorf(&#34;asn1: time did not serialize back to the original value and may be invalid: given %q, but serialized as %q&#34;, s, serialized)
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	}
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	return
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>}
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span><span class="comment">// PrintableString</span>
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span><span class="comment">// parsePrintableString parses a ASN.1 PrintableString from the given byte</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span><span class="comment">// array and returns it.</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>func parsePrintableString(bytes []byte) (ret string, err error) {
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>	for _, b := range bytes {
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>		if !isPrintable(b) {
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>			err = SyntaxError{&#34;PrintableString contains invalid character&#34;}
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>			return
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		}
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>	}
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>	ret = string(bytes)
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>	return
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>}
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span><span class="comment">// isPrintable reports whether the given b is in the ASN.1 PrintableString set.</span>
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>func isPrintable(b byte) bool {
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	return &#39;a&#39; &lt;= b &amp;&amp; b &lt;= &#39;z&#39; ||
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>		&#39;A&#39; &lt;= b &amp;&amp; b &lt;= &#39;Z&#39; ||
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>		&#39;0&#39; &lt;= b &amp;&amp; b &lt;= &#39;9&#39; ||
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>		&#39;\&#39;&#39; &lt;= b &amp;&amp; b &lt;= &#39;)&#39; ||
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>		&#39;+&#39; &lt;= b &amp;&amp; b &lt;= &#39;/&#39; ||
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>		b == &#39; &#39; ||
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>		b == &#39;:&#39; ||
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>		b == &#39;=&#39; ||
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>		b == &#39;?&#39; ||
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>		<span class="comment">// This is technically not allowed in a PrintableString.</span>
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>		<span class="comment">// However, x509 certificates with wildcard strings don&#39;t</span>
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>		<span class="comment">// always use the correct string type so we permit it.</span>
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>		b == &#39;*&#39;
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>}
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span><span class="comment">// IA5String</span>
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span><span class="comment">// parseIA5String parses a ASN.1 IA5String (ASCII string) from the given</span>
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span><span class="comment">// byte slice and returns it.</span>
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>func parseIA5String(bytes []byte) (ret string, err error) {
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	for _, b := range bytes {
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>		if b &gt;= utf8.RuneSelf {
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>			err = SyntaxError{&#34;IA5String contains invalid character&#34;}
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>			return
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>		}
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>	}
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>	ret = string(bytes)
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>	return
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>}
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span><span class="comment">// T61String</span>
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span><span class="comment">// parseT61String parses a ASN.1 T61String (8-bit clean string) from the given</span>
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span><span class="comment">// byte slice and returns it.</span>
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>func parseT61String(bytes []byte) (ret string, err error) {
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>	return string(bytes), nil
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>}
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span><span class="comment">// UTF8String</span>
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span><span class="comment">// parseUTF8String parses a ASN.1 UTF8String (raw UTF-8) from the given byte</span>
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span><span class="comment">// array and returns it.</span>
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>func parseUTF8String(bytes []byte) (ret string, err error) {
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	if !utf8.Valid(bytes) {
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>		return &#34;&#34;, errors.New(&#34;asn1: invalid UTF-8 string&#34;)
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>	}
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>	return string(bytes), nil
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>}
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span><span class="comment">// A RawValue represents an undecoded ASN.1 object.</span>
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>type RawValue struct {
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	Class, Tag int
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	IsCompound bool
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	Bytes      []byte
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>	FullBytes  []byte <span class="comment">// includes the tag and length</span>
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>}
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span><span class="comment">// RawContent is used to signal that the undecoded, DER data needs to be</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span><span class="comment">// preserved for a struct. To use it, the first field of the struct must have</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span><span class="comment">// this type. It&#39;s an error for any of the other fields to have this type.</span>
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>type RawContent []byte
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span><span class="comment">// Tagging</span>
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span><span class="comment">// parseTagAndLength parses an ASN.1 tag and length pair from the given offset</span>
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span><span class="comment">// into a byte slice. It returns the parsed data and the new offset. SET and</span>
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span><span class="comment">// SET OF (tag 17) are mapped to SEQUENCE and SEQUENCE OF (tag 16) since we</span>
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span><span class="comment">// don&#39;t distinguish between ordered and unordered objects in this code.</span>
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>func parseTagAndLength(bytes []byte, initOffset int) (ret tagAndLength, offset int, err error) {
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>	offset = initOffset
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>	<span class="comment">// parseTagAndLength should not be called without at least a single</span>
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>	<span class="comment">// byte to read. Thus this check is for robustness:</span>
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>	if offset &gt;= len(bytes) {
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>		err = errors.New(&#34;asn1: internal error in parseTagAndLength&#34;)
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>		return
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>	}
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>	b := bytes[offset]
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>	offset++
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>	ret.class = int(b &gt;&gt; 6)
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>	ret.isCompound = b&amp;0x20 == 0x20
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>	ret.tag = int(b &amp; 0x1f)
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	<span class="comment">// If the bottom five bits are set, then the tag number is actually base 128</span>
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>	<span class="comment">// encoded afterwards</span>
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>	if ret.tag == 0x1f {
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>		ret.tag, offset, err = parseBase128Int(bytes, offset)
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>			return
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>		}
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		<span class="comment">// Tags should be encoded in minimal form.</span>
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>		if ret.tag &lt; 0x1f {
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>			err = SyntaxError{&#34;non-minimal tag&#34;}
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>			return
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>		}
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>	}
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>	if offset &gt;= len(bytes) {
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>		err = SyntaxError{&#34;truncated tag or length&#34;}
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>		return
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>	}
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>	b = bytes[offset]
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>	offset++
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>	if b&amp;0x80 == 0 {
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>		<span class="comment">// The length is encoded in the bottom 7 bits.</span>
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>		ret.length = int(b &amp; 0x7f)
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>	} else {
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>		<span class="comment">// Bottom 7 bits give the number of length bytes to follow.</span>
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>		numBytes := int(b &amp; 0x7f)
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>		if numBytes == 0 {
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>			err = SyntaxError{&#34;indefinite length found (not DER)&#34;}
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>			return
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>		}
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>		ret.length = 0
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>		for i := 0; i &lt; numBytes; i++ {
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>			if offset &gt;= len(bytes) {
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>				err = SyntaxError{&#34;truncated tag or length&#34;}
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>				return
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>			}
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>			b = bytes[offset]
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>			offset++
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>			if ret.length &gt;= 1&lt;&lt;23 {
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>				<span class="comment">// We can&#39;t shift ret.length up without</span>
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>				<span class="comment">// overflowing.</span>
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>				err = StructuralError{&#34;length too large&#34;}
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>				return
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>			}
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>			ret.length &lt;&lt;= 8
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>			ret.length |= int(b)
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>			if ret.length == 0 {
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>				<span class="comment">// DER requires that lengths be minimal.</span>
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>				err = StructuralError{&#34;superfluous leading zeros in length&#34;}
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>				return
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>			}
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>		}
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>		<span class="comment">// Short lengths must be encoded in short form.</span>
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>		if ret.length &lt; 0x80 {
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>			err = StructuralError{&#34;non-minimal length&#34;}
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>			return
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		}
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>	}
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>	return
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>}
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span><span class="comment">// parseSequenceOf is used for SEQUENCE OF and SET OF values. It tries to parse</span>
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span><span class="comment">// a number of ASN.1 values from the given byte slice and returns them as a</span>
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span><span class="comment">// slice of Go values of the given type.</span>
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>func parseSequenceOf(bytes []byte, sliceType reflect.Type, elemType reflect.Type) (ret reflect.Value, err error) {
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	expectedTag, compoundType, ok := getUniversalType(elemType)
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	if !ok {
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>		err = StructuralError{&#34;unknown Go type for slice&#34;}
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		return
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	}
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>	<span class="comment">// First we iterate over the input and count the number of elements,</span>
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>	<span class="comment">// checking that the types are correct in each case.</span>
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>	numElements := 0
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>	for offset := 0; offset &lt; len(bytes); {
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>		var t tagAndLength
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>		t, offset, err = parseTagAndLength(bytes, offset)
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>			return
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>		}
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>		switch t.tag {
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>		case TagIA5String, TagGeneralString, TagT61String, TagUTF8String:
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>			<span class="comment">// We pretend that various other string types are</span>
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>			<span class="comment">// PRINTABLE STRINGs so that a sequence of them can be</span>
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>			<span class="comment">// parsed into a []string.</span>
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>			t.tag = TagPrintableString
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>		case TagGeneralizedTime, TagUTCTime:
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>			<span class="comment">// Likewise, both time types are treated the same.</span>
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>			t.tag = TagUTCTime
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>		}
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>		if t.class != ClassUniversal || t.isCompound != compoundType || t.tag != expectedTag {
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>			err = StructuralError{&#34;sequence tag mismatch&#34;}
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>			return
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>		}
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>		if invalidLength(offset, t.length, len(bytes)) {
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>			err = SyntaxError{&#34;truncated sequence&#34;}
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>			return
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>		}
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>		offset += t.length
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		numElements++
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>	}
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>	ret = reflect.MakeSlice(sliceType, numElements, numElements)
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>	params := fieldParameters{}
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>	offset := 0
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>	for i := 0; i &lt; numElements; i++ {
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>		offset, err = parseField(ret.Index(i), bytes, offset, params)
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>			return
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>		}
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>	}
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>	return
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>}
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>var (
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>	bitStringType        = reflect.TypeOf(BitString{})
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>	objectIdentifierType = reflect.TypeOf(ObjectIdentifier{})
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>	enumeratedType       = reflect.TypeOf(Enumerated(0))
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>	flagType             = reflect.TypeOf(Flag(false))
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>	timeType             = reflect.TypeOf(time.Time{})
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>	rawValueType         = reflect.TypeOf(RawValue{})
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>	rawContentsType      = reflect.TypeOf(RawContent(nil))
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>	bigIntType           = reflect.TypeOf(new(big.Int))
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>)
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span><span class="comment">// invalidLength returns true iff offset + length &gt; sliceLength, or if the</span>
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span><span class="comment">// addition would overflow.</span>
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>func invalidLength(offset, length, sliceLength int) bool {
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>	return offset+length &lt; offset || offset+length &gt; sliceLength
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>}
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span><span class="comment">// parseField is the main parsing function. Given a byte slice and an offset</span>
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span><span class="comment">// into the array, it will try to parse a suitable ASN.1 value out and store it</span>
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span><span class="comment">// in the given Value.</span>
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>func parseField(v reflect.Value, bytes []byte, initOffset int, params fieldParameters) (offset int, err error) {
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>	offset = initOffset
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>	fieldType := v.Type()
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>	<span class="comment">// If we have run out of data, it may be that there are optional elements at the end.</span>
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>	if offset == len(bytes) {
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>		if !setDefaultValue(v, params) {
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>			err = SyntaxError{&#34;sequence truncated&#34;}
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>		}
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>		return
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>	}
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>	<span class="comment">// Deal with raw values.</span>
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>	if fieldType == rawValueType {
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>		var t tagAndLength
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>		t, offset, err = parseTagAndLength(bytes, offset)
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>			return
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>		}
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>		if invalidLength(offset, t.length, len(bytes)) {
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>			err = SyntaxError{&#34;data truncated&#34;}
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>			return
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>		}
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>		result := RawValue{t.class, t.tag, t.isCompound, bytes[offset : offset+t.length], bytes[initOffset : offset+t.length]}
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>		offset += t.length
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>		v.Set(reflect.ValueOf(result))
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>		return
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>	}
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>	<span class="comment">// Deal with the ANY type.</span>
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>	if ifaceType := fieldType; ifaceType.Kind() == reflect.Interface &amp;&amp; ifaceType.NumMethod() == 0 {
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>		var t tagAndLength
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>		t, offset, err = parseTagAndLength(bytes, offset)
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>			return
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>		}
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>		if invalidLength(offset, t.length, len(bytes)) {
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>			err = SyntaxError{&#34;data truncated&#34;}
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>			return
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>		}
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>		var result interface{}
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>		if !t.isCompound &amp;&amp; t.class == ClassUniversal {
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>			innerBytes := bytes[offset : offset+t.length]
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>			switch t.tag {
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>			case TagPrintableString:
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>				result, err = parsePrintableString(innerBytes)
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>			case TagIA5String:
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>				result, err = parseIA5String(innerBytes)
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>			case TagT61String:
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>				result, err = parseT61String(innerBytes)
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>			case TagUTF8String:
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>				result, err = parseUTF8String(innerBytes)
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>			case TagInteger:
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>				result, err = parseInt64(innerBytes)
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>			case TagBitString:
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>				result, err = parseBitString(innerBytes)
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>			case TagOID:
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>				result, err = parseObjectIdentifier(innerBytes)
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>			case TagUTCTime:
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>				result, err = parseUTCTime(innerBytes)
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>			case TagGeneralizedTime:
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>				result, err = parseGeneralizedTime(innerBytes)
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>			case TagOctetString:
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>				result = innerBytes
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>			default:
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>				<span class="comment">// If we don&#39;t know how to handle the type, we just leave Value as nil.</span>
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>			}
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>		}
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		offset += t.length
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>			return
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>		}
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>		if result != nil {
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>			v.Set(reflect.ValueOf(result))
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>		}
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>		return
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>	}
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>	universalTag, compoundType, ok1 := getUniversalType(fieldType)
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>	if !ok1 {
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>		err = StructuralError{fmt.Sprintf(&#34;unknown Go type: %v&#34;, fieldType)}
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>		return
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>	}
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>	t, offset, err := parseTagAndLength(bytes, offset)
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>		return
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>	}
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>	if params.explicit {
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>		expectedClass := ClassContextSpecific
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>		if params.application {
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>			expectedClass = ClassApplication
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>		}
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>		if offset == len(bytes) {
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>			err = StructuralError{&#34;explicit tag has no child&#34;}
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>			return
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>		}
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>		if t.class == expectedClass &amp;&amp; t.tag == *params.tag &amp;&amp; (t.length == 0 || t.isCompound) {
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>			if t.length &gt; 0 {
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>				t, offset, err = parseTagAndLength(bytes, offset)
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>				if err != nil {
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>					return
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>				}
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>			} else {
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>				if fieldType != flagType {
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>					err = StructuralError{&#34;zero length explicit tag was not an asn1.Flag&#34;}
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>					return
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>				}
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>				v.SetBool(true)
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>				return
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>			}
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>		} else {
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>			<span class="comment">// The tags didn&#39;t match, it might be an optional element.</span>
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>			ok := setDefaultValue(v, params)
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>			if ok {
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>				offset = initOffset
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>			} else {
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>				err = StructuralError{&#34;explicitly tagged member didn&#39;t match&#34;}
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>			}
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>			return
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>		}
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>	}
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>	<span class="comment">// Special case for strings: all the ASN.1 string types map to the Go</span>
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>	<span class="comment">// type string. getUniversalType returns the tag for PrintableString</span>
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>	<span class="comment">// when it sees a string, so if we see a different string type on the</span>
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>	<span class="comment">// wire, we change the universal type to match.</span>
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>	if universalTag == TagPrintableString {
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>		if t.class == ClassUniversal {
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>			switch t.tag {
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>			case TagIA5String, TagGeneralString, TagT61String, TagUTF8String:
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>				universalTag = t.tag
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>			}
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>		} else if params.stringType != 0 {
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>			universalTag = params.stringType
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>		}
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>	}
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>	<span class="comment">// Special case for time: UTCTime and GeneralizedTime both map to the</span>
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>	<span class="comment">// Go type time.Time.</span>
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>	if universalTag == TagUTCTime &amp;&amp; t.tag == TagGeneralizedTime &amp;&amp; t.class == ClassUniversal {
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>		universalTag = TagGeneralizedTime
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>	}
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>	if params.set {
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>		universalTag = TagSet
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>	}
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>	expectedClass := ClassUniversal
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>	expectedTag := universalTag
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>	if !params.explicit &amp;&amp; params.tag != nil {
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>		expectedClass = ClassContextSpecific
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>		expectedTag = *params.tag
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>	}
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>	if !params.explicit &amp;&amp; params.application &amp;&amp; params.tag != nil {
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>		expectedClass = ClassApplication
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>		expectedTag = *params.tag
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>	}
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>	<span class="comment">// We have unwrapped any explicit tagging at this point.</span>
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>	if t.class != expectedClass || t.tag != expectedTag || t.isCompound != compoundType {
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>		<span class="comment">// Tags don&#39;t match. Again, it could be an optional element.</span>
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>		ok := setDefaultValue(v, params)
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>		if ok {
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>			offset = initOffset
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>		} else {
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>			err = StructuralError{fmt.Sprintf(&#34;tags don&#39;t match (%d vs %+v) %+v %s @%d&#34;, expectedTag, t, params, fieldType.Name(), offset)}
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>		}
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>		return
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>	}
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>	if invalidLength(offset, t.length, len(bytes)) {
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>		err = SyntaxError{&#34;data truncated&#34;}
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>		return
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>	}
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>	innerBytes := bytes[offset : offset+t.length]
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>	offset += t.length
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>	<span class="comment">// We deal with the structures defined in this package first.</span>
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>	switch fieldType {
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>	case objectIdentifierType:
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>		newSlice, err1 := parseObjectIdentifier(innerBytes)
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>		v.Set(reflect.MakeSlice(v.Type(), len(newSlice), len(newSlice)))
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>		if err1 == nil {
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>			reflect.Copy(v, reflect.ValueOf(newSlice))
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>		}
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>		err = err1
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>		return
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>	case bitStringType:
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>		bs, err1 := parseBitString(innerBytes)
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>		if err1 == nil {
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>			v.Set(reflect.ValueOf(bs))
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>		}
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>		err = err1
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>		return
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>	case timeType:
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>		var time time.Time
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>		var err1 error
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>		if universalTag == TagUTCTime {
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>			time, err1 = parseUTCTime(innerBytes)
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>		} else {
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>			time, err1 = parseGeneralizedTime(innerBytes)
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>		}
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>		if err1 == nil {
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>			v.Set(reflect.ValueOf(time))
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>		}
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>		err = err1
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>		return
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>	case enumeratedType:
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>		parsedInt, err1 := parseInt32(innerBytes)
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>		if err1 == nil {
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>			v.SetInt(int64(parsedInt))
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>		}
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>		err = err1
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>		return
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>	case flagType:
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>		v.SetBool(true)
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>		return
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>	case bigIntType:
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>		parsedInt, err1 := parseBigInt(innerBytes)
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>		if err1 == nil {
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>			v.Set(reflect.ValueOf(parsedInt))
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>		}
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>		err = err1
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>		return
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>	}
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>	switch val := v; val.Kind() {
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>	case reflect.Bool:
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>		parsedBool, err1 := parseBool(innerBytes)
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>		if err1 == nil {
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>			val.SetBool(parsedBool)
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>		}
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>		err = err1
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>		return
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>	case reflect.Int, reflect.Int32, reflect.Int64:
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>		if val.Type().Size() == 4 {
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>			parsedInt, err1 := parseInt32(innerBytes)
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>			if err1 == nil {
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>				val.SetInt(int64(parsedInt))
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>			}
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>			err = err1
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>		} else {
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>			parsedInt, err1 := parseInt64(innerBytes)
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>			if err1 == nil {
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>				val.SetInt(parsedInt)
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>			}
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>			err = err1
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>		}
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>		return
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>	<span class="comment">// TODO(dfc) Add support for the remaining integer types</span>
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>	case reflect.Struct:
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>		structType := fieldType
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>		for i := 0; i &lt; structType.NumField(); i++ {
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>			if structType.Field(i).PkgPath != &#34;&#34; {
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>				err = StructuralError{&#34;struct contains unexported fields&#34;}
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>				return
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>			}
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>		}
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>		if structType.NumField() &gt; 0 &amp;&amp;
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>			structType.Field(0).Type == rawContentsType {
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>			bytes := bytes[initOffset:offset]
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>			val.Field(0).Set(reflect.ValueOf(RawContent(bytes)))
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>		}
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>		innerOffset := 0
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>		for i := 0; i &lt; structType.NumField(); i++ {
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>			field := structType.Field(i)
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>			if i == 0 &amp;&amp; field.Type == rawContentsType {
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>				continue
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>			}
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>			innerOffset, err = parseField(val.Field(i), innerBytes, innerOffset, parseFieldParameters(field.Tag.Get(&#34;asn1&#34;)))
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span>				return
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>			}
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>		}
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>		<span class="comment">// We allow extra bytes at the end of the SEQUENCE because</span>
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>		<span class="comment">// adding elements to the end has been used in X.509 as the</span>
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>		<span class="comment">// version numbers have increased.</span>
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>		return
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>	case reflect.Slice:
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>		sliceType := fieldType
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>		if sliceType.Elem().Kind() == reflect.Uint8 {
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>			val.Set(reflect.MakeSlice(sliceType, len(innerBytes), len(innerBytes)))
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>			reflect.Copy(val, reflect.ValueOf(innerBytes))
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>			return
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>		}
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>		newSlice, err1 := parseSequenceOf(innerBytes, sliceType, sliceType.Elem())
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>		if err1 == nil {
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>			val.Set(newSlice)
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>		}
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>		err = err1
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>		return
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>	case reflect.String:
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>		var v string
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>		switch universalTag {
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>		case TagPrintableString:
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>			v, err = parsePrintableString(innerBytes)
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>		case TagIA5String:
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>			v, err = parseIA5String(innerBytes)
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>		case TagT61String:
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>			v, err = parseT61String(innerBytes)
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>		case TagUTF8String:
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>			v, err = parseUTF8String(innerBytes)
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>		case TagGeneralString:
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>			<span class="comment">// GeneralString is specified in ISO-2022/ECMA-35,</span>
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>			<span class="comment">// A brief review suggests that it includes structures</span>
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>			<span class="comment">// that allow the encoding to change midstring and</span>
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>			<span class="comment">// such. We give up and pass it as an 8-bit string.</span>
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>			v, err = parseT61String(innerBytes)
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>		default:
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>			err = SyntaxError{fmt.Sprintf(&#34;internal error: unknown string type %d&#34;, universalTag)}
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>		}
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>		if err == nil {
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>			val.SetString(v)
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>		}
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>		return
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>	}
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>	err = StructuralError{&#34;unsupported: &#34; + v.Type().String()}
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>	return
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>}
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span><span class="comment">// canHaveDefaultValue reports whether k is a Kind that we will set a default</span>
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span><span class="comment">// value for. (A signed integer, essentially.)</span>
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>func canHaveDefaultValue(k reflect.Kind) bool {
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>	switch k {
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>		return true
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>	}
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>	return false
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>}
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span><span class="comment">// setDefaultValue is used to install a default value, from a tag string, into</span>
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span><span class="comment">// a Value. It is successful if the field was optional, even if a default value</span>
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span><span class="comment">// wasn&#39;t provided or it failed to install it into the Value.</span>
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>func setDefaultValue(v reflect.Value, params fieldParameters) (ok bool) {
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>	if !params.optional {
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>		return
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>	}
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>	ok = true
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>	if params.defaultValue == nil {
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>		return
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>	}
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>	if canHaveDefaultValue(v.Kind()) {
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>		v.SetInt(*params.defaultValue)
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>	}
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>	return
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>}
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span><span class="comment">// Unmarshal parses the DER-encoded ASN.1 data structure b</span>
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span><span class="comment">// and uses the reflect package to fill in an arbitrary value pointed at by val.</span>
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span><span class="comment">// Because Unmarshal uses the reflect package, the structs</span>
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span><span class="comment">// being written to must use upper case field names.</span>
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 INTEGER can be written to an int, int32, int64,</span>
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span><span class="comment">// or *big.Int (from the math/big package).</span>
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span><span class="comment">// If the encoded value does not fit in the Go type,</span>
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span><span class="comment">// Unmarshal returns a parse error.</span>
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 BIT STRING can be written to a BitString.</span>
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 OCTET STRING can be written to a []byte.</span>
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 OBJECT IDENTIFIER can be written to an</span>
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span><span class="comment">// ObjectIdentifier.</span>
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 ENUMERATED can be written to an Enumerated.</span>
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 UTCTIME or GENERALIZEDTIME can be written to a time.Time.</span>
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 PrintableString or IA5String can be written to a string.</span>
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span><span class="comment">// Any of the above ASN.1 values can be written to an interface{}.</span>
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span><span class="comment">// The value stored in the interface has the corresponding Go type.</span>
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span><span class="comment">// For integers, that type is int64.</span>
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 SEQUENCE OF x or SET OF x can be written</span>
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span><span class="comment">// to a slice if an x can be written to the slice&#39;s element type.</span>
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span><span class="comment">// An ASN.1 SEQUENCE or SET can be written to a struct</span>
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span><span class="comment">// if each of the elements in the sequence can be</span>
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span><span class="comment">// written to the corresponding element in the struct.</span>
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span><span class="comment">// The following tags on struct fields have special meaning to Unmarshal:</span>
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span><span class="comment">//	application specifies that a APPLICATION tag is used</span>
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span><span class="comment">//	default:x   sets the default value for optional integer fields (only used if optional is also present)</span>
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span><span class="comment">//	explicit    specifies that an additional, explicit tag wraps the implicit one</span>
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span><span class="comment">//	optional    marks the field as ASN.1 OPTIONAL</span>
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span><span class="comment">//	set         causes a SET, rather than a SEQUENCE type to be expected</span>
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span><span class="comment">//	tag:x       specifies the ASN.1 tag number; implies ASN.1 CONTEXT SPECIFIC</span>
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span><span class="comment">// If the type of the first field of a structure is RawContent then the raw</span>
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span><span class="comment">// ASN1 contents of the struct will be stored in it.</span>
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span><span class="comment">// If the type name of a slice element ends with &#34;SET&#34; then it&#39;s treated as if</span>
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span><span class="comment">// the &#34;set&#34; tag was set on it. This can be used with nested slices where a</span>
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span><span class="comment">// struct tag cannot be given.</span>
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span><span class="comment">// Other ASN.1 types are not supported; if it encounters them,</span>
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span><span class="comment">// Unmarshal returns a parse error.</span>
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span>func Unmarshal(b []byte, val interface{}) (rest []byte, err error) {
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span>	return UnmarshalWithParams(b, val, &#34;&#34;)
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>}
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span><span class="comment">// UnmarshalWithParams allows field parameters to be specified for the</span>
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span><span class="comment">// top-level element. The form of the params is the same as the field tags.</span>
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>func UnmarshalWithParams(b []byte, val interface{}, params string) (rest []byte, err error) {
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>	v := reflect.ValueOf(val).Elem()
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>	offset, err := parseField(v, b, 0, parseFieldParameters(params))
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>		return nil, err
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>	}
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span>	return b[offset:], nil
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>}
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>
+</pre><p><a href="asn1.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

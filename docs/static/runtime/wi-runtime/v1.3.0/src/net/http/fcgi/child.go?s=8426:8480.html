@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/http/fcgi/child.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./child.go%3Fs=8426:8480.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/net">net</a>/<a href="../../http.1.html">http</a>/<a href="../fcgi.1.html">fcgi</a>/<span class="text-muted">child.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../../pkg/net/http/fcgi.1.html">net/http/fcgi</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package fcgi
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">// This file implements FastCGI from the perspective of a child process.</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>import (
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;context&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;io/ioutil&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;net&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;net/http&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;net/http/cgi&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;os&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	&#34;sync&#34;
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>)
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span><span class="comment">// request holds the state for an in-progress request. As soon as it&#39;s complete,</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span><span class="comment">// it&#39;s converted to an http.Request.</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>type request struct {
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	pw        *io.PipeWriter
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	reqId     uint16
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	params    map[string]string
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	buf       [1024]byte
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	rawParams []byte
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	keepConn  bool
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span><span class="comment">// envVarsContextKey uniquely identifies a mapping of CGI</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span><span class="comment">// environment variables to their values in a request context</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>type envVarsContextKey struct{}
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>func newRequest(reqId uint16, flags uint8) *request {
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	r := &amp;request{
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		reqId:    reqId,
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>		params:   map[string]string{},
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		keepConn: flags&amp;flagKeepConn != 0,
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	}
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	r.rawParams = r.buf[:0]
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	return r
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>}
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span><span class="comment">// parseParams reads an encoded []byte into Params.</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>func (r *request) parseParams() {
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	text := r.rawParams
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	r.rawParams = nil
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	for len(text) &gt; 0 {
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>		keyLen, n := readSize(text)
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>		if n == 0 {
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>			return
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>		}
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>		text = text[n:]
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		valLen, n := readSize(text)
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>		if n == 0 {
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>			return
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>		}
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>		text = text[n:]
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>		if int(keyLen)+int(valLen) &gt; len(text) {
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>			return
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		}
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>		key := readString(text, keyLen)
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		text = text[keyLen:]
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>		val := readString(text, valLen)
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>		text = text[valLen:]
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>		r.params[key] = val
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	}
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>}
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span><span class="comment">// response implements http.ResponseWriter.</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>type response struct {
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	req         *request
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	header      http.Header
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	w           *bufWriter
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	wroteHeader bool
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>}
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>func newResponse(c *child, req *request) *response {
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	return &amp;response{
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>		req:    req,
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>		header: http.Header{},
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>		w:      newWriter(c.conn, typeStdout, req.reqId),
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	}
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>}
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>func (r *response) Header() http.Header {
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	return r.header
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>}
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>func (r *response) Write(data []byte) (int, error) {
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	if !r.wroteHeader {
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>		r.WriteHeader(http.StatusOK)
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	}
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	return r.w.Write(data)
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>}
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>func (r *response) WriteHeader(code int) {
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	if r.wroteHeader {
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		return
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	}
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	r.wroteHeader = true
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	if code == http.StatusNotModified {
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>		<span class="comment">// Must not have body.</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		r.header.Del(&#34;Content-Type&#34;)
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		r.header.Del(&#34;Content-Length&#34;)
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		r.header.Del(&#34;Transfer-Encoding&#34;)
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>	} else if r.header.Get(&#34;Content-Type&#34;) == &#34;&#34; {
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>		r.header.Set(&#34;Content-Type&#34;, &#34;text/html; charset=utf-8&#34;)
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	}
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	if r.header.Get(&#34;Date&#34;) == &#34;&#34; {
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		r.header.Set(&#34;Date&#34;, time.Now().UTC().Format(http.TimeFormat))
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	}
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	fmt.Fprintf(r.w, &#34;Status: %d %s\r\n&#34;, code, http.StatusText(code))
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	r.header.Write(r.w)
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	r.w.WriteString(&#34;\r\n&#34;)
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>}
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>func (r *response) Flush() {
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	if !r.wroteHeader {
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>		r.WriteHeader(http.StatusOK)
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	}
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	r.w.Flush()
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>}
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>func (r *response) Close() error {
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	r.Flush()
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	return r.w.Close()
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>}
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>type child struct {
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	conn    *conn
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	handler http.Handler
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	mu       sync.Mutex          <span class="comment">// protects requests:</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	requests map[uint16]*request <span class="comment">// keyed by request ID</span>
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>}
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>func newChild(rwc io.ReadWriteCloser, handler http.Handler) *child {
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	return &amp;child{
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>		conn:     newConn(rwc),
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		handler:  handler,
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>		requests: make(map[uint16]*request),
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	}
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>}
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>func (c *child) serve() {
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	defer c.conn.Close()
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	defer c.cleanUp()
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>	var rec record
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>	for {
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>		if err := rec.read(c.conn.rwc); err != nil {
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>			return
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		}
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>		if err := c.handleRecord(&amp;rec); err != nil {
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>			return
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		}
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>	}
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>}
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>var errCloseConn = errors.New(&#34;fcgi: connection should be closed&#34;)
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>var emptyBody = ioutil.NopCloser(strings.NewReader(&#34;&#34;))
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span><span class="comment">// ErrRequestAborted is returned by Read when a handler attempts to read the</span>
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span><span class="comment">// body of a request that has been aborted by the web server.</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>var ErrRequestAborted = errors.New(&#34;fcgi: request aborted by web server&#34;)
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span><span class="comment">// ErrConnClosed is returned by Read when a handler attempts to read the body of</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span><span class="comment">// a request after the connection to the web server has been closed.</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>var ErrConnClosed = errors.New(&#34;fcgi: connection to web server closed&#34;)
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>func (c *child) handleRecord(rec *record) error {
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	c.mu.Lock()
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	req, ok := c.requests[rec.h.Id]
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	c.mu.Unlock()
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	if !ok &amp;&amp; rec.h.Type != typeBeginRequest &amp;&amp; rec.h.Type != typeGetValues {
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>		<span class="comment">// The spec says to ignore unknown request IDs.</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		return nil
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	}
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	switch rec.h.Type {
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	case typeBeginRequest:
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>		if req != nil {
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>			<span class="comment">// The server is trying to begin a request with the same ID</span>
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>			<span class="comment">// as an in-progress request. This is an error.</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>			return errors.New(&#34;fcgi: received ID that is already in-flight&#34;)
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>		}
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>		var br beginRequest
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		if err := br.read(rec.content()); err != nil {
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>			return err
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>		}
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>		if br.role != roleResponder {
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>			c.conn.writeEndRequest(rec.h.Id, 0, statusUnknownRole)
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>			return nil
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		}
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>		req = newRequest(rec.h.Id, br.flags)
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>		c.mu.Lock()
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		c.requests[rec.h.Id] = req
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>		c.mu.Unlock()
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>		return nil
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	case typeParams:
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		<span class="comment">// NOTE(eds): Technically a key-value pair can straddle the boundary</span>
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>		<span class="comment">// between two packets. We buffer until we&#39;ve received all parameters.</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>		if len(rec.content()) &gt; 0 {
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>			req.rawParams = append(req.rawParams, rec.content()...)
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>			return nil
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		}
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>		req.parseParams()
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>		return nil
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	case typeStdin:
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		content := rec.content()
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>		if req.pw == nil {
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>			var body io.ReadCloser
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>			if len(content) &gt; 0 {
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>				<span class="comment">// body could be an io.LimitReader, but it shouldn&#39;t matter</span>
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>				<span class="comment">// as long as both sides are behaving.</span>
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>				body, req.pw = io.Pipe()
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>			} else {
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>				body = emptyBody
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>			}
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>			go c.serveRequest(req, body)
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>		}
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>		if len(content) &gt; 0 {
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>			<span class="comment">// TODO(eds): This blocks until the handler reads from the pipe.</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>			<span class="comment">// If the handler takes a long time, it might be a problem.</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>			req.pw.Write(content)
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>		} else if req.pw != nil {
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>			req.pw.Close()
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>		}
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>		return nil
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	case typeGetValues:
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>		values := map[string]string{&#34;FCGI_MPXS_CONNS&#34;: &#34;1&#34;}
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>		c.conn.writePairs(typeGetValuesResult, 0, values)
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>		return nil
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	case typeData:
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>		<span class="comment">// If the filter role is implemented, read the data stream here.</span>
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>		return nil
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	case typeAbortRequest:
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>		c.mu.Lock()
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>		delete(c.requests, rec.h.Id)
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		c.mu.Unlock()
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>		c.conn.writeEndRequest(rec.h.Id, 0, statusRequestComplete)
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>		if req.pw != nil {
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>			req.pw.CloseWithError(ErrRequestAborted)
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>		}
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>		if !req.keepConn {
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>			<span class="comment">// connection will close upon return</span>
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>			return errCloseConn
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>		}
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>		return nil
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	default:
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>		b := make([]byte, 8)
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>		b[0] = byte(rec.h.Type)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>		c.conn.writeRecord(typeUnknownType, 0, b)
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>		return nil
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	}
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>}
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span><span class="comment">// filterOutUsedEnvVars returns a new map of env vars without the</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span><span class="comment">// variables in the given envVars map that are read for creating each http.Request</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>func filterOutUsedEnvVars(envVars map[string]string) map[string]string {
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	withoutUsedEnvVars := make(map[string]string)
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	for k, v := range envVars {
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>		if addFastCGIEnvToContext(k) {
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>			withoutUsedEnvVars[k] = v
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>		}
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	}
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	return withoutUsedEnvVars
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>}
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>func (c *child) serveRequest(req *request, body io.ReadCloser) {
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	r := newResponse(c, req)
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	httpReq, err := cgi.RequestFromMap(req.params)
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		<span class="comment">// there was an error reading the request</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>		r.WriteHeader(http.StatusInternalServerError)
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>		c.conn.writeRecord(typeStderr, req.reqId, []byte(err.Error()))
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	} else {
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		httpReq.Body = body
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>		withoutUsedEnvVars := filterOutUsedEnvVars(req.params)
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>		envVarCtx := context.WithValue(httpReq.Context(), envVarsContextKey{}, withoutUsedEnvVars)
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>		httpReq = httpReq.WithContext(envVarCtx)
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>		c.handler.ServeHTTP(r, httpReq)
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>	}
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	r.Close()
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	c.mu.Lock()
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	delete(c.requests, req.reqId)
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	c.mu.Unlock()
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	c.conn.writeEndRequest(req.reqId, 0, statusRequestComplete)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	<span class="comment">// Consume the entire body, so the host isn&#39;t still writing to</span>
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>	<span class="comment">// us when we close the socket below in the !keepConn case,</span>
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>	<span class="comment">// otherwise we&#39;d send a RST. (golang.org/issue/4183)</span>
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	<span class="comment">// TODO(bradfitz): also bound this copy in time. Or send</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	<span class="comment">// some sort of abort request to the host, so the host</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	<span class="comment">// can properly cut off the client sending all the data.</span>
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>	<span class="comment">// For now just bound it a little and</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>	io.CopyN(ioutil.Discard, body, 100&lt;&lt;20)
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>	body.Close()
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	if !req.keepConn {
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>		c.conn.Close()
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	}
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>}
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>func (c *child) cleanUp() {
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	c.mu.Lock()
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>	defer c.mu.Unlock()
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	for _, req := range c.requests {
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		if req.pw != nil {
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>			<span class="comment">// race with call to Close in c.serveRequest doesn&#39;t matter because</span>
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>			<span class="comment">// Pipe(Reader|Writer).Close are idempotent</span>
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>			req.pw.CloseWithError(ErrConnClosed)
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>		}
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	}
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>}
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span><span class="comment">// Serve accepts incoming FastCGI connections on the listener l, creating a new</span>
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span><span class="comment">// goroutine for each. The goroutine reads requests and then calls handler</span>
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span><span class="comment">// to reply to them.</span>
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span><span class="comment">// If l is nil, Serve accepts connections from os.Stdin.</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span><span class="comment">// If handler is nil, http.DefaultServeMux is used.</span>
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span><span class="selection">func Serve(l net.Listener, handler http.Handler) error</span> {
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	if l == nil {
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>		var err error
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>		l, err = net.FileListener(os.Stdin)
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>			return err
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>		}
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		defer l.Close()
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	}
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	if handler == nil {
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>		handler = http.DefaultServeMux
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>	}
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	for {
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>		rw, err := l.Accept()
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>			return err
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>		}
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>		c := newChild(rw, handler)
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>		go c.serve()
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	}
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>}
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span><span class="comment">// ProcessEnv returns FastCGI environment variables associated with the request r</span>
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span><span class="comment">// for which no effort was made to be included in the request itself - the data</span>
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span><span class="comment">// is hidden in the request&#39;s context. As an example, if REMOTE_USER is set for a</span>
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span><span class="comment">// request, it will not be found anywhere in r, but it will be included in</span>
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span><span class="comment">// ProcessEnv&#39;s response (via r&#39;s context).</span>
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>func ProcessEnv(r *http.Request) map[string]string {
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>	env, _ := r.Context().Value(envVarsContextKey{}).(map[string]string)
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	return env
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>}
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span><span class="comment">// addFastCGIEnvToContext reports whether to include the FastCGI environment variable s</span>
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span><span class="comment">// in the http.Request.Context, accessible via ProcessEnv.</span>
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>func addFastCGIEnvToContext(s string) bool {
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>	<span class="comment">// Exclude things supported by net/http natively:</span>
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	switch s {
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	case &#34;CONTENT_LENGTH&#34;, &#34;CONTENT_TYPE&#34;, &#34;HTTPS&#34;,
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>		&#34;PATH_INFO&#34;, &#34;QUERY_STRING&#34;, &#34;REMOTE_ADDR&#34;,
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>		&#34;REMOTE_HOST&#34;, &#34;REMOTE_PORT&#34;, &#34;REQUEST_METHOD&#34;,
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>		&#34;REQUEST_URI&#34;, &#34;SCRIPT_NAME&#34;, &#34;SERVER_PROTOCOL&#34;:
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>		return false
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	}
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	if strings.HasPrefix(s, &#34;HTTP_&#34;) {
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>		return false
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>	}
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>	<span class="comment">// Explicitly include FastCGI-specific things.</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>	<span class="comment">// This list is redundant with the default &#34;return true&#34; below.</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>	<span class="comment">// Consider this documentation of the sorts of things we expect</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>	<span class="comment">// to maybe see.</span>
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>	switch s {
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	case &#34;REMOTE_USER&#34;:
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>		return true
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>	}
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>	<span class="comment">// Unknown, so include it to be safe.</span>
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>	return true
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>}
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>
+</pre><p><a href="child.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/http/cgi/matryoshka_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="matryoshka_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/net">net</a>/<a href="../../http.1.html">http</a>/<a href="../cgi.1.html">cgi</a>/<span class="text-muted">matryoshka_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../../pkg/net/http/cgi.1.html">net/http/cgi</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// Tests a Go CGI program running under a Go CGI host process.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// Further, the two programs are the same binary, just checking</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">// their environment to figure out what mode to run in.</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>package cgi
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>import (
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;internal/testenv&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;net/http&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;net/http/httptest&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;os&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>)
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span><span class="comment">// This test is a CGI host (testing host.go) that runs its own binary</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span><span class="comment">// as a child process testing the other half of CGI (child.go).</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>func TestHostingOurselves(t *testing.T) {
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	testenv.MustHaveExec(t)
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	h := &amp;Handler{
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>		Path: os.Args[0],
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>		Root: &#34;/test.go&#34;,
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>		Args: []string{&#34;-test.run=TestBeChildCGIProcess&#34;},
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	expectedMap := map[string]string{
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>		&#34;test&#34;:                  &#34;Hello CGI-in-CGI&#34;,
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>		&#34;param-a&#34;:               &#34;b&#34;,
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>		&#34;param-foo&#34;:             &#34;bar&#34;,
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>		&#34;env-GATEWAY_INTERFACE&#34;: &#34;CGI/1.1&#34;,
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>		&#34;env-HTTP_HOST&#34;:         &#34;example.com&#34;,
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>		&#34;env-PATH_INFO&#34;:         &#34;&#34;,
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		&#34;env-QUERY_STRING&#34;:      &#34;foo=bar&amp;a=b&#34;,
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>		&#34;env-REMOTE_ADDR&#34;:       &#34;1.2.3.4&#34;,
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		&#34;env-REMOTE_HOST&#34;:       &#34;1.2.3.4&#34;,
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		&#34;env-REMOTE_PORT&#34;:       &#34;1234&#34;,
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>		&#34;env-REQUEST_METHOD&#34;:    &#34;GET&#34;,
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>		&#34;env-REQUEST_URI&#34;:       &#34;/test.go?foo=bar&amp;a=b&#34;,
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>		&#34;env-SCRIPT_FILENAME&#34;:   os.Args[0],
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>		&#34;env-SCRIPT_NAME&#34;:       &#34;/test.go&#34;,
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>		&#34;env-SERVER_NAME&#34;:       &#34;example.com&#34;,
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>		&#34;env-SERVER_PORT&#34;:       &#34;80&#34;,
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>		&#34;env-SERVER_SOFTWARE&#34;:   &#34;go&#34;,
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	}
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	replay := runCgiTest(t, h, &#34;GET /test.go?foo=bar&amp;a=b HTTP/1.0\nHost: example.com\n\n&#34;, expectedMap)
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	if expected, got := &#34;text/html; charset=utf-8&#34;, replay.Header().Get(&#34;Content-Type&#34;); got != expected {
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>		t.Errorf(&#34;got a Content-Type of %q; expected %q&#34;, got, expected)
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	}
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	if expected, got := &#34;X-Test-Value&#34;, replay.Header().Get(&#34;X-Test-Header&#34;); got != expected {
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		t.Errorf(&#34;got a X-Test-Header of %q; expected %q&#34;, got, expected)
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	}
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>}
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>type customWriterRecorder struct {
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	w io.Writer
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>	*httptest.ResponseRecorder
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>}
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>func (r *customWriterRecorder) Write(p []byte) (n int, err error) {
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	return r.w.Write(p)
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>}
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>type limitWriter struct {
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	w io.Writer
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	n int
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>}
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>func (w *limitWriter) Write(p []byte) (n int, err error) {
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	if len(p) &gt; w.n {
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		p = p[:w.n]
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	}
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	if len(p) &gt; 0 {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		n, err = w.w.Write(p)
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		w.n -= n
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	}
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	if w.n == 0 {
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>		err = errors.New(&#34;past write limit&#34;)
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	}
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	return
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>}
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span><span class="comment">// If there&#39;s an error copying the child&#39;s output to the parent, test</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span><span class="comment">// that we kill the child.</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>func TestKillChildAfterCopyError(t *testing.T) {
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	testenv.MustHaveExec(t)
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	defer func() { testHookStartProcess = nil }()
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	proc := make(chan *os.Process, 1)
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	testHookStartProcess = func(p *os.Process) {
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>		proc &lt;- p
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	}
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	h := &amp;Handler{
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>		Path: os.Args[0],
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		Root: &#34;/test.go&#34;,
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		Args: []string{&#34;-test.run=TestBeChildCGIProcess&#34;},
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	}
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	req, _ := http.NewRequest(&#34;GET&#34;, &#34;http://example.com/test.cgi?write-forever=1&#34;, nil)
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	rec := httptest.NewRecorder()
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	var out bytes.Buffer
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>	const writeLen = 50 &lt;&lt; 10
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	rw := &amp;customWriterRecorder{&amp;limitWriter{&amp;out, writeLen}, rec}
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	donec := make(chan bool, 1)
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	go func() {
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>		h.ServeHTTP(rw, req)
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>		donec &lt;- true
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	}()
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	select {
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	case &lt;-donec:
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		if out.Len() != writeLen || out.Bytes()[0] != &#39;a&#39; {
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>			t.Errorf(&#34;unexpected output: %q&#34;, out.Bytes())
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>		}
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	case &lt;-time.After(5 * time.Second):
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>		t.Errorf(&#34;timeout. ServeHTTP hung and didn&#39;t kill the child process?&#34;)
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>		select {
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>		case p := &lt;-proc:
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>			p.Kill()
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>			t.Logf(&#34;killed process&#34;)
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>		default:
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>			t.Logf(&#34;didn&#39;t kill process&#34;)
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>		}
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	}
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>}
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span><span class="comment">// Test that a child handler writing only headers works.</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span><span class="comment">// golang.org/issue/7196</span>
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>func TestChildOnlyHeaders(t *testing.T) {
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	testenv.MustHaveExec(t)
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	h := &amp;Handler{
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>		Path: os.Args[0],
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>		Root: &#34;/test.go&#34;,
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		Args: []string{&#34;-test.run=TestBeChildCGIProcess&#34;},
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	}
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	expectedMap := map[string]string{
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>		&#34;_body&#34;: &#34;&#34;,
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	}
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	replay := runCgiTest(t, h, &#34;GET /test.go?no-body=1 HTTP/1.0\nHost: example.com\n\n&#34;, expectedMap)
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	if expected, got := &#34;X-Test-Value&#34;, replay.Header().Get(&#34;X-Test-Header&#34;); got != expected {
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		t.Errorf(&#34;got a X-Test-Header of %q; expected %q&#34;, got, expected)
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	}
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>}
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span><span class="comment">// golang.org/issue/7198</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>func Test500WithNoHeaders(t *testing.T)     { want500Test(t, &#34;/immediate-disconnect&#34;) }
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>func Test500WithNoContentType(t *testing.T) { want500Test(t, &#34;/no-content-type&#34;) }
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>func Test500WithEmptyHeaders(t *testing.T)  { want500Test(t, &#34;/empty-headers&#34;) }
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>func want500Test(t *testing.T, path string) {
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	h := &amp;Handler{
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>		Path: os.Args[0],
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		Root: &#34;/test.go&#34;,
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>		Args: []string{&#34;-test.run=TestBeChildCGIProcess&#34;},
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>	}
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	expectedMap := map[string]string{
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>		&#34;_body&#34;: &#34;&#34;,
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	}
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	replay := runCgiTest(t, h, &#34;GET &#34;+path+&#34; HTTP/1.0\nHost: example.com\n\n&#34;, expectedMap)
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	if replay.Code != 500 {
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		t.Errorf(&#34;Got code %d; want 500&#34;, replay.Code)
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	}
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>}
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>type neverEnding byte
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>func (b neverEnding) Read(p []byte) (n int, err error) {
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	for i := range p {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		p[i] = byte(b)
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	}
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	return len(p), nil
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span><span class="comment">// Note: not actually a test.</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>func TestBeChildCGIProcess(t *testing.T) {
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	if os.Getenv(&#34;REQUEST_METHOD&#34;) == &#34;&#34; {
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>		<span class="comment">// Not in a CGI environment; skipping test.</span>
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>		return
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	}
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	switch os.Getenv(&#34;REQUEST_URI&#34;) {
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	case &#34;/immediate-disconnect&#34;:
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>		os.Exit(0)
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>	case &#34;/no-content-type&#34;:
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>		fmt.Printf(&#34;Content-Length: 6\n\nHello\n&#34;)
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>		os.Exit(0)
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	case &#34;/empty-headers&#34;:
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		fmt.Printf(&#34;\nHello&#34;)
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>		os.Exit(0)
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	}
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	Serve(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		rw.Header().Set(&#34;X-Test-Header&#34;, &#34;X-Test-Value&#34;)
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>		req.ParseForm()
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		if req.FormValue(&#34;no-body&#34;) == &#34;1&#34; {
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>			return
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>		}
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		if req.FormValue(&#34;write-forever&#34;) == &#34;1&#34; {
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>			io.Copy(rw, neverEnding(&#39;a&#39;))
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>			for {
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>				time.Sleep(5 * time.Second) <span class="comment">// hang forever, until killed</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>			}
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>		}
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>		fmt.Fprintf(rw, &#34;test=Hello CGI-in-CGI\n&#34;)
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>		for k, vv := range req.Form {
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>			for _, v := range vv {
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>				fmt.Fprintf(rw, &#34;param-%s=%s\n&#34;, k, v)
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>			}
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>		}
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>		for _, kv := range os.Environ() {
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>			fmt.Fprintf(rw, &#34;env-%s\n&#34;, kv)
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>		}
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	}))
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>	os.Exit(0)
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>}
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>
+</pre><p><a href="matryoshka_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

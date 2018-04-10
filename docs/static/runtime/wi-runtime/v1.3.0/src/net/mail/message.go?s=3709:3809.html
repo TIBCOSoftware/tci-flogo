@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/mail/message.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./message.go%3Fs=3709:3809.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/net">net</a>/<a href="../mail.1.html">mail</a>/<span class="text-muted">message.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/net/mail.1.html">net/mail</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2011 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">/*
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>Package mail implements parsing of mail messages.
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>For the most part, this package follows the syntax as specified by RFC 5322 and
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>extended by RFC 6532.
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>Notable divergences:
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	* Obsolete address formats are not parsed, including addresses with
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	  embedded route information.
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	* Group addresses are not parsed.
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	* The full range of spacing (the CFWS syntax element) is not supported,
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	  such as breaking addresses across lines.
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	* No unicode normalization is performed.
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>*/</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>package mail
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>import (
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;bufio&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	&#34;log&#34;
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	&#34;mime&#34;
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	&#34;net/textproto&#34;
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	&#34;unicode/utf8&#34;
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>)
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>var debug = debugT(false)
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>type debugT bool
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>func (d debugT) Printf(format string, args ...interface{}) {
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	if d {
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>		log.Printf(format, args...)
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	}
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>}
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span><span class="comment">// A Message represents a parsed mail message.</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>type Message struct {
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	Header Header
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	Body   io.Reader
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>}
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span><span class="comment">// ReadMessage reads a message from r.</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span><span class="comment">// The headers are parsed, and the body of the message will be available</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span><span class="comment">// for reading from msg.Body.</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>func ReadMessage(r io.Reader) (msg *Message, err error) {
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	tp := textproto.NewReader(bufio.NewReader(r))
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	hdr, err := tp.ReadMIMEHeader()
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>		return nil, err
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	}
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	return &amp;Message{
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>		Header: Header(hdr),
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>		Body:   tp.R,
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	}, nil
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>}
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span><span class="comment">// Layouts suitable for passing to time.Parse.</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span><span class="comment">// These are tried in order.</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>var dateLayouts []string
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>func init() {
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	<span class="comment">// Generate layouts based on RFC 5322, section 3.3.</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	dows := [...]string{&#34;&#34;, &#34;Mon, &#34;}   <span class="comment">// day-of-week</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	days := [...]string{&#34;2&#34;, &#34;02&#34;}     <span class="comment">// day = 1*2DIGIT</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	years := [...]string{&#34;2006&#34;, &#34;06&#34;} <span class="comment">// year = 4*DIGIT / 2*DIGIT</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	seconds := [...]string{&#34;:05&#34;, &#34;&#34;}  <span class="comment">// second</span>
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	<span class="comment">// &#34;-0700 (MST)&#34; is not in RFC 5322, but is common.</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	zones := [...]string{&#34;-0700&#34;, &#34;MST&#34;, &#34;-0700 (MST)&#34;} <span class="comment">// zone = ((&#34;+&#34; / &#34;-&#34;) 4DIGIT) / &#34;GMT&#34; / ...</span>
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	for _, dow := range dows {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		for _, day := range days {
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>			for _, year := range years {
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>				for _, second := range seconds {
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>					for _, zone := range zones {
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>						s := dow + day + &#34; Jan &#34; + year + &#34; 15:04&#34; + second + &#34; &#34; + zone
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>						dateLayouts = append(dateLayouts, s)
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>					}
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>				}
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>			}
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>		}
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	}
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>}
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span><span class="comment">// ParseDate parses an RFC 5322 date string.</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>func ParseDate(date string) (time.Time, error) {
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	for _, layout := range dateLayouts {
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>		t, err := time.Parse(layout, date)
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>		if err == nil {
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>			return t, nil
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>		}
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	}
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	return time.Time{}, errors.New(&#34;mail: header could not be parsed&#34;)
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>}
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span><span class="comment">// A Header represents the key-value pairs in a mail message header.</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>type Header map[string][]string
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span><span class="comment">// Get gets the first value associated with the given key.</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span><span class="comment">// It is case insensitive; CanonicalMIMEHeaderKey is used</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span><span class="comment">// to canonicalize the provided key.</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span><span class="comment">// If there are no values associated with the key, Get returns &#34;&#34;.</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span><span class="comment">// To access multiple values of a key, or to use non-canonical keys,</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span><span class="comment">// access the map directly.</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>func (h Header) Get(key string) string {
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	return textproto.MIMEHeader(h).Get(key)
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>}
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>var ErrHeaderNotPresent = errors.New(&#34;mail: header not in message&#34;)
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span><span class="comment">// Date parses the Date header field.</span>
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>func (h Header) Date() (time.Time, error) {
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	hdr := h.Get(&#34;Date&#34;)
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	if hdr == &#34;&#34; {
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>		return time.Time{}, ErrHeaderNotPresent
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	}
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	return ParseDate(hdr)
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>}
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span><span class="comment">// AddressList parses the named header field as a list of addresses.</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>func (h Header) AddressList(key string) ([]*Address, error) {
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	hdr := h.Get(key)
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	if hdr == &#34;&#34; {
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>		return nil, ErrHeaderNotPresent
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	}
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	return ParseAddressList(hdr)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>}
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span><span class="comment">// Address represents a single mail address.</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span><span class="comment">// An address such as &#34;Barry Gibbs &lt;bg@example.com&gt;&#34; is represented</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span><span class="comment">// as Address{Name: &#34;Barry Gibbs&#34;, Address: &#34;bg@example.com&#34;}.</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span><span class="selection">type Address struct {
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	Name    string </span><span class="selection-comment">// Proper name; may be empty.</span><span class="selection">
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>	Address string </span><span class="selection-comment">// user@domain</span><span class="selection">
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>}</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span><span class="comment">// Parses a single RFC 5322 address, e.g. &#34;Barry Gibbs &lt;bg@example.com&gt;&#34;</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>func ParseAddress(address string) (*Address, error) {
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	return (&amp;addrParser{s: address}).parseSingleAddress()
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>}
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span><span class="comment">// ParseAddressList parses the given string as a list of addresses.</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>func ParseAddressList(list string) ([]*Address, error) {
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	return (&amp;addrParser{s: list}).parseAddressList()
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>}
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span><span class="comment">// An AddressParser is an RFC 5322 address parser.</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>type AddressParser struct {
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	<span class="comment">// WordDecoder optionally specifies a decoder for RFC 2047 encoded-words.</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	WordDecoder *mime.WordDecoder
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>}
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span><span class="comment">// Parse parses a single RFC 5322 address of the</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span><span class="comment">// form &#34;Gogh Fir &lt;gf@example.com&gt;&#34; or &#34;foo@example.com&#34;.</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>func (p *AddressParser) Parse(address string) (*Address, error) {
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	return (&amp;addrParser{s: address, dec: p.WordDecoder}).parseSingleAddress()
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>}
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span><span class="comment">// ParseList parses the given string as a list of comma-separated addresses</span>
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span><span class="comment">// of the form &#34;Gogh Fir &lt;gf@example.com&gt;&#34; or &#34;foo@example.com&#34;.</span>
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>func (p *AddressParser) ParseList(list string) ([]*Address, error) {
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	return (&amp;addrParser{s: list, dec: p.WordDecoder}).parseAddressList()
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>}
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span><span class="comment">// String formats the address as a valid RFC 5322 address.</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span><span class="comment">// If the address&#39;s name contains non-ASCII characters</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span><span class="comment">// the name will be rendered according to RFC 2047.</span>
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>func (a *Address) String() string {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>	<span class="comment">// Format address local@domain</span>
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	at := strings.LastIndex(a.Address, &#34;@&#34;)
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	var local, domain string
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	if at &lt; 0 {
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>		<span class="comment">// This is a malformed address (&#34;@&#34; is required in addr-spec);</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>		<span class="comment">// treat the whole address as local-part.</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		local = a.Address
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	} else {
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>		local, domain = a.Address[:at], a.Address[at+1:]
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	}
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	<span class="comment">// Add quotes if needed</span>
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	quoteLocal := false
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>	for i, r := range local {
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>		if isAtext(r, false) {
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>			continue
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>		}
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>		if r == &#39;.&#39; {
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>			<span class="comment">// Dots are okay if they are surrounded by atext.</span>
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>			<span class="comment">// We only need to check that the previous byte is</span>
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>			<span class="comment">// not a dot, and this isn&#39;t the end of the string.</span>
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>			if i &gt; 0 &amp;&amp; local[i-1] != &#39;.&#39; &amp;&amp; i &lt; len(local)-1 {
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>				continue
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>			}
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		}
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>		quoteLocal = true
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>		break
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>	}
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	if quoteLocal {
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>		local = quoteString(local)
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	}
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	s := &#34;&lt;&#34; + local + &#34;@&#34; + domain + &#34;&gt;&#34;
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	if a.Name == &#34;&#34; {
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		return s
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>	}
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	<span class="comment">// If every character is printable ASCII, quoting is simple.</span>
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	allPrintable := true
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	for _, r := range a.Name {
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>		<span class="comment">// isWSP here should actually be isFWS,</span>
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>		<span class="comment">// but we don&#39;t support folding yet.</span>
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		if !isVchar(r) &amp;&amp; !isWSP(r) || isMultibyte(r) {
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>			allPrintable = false
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>			break
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>		}
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	}
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	if allPrintable {
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>		return quoteString(a.Name) + &#34; &#34; + s
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	}
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	<span class="comment">// Text in an encoded-word in a display-name must not contain certain</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	<span class="comment">// characters like quotes or parentheses (see RFC 2047 section 5.3).</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	<span class="comment">// When this is the case encode the name using base64 encoding.</span>
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	if strings.ContainsAny(a.Name, &#34;\&#34;#$%&amp;&#39;(),.:;&lt;&gt;@[]^`{|}~&#34;) {
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>		return mime.BEncoding.Encode(&#34;utf-8&#34;, a.Name) + &#34; &#34; + s
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	}
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	return mime.QEncoding.Encode(&#34;utf-8&#34;, a.Name) + &#34; &#34; + s
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>}
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>type addrParser struct {
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>	s   string
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	dec *mime.WordDecoder <span class="comment">// may be nil</span>
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>}
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>func (p *addrParser) parseAddressList() ([]*Address, error) {
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	var list []*Address
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>	for {
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		p.skipSpace()
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>		addr, err := p.parseAddress()
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>			return nil, err
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>		}
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>		list = append(list, addr)
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>		p.skipSpace()
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>		if p.empty() {
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>			break
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>		}
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>		if !p.consume(&#39;,&#39;) {
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>			return nil, errors.New(&#34;mail: expected comma&#34;)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>		}
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>	}
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	return list, nil
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>}
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>func (p *addrParser) parseSingleAddress() (*Address, error) {
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>	addr, err := p.parseAddress()
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>		return nil, err
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	}
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	p.skipSpace()
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	if !p.empty() {
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>		return nil, fmt.Errorf(&#34;mail: expected single address, got %q&#34;, p.s)
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	}
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	return addr, nil
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>}
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span><span class="comment">// parseAddress parses a single RFC 5322 address at the start of p.</span>
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>func (p *addrParser) parseAddress() (addr *Address, err error) {
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	debug.Printf(&#34;parseAddress: %q&#34;, p.s)
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	p.skipSpace()
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>	if p.empty() {
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;mail: no address&#34;)
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	}
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>	<span class="comment">// address = name-addr / addr-spec</span>
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>	<span class="comment">// TODO(dsymonds): Support parsing group address.</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>	<span class="comment">// addr-spec has a more restricted grammar than name-addr,</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>	<span class="comment">// so try parsing it first, and fallback to name-addr.</span>
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>	<span class="comment">// TODO(dsymonds): Is this really correct?</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	spec, err := p.consumeAddrSpec()
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	if err == nil {
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>		return &amp;Address{
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>			Address: spec,
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		}, err
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	}
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	debug.Printf(&#34;parseAddress: not an addr-spec: %v&#34;, err)
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>	debug.Printf(&#34;parseAddress: state is now %q&#34;, p.s)
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	<span class="comment">// display-name</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	var displayName string
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	if p.peek() != &#39;&lt;&#39; {
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>		displayName, err = p.consumePhrase()
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>			return nil, err
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>		}
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	}
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	debug.Printf(&#34;parseAddress: displayName=%q&#34;, displayName)
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	<span class="comment">// angle-addr = &#34;&lt;&#34; addr-spec &#34;&gt;&#34;</span>
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>	p.skipSpace()
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	if !p.consume(&#39;&lt;&#39;) {
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;mail: no angle-addr&#34;)
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>	}
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	spec, err = p.consumeAddrSpec()
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>		return nil, err
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>	}
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	if !p.consume(&#39;&gt;&#39;) {
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;mail: unclosed angle-addr&#34;)
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	}
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>	debug.Printf(&#34;parseAddress: spec=%q&#34;, spec)
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	return &amp;Address{
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>		Name:    displayName,
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>		Address: spec,
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>	}, nil
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>}
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span><span class="comment">// consumeAddrSpec parses a single RFC 5322 addr-spec at the start of p.</span>
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>func (p *addrParser) consumeAddrSpec() (spec string, err error) {
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>	debug.Printf(&#34;consumeAddrSpec: %q&#34;, p.s)
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>	orig := *p
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	defer func() {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>			*p = orig
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>		}
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	}()
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	<span class="comment">// local-part = dot-atom / quoted-string</span>
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>	var localPart string
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	p.skipSpace()
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	if p.empty() {
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>		return &#34;&#34;, errors.New(&#34;mail: no addr-spec&#34;)
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	}
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>	if p.peek() == &#39;&#34;&#39; {
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>		<span class="comment">// quoted-string</span>
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>		debug.Printf(&#34;consumeAddrSpec: parsing quoted-string&#34;)
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		localPart, err = p.consumeQuotedString()
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>		if localPart == &#34;&#34; {
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>			err = errors.New(&#34;mail: empty quoted string in addr-spec&#34;)
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>		}
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	} else {
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>		<span class="comment">// dot-atom</span>
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>		debug.Printf(&#34;consumeAddrSpec: parsing dot-atom&#34;)
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>		localPart, err = p.consumeAtom(true, false)
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	}
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>		debug.Printf(&#34;consumeAddrSpec: failed: %v&#34;, err)
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		return &#34;&#34;, err
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	}
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>	if !p.consume(&#39;@&#39;) {
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>		return &#34;&#34;, errors.New(&#34;mail: missing @ in addr-spec&#34;)
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	}
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	<span class="comment">// domain = dot-atom / domain-literal</span>
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>	var domain string
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	p.skipSpace()
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	if p.empty() {
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>		return &#34;&#34;, errors.New(&#34;mail: no domain in addr-spec&#34;)
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	}
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>	<span class="comment">// TODO(dsymonds): Handle domain-literal</span>
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>	domain, err = p.consumeAtom(true, false)
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>		return &#34;&#34;, err
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>	}
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	return localPart + &#34;@&#34; + domain, nil
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>}
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span><span class="comment">// consumePhrase parses the RFC 5322 phrase at the start of p.</span>
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>func (p *addrParser) consumePhrase() (phrase string, err error) {
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>	debug.Printf(&#34;consumePhrase: [%s]&#34;, p.s)
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	<span class="comment">// phrase = 1*word</span>
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>	var words []string
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>	var isPrevEncoded bool
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>	for {
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>		<span class="comment">// word = atom / quoted-string</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>		var word string
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>		p.skipSpace()
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>		if p.empty() {
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>			break
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>		}
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>		isEncoded := false
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>		if p.peek() == &#39;&#34;&#39; {
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>			<span class="comment">// quoted-string</span>
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>			word, err = p.consumeQuotedString()
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>		} else {
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>			<span class="comment">// atom</span>
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>			<span class="comment">// We actually parse dot-atom here to be more permissive</span>
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>			<span class="comment">// than what RFC 5322 specifies.</span>
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>			word, err = p.consumeAtom(true, true)
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>			if err == nil {
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>				word, isEncoded, err = p.decodeRFC2047Word(word)
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>			}
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>		}
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>			break
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		}
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		debug.Printf(&#34;consumePhrase: consumed %q&#34;, word)
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>		if isPrevEncoded &amp;&amp; isEncoded {
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>			words[len(words)-1] += word
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>		} else {
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>			words = append(words, word)
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>		}
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>		isPrevEncoded = isEncoded
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	}
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>	<span class="comment">// Ignore any error if we got at least one word.</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	if err != nil &amp;&amp; len(words) == 0 {
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>		debug.Printf(&#34;consumePhrase: hit err: %v&#34;, err)
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>		return &#34;&#34;, fmt.Errorf(&#34;mail: missing word in phrase: %v&#34;, err)
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>	}
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>	phrase = strings.Join(words, &#34; &#34;)
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>	return phrase, nil
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>}
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span><span class="comment">// consumeQuotedString parses the quoted string at the start of p.</span>
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>func (p *addrParser) consumeQuotedString() (qs string, err error) {
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>	<span class="comment">// Assume first byte is &#39;&#34;&#39;.</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	i := 1
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>	qsb := make([]rune, 0, 10)
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>	escaped := false
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>Loop:
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>	for {
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		r, size := utf8.DecodeRuneInString(p.s[i:])
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>		switch {
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>		case size == 0:
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>			return &#34;&#34;, errors.New(&#34;mail: unclosed quoted-string&#34;)
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>		case size == 1 &amp;&amp; r == utf8.RuneError:
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>			return &#34;&#34;, fmt.Errorf(&#34;mail: invalid utf-8 in quoted-string: %q&#34;, p.s)
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>		case escaped:
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>			<span class="comment">//  quoted-pair = (&#34;\&#34; (VCHAR / WSP))</span>
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>			if !isVchar(r) &amp;&amp; !isWSP(r) {
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>				return &#34;&#34;, fmt.Errorf(&#34;mail: bad character in quoted-string: %q&#34;, r)
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>			}
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>			qsb = append(qsb, r)
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>			escaped = false
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>		case isQtext(r) || isWSP(r):
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>			<span class="comment">// qtext (printable US-ASCII excluding &#34; and \), or</span>
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>			<span class="comment">// FWS (almost; we&#39;re ignoring CRLF)</span>
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>			qsb = append(qsb, r)
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>		case r == &#39;&#34;&#39;:
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>			break Loop
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>		case r == &#39;\\&#39;:
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>			escaped = true
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>		default:
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>			return &#34;&#34;, fmt.Errorf(&#34;mail: bad character in quoted-string: %q&#34;, r)
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>		}
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>		i += size
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>	}
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	p.s = p.s[i+1:]
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	return string(qsb), nil
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>}
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span><span class="comment">// consumeAtom parses an RFC 5322 atom at the start of p.</span>
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span><span class="comment">// If dot is true, consumeAtom parses an RFC 5322 dot-atom instead.</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span><span class="comment">// If permissive is true, consumeAtom will not fail on</span>
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span><span class="comment">// leading/trailing/double dots in the atom (see golang.org/issue/4938).</span>
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>func (p *addrParser) consumeAtom(dot bool, permissive bool) (atom string, err error) {
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>	i := 0
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>Loop:
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>	for {
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>		r, size := utf8.DecodeRuneInString(p.s[i:])
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>		switch {
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>		case size == 1 &amp;&amp; r == utf8.RuneError:
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>			return &#34;&#34;, fmt.Errorf(&#34;mail: invalid utf-8 in address: %q&#34;, p.s)
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>		case size == 0 || !isAtext(r, dot):
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>			break Loop
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>		default:
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>			i += size
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>		}
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>	}
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>	if i == 0 {
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>		return &#34;&#34;, errors.New(&#34;mail: invalid string&#34;)
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>	}
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>	atom, p.s = p.s[:i], p.s[i:]
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>	if !permissive {
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>		if strings.HasPrefix(atom, &#34;.&#34;) {
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>			return &#34;&#34;, errors.New(&#34;mail: leading dot in atom&#34;)
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>		}
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>		if strings.Contains(atom, &#34;..&#34;) {
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>			return &#34;&#34;, errors.New(&#34;mail: double dot in atom&#34;)
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>		}
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>		if strings.HasSuffix(atom, &#34;.&#34;) {
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>			return &#34;&#34;, errors.New(&#34;mail: trailing dot in atom&#34;)
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>		}
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>	}
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>	return atom, nil
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>}
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>func (p *addrParser) consume(c byte) bool {
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>	if p.empty() || p.peek() != c {
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>		return false
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>	}
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>	p.s = p.s[1:]
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>	return true
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>}
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span><span class="comment">// skipSpace skips the leading space and tab characters.</span>
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>func (p *addrParser) skipSpace() {
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>	p.s = strings.TrimLeft(p.s, &#34; \t&#34;)
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>}
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>func (p *addrParser) peek() byte {
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	return p.s[0]
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>}
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>func (p *addrParser) empty() bool {
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	return p.len() == 0
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>}
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>func (p *addrParser) len() int {
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>	return len(p.s)
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>}
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>func (p *addrParser) decodeRFC2047Word(s string) (word string, isEncoded bool, err error) {
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>	if p.dec != nil {
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>		word, err = p.dec.Decode(s)
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>	} else {
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>		word, err = rfc2047Decoder.Decode(s)
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>	}
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>	if err == nil {
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>		return word, true, nil
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>	}
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>	if _, ok := err.(charsetError); ok {
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>		return s, true, err
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>	}
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	<span class="comment">// Ignore invalid RFC 2047 encoded-word errors.</span>
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>	return s, false, nil
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>}
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>var rfc2047Decoder = mime.WordDecoder{
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>	CharsetReader: func(charset string, input io.Reader) (io.Reader, error) {
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>		return nil, charsetError(charset)
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>	},
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>}
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>type charsetError string
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>func (e charsetError) Error() string {
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>	return fmt.Sprintf(&#34;charset not supported: %q&#34;, string(e))
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>}
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span><span class="comment">// isAtext reports whether r is an RFC 5322 atext character.</span>
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span><span class="comment">// If dot is true, period is included.</span>
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>func isAtext(r rune, dot bool) bool {
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>	switch r {
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>	case &#39;.&#39;:
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>		return dot
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>	case &#39;(&#39;, &#39;)&#39;, &#39;&lt;&#39;, &#39;&gt;&#39;, &#39;[&#39;, &#39;]&#39;, &#39;:&#39;, &#39;;&#39;, &#39;@&#39;, &#39;\\&#39;, &#39;,&#39;, &#39;&#34;&#39;: <span class="comment">// RFC 5322 3.2.3. specials</span>
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>		return false
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>	}
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>	return isVchar(r)
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>}
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span><span class="comment">// isQtext reports whether r is an RFC 5322 qtext character.</span>
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>func isQtext(r rune) bool {
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>	<span class="comment">// Printable US-ASCII, excluding backslash or quote.</span>
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>	if r == &#39;\\&#39; || r == &#39;&#34;&#39; {
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>		return false
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>	}
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>	return isVchar(r)
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>}
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span><span class="comment">// quoteString renders a string as an RFC 5322 quoted-string.</span>
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>func quoteString(s string) string {
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>	var buf bytes.Buffer
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>	buf.WriteByte(&#39;&#34;&#39;)
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>	for _, r := range s {
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>		if isQtext(r) || isWSP(r) {
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>			buf.WriteRune(r)
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>		} else if isVchar(r) {
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>			buf.WriteByte(&#39;\\&#39;)
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>			buf.WriteRune(r)
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>		}
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>	}
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>	buf.WriteByte(&#39;&#34;&#39;)
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>	return buf.String()
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>}
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span><span class="comment">// isVchar reports whether r is an RFC 5322 VCHAR character.</span>
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>func isVchar(r rune) bool {
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>	<span class="comment">// Visible (printing) characters.</span>
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>	return &#39;!&#39; &lt;= r &amp;&amp; r &lt;= &#39;~&#39; || isMultibyte(r)
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>}
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span><span class="comment">// isMultibyte reports whether r is a multi-byte UTF-8 character</span>
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span><span class="comment">// as supported by RFC 6532</span>
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>func isMultibyte(r rune) bool {
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>	return r &gt;= utf8.RuneSelf
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>}
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span><span class="comment">// isWSP reports whether r is a WSP (white space).</span>
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span><span class="comment">// WSP is a space or horizontal tab (RFC 5234 Appendix B).</span>
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>func isWSP(r rune) bool {
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>	return r == &#39; &#39; || r == &#39;\t&#39;
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>}
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>
+</pre><p><a href="message.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

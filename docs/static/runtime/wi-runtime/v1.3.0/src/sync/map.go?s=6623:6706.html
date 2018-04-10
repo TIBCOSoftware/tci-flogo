@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/sync/map.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./map.go%3Fs=6623:6706.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/sync">sync</a>/<span class="text-muted">map.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:6060/pkg/sync">sync</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2016 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package sync
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;sync/atomic&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;unsafe&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>)
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span><span class="comment">// Map is a concurrent map with amortized-constant-time loads, stores, and deletes.</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span><span class="comment">// It is safe for multiple goroutines to call a Map&#39;s methods concurrently.</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">// It is optimized for use in concurrent loops with keys that are</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// stable over time, and either few steady-state stores, or stores</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// localized to one goroutine per key.</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span><span class="comment">// For use cases that do not share these attributes, it will likely have</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span><span class="comment">// comparable or worse performance and worse type safety than an ordinary</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span><span class="comment">// map paired with a read-write mutex.</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span><span class="comment">// The zero Map is valid and empty.</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span><span class="comment">// A Map must not be copied after first use.</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>type Map struct {
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	mu Mutex
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	<span class="comment">// read contains the portion of the map&#39;s contents that are safe for</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	<span class="comment">// concurrent access (with or without mu held).</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	<span class="comment">// The read field itself is always safe to load, but must only be stored with</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	<span class="comment">// mu held.</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	<span class="comment">// Entries stored in read may be updated concurrently without mu, but updating</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	<span class="comment">// a previously-expunged entry requires that the entry be copied to the dirty</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	<span class="comment">// map and unexpunged with mu held.</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	read atomic.Value <span class="comment">// readOnly</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	<span class="comment">// dirty contains the portion of the map&#39;s contents that require mu to be</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	<span class="comment">// held. To ensure that the dirty map can be promoted to the read map quickly,</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	<span class="comment">// it also includes all of the non-expunged entries in the read map.</span>
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	<span class="comment">// Expunged entries are not stored in the dirty map. An expunged entry in the</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	<span class="comment">// clean map must be unexpunged and added to the dirty map before a new value</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	<span class="comment">// can be stored to it.</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	<span class="comment">// If the dirty map is nil, the next write to the map will initialize it by</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	<span class="comment">// making a shallow copy of the clean map, omitting stale entries.</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	dirty map[interface{}]*entry
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	<span class="comment">// misses counts the number of loads since the read map was last updated that</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	<span class="comment">// needed to lock mu to determine whether the key was present.</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	<span class="comment">// Once enough misses have occurred to cover the cost of copying the dirty</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	<span class="comment">// map, the dirty map will be promoted to the read map (in the unamended</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	<span class="comment">// state) and the next store to the map will make a new dirty copy.</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	misses int
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>}
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span><span class="comment">// readOnly is an immutable struct stored atomically in the Map.read field.</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>type readOnly struct {
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	m       map[interface{}]*entry
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	amended bool <span class="comment">// true if the dirty map contains some key not in m.</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>}
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span><span class="comment">// expunged is an arbitrary pointer that marks entries which have been deleted</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span><span class="comment">// from the dirty map.</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>var expunged = unsafe.Pointer(new(interface{}))
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span><span class="comment">// An entry is a slot in the map corresponding to a particular key.</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>type entry struct {
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	<span class="comment">// p points to the interface{} value stored for the entry.</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	<span class="comment">// If p == nil, the entry has been deleted and m.dirty == nil.</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	<span class="comment">// If p == expunged, the entry has been deleted, m.dirty != nil, and the entry</span>
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	<span class="comment">// is missing from m.dirty.</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	<span class="comment">// Otherwise, the entry is valid and recorded in m.read.m[key] and, if m.dirty</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	<span class="comment">// != nil, in m.dirty[key].</span>
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	<span class="comment">// An entry can be deleted by atomic replacement with nil: when m.dirty is</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	<span class="comment">// next created, it will atomically replace nil with expunged and leave</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	<span class="comment">// m.dirty[key] unset.</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	<span class="comment">// An entry&#39;s associated value can be updated by atomic replacement, provided</span>
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	<span class="comment">// p != expunged. If p == expunged, an entry&#39;s associated value can be updated</span>
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	<span class="comment">// only after first setting m.dirty[key] = e so that lookups using the dirty</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>	<span class="comment">// map find the entry.</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	p unsafe.Pointer <span class="comment">// *interface{}</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>}
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>func newEntry(i interface{}) *entry {
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	return &amp;entry{p: unsafe.Pointer(&amp;i)}
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>}
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span><span class="comment">// Load returns the value stored in the map for a key, or nil if no</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span><span class="comment">// value is present.</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span><span class="comment">// The ok result indicates whether value was found in the map.</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>func (m *Map) Load(key interface{}) (value interface{}, ok bool) {
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	read, _ := m.read.Load().(readOnly)
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	e, ok := read.m[key]
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	if !ok &amp;&amp; read.amended {
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		m.mu.Lock()
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>		<span class="comment">// Avoid reporting a spurious miss if m.dirty got promoted while we were</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>		<span class="comment">// blocked on m.mu. (If further loads of the same key will not miss, it&#39;s</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>		<span class="comment">// not worth copying the dirty map for this key.)</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		read, _ = m.read.Load().(readOnly)
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		e, ok = read.m[key]
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		if !ok &amp;&amp; read.amended {
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>			e, ok = m.dirty[key]
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>			<span class="comment">// Regardless of whether the entry was present, record a miss: this key</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>			<span class="comment">// will take the slow path until the dirty map is promoted to the read</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>			<span class="comment">// map.</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>			m.missLocked()
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		}
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>		m.mu.Unlock()
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	}
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	if !ok {
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		return nil, false
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	}
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	return e.load()
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>}
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>func (e *entry) load() (value interface{}, ok bool) {
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	p := atomic.LoadPointer(&amp;e.p)
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	if p == nil || p == expunged {
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>		return nil, false
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	}
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	return *(*interface{})(p), true
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>}
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span><span class="comment">// Store sets the value for a key.</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>func (m *Map) Store(key, value interface{}) {
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	read, _ := m.read.Load().(readOnly)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	if e, ok := read.m[key]; ok &amp;&amp; e.tryStore(&amp;value) {
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>		return
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	}
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	m.mu.Lock()
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	read, _ = m.read.Load().(readOnly)
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	if e, ok := read.m[key]; ok {
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		if e.unexpungeLocked() {
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>			<span class="comment">// The entry was previously expunged, which implies that there is a</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>			<span class="comment">// non-nil dirty map and this entry is not in it.</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>			m.dirty[key] = e
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		}
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>		e.storeLocked(&amp;value)
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	} else if e, ok := m.dirty[key]; ok {
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		e.storeLocked(&amp;value)
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	} else {
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>		if !read.amended {
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>			<span class="comment">// We&#39;re adding the first new key to the dirty map.</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>			<span class="comment">// Make sure it is allocated and mark the read-only map as incomplete.</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>			m.dirtyLocked()
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>			m.read.Store(readOnly{m: read.m, amended: true})
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>		}
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		m.dirty[key] = newEntry(value)
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	}
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	m.mu.Unlock()
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>}
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span><span class="comment">// tryStore stores a value if the entry has not been expunged.</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span><span class="comment">// If the entry is expunged, tryStore returns false and leaves the entry</span>
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span><span class="comment">// unchanged.</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>func (e *entry) tryStore(i *interface{}) bool {
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	p := atomic.LoadPointer(&amp;e.p)
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	if p == expunged {
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		return false
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	}
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	for {
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		if atomic.CompareAndSwapPointer(&amp;e.p, p, unsafe.Pointer(i)) {
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>			return true
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		}
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		p = atomic.LoadPointer(&amp;e.p)
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>		if p == expunged {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>			return false
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>		}
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	}
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span><span class="comment">// unexpungeLocked ensures that the entry is not marked as expunged.</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span><span class="comment">// If the entry was previously expunged, it must be added to the dirty map</span>
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span><span class="comment">// before m.mu is unlocked.</span>
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>func (e *entry) unexpungeLocked() (wasExpunged bool) {
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	return atomic.CompareAndSwapPointer(&amp;e.p, expunged, nil)
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>}
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span><span class="comment">// storeLocked unconditionally stores a value to the entry.</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span><span class="comment">// The entry must be known not to be expunged.</span>
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>func (e *entry) storeLocked(i *interface{}) {
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	atomic.StorePointer(&amp;e.p, unsafe.Pointer(i))
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>}
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span><span class="comment">// LoadOrStore returns the existing value for the key if present.</span>
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span><span class="comment">// Otherwise, it stores and returns the given value.</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span><span class="comment">// The loaded result is true if the value was loaded, false if stored.</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span><span class="selection">func (m *Map) LoadOrStore(key, value interface{}) (actual interface{}, loaded bool)</span> {
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	<span class="comment">// Avoid locking if it&#39;s a clean hit.</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	read, _ := m.read.Load().(readOnly)
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	if e, ok := read.m[key]; ok {
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		actual, loaded, ok := e.tryLoadOrStore(value)
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>		if ok {
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>			return actual, loaded
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>		}
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	}
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	m.mu.Lock()
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	read, _ = m.read.Load().(readOnly)
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	if e, ok := read.m[key]; ok {
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		if e.unexpungeLocked() {
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>			m.dirty[key] = e
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>		}
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>		actual, loaded, _ = e.tryLoadOrStore(value)
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	} else if e, ok := m.dirty[key]; ok {
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>		actual, loaded, _ = e.tryLoadOrStore(value)
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>		m.missLocked()
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>	} else {
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		if !read.amended {
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>			<span class="comment">// We&#39;re adding the first new key to the dirty map.</span>
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>			<span class="comment">// Make sure it is allocated and mark the read-only map as incomplete.</span>
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>			m.dirtyLocked()
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>			m.read.Store(readOnly{m: read.m, amended: true})
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>		}
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>		m.dirty[key] = newEntry(value)
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>		actual, loaded = value, false
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	}
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	m.mu.Unlock()
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	return actual, loaded
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>}
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span><span class="comment">// tryLoadOrStore atomically loads or stores a value if the entry is not</span>
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span><span class="comment">// expunged.</span>
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span><span class="comment">// If the entry is expunged, tryLoadOrStore leaves the entry unchanged and</span>
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span><span class="comment">// returns with ok==false.</span>
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>func (e *entry) tryLoadOrStore(i interface{}) (actual interface{}, loaded, ok bool) {
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	p := atomic.LoadPointer(&amp;e.p)
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	if p == expunged {
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>		return nil, false, false
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	}
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	if p != nil {
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>		return *(*interface{})(p), true, true
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	}
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	<span class="comment">// Copy the interface after the first load to make this method more amenable</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	<span class="comment">// to escape analysis: if we hit the &#34;load&#34; path or the entry is expunged, we</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	<span class="comment">// shouldn&#39;t bother heap-allocating.</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	ic := i
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	for {
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>		if atomic.CompareAndSwapPointer(&amp;e.p, nil, unsafe.Pointer(&amp;ic)) {
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>			return i, false, true
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>		}
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>		p = atomic.LoadPointer(&amp;e.p)
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>		if p == expunged {
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>			return nil, false, false
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>		}
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>		if p != nil {
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>			return *(*interface{})(p), true, true
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>		}
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	}
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>}
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span><span class="comment">// Delete deletes the value for a key.</span>
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>func (m *Map) Delete(key interface{}) {
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	read, _ := m.read.Load().(readOnly)
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	e, ok := read.m[key]
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	if !ok &amp;&amp; read.amended {
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>		m.mu.Lock()
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>		read, _ = m.read.Load().(readOnly)
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		e, ok = read.m[key]
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>		if !ok &amp;&amp; read.amended {
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>			delete(m.dirty, key)
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>		}
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>		m.mu.Unlock()
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	}
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	if ok {
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		e.delete()
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>}
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>func (e *entry) delete() (hadValue bool) {
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>	for {
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>		p := atomic.LoadPointer(&amp;e.p)
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>		if p == nil || p == expunged {
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>			return false
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>		}
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>		if atomic.CompareAndSwapPointer(&amp;e.p, p, nil) {
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>			return true
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>		}
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	}
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>}
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span><span class="comment">// Range calls f sequentially for each key and value present in the map.</span>
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span><span class="comment">// If f returns false, range stops the iteration.</span>
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span><span class="comment">// Range does not necessarily correspond to any consistent snapshot of the Map&#39;s</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span><span class="comment">// contents: no key will be visited more than once, but if the value for any key</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span><span class="comment">// is stored or deleted concurrently, Range may reflect any mapping for that key</span>
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span><span class="comment">// from any point during the Range call.</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span><span class="comment">// Range may be O(N) with the number of elements in the map even if f returns</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span><span class="comment">// false after a constant number of calls.</span>
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>func (m *Map) Range(f func(key, value interface{}) bool) {
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	<span class="comment">// We need to be able to iterate over all of the keys that were already</span>
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	<span class="comment">// present at the start of the call to Range.</span>
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	<span class="comment">// If read.amended is false, then read.m satisfies that property without</span>
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>	<span class="comment">// requiring us to hold m.mu for a long time.</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	read, _ := m.read.Load().(readOnly)
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	if read.amended {
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>		<span class="comment">// m.dirty contains keys not in read.m. Fortunately, Range is already O(N)</span>
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>		<span class="comment">// (assuming the caller does not break out early), so a call to Range</span>
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		<span class="comment">// amortizes an entire copy of the map: we can promote the dirty copy</span>
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>		<span class="comment">// immediately!</span>
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>		m.mu.Lock()
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>		read, _ = m.read.Load().(readOnly)
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>		if read.amended {
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>			read = readOnly{m: m.dirty}
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>			m.read.Store(read)
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>			m.dirty = nil
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>			m.misses = 0
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>		}
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>		m.mu.Unlock()
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>	}
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	for k, e := range read.m {
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>		v, ok := e.load()
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>		if !ok {
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>			continue
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>		}
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>		if !f(k, v) {
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>			break
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		}
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	}
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>}
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>func (m *Map) missLocked() {
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	m.misses++
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>	if m.misses &lt; len(m.dirty) {
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>		return
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	}
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	m.read.Store(readOnly{m: m.dirty})
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	m.dirty = nil
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>	m.misses = 0
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>}
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>func (m *Map) dirtyLocked() {
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	if m.dirty != nil {
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>		return
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	}
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	read, _ := m.read.Load().(readOnly)
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	m.dirty = make(map[interface{}]*entry, len(read.m))
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>	for k, e := range read.m {
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>		if !e.tryExpungeLocked() {
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>			m.dirty[k] = e
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>		}
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	}
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>}
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>func (e *entry) tryExpungeLocked() (isExpunged bool) {
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	p := atomic.LoadPointer(&amp;e.p)
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	for p == nil {
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>		if atomic.CompareAndSwapPointer(&amp;e.p, nil, expunged) {
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>			return true
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>		}
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>		p = atomic.LoadPointer(&amp;e.p)
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	}
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	return p == expunged
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>}
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>
+</pre><p><a href="map.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

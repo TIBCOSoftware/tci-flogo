@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/tls/common.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./common.go%3Fs=10482:10938.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../tls.1.html">tls</a>/<span class="text-muted">common.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/tls.1.html">crypto/tls</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package tls
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;container/list&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;crypto&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;crypto/internal/cipherhw&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;crypto/rand&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;crypto/sha512&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;crypto/x509&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;math/big&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;net&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	&#34;sync&#34;
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>)
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>const (
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	VersionSSL30 = 0x0300
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	VersionTLS10 = 0x0301
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	VersionTLS11 = 0x0302
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	VersionTLS12 = 0x0303
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>)
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>const (
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	maxPlaintext    = 16384        <span class="comment">// maximum plaintext payload length</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	maxCiphertext   = 16384 + 2048 <span class="comment">// maximum ciphertext payload length</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	recordHeaderLen = 5            <span class="comment">// record header length</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	maxHandshake    = 65536        <span class="comment">// maximum handshake we support (protocol max is 16 MB)</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	minVersion = VersionTLS10
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	maxVersion = VersionTLS12
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>)
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span><span class="comment">// TLS record types.</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>type recordType uint8
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>const (
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	recordTypeChangeCipherSpec recordType = 20
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	recordTypeAlert            recordType = 21
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	recordTypeHandshake        recordType = 22
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	recordTypeApplicationData  recordType = 23
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>)
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span><span class="comment">// TLS handshake message types.</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>const (
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	typeHelloRequest       uint8 = 0
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	typeClientHello        uint8 = 1
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	typeServerHello        uint8 = 2
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	typeNewSessionTicket   uint8 = 4
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	typeCertificate        uint8 = 11
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	typeServerKeyExchange  uint8 = 12
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	typeCertificateRequest uint8 = 13
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	typeServerHelloDone    uint8 = 14
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	typeCertificateVerify  uint8 = 15
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	typeClientKeyExchange  uint8 = 16
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	typeFinished           uint8 = 20
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	typeCertificateStatus  uint8 = 22
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>	typeNextProtocol       uint8 = 67 <span class="comment">// Not IANA assigned</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>)
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span><span class="comment">// TLS compression types.</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>const (
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	compressionNone uint8 = 0
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>)
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span><span class="comment">// TLS extension numbers</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>const (
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	extensionServerName          uint16 = 0
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	extensionStatusRequest       uint16 = 5
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	extensionSupportedCurves     uint16 = 10
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	extensionSupportedPoints     uint16 = 11
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	extensionSignatureAlgorithms uint16 = 13
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	extensionALPN                uint16 = 16
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	extensionSCT                 uint16 = 18 <span class="comment">// https://tools.ietf.org/html/rfc6962#section-6</span>
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	extensionSessionTicket       uint16 = 35
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	extensionNextProtoNeg        uint16 = 13172 <span class="comment">// not IANA assigned</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	extensionRenegotiationInfo   uint16 = 0xff01
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>)
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span><span class="comment">// TLS signaling cipher suite values</span>
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>const (
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	scsvRenegotiation uint16 = 0x00ff
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>)
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span><span class="comment">// CurveID is the type of a TLS identifier for an elliptic curve. See</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span><span class="comment">// http://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-8</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>type CurveID uint16
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>const (
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	CurveP256 CurveID = 23
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	CurveP384 CurveID = 24
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	CurveP521 CurveID = 25
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	X25519    CurveID = 29
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>)
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span><span class="comment">// TLS Elliptic Curve Point Formats</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span><span class="comment">// http://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-9</span>
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>const (
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	pointFormatUncompressed uint8 = 0
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>)
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span><span class="comment">// TLS CertificateStatusType (RFC 3546)</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>const (
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	statusTypeOCSP uint8 = 1
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>)
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span><span class="comment">// Certificate types (for certificateRequestMsg)</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>const (
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	certTypeRSASign    = 1 <span class="comment">// A certificate containing an RSA key</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	certTypeDSSSign    = 2 <span class="comment">// A certificate containing a DSA key</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	certTypeRSAFixedDH = 3 <span class="comment">// A certificate containing a static DH key</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	certTypeDSSFixedDH = 4 <span class="comment">// A certificate containing a static DH key</span>
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	<span class="comment">// See RFC 4492 sections 3 and 5.5.</span>
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	certTypeECDSASign      = 64 <span class="comment">// A certificate containing an ECDSA-capable public key, signed with ECDSA.</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	certTypeRSAFixedECDH   = 65 <span class="comment">// A certificate containing an ECDH-capable public key, signed with RSA.</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	certTypeECDSAFixedECDH = 66 <span class="comment">// A certificate containing an ECDH-capable public key, signed with ECDSA.</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	<span class="comment">// Rest of these are reserved by the TLS spec</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>)
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span><span class="comment">// Hash functions for TLS 1.2 (See RFC 5246, section A.4.1)</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>const (
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	hashSHA1   uint8 = 2
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	hashSHA256 uint8 = 4
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	hashSHA384 uint8 = 5
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>)
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span><span class="comment">// Signature algorithms for TLS 1.2 (See RFC 5246, section A.4.1)</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>const (
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	signatureRSA   uint8 = 1
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	signatureECDSA uint8 = 3
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>)
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span><span class="comment">// signatureAndHash mirrors the TLS 1.2, SignatureAndHashAlgorithm struct. See</span>
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span><span class="comment">// RFC 5246, section A.4.1.</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>type signatureAndHash struct {
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	hash, signature uint8
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>}
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span><span class="comment">// supportedSignatureAlgorithms contains the signature and hash algorithms that</span>
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span><span class="comment">// the code advertises as supported in a TLS 1.2 ClientHello and in a TLS 1.2</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span><span class="comment">// CertificateRequest.</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>var supportedSignatureAlgorithms = []signatureAndHash{
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	{hashSHA256, signatureRSA},
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>	{hashSHA256, signatureECDSA},
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	{hashSHA384, signatureRSA},
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	{hashSHA384, signatureECDSA},
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>	{hashSHA1, signatureRSA},
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>	{hashSHA1, signatureECDSA},
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>}
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span><span class="comment">// ConnectionState records basic TLS details about the connection.</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>type ConnectionState struct {
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	Version                     uint16                <span class="comment">// TLS version used by the connection (e.g. VersionTLS12)</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	HandshakeComplete           bool                  <span class="comment">// TLS handshake is complete</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>	DidResume                   bool                  <span class="comment">// connection resumes a previous TLS connection</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>	CipherSuite                 uint16                <span class="comment">// cipher suite in use (TLS_RSA_WITH_RC4_128_SHA, ...)</span>
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	NegotiatedProtocol          string                <span class="comment">// negotiated next protocol (not guaranteed to be from Config.NextProtos)</span>
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>	NegotiatedProtocolIsMutual  bool                  <span class="comment">// negotiated protocol was advertised by server (client side only)</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	ServerName                  string                <span class="comment">// server name requested by client, if any (server side only)</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	PeerCertificates            []*x509.Certificate   <span class="comment">// certificate chain presented by remote peer</span>
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	VerifiedChains              [][]*x509.Certificate <span class="comment">// verified chains built from PeerCertificates</span>
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	SignedCertificateTimestamps [][]byte              <span class="comment">// SCTs from the server, if any</span>
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	OCSPResponse                []byte                <span class="comment">// stapled OCSP response from server, if any</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>	<span class="comment">// TLSUnique contains the &#34;tls-unique&#34; channel binding value (see RFC</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>	<span class="comment">// 5929, section 3). For resumed sessions this value will be nil</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>	<span class="comment">// because resumption does not include enough context (see</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	<span class="comment">// https://mitls.org/pages/attacks/3SHAKE#channelbindings). This will</span>
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	<span class="comment">// change in future versions of Go once the TLS master-secret fix has</span>
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>	<span class="comment">// been standardized and implemented.</span>
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	TLSUnique []byte
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>}
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span><span class="comment">// ClientAuthType declares the policy the server will follow for</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span><span class="comment">// TLS Client Authentication.</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>type ClientAuthType int
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>const (
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	NoClientCert ClientAuthType = iota
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	RequestClientCert
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	RequireAnyClientCert
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	VerifyClientCertIfGiven
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>	RequireAndVerifyClientCert
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>)
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span><span class="comment">// ClientSessionState contains the state needed by clients to resume TLS</span>
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span><span class="comment">// sessions.</span>
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>type ClientSessionState struct {
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	sessionTicket      []uint8               <span class="comment">// Encrypted ticket used for session resumption with server</span>
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	vers               uint16                <span class="comment">// SSL/TLS version negotiated for the session</span>
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	cipherSuite        uint16                <span class="comment">// Ciphersuite negotiated for the session</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	masterSecret       []byte                <span class="comment">// MasterSecret generated by client on a full handshake</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	serverCertificates []*x509.Certificate   <span class="comment">// Certificate chain presented by the server</span>
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	verifiedChains     [][]*x509.Certificate <span class="comment">// Certificate chains we built for verification</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>}
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span><span class="comment">// ClientSessionCache is a cache of ClientSessionState objects that can be used</span>
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span><span class="comment">// by a client to resume a TLS session with a given server. ClientSessionCache</span>
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span><span class="comment">// implementations should expect to be called concurrently from different</span>
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span><span class="comment">// goroutines. Only ticket-based resumption is supported, not SessionID-based</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span><span class="comment">// resumption.</span>
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>type ClientSessionCache interface {
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	<span class="comment">// Get searches for a ClientSessionState associated with the given key.</span>
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	<span class="comment">// On return, ok is true if one was found.</span>
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	Get(sessionKey string) (session *ClientSessionState, ok bool)
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>	<span class="comment">// Put adds the ClientSessionState to the cache with the given key.</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>	Put(sessionKey string, cs *ClientSessionState)
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>}
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span><span class="comment">// SignatureScheme identifies a signature algorithm supported by TLS. See</span>
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span><span class="comment">// https://tools.ietf.org/html/draft-ietf-tls-tls13-18#section-4.2.3.</span>
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>type SignatureScheme uint16
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>const (
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	PKCS1WithSHA1   SignatureScheme = 0x0201
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	PKCS1WithSHA256 SignatureScheme = 0x0401
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	PKCS1WithSHA384 SignatureScheme = 0x0501
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	PKCS1WithSHA512 SignatureScheme = 0x0601
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	PSSWithSHA256 SignatureScheme = 0x0804
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	PSSWithSHA384 SignatureScheme = 0x0805
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	PSSWithSHA512 SignatureScheme = 0x0806
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	ECDSAWithP256AndSHA256 SignatureScheme = 0x0403
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	ECDSAWithP384AndSHA384 SignatureScheme = 0x0503
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	ECDSAWithP521AndSHA512 SignatureScheme = 0x0603
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>)
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span><span class="comment">// ClientHelloInfo contains information from a ClientHello message in order to</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span><span class="comment">// guide certificate selection in the GetCertificate callback.</span>
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>type ClientHelloInfo struct {
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>	<span class="comment">// CipherSuites lists the CipherSuites supported by the client (e.g.</span>
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	<span class="comment">// TLS_RSA_WITH_RC4_128_SHA).</span>
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	CipherSuites []uint16
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	<span class="comment">// ServerName indicates the name of the server requested by the client</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	<span class="comment">// in order to support virtual hosting. ServerName is only set if the</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>	<span class="comment">// client is using SNI (see</span>
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	<span class="comment">// http://tools.ietf.org/html/rfc4366#section-3.1).</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>	ServerName string
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	<span class="comment">// SupportedCurves lists the elliptic curves supported by the client.</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	<span class="comment">// SupportedCurves is set only if the Supported Elliptic Curves</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	<span class="comment">// Extension is being used (see</span>
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	<span class="comment">// http://tools.ietf.org/html/rfc4492#section-5.1.1).</span>
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	SupportedCurves []CurveID
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	<span class="comment">// SupportedPoints lists the point formats supported by the client.</span>
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	<span class="comment">// SupportedPoints is set only if the Supported Point Formats Extension</span>
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>	<span class="comment">// is being used (see</span>
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>	<span class="comment">// http://tools.ietf.org/html/rfc4492#section-5.1.2).</span>
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	SupportedPoints []uint8
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	<span class="comment">// SignatureSchemes lists the signature and hash schemes that the client</span>
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	<span class="comment">// is willing to verify. SignatureSchemes is set only if the Signature</span>
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	<span class="comment">// Algorithms Extension is being used (see</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>	<span class="comment">// https://tools.ietf.org/html/rfc5246#section-7.4.1.4.1).</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>	SignatureSchemes []SignatureScheme
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	<span class="comment">// SupportedProtos lists the application protocols supported by the client.</span>
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	<span class="comment">// SupportedProtos is set only if the Application-Layer Protocol</span>
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	<span class="comment">// Negotiation Extension is being used (see</span>
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	<span class="comment">// https://tools.ietf.org/html/rfc7301#section-3.1).</span>
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	<span class="comment">// Servers can select a protocol by setting Config.NextProtos in a</span>
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	<span class="comment">// GetConfigForClient return value.</span>
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	SupportedProtos []string
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	<span class="comment">// SupportedVersions lists the TLS versions supported by the client.</span>
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	<span class="comment">// For TLS versions less than 1.3, this is extrapolated from the max</span>
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	<span class="comment">// version advertised by the client, so values other than the greatest</span>
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	<span class="comment">// might be rejected if used.</span>
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>	SupportedVersions []uint16
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	<span class="comment">// Conn is the underlying net.Conn for the connection. Do not read</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	<span class="comment">// from, or write to, this connection; that will cause the TLS</span>
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>	<span class="comment">// connection to fail.</span>
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>	Conn net.Conn
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>}
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span><span class="comment">// CertificateRequestInfo contains information from a server&#39;s</span>
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span><span class="comment">// CertificateRequest message, which is used to demand a certificate and proof</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span><span class="comment">// of control from a client.</span>
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span><span class="selection">type CertificateRequestInfo struct {
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// AcceptableCAs contains zero or more, DER-encoded, X.501</span><span class="selection">
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// Distinguished Names. These are the names of root or intermediate CAs</span><span class="selection">
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// that the server wishes the returned certificate to be signed by. An</span><span class="selection">
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// empty slice indicates that the server has no preference.</span><span class="selection">
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	AcceptableCAs [][]byte
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// SignatureSchemes lists the signature schemes that the server is</span><span class="selection">
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// willing to verify.</span><span class="selection">
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	SignatureSchemes []SignatureScheme
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>}</span>
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span><span class="comment">// RenegotiationSupport enumerates the different levels of support for TLS</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span><span class="comment">// renegotiation. TLS renegotiation is the act of performing subsequent</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span><span class="comment">// handshakes on a connection after the first. This significantly complicates</span>
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span><span class="comment">// the state machine and has been the source of numerous, subtle security</span>
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span><span class="comment">// issues. Initiating a renegotiation is not supported, but support for</span>
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span><span class="comment">// accepting renegotiation requests may be enabled.</span>
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span><span class="comment">// Even when enabled, the server may not change its identity between handshakes</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span><span class="comment">// (i.e. the leaf certificate must be the same). Additionally, concurrent</span>
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span><span class="comment">// handshake and application data flow is not permitted so renegotiation can</span>
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span><span class="comment">// only be used with protocols that synchronise with the renegotiation, such as</span>
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span><span class="comment">// HTTPS.</span>
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>type RenegotiationSupport int
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>const (
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	<span class="comment">// RenegotiateNever disables renegotiation.</span>
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>	RenegotiateNever RenegotiationSupport = iota
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>	<span class="comment">// RenegotiateOnceAsClient allows a remote server to request</span>
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>	<span class="comment">// renegotiation once per connection.</span>
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	RenegotiateOnceAsClient
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>	<span class="comment">// RenegotiateFreelyAsClient allows a remote server to repeatedly</span>
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>	<span class="comment">// request renegotiation.</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	RenegotiateFreelyAsClient
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>)
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span><span class="comment">// A Config structure is used to configure a TLS client or server.</span>
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span><span class="comment">// After one has been passed to a TLS function it must not be</span>
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span><span class="comment">// modified. A Config may be reused; the tls package will also not</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span><span class="comment">// modify it.</span>
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>type Config struct {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>	<span class="comment">// Rand provides the source of entropy for nonces and RSA blinding.</span>
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	<span class="comment">// If Rand is nil, TLS uses the cryptographic random reader in package</span>
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	<span class="comment">// crypto/rand.</span>
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	<span class="comment">// The Reader must be safe for use by multiple goroutines.</span>
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>	Rand io.Reader
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>	<span class="comment">// Time returns the current time as the number of seconds since the epoch.</span>
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	<span class="comment">// If Time is nil, TLS uses time.Now.</span>
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	Time func() time.Time
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	<span class="comment">// Certificates contains one or more certificate chains to present to</span>
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>	<span class="comment">// the other side of the connection. Server configurations must include</span>
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	<span class="comment">// at least one certificate or else set GetCertificate. Clients doing</span>
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>	<span class="comment">// client-authentication may set either Certificates or</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>	<span class="comment">// GetClientCertificate.</span>
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	Certificates []Certificate
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	<span class="comment">// NameToCertificate maps from a certificate name to an element of</span>
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	<span class="comment">// Certificates. Note that a certificate name can be of the form</span>
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	<span class="comment">// &#39;*.example.com&#39; and so doesn&#39;t have to be a domain name as such.</span>
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	<span class="comment">// See Config.BuildNameToCertificate</span>
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>	<span class="comment">// The nil value causes the first element of Certificates to be used</span>
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	<span class="comment">// for all connections.</span>
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	NameToCertificate map[string]*Certificate
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	<span class="comment">// GetCertificate returns a Certificate based on the given</span>
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	<span class="comment">// ClientHelloInfo. It will only be called if the client supplies SNI</span>
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	<span class="comment">// information or if Certificates is empty.</span>
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	<span class="comment">// If GetCertificate is nil or returns nil, then the certificate is</span>
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	<span class="comment">// retrieved from NameToCertificate. If NameToCertificate is nil, the</span>
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	<span class="comment">// first element of Certificates will be used.</span>
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	GetCertificate func(*ClientHelloInfo) (*Certificate, error)
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	<span class="comment">// GetClientCertificate, if not nil, is called when a server requests a</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	<span class="comment">// certificate from a client. If set, the contents of Certificates will</span>
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	<span class="comment">// be ignored.</span>
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>	<span class="comment">// If GetClientCertificate returns an error, the handshake will be</span>
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>	<span class="comment">// aborted and that error will be returned. Otherwise</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>	<span class="comment">// GetClientCertificate must return a non-nil Certificate. If</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>	<span class="comment">// Certificate.Certificate is empty then no certificate will be sent to</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>	<span class="comment">// the server. If this is unacceptable to the server then it may abort</span>
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>	<span class="comment">// the handshake.</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>	<span class="comment">// GetClientCertificate may be called multiple times for the same</span>
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>	<span class="comment">// connection if renegotiation occurs or if TLS 1.3 is in use.</span>
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>	GetClientCertificate func(*CertificateRequestInfo) (*Certificate, error)
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>	<span class="comment">// GetConfigForClient, if not nil, is called after a ClientHello is</span>
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	<span class="comment">// received from a client. It may return a non-nil Config in order to</span>
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>	<span class="comment">// change the Config that will be used to handle this connection. If</span>
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>	<span class="comment">// the returned Config is nil, the original Config will be used. The</span>
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>	<span class="comment">// Config returned by this callback may not be subsequently modified.</span>
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>	<span class="comment">// If GetConfigForClient is nil, the Config passed to Server() will be</span>
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>	<span class="comment">// used for all connections.</span>
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>	<span class="comment">// Uniquely for the fields in the returned Config, session ticket keys</span>
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>	<span class="comment">// will be duplicated from the original Config if not set.</span>
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>	<span class="comment">// Specifically, if SetSessionTicketKeys was called on the original</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>	<span class="comment">// config but not on the returned config then the ticket keys from the</span>
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	<span class="comment">// original config will be copied into the new config before use.</span>
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>	<span class="comment">// Otherwise, if SessionTicketKey was set in the original config but</span>
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	<span class="comment">// not in the returned config then it will be copied into the returned</span>
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>	<span class="comment">// config before use. If neither of those cases applies then the key</span>
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>	<span class="comment">// material from the returned config will be used for session tickets.</span>
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>	GetConfigForClient func(*ClientHelloInfo) (*Config, error)
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>	<span class="comment">// VerifyPeerCertificate, if not nil, is called after normal</span>
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>	<span class="comment">// certificate verification by either a TLS client or server. It</span>
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>	<span class="comment">// receives the raw ASN.1 certificates provided by the peer and also</span>
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>	<span class="comment">// any verified chains that normal processing found. If it returns a</span>
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>	<span class="comment">// non-nil error, the handshake is aborted and that error results.</span>
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>	<span class="comment">// If normal verification fails then the handshake will abort before</span>
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>	<span class="comment">// considering this callback. If normal verification is disabled by</span>
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>	<span class="comment">// setting InsecureSkipVerify then this callback will be considered but</span>
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>	<span class="comment">// the verifiedChains argument will always be nil.</span>
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>	VerifyPeerCertificate func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>	<span class="comment">// RootCAs defines the set of root certificate authorities</span>
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>	<span class="comment">// that clients use when verifying server certificates.</span>
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>	<span class="comment">// If RootCAs is nil, TLS uses the host&#39;s root CA set.</span>
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	RootCAs *x509.CertPool
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	<span class="comment">// NextProtos is a list of supported, application level protocols.</span>
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>	NextProtos []string
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>	<span class="comment">// ServerName is used to verify the hostname on the returned</span>
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>	<span class="comment">// certificates unless InsecureSkipVerify is given. It is also included</span>
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>	<span class="comment">// in the client&#39;s handshake to support virtual hosting unless it is</span>
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	<span class="comment">// an IP address.</span>
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>	ServerName string
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	<span class="comment">// ClientAuth determines the server&#39;s policy for</span>
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>	<span class="comment">// TLS Client Authentication. The default is NoClientCert.</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	ClientAuth ClientAuthType
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>	<span class="comment">// ClientCAs defines the set of root certificate authorities</span>
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>	<span class="comment">// that servers use if required to verify a client certificate</span>
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>	<span class="comment">// by the policy in ClientAuth.</span>
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>	ClientCAs *x509.CertPool
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>	<span class="comment">// InsecureSkipVerify controls whether a client verifies the</span>
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	<span class="comment">// server&#39;s certificate chain and host name.</span>
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	<span class="comment">// If InsecureSkipVerify is true, TLS accepts any certificate</span>
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	<span class="comment">// presented by the server and any host name in that certificate.</span>
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>	<span class="comment">// In this mode, TLS is susceptible to man-in-the-middle attacks.</span>
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>	<span class="comment">// This should be used only for testing.</span>
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>	InsecureSkipVerify bool
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>	<span class="comment">// CipherSuites is a list of supported cipher suites. If CipherSuites</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>	<span class="comment">// is nil, TLS uses a list of suites supported by the implementation.</span>
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>	CipherSuites []uint16
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>	<span class="comment">// PreferServerCipherSuites controls whether the server selects the</span>
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>	<span class="comment">// client&#39;s most preferred ciphersuite, or the server&#39;s most preferred</span>
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>	<span class="comment">// ciphersuite. If true then the server&#39;s preference, as expressed in</span>
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>	<span class="comment">// the order of elements in CipherSuites, is used.</span>
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>	PreferServerCipherSuites bool
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>	<span class="comment">// SessionTicketsDisabled may be set to true to disable session ticket</span>
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>	<span class="comment">// (resumption) support.</span>
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>	SessionTicketsDisabled bool
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>	<span class="comment">// SessionTicketKey is used by TLS servers to provide session</span>
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>	<span class="comment">// resumption. See RFC 5077. If zero, it will be filled with</span>
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>	<span class="comment">// random data before the first server handshake.</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>	<span class="comment">// If multiple servers are terminating connections for the same host</span>
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>	<span class="comment">// they should all have the same SessionTicketKey. If the</span>
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>	<span class="comment">// SessionTicketKey leaks, previously recorded and future TLS</span>
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>	<span class="comment">// connections using that key are compromised.</span>
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>	SessionTicketKey [32]byte
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	<span class="comment">// SessionCache is a cache of ClientSessionState entries for TLS session</span>
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>	<span class="comment">// resumption.</span>
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>	ClientSessionCache ClientSessionCache
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>	<span class="comment">// MinVersion contains the minimum SSL/TLS version that is acceptable.</span>
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	<span class="comment">// If zero, then TLS 1.0 is taken as the minimum.</span>
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	MinVersion uint16
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>	<span class="comment">// MaxVersion contains the maximum SSL/TLS version that is acceptable.</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>	<span class="comment">// If zero, then the maximum version supported by this package is used,</span>
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>	<span class="comment">// which is currently TLS 1.2.</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>	MaxVersion uint16
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>	<span class="comment">// CurvePreferences contains the elliptic curves that will be used in</span>
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>	<span class="comment">// an ECDHE handshake, in preference order. If empty, the default will</span>
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>	<span class="comment">// be used.</span>
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>	CurvePreferences []CurveID
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>	<span class="comment">// DynamicRecordSizingDisabled disables adaptive sizing of TLS records.</span>
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>	<span class="comment">// When true, the largest possible TLS record size is always used. When</span>
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>	<span class="comment">// false, the size of TLS records may be adjusted in an attempt to</span>
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>	<span class="comment">// improve latency.</span>
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>	DynamicRecordSizingDisabled bool
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>	<span class="comment">// Renegotiation controls what types of renegotiation are supported.</span>
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>	<span class="comment">// The default, none, is correct for the vast majority of applications.</span>
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>	Renegotiation RenegotiationSupport
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>	<span class="comment">// KeyLogWriter optionally specifies a destination for TLS master secrets</span>
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>	<span class="comment">// in NSS key log format that can be used to allow external programs</span>
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>	<span class="comment">// such as Wireshark to decrypt TLS connections.</span>
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>	<span class="comment">// See https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format.</span>
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>	<span class="comment">// Use of KeyLogWriter compromises security and should only be</span>
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>	<span class="comment">// used for debugging.</span>
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>	KeyLogWriter io.Writer
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>	serverInitOnce sync.Once <span class="comment">// guards calling (*Config).serverInit</span>
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>	<span class="comment">// mutex protects sessionTicketKeys.</span>
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>	mutex sync.RWMutex
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>	<span class="comment">// sessionTicketKeys contains zero or more ticket keys. If the length</span>
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>	<span class="comment">// is zero, SessionTicketsDisabled must be true. The first key is used</span>
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>	<span class="comment">// for new tickets and any subsequent keys can be used to decrypt old</span>
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>	<span class="comment">// tickets.</span>
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>	sessionTicketKeys []ticketKey
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>}
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span><span class="comment">// ticketKeyNameLen is the number of bytes of identifier that is prepended to</span>
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span><span class="comment">// an encrypted session ticket in order to identify the key used to encrypt it.</span>
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>const ticketKeyNameLen = 16
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span><span class="comment">// ticketKey is the internal representation of a session ticket key.</span>
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>type ticketKey struct {
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>	<span class="comment">// keyName is an opaque byte string that serves to identify the session</span>
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>	<span class="comment">// ticket key. It&#39;s exposed as plaintext in every session ticket.</span>
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>	keyName [ticketKeyNameLen]byte
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>	aesKey  [16]byte
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>	hmacKey [16]byte
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>}
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span><span class="comment">// ticketKeyFromBytes converts from the external representation of a session</span>
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span><span class="comment">// ticket key to a ticketKey. Externally, session ticket keys are 32 random</span>
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span><span class="comment">// bytes and this function expands that into sufficient name and key material.</span>
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>func ticketKeyFromBytes(b [32]byte) (key ticketKey) {
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>	hashed := sha512.Sum512(b[:])
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	copy(key.keyName[:], hashed[:ticketKeyNameLen])
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	copy(key.aesKey[:], hashed[ticketKeyNameLen:ticketKeyNameLen+16])
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>	copy(key.hmacKey[:], hashed[ticketKeyNameLen+16:ticketKeyNameLen+32])
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>	return key
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>}
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span><span class="comment">// Clone returns a shallow clone of c. It is safe to clone a Config that is</span>
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span><span class="comment">// being used concurrently by a TLS client or server.</span>
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>func (c *Config) Clone() *Config {
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>	<span class="comment">// Running serverInit ensures that it&#39;s safe to read</span>
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>	<span class="comment">// SessionTicketsDisabled.</span>
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>	c.serverInitOnce.Do(func() { c.serverInit(nil) })
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>	var sessionTicketKeys []ticketKey
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>	c.mutex.RLock()
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>	sessionTicketKeys = c.sessionTicketKeys
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>	c.mutex.RUnlock()
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>	return &amp;Config{
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>		Rand:                        c.Rand,
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>		Time:                        c.Time,
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>		Certificates:                c.Certificates,
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>		NameToCertificate:           c.NameToCertificate,
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>		GetCertificate:              c.GetCertificate,
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>		GetClientCertificate:        c.GetClientCertificate,
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>		GetConfigForClient:          c.GetConfigForClient,
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>		VerifyPeerCertificate:       c.VerifyPeerCertificate,
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>		RootCAs:                     c.RootCAs,
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>		NextProtos:                  c.NextProtos,
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>		ServerName:                  c.ServerName,
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>		ClientAuth:                  c.ClientAuth,
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>		ClientCAs:                   c.ClientCAs,
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>		InsecureSkipVerify:          c.InsecureSkipVerify,
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>		CipherSuites:                c.CipherSuites,
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>		PreferServerCipherSuites:    c.PreferServerCipherSuites,
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		SessionTicketsDisabled:      c.SessionTicketsDisabled,
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>		SessionTicketKey:            c.SessionTicketKey,
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>		ClientSessionCache:          c.ClientSessionCache,
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>		MinVersion:                  c.MinVersion,
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>		MaxVersion:                  c.MaxVersion,
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>		CurvePreferences:            c.CurvePreferences,
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>		DynamicRecordSizingDisabled: c.DynamicRecordSizingDisabled,
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>		Renegotiation:               c.Renegotiation,
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>		KeyLogWriter:                c.KeyLogWriter,
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>		sessionTicketKeys:           sessionTicketKeys,
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>	}
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>}
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span><span class="comment">// serverInit is run under c.serverInitOnce to do initialization of c. If c was</span>
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span><span class="comment">// returned by a GetConfigForClient callback then the argument should be the</span>
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span><span class="comment">// Config that was passed to Server, otherwise it should be nil.</span>
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>func (c *Config) serverInit(originalConfig *Config) {
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>	if c.SessionTicketsDisabled || len(c.ticketKeys()) != 0 {
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>		return
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>	}
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>	alreadySet := false
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>	for _, b := range c.SessionTicketKey {
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>		if b != 0 {
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>			alreadySet = true
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>			break
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>		}
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>	}
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>	if !alreadySet {
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>		if originalConfig != nil {
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>			copy(c.SessionTicketKey[:], originalConfig.SessionTicketKey[:])
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>		} else if _, err := io.ReadFull(c.rand(), c.SessionTicketKey[:]); err != nil {
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>			c.SessionTicketsDisabled = true
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>			return
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>		}
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>	}
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>	if originalConfig != nil {
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>		originalConfig.mutex.RLock()
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>		c.sessionTicketKeys = originalConfig.sessionTicketKeys
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>		originalConfig.mutex.RUnlock()
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>	} else {
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>		c.sessionTicketKeys = []ticketKey{ticketKeyFromBytes(c.SessionTicketKey)}
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>	}
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>}
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>func (c *Config) ticketKeys() []ticketKey {
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>	c.mutex.RLock()
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>	<span class="comment">// c.sessionTicketKeys is constant once created. SetSessionTicketKeys</span>
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>	<span class="comment">// will only update it by replacing it with a new value.</span>
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>	ret := c.sessionTicketKeys
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>	c.mutex.RUnlock()
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>	return ret
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>}
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span><span class="comment">// SetSessionTicketKeys updates the session ticket keys for a server. The first</span>
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span><span class="comment">// key will be used when creating new tickets, while all keys can be used for</span>
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span><span class="comment">// decrypting tickets. It is safe to call this function while the server is</span>
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span><span class="comment">// running in order to rotate the session ticket keys. The function will panic</span>
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span><span class="comment">// if keys is empty.</span>
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>func (c *Config) SetSessionTicketKeys(keys [][32]byte) {
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>	if len(keys) == 0 {
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>		panic(&#34;tls: keys must have at least one key&#34;)
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>	}
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>	newKeys := make([]ticketKey, len(keys))
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>	for i, bytes := range keys {
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>		newKeys[i] = ticketKeyFromBytes(bytes)
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>	}
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>	c.mutex.Lock()
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>	c.sessionTicketKeys = newKeys
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>	c.mutex.Unlock()
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>}
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>func (c *Config) rand() io.Reader {
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>	r := c.Rand
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>	if r == nil {
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>		return rand.Reader
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	}
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>	return r
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>}
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>func (c *Config) time() time.Time {
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>	t := c.Time
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>	if t == nil {
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>		t = time.Now
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>	}
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>	return t()
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>}
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>func (c *Config) cipherSuites() []uint16 {
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>	s := c.CipherSuites
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>	if s == nil {
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>		s = defaultCipherSuites()
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>	}
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>	return s
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>}
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>func (c *Config) minVersion() uint16 {
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>	if c == nil || c.MinVersion == 0 {
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		return minVersion
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>	}
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>	return c.MinVersion
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>}
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>func (c *Config) maxVersion() uint16 {
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>	if c == nil || c.MaxVersion == 0 {
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>		return maxVersion
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>	}
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>	return c.MaxVersion
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>}
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>var defaultCurvePreferences = []CurveID{X25519, CurveP256, CurveP384, CurveP521}
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>func (c *Config) curvePreferences() []CurveID {
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>	if c == nil || len(c.CurvePreferences) == 0 {
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>		return defaultCurvePreferences
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>	}
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>	return c.CurvePreferences
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>}
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span><span class="comment">// mutualVersion returns the protocol version to use given the advertised</span>
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span><span class="comment">// version of the peer.</span>
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>func (c *Config) mutualVersion(vers uint16) (uint16, bool) {
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>	minVersion := c.minVersion()
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>	maxVersion := c.maxVersion()
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>	if vers &lt; minVersion {
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>		return 0, false
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>	}
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>	if vers &gt; maxVersion {
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>		vers = maxVersion
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>	}
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>	return vers, true
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>}
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span><span class="comment">// getCertificate returns the best certificate for the given ClientHelloInfo,</span>
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span><span class="comment">// defaulting to the first element of c.Certificates.</span>
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>func (c *Config) getCertificate(clientHello *ClientHelloInfo) (*Certificate, error) {
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>	if c.GetCertificate != nil &amp;&amp;
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>		(len(c.Certificates) == 0 || len(clientHello.ServerName) &gt; 0) {
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>		cert, err := c.GetCertificate(clientHello)
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>		if cert != nil || err != nil {
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>			return cert, err
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>		}
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>	}
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>	if len(c.Certificates) == 0 {
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;tls: no certificates configured&#34;)
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>	}
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>	if len(c.Certificates) == 1 || c.NameToCertificate == nil {
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>		<span class="comment">// There&#39;s only one choice, so no point doing any work.</span>
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>		return &amp;c.Certificates[0], nil
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>	}
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>	name := strings.ToLower(clientHello.ServerName)
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>	for len(name) &gt; 0 &amp;&amp; name[len(name)-1] == &#39;.&#39; {
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>		name = name[:len(name)-1]
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>	}
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>	if cert, ok := c.NameToCertificate[name]; ok {
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>		return cert, nil
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>	}
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>	<span class="comment">// try replacing labels in the name with wildcards until we get a</span>
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>	<span class="comment">// match.</span>
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>	labels := strings.Split(name, &#34;.&#34;)
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>	for i := range labels {
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>		labels[i] = &#34;*&#34;
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>		candidate := strings.Join(labels, &#34;.&#34;)
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>		if cert, ok := c.NameToCertificate[candidate]; ok {
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>			return cert, nil
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>		}
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>	}
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>	<span class="comment">// If nothing matches, return the first certificate.</span>
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>	return &amp;c.Certificates[0], nil
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>}
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span><span class="comment">// BuildNameToCertificate parses c.Certificates and builds c.NameToCertificate</span>
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span><span class="comment">// from the CommonName and SubjectAlternateName fields of each of the leaf</span>
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span><span class="comment">// certificates.</span>
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>func (c *Config) BuildNameToCertificate() {
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>	c.NameToCertificate = make(map[string]*Certificate)
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>	for i := range c.Certificates {
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>		cert := &amp;c.Certificates[i]
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>		x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>			continue
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>		}
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>		if len(x509Cert.Subject.CommonName) &gt; 0 {
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>			c.NameToCertificate[x509Cert.Subject.CommonName] = cert
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>		}
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>		for _, san := range x509Cert.DNSNames {
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>			c.NameToCertificate[san] = cert
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>		}
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>	}
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>}
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span><span class="comment">// writeKeyLog logs client random and master secret if logging was enabled by</span>
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span><span class="comment">// setting c.KeyLogWriter.</span>
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>func (c *Config) writeKeyLog(clientRandom, masterSecret []byte) error {
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>	if c.KeyLogWriter == nil {
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>		return nil
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>	}
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>	logLine := []byte(fmt.Sprintf(&#34;CLIENT_RANDOM %x %x\n&#34;, clientRandom, masterSecret))
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>	writerMutex.Lock()
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>	_, err := c.KeyLogWriter.Write(logLine)
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>	writerMutex.Unlock()
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>	return err
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>}
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span><span class="comment">// writerMutex protects all KeyLogWriters globally. It is rarely enabled,</span>
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span><span class="comment">// and is only for debugging, so a global mutex saves space.</span>
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>var writerMutex sync.Mutex
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span><span class="comment">// A Certificate is a chain of one or more certificates, leaf first.</span>
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>type Certificate struct {
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>	Certificate [][]byte
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>	<span class="comment">// PrivateKey contains the private key corresponding to the public key</span>
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>	<span class="comment">// in Leaf. For a server, this must implement crypto.Signer and/or</span>
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>	<span class="comment">// crypto.Decrypter, with an RSA or ECDSA PublicKey. For a client</span>
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>	<span class="comment">// (performing client authentication), this must be a crypto.Signer</span>
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>	<span class="comment">// with an RSA or ECDSA PublicKey.</span>
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>	PrivateKey crypto.PrivateKey
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>	<span class="comment">// OCSPStaple contains an optional OCSP response which will be served</span>
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>	<span class="comment">// to clients that request it.</span>
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>	OCSPStaple []byte
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>	<span class="comment">// SignedCertificateTimestamps contains an optional list of Signed</span>
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>	<span class="comment">// Certificate Timestamps which will be served to clients that request it.</span>
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>	SignedCertificateTimestamps [][]byte
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>	<span class="comment">// Leaf is the parsed form of the leaf certificate, which may be</span>
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>	<span class="comment">// initialized using x509.ParseCertificate to reduce per-handshake</span>
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>	<span class="comment">// processing for TLS clients doing client authentication. If nil, the</span>
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>	<span class="comment">// leaf certificate will be parsed as needed.</span>
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>	Leaf *x509.Certificate
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>}
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>type handshakeMessage interface {
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>	marshal() []byte
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>	unmarshal([]byte) bool
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>}
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span><span class="comment">// lruSessionCache is a ClientSessionCache implementation that uses an LRU</span>
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span><span class="comment">// caching strategy.</span>
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>type lruSessionCache struct {
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>	sync.Mutex
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>	m        map[string]*list.Element
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>	q        *list.List
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>	capacity int
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>}
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>type lruSessionCacheEntry struct {
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>	sessionKey string
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>	state      *ClientSessionState
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>}
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span><span class="comment">// NewLRUClientSessionCache returns a ClientSessionCache with the given</span>
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span><span class="comment">// capacity that uses an LRU strategy. If capacity is &lt; 1, a default capacity</span>
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span><span class="comment">// is used instead.</span>
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>func NewLRUClientSessionCache(capacity int) ClientSessionCache {
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>	const defaultSessionCacheCapacity = 64
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>	if capacity &lt; 1 {
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>		capacity = defaultSessionCacheCapacity
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>	}
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>	return &amp;lruSessionCache{
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>		m:        make(map[string]*list.Element),
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>		q:        list.New(),
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>		capacity: capacity,
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>	}
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>}
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span><span class="comment">// Put adds the provided (sessionKey, cs) pair to the cache.</span>
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>func (c *lruSessionCache) Put(sessionKey string, cs *ClientSessionState) {
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>	c.Lock()
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>	defer c.Unlock()
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>	if elem, ok := c.m[sessionKey]; ok {
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>		entry := elem.Value.(*lruSessionCacheEntry)
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>		entry.state = cs
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>		c.q.MoveToFront(elem)
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>		return
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>	}
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>	if c.q.Len() &lt; c.capacity {
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>		entry := &amp;lruSessionCacheEntry{sessionKey, cs}
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>		c.m[sessionKey] = c.q.PushFront(entry)
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>		return
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>	}
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>	elem := c.q.Back()
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>	entry := elem.Value.(*lruSessionCacheEntry)
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>	delete(c.m, entry.sessionKey)
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>	entry.sessionKey = sessionKey
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>	entry.state = cs
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>	c.q.MoveToFront(elem)
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>	c.m[sessionKey] = elem
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>}
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span><span class="comment">// Get returns the ClientSessionState value associated with a given key. It</span>
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span><span class="comment">// returns (nil, false) if no value is found.</span>
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>func (c *lruSessionCache) Get(sessionKey string) (*ClientSessionState, bool) {
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>	c.Lock()
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>	defer c.Unlock()
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>	if elem, ok := c.m[sessionKey]; ok {
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>		c.q.MoveToFront(elem)
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>		return elem.Value.(*lruSessionCacheEntry).state, true
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>	}
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>	return nil, false
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>}
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span><span class="comment">// TODO(jsing): Make these available to both crypto/x509 and crypto/tls.</span>
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>type dsaSignature struct {
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>	R, S *big.Int
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>}
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>type ecdsaSignature dsaSignature
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>var emptyConfig Config
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>func defaultConfig() *Config {
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>	return &amp;emptyConfig
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>}
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>var (
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>	once                   sync.Once
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>	varDefaultCipherSuites []uint16
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>)
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>func defaultCipherSuites() []uint16 {
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>	once.Do(initDefaultCipherSuites)
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>	return varDefaultCipherSuites
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>}
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>func initDefaultCipherSuites() {
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>	var topCipherSuites []uint16
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>	if cipherhw.AESGCMSupport() {
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>		<span class="comment">// If AES-GCM hardware is provided then prioritise AES-GCM</span>
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>		<span class="comment">// cipher suites.</span>
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>		topCipherSuites = []uint16{
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>			TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>			TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>			TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>			TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>			TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>			TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>		}
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>	} else {
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>		<span class="comment">// Without AES-GCM hardware, we put the ChaCha20-Poly1305</span>
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>		<span class="comment">// cipher suites first.</span>
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>		topCipherSuites = []uint16{
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>			TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>			TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>			TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>			TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>			TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>			TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>		}
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>	}
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span>
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>	varDefaultCipherSuites = make([]uint16, 0, len(cipherSuites))
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>	varDefaultCipherSuites = append(varDefaultCipherSuites, topCipherSuites...)
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>NextCipherSuite:
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>	for _, suite := range cipherSuites {
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>		if suite.flags&amp;suiteDefaultOff != 0 {
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>			continue
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>		}
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>		for _, existing := range varDefaultCipherSuites {
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>			if existing == suite.id {
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>				continue NextCipherSuite
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>			}
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>		}
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>		varDefaultCipherSuites = append(varDefaultCipherSuites, suite.id)
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>	}
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>}
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>func unexpectedMessageError(wanted, got interface{}) error {
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>	return fmt.Errorf(&#34;tls: received unexpected handshake message of type %T when waiting for %T&#34;, got, wanted)
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>}
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>func isSupportedSignatureAndHash(sigHash signatureAndHash, sigHashes []signatureAndHash) bool {
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>	for _, s := range sigHashes {
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>		if s == sigHash {
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>			return true
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>		}
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>	}
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>	return false
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>}
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>
+</pre><p><a href="common.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

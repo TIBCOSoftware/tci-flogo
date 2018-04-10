@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/x509/x509_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="x509_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../x509.1.html">x509</a>/<span class="text-muted">x509_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/x509.1.html">crypto/x509</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package x509
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;crypto/dsa&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;crypto/ecdsa&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;crypto/elliptic&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;crypto/rand&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;crypto/rsa&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	_ &#34;crypto/sha256&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	_ &#34;crypto/sha512&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;crypto/x509/pkix&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;encoding/asn1&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;encoding/base64&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;encoding/hex&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	&#34;encoding/pem&#34;
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	&#34;internal/testenv&#34;
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	&#34;math/big&#34;
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	&#34;net&#34;
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	&#34;os/exec&#34;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	&#34;runtime&#34;
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>)
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>func TestParsePKCS1PrivateKey(t *testing.T) {
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	block, _ := pem.Decode([]byte(pemPrivateKey))
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	priv, err := ParsePKCS1PrivateKey(block.Bytes)
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>		t.Errorf(&#34;Failed to parse private key: %s&#34;, err)
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>		return
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	}
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	if priv.PublicKey.N.Cmp(rsaPrivateKey.PublicKey.N) != 0 ||
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		priv.PublicKey.E != rsaPrivateKey.PublicKey.E ||
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>		priv.D.Cmp(rsaPrivateKey.D) != 0 ||
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		priv.Primes[0].Cmp(rsaPrivateKey.Primes[0]) != 0 ||
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		priv.Primes[1].Cmp(rsaPrivateKey.Primes[1]) != 0 {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>		t.Errorf(&#34;got:%+v want:%+v&#34;, priv, rsaPrivateKey)
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	}
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	<span class="comment">// This private key includes an invalid prime that</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	<span class="comment">// rsa.PrivateKey.Validate should reject.</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	data := []byte(&#34;0\x16\x02\x00\x02\x02\u007f\x00\x02\x0200\x02\x0200\x02\x02\x00\x01\x02\x02\u007f\x00&#34;)
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	if _, err := ParsePKCS1PrivateKey(data); err == nil {
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>		t.Errorf(&#34;parsing invalid private key did not result in an error&#34;)
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	}
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>}
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>func TestParsePKIXPublicKey(t *testing.T) {
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	block, _ := pem.Decode([]byte(pemPublicKey))
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	pub, err := ParsePKIXPublicKey(block.Bytes)
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>		t.Errorf(&#34;Failed to parse RSA public key: %s&#34;, err)
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>		return
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	}
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	rsaPub, ok := pub.(*rsa.PublicKey)
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	if !ok {
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>		t.Errorf(&#34;Value returned from ParsePKIXPublicKey was not an RSA public key&#34;)
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		return
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	}
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	pubBytes2, err := MarshalPKIXPublicKey(rsaPub)
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>		t.Errorf(&#34;Failed to marshal RSA public key for the second time: %s&#34;, err)
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>		return
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	}
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	if !bytes.Equal(pubBytes2, block.Bytes) {
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>		t.Errorf(&#34;Reserialization of public key didn&#39;t match. got %x, want %x&#34;, pubBytes2, block.Bytes)
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	}
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>}
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>var pemPublicKey = `-----BEGIN PUBLIC KEY-----
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3VoPN9PKUjKFLMwOge6+
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>wnDi8sbETGIx2FKXGgqtAKpzmem53kRGEQg8WeqRmp12wgp74TGpkEXsGae7RS1k
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>enJCnma4fii+noGH7R0qKgHvPrI2Bwa9hzsH8tHxpyM3qrXslOmD45EH9SxIDUBJ
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>FehNdaPbLP1gFyahKMsdfxFJLUvbUycuZSJ2ZnIgeVxwm4qbSvZInL9Iu4FzuPtg
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>fINKcbbovy1qq4KvPIrXzhbY3PWDc6btxCf3SE0JdE1MCPThntB62/bLMSQ7xdDR
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>FF53oIpvxe/SCOymfWq/LW849Ytv3Xwod0+wzAP8STXG4HSELS4UedPYeHJJJYcZ
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>+QIDAQAB
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>-----END PUBLIC KEY-----
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>`
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>var pemPrivateKey = `
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>-----BEGIN RSA PRIVATE KEY-----
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>MIICXAIBAAKBgQCxoeCUW5KJxNPxMp+KmCxKLc1Zv9Ny+4CFqcUXVUYH69L3mQ7v
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>IWrJ9GBfcaA7BPQqUlWxWM+OCEQZH1EZNIuqRMNQVuIGCbz5UQ8w6tS0gcgdeGX7
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>J7jgCQ4RK3F/PuCM38QBLaHx988qG8NMc6VKErBjctCXFHQt14lerd5KpQIDAQAB
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>AoGAYrf6Hbk+mT5AI33k2Jt1kcweodBP7UkExkPxeuQzRVe0KVJw0EkcFhywKpr1
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>V5eLMrILWcJnpyHE5slWwtFHBG6a5fLaNtsBBtcAIfqTQ0Vfj5c6SzVaJv0Z5rOd
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>7gQF6isy3t3w9IF3We9wXQKzT6q5ypPGdm6fciKQ8RnzREkCQQDZwppKATqQ41/R
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>vhSj90fFifrGE6aVKC1hgSpxGQa4oIdsYYHwMzyhBmWW9Xv/R+fPyr8ZwPxp2c12
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>33QwOLPLAkEA0NNUb+z4ebVVHyvSwF5jhfJxigim+s49KuzJ1+A2RaSApGyBZiwS
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>rWvWkB471POAKUYt5ykIWVZ83zcceQiNTwJBAMJUFQZX5GDqWFc/zwGoKkeR49Yi
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>MTXIvf7Wmv6E++eFcnT461FlGAUHRV+bQQXGsItR/opIG7mGogIkVXa3E1MCQARX
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>AAA7eoZ9AEHflUeuLn9QJI/r0hyQQLEtrpwv6rDT1GCWaLII5HJ6NUFVf4TTcqxo
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>6vdM4QGKTJoO+SaCyP0CQFdpcxSAuzpFcKv0IlJ8XzS/cy+mweCMwyJ1PFEc4FX6
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>wg/HcAJWY60xZTJDFN+Qfx8ZQvBEin6c2/h+zZi5IVY=
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>-----END RSA PRIVATE KEY-----
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>`
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>var testPrivateKey *rsa.PrivateKey
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>func init() {
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	block, _ := pem.Decode([]byte(pemPrivateKey))
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	var err error
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	if testPrivateKey, err = ParsePKCS1PrivateKey(block.Bytes); err != nil {
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>		panic(&#34;Failed to parse private key: &#34; + err.Error())
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	}
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>}
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>func bigFromString(s string) *big.Int {
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	ret := new(big.Int)
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	ret.SetString(s, 10)
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	return ret
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>}
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>func fromBase10(base10 string) *big.Int {
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	i := new(big.Int)
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	i.SetString(base10, 10)
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	return i
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>}
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>func bigFromHexString(s string) *big.Int {
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	ret := new(big.Int)
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	ret.SetString(s, 16)
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	return ret
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>}
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>var rsaPrivateKey = &amp;rsa.PrivateKey{
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	PublicKey: rsa.PublicKey{
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>		N: bigFromString(&#34;124737666279038955318614287965056875799409043964547386061640914307192830334599556034328900586693254156136128122194531292927142396093148164407300419162827624945636708870992355233833321488652786796134504707628792159725681555822420087112284637501705261187690946267527866880072856272532711620639179596808018872997&#34;),
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>		E: 65537,
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	},
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	D: bigFromString(&#34;69322600686866301945688231018559005300304807960033948687567105312977055197015197977971637657636780793670599180105424702854759606794705928621125408040473426339714144598640466128488132656829419518221592374964225347786430566310906679585739468938549035854760501049443920822523780156843263434219450229353270690889&#34;),
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	Primes: []*big.Int{
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		bigFromString(&#34;11405025354575369741595561190164746858706645478381139288033759331174478411254205003127028642766986913445391069745480057674348716675323735886284176682955723&#34;),
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>		bigFromString(&#34;10937079261204603443118731009201819560867324167189758120988909645641782263430128449826989846631183550578761324239709121189827307416350485191350050332642639&#34;),
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	},
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>}
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>func TestMarshalRSAPrivateKey(t *testing.T) {
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	priv := &amp;rsa.PrivateKey{
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		PublicKey: rsa.PublicKey{
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>			N: fromBase10(&#34;16346378922382193400538269749936049106320265317511766357599732575277382844051791096569333808598921852351577762718529818072849191122419410612033592401403764925096136759934497687765453905884149505175426053037420486697072448609022753683683718057795566811401938833367954642951433473337066311978821180526439641496973296037000052546108507805269279414789035461158073156772151892452251106173507240488993608650881929629163465099476849643165682709047462010581308719577053905787496296934240246311806555924593059995202856826239801816771116902778517096212527979497399966526283516447337775509777558018145573127308919204297111496233&#34;),
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>			E: 3,
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>		},
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>		D: fromBase10(&#34;10897585948254795600358846499957366070880176878341177571733155050184921896034527397712889205732614568234385175145686545381899460748279607074689061600935843283397424506622998458510302603922766336783617368686090042765718290914099334449154829375179958369993407724946186243249568928237086215759259909861748642124071874879861299389874230489928271621259294894142840428407196932444474088857746123104978617098858619445675532587787023228852383149557470077802718705420275739737958953794088728369933811184572620857678792001136676902250566845618813972833750098806496641114644760255910789397593428910198080271317419213080834885003&#34;),
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>		Primes: []*big.Int{
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>			fromBase10(&#34;1025363189502892836833747188838978207017355117492483312747347695538428729137306368764177201532277413433182799108299960196606011786562992097313508180436744488171474690412562218914213688661311117337381958560443&#34;),
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>			fromBase10(&#34;3467903426626310123395340254094941045497208049900750380025518552334536945536837294961497712862519984786362199788654739924501424784631315081391467293694361474867825728031147665777546570788493758372218019373&#34;),
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>			fromBase10(&#34;4597024781409332673052708605078359346966325141767460991205742124888960305710298765592730135879076084498363772408626791576005136245060321874472727132746643162385746062759369754202494417496879741537284589047&#34;),
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		},
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	}
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	derBytes := MarshalPKCS1PrivateKey(priv)
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>	priv2, err := ParsePKCS1PrivateKey(derBytes)
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>		t.Errorf(&#34;error parsing serialized key: %s&#34;, err)
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		return
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	}
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	if priv.PublicKey.N.Cmp(priv2.PublicKey.N) != 0 ||
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		priv.PublicKey.E != priv2.PublicKey.E ||
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		priv.D.Cmp(priv2.D) != 0 ||
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>		len(priv2.Primes) != 3 ||
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		priv.Primes[0].Cmp(priv2.Primes[0]) != 0 ||
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		priv.Primes[1].Cmp(priv2.Primes[1]) != 0 ||
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		priv.Primes[2].Cmp(priv2.Primes[2]) != 0 {
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		t.Errorf(&#34;got:%+v want:%+v&#34;, priv, priv2)
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	}
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>}
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>type matchHostnamesTest struct {
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	pattern, host string
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	ok            bool
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>}
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>var matchHostnamesTests = []matchHostnamesTest{
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	{&#34;a.b.c&#34;, &#34;a.b.c&#34;, true},
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	{&#34;a.b.c&#34;, &#34;b.b.c&#34;, false},
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	{&#34;&#34;, &#34;b.b.c&#34;, false},
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	{&#34;a.b.c&#34;, &#34;&#34;, false},
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	{&#34;example.com&#34;, &#34;example.com&#34;, true},
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>	{&#34;example.com&#34;, &#34;www.example.com&#34;, false},
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>	{&#34;*.example.com&#34;, &#34;example.com&#34;, false},
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	{&#34;*.example.com&#34;, &#34;www.example.com&#34;, true},
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	{&#34;*.example.com&#34;, &#34;www.example.com.&#34;, true},
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	{&#34;*.example.com&#34;, &#34;xyz.www.example.com&#34;, false},
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	{&#34;*.*.example.com&#34;, &#34;xyz.www.example.com&#34;, false},
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	{&#34;*.www.*.com&#34;, &#34;xyz.www.example.com&#34;, false},
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	{&#34;*bar.example.com&#34;, &#34;foobar.example.com&#34;, false},
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	{&#34;f*.example.com&#34;, &#34;foobar.example.com&#34;, false},
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	{&#34;&#34;, &#34;.&#34;, false},
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	{&#34;.&#34;, &#34;&#34;, false},
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	{&#34;.&#34;, &#34;.&#34;, false},
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	{&#34;example.com&#34;, &#34;example.com.&#34;, true},
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	{&#34;example.com.&#34;, &#34;example.com&#34;, true},
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>	{&#34;example.com.&#34;, &#34;example.com.&#34;, true},
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	{&#34;*.com.&#34;, &#34;example.com.&#34;, true},
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>	{&#34;*.com.&#34;, &#34;example.com&#34;, true},
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	{&#34;*.com&#34;, &#34;example.com&#34;, true},
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	{&#34;*.com&#34;, &#34;example.com.&#34;, true},
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>}
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>func TestMatchHostnames(t *testing.T) {
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	for i, test := range matchHostnamesTests {
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		r := matchHostnames(test.pattern, test.host)
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>		if r != test.ok {
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>			t.Errorf(&#34;#%d mismatch got: %t want: %t when matching &#39;%s&#39; against &#39;%s&#39;&#34;, i, r, test.ok, test.host, test.pattern)
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>		}
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	}
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>}
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>func TestMatchIP(t *testing.T) {
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	<span class="comment">// Check that pattern matching is working.</span>
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	c := &amp;Certificate{
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>		DNSNames: []string{&#34;*.foo.bar.baz&#34;},
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>		Subject: pkix.Name{
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>			CommonName: &#34;*.foo.bar.baz&#34;,
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>		},
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	}
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	err := c.VerifyHostname(&#34;quux.foo.bar.baz&#34;)
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>		t.Fatalf(&#34;VerifyHostname(quux.foo.bar.baz): %v&#34;, err)
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	}
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	<span class="comment">// But check that if we change it to be matching against an IP address,</span>
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	<span class="comment">// it is rejected.</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	c = &amp;Certificate{
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>		DNSNames: []string{&#34;*.2.3.4&#34;},
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>		Subject: pkix.Name{
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>			CommonName: &#34;*.2.3.4&#34;,
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>		},
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>	}
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	err = c.VerifyHostname(&#34;1.2.3.4&#34;)
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	if err == nil {
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>		t.Fatalf(&#34;VerifyHostname(1.2.3.4) should have failed, did not&#34;)
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	}
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>	c = &amp;Certificate{
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		IPAddresses: []net.IP{net.ParseIP(&#34;127.0.0.1&#34;), net.ParseIP(&#34;::1&#34;)},
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>	}
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	err = c.VerifyHostname(&#34;127.0.0.1&#34;)
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>		t.Fatalf(&#34;VerifyHostname(127.0.0.1): %v&#34;, err)
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	}
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	err = c.VerifyHostname(&#34;::1&#34;)
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>		t.Fatalf(&#34;VerifyHostname(::1): %v&#34;, err)
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	}
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	err = c.VerifyHostname(&#34;[::1]&#34;)
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>		t.Fatalf(&#34;VerifyHostname([::1]): %v&#34;, err)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	}
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>}
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>func TestCertificateParse(t *testing.T) {
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	s, _ := hex.DecodeString(certBytes)
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>	certs, err := ParseCertificates(s)
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>		t.Error(err)
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	}
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	if len(certs) != 2 {
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>		t.Errorf(&#34;Wrong number of certs: got %d want 2&#34;, len(certs))
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>		return
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	}
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	err = certs[0].CheckSignatureFrom(certs[1])
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		t.Error(err)
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	}
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	if err := certs[0].VerifyHostname(&#34;mail.google.com&#34;); err != nil {
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>		t.Error(err)
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>	}
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	const expectedExtensions = 4
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	if n := len(certs[0].Extensions); n != expectedExtensions {
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		t.Errorf(&#34;want %d extensions, got %d&#34;, expectedExtensions, n)
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>	}
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>}
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>var certBytes = &#34;308203223082028ba00302010202106edf0d9499fd4533dd1297fc42a93be1300d06092a864886&#34; +
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>	&#34;f70d0101050500304c310b3009060355040613025a4131253023060355040a131c546861777465&#34; +
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	&#34;20436f6e73756c74696e67202850747929204c74642e311630140603550403130d546861777465&#34; +
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	&#34;20534743204341301e170d3039303332353136343932395a170d3130303332353136343932395a&#34; +
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	&#34;3069310b3009060355040613025553311330110603550408130a43616c69666f726e6961311630&#34; +
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	&#34;140603550407130d4d6f756e7461696e205669657731133011060355040a130a476f6f676c6520&#34; +
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	&#34;496e63311830160603550403130f6d61696c2e676f6f676c652e636f6d30819f300d06092a8648&#34; +
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	&#34;86f70d010101050003818d0030818902818100c5d6f892fccaf5614b064149e80a2c9581a218ef&#34; +
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	&#34;41ec35bd7a58125ae76f9ea54ddc893abbeb029f6b73616bf0ffd868791fba7af9c4aebf3706ba&#34; +
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>	&#34;3eeaeed27435b4ddcfb157c05f351d66aa87fee0de072d66d773affbd36ab78bef090e0cc861a9&#34; +
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>	&#34;03ac90dd98b51c9c41566c017f0beec3bff391051ffba0f5cc6850ad2a590203010001a381e730&#34; +
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	&#34;81e430280603551d250421301f06082b0601050507030106082b06010505070302060960864801&#34; +
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	&#34;86f842040130360603551d1f042f302d302ba029a0278625687474703a2f2f63726c2e74686177&#34; +
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	&#34;74652e636f6d2f54686177746553474343412e63726c307206082b060105050701010466306430&#34; +
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>	&#34;2206082b060105050730018616687474703a2f2f6f6373702e7468617774652e636f6d303e0608&#34; +
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>	&#34;2b060105050730028632687474703a2f2f7777772e7468617774652e636f6d2f7265706f736974&#34; +
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>	&#34;6f72792f5468617774655f5347435f43412e637274300c0603551d130101ff04023000300d0609&#34; +
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>	&#34;2a864886f70d01010505000381810062f1f3050ebc105e497c7aedf87e24d2f4a986bb3b837bd1&#34; +
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	&#34;9b91ebcad98b065992f6bd2b49b7d6d3cb2e427a99d606c7b1d46352527fac39e6a8b6726de5bf&#34; +
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	&#34;70212a52cba07634a5e332011bd1868e78eb5e3c93cf03072276786f207494feaa0ed9d53b2110&#34; +
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	&#34;a76571f90209cdae884385c882587030ee15f33d761e2e45a6bc308203233082028ca003020102&#34; +
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	&#34;020430000002300d06092a864886f70d0101050500305f310b3009060355040613025553311730&#34; +
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>	&#34;15060355040a130e566572695369676e2c20496e632e31373035060355040b132e436c61737320&#34; +
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	&#34;33205075626c6963205072696d6172792043657274696669636174696f6e20417574686f726974&#34; +
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	&#34;79301e170d3034303531333030303030305a170d3134303531323233353935395a304c310b3009&#34; +
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>	&#34;060355040613025a4131253023060355040a131c54686177746520436f6e73756c74696e672028&#34; +
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	&#34;50747929204c74642e311630140603550403130d5468617774652053474320434130819f300d06&#34; +
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>	&#34;092a864886f70d010101050003818d0030818902818100d4d367d08d157faecd31fe7d1d91a13f&#34; +
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>	&#34;0b713cacccc864fb63fc324b0794bd6f80ba2fe10493c033fc093323e90b742b71c403c6d2cde2&#34; +
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>	&#34;2ff50963cdff48a500bfe0e7f388b72d32de9836e60aad007bc4644a3b847503f270927d0e62f5&#34; +
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	&#34;21ab693684317590f8bfc76c881b06957cc9e5a8de75a12c7a68dfd5ca1c875860190203010001&#34; +
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>	&#34;a381fe3081fb30120603551d130101ff040830060101ff020100300b0603551d0f040403020106&#34; +
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	&#34;301106096086480186f842010104040302010630280603551d110421301fa41d301b3119301706&#34; +
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>	&#34;035504031310507269766174654c6162656c332d313530310603551d1f042a30283026a024a022&#34; +
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>	&#34;8620687474703a2f2f63726c2e766572697369676e2e636f6d2f706361332e63726c303206082b&#34; +
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	&#34;0601050507010104263024302206082b060105050730018616687474703a2f2f6f6373702e7468&#34; +
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>	&#34;617774652e636f6d30340603551d25042d302b06082b0601050507030106082b06010505070302&#34; +
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>	&#34;06096086480186f8420401060a6086480186f845010801300d06092a864886f70d010105050003&#34; +
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>	&#34;81810055ac63eadea1ddd2905f9f0bce76be13518f93d9052bc81b774bad6950a1eededcfddb07&#34; +
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	&#34;e9e83994dcab72792f06bfab8170c4a8edea5334edef1e53d906c7562bd15cf4d18a8eb42bb137&#34; +
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	&#34;9048084225c53e8acb7feb6f04d16dc574a2f7a27c7b603c77cd0ece48027f012fb69b37e02a2a&#34; +
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	&#34;36dcd585d6ace53f546f961e05af&#34;
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>func TestCreateSelfSignedCertificate(t *testing.T) {
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	random := rand.Reader
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	ecdsaPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Failed to generate ECDSA key: %s&#34;, err)
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	}
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>		name      string
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>		pub, priv interface{}
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>		checkSig  bool
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>		sigAlgo   SignatureAlgorithm
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	}{
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>		{&#34;RSA/RSA&#34;, &amp;testPrivateKey.PublicKey, testPrivateKey, true, SHA1WithRSA},
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>		{&#34;RSA/ECDSA&#34;, &amp;testPrivateKey.PublicKey, ecdsaPriv, false, ECDSAWithSHA384},
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>		{&#34;ECDSA/RSA&#34;, &amp;ecdsaPriv.PublicKey, testPrivateKey, false, SHA256WithRSA},
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>		{&#34;ECDSA/ECDSA&#34;, &amp;ecdsaPriv.PublicKey, ecdsaPriv, true, ECDSAWithSHA1},
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		{&#34;RSAPSS/RSAPSS&#34;, &amp;testPrivateKey.PublicKey, testPrivateKey, true, SHA256WithRSAPSS},
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>		{&#34;ECDSA/RSAPSS&#34;, &amp;ecdsaPriv.PublicKey, testPrivateKey, false, SHA256WithRSAPSS},
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>		{&#34;RSAPSS/ECDSA&#34;, &amp;testPrivateKey.PublicKey, ecdsaPriv, false, ECDSAWithSHA384},
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	}
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	testExtKeyUsage := []ExtKeyUsage{ExtKeyUsageClientAuth, ExtKeyUsageServerAuth}
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	testUnknownExtKeyUsage := []asn1.ObjectIdentifier{[]int{1, 2, 3}, []int{2, 59, 1}}
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>	extraExtensionData := []byte(&#34;extra extension&#34;)
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	for _, test := range tests {
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>		commonName := &#34;test.example.com&#34;
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		template := Certificate{
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>			<span class="comment">// SerialNumber is negative to ensure that negative</span>
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>			<span class="comment">// values are parsed. This is due to the prevalence of</span>
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>			<span class="comment">// buggy code that produces certificates with negative</span>
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>			<span class="comment">// serial numbers.</span>
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>			SerialNumber: big.NewInt(-1),
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>			Subject: pkix.Name{
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>				CommonName:   commonName,
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>				Organization: []string{&#34;Σ Acme Co&#34;},
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>				Country:      []string{&#34;US&#34;},
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>				ExtraNames: []pkix.AttributeTypeAndValue{
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>					{
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>						Type:  []int{2, 5, 4, 42},
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>						Value: &#34;Gopher&#34;,
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>					},
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>					<span class="comment">// This should override the Country, above.</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>					{
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>						Type:  []int{2, 5, 4, 6},
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>						Value: &#34;NL&#34;,
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>					},
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>				},
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>			},
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>			NotBefore: time.Unix(1000, 0),
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>			NotAfter:  time.Unix(100000, 0),
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>			SignatureAlgorithm: test.sigAlgo,
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>			SubjectKeyId: []byte{1, 2, 3, 4},
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>			KeyUsage:     KeyUsageCertSign,
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>			ExtKeyUsage:        testExtKeyUsage,
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>			UnknownExtKeyUsage: testUnknownExtKeyUsage,
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>			BasicConstraintsValid: true,
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>			IsCA: true,
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>			OCSPServer:            []string{&#34;http://ocsp.example.com&#34;},
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>			IssuingCertificateURL: []string{&#34;http://crt.example.com/ca1.crt&#34;},
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>			DNSNames:       []string{&#34;test.example.com&#34;},
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>			EmailAddresses: []string{&#34;gopher@golang.org&#34;},
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>			IPAddresses:    []net.IP{net.IPv4(127, 0, 0, 1).To4(), net.ParseIP(&#34;2001:4860:0:2001::68&#34;)},
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>			PolicyIdentifiers:   []asn1.ObjectIdentifier{[]int{1, 2, 3}},
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>			PermittedDNSDomains: []string{&#34;.example.com&#34;, &#34;example.com&#34;},
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>			ExcludedDNSDomains:  []string{&#34;bar.example.com&#34;},
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>			CRLDistributionPoints: []string{&#34;http://crl1.example.com/ca1.crl&#34;, &#34;http://crl2.example.com/ca1.crl&#34;},
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>			ExtraExtensions: []pkix.Extension{
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>				{
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>					Id:    []int{1, 2, 3, 4},
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>					Value: extraExtensionData,
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>				},
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>				<span class="comment">// This extension should override the SubjectKeyId, above.</span>
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>				{
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>					Id:       oidExtensionSubjectKeyId,
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>					Critical: false,
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>					Value:    []byte{0x04, 0x04, 4, 3, 2, 1},
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>				},
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>			},
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>		}
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>		derBytes, err := CreateCertificate(random, &amp;template, &amp;template, test.pub, test.priv)
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: failed to create certificate: %s&#34;, test.name, err)
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>			continue
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>		}
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>		cert, err := ParseCertificate(derBytes)
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: failed to parse certificate: %s&#34;, test.name, err)
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>			continue
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>		}
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>		if len(cert.PolicyIdentifiers) != 1 || !cert.PolicyIdentifiers[0].Equal(template.PolicyIdentifiers[0]) {
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: failed to parse policy identifiers: got:%#v want:%#v&#34;, test.name, cert.PolicyIdentifiers, template.PolicyIdentifiers)
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>		}
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		if len(cert.PermittedDNSDomains) != 2 || cert.PermittedDNSDomains[0] != &#34;.example.com&#34; || cert.PermittedDNSDomains[1] != &#34;example.com&#34; {
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: failed to parse name constraints: %#v&#34;, test.name, cert.PermittedDNSDomains)
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>		}
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>		if len(cert.ExcludedDNSDomains) != 1 || cert.ExcludedDNSDomains[0] != &#34;bar.example.com&#34; {
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: failed to parse name constraint exclusions: %#v&#34;, test.name, cert.ExcludedDNSDomains)
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>		}
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>		if cert.Subject.CommonName != commonName {
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: subject wasn&#39;t correctly copied from the template. Got %s, want %s&#34;, test.name, cert.Subject.CommonName, commonName)
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>		}
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>		if len(cert.Subject.Country) != 1 || cert.Subject.Country[0] != &#34;NL&#34; {
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: ExtraNames didn&#39;t override Country&#34;, test.name)
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>		}
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>		found := false
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>		for _, atv := range cert.Subject.Names {
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>			if atv.Type.Equal([]int{2, 5, 4, 42}) {
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>				found = true
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>				break
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>			}
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>		}
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>		if !found {
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: Names didn&#39;t contain oid 2.5.4.42 from ExtraNames&#34;, test.name)
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>		}
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>		if cert.Issuer.CommonName != commonName {
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: issuer wasn&#39;t correctly copied from the template. Got %s, want %s&#34;, test.name, cert.Issuer.CommonName, commonName)
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>		}
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>		if cert.SignatureAlgorithm != test.sigAlgo {
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: SignatureAlgorithm wasn&#39;t copied from template. Got %v, want %v&#34;, test.name, cert.SignatureAlgorithm, test.sigAlgo)
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>		}
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(cert.ExtKeyUsage, testExtKeyUsage) {
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: extkeyusage wasn&#39;t correctly copied from the template. Got %v, want %v&#34;, test.name, cert.ExtKeyUsage, testExtKeyUsage)
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>		}
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(cert.UnknownExtKeyUsage, testUnknownExtKeyUsage) {
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: unknown extkeyusage wasn&#39;t correctly copied from the template. Got %v, want %v&#34;, test.name, cert.UnknownExtKeyUsage, testUnknownExtKeyUsage)
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>		}
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(cert.OCSPServer, template.OCSPServer) {
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: OCSP servers differ from template. Got %v, want %v&#34;, test.name, cert.OCSPServer, template.OCSPServer)
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>		}
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(cert.IssuingCertificateURL, template.IssuingCertificateURL) {
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: Issuing certificate URLs differ from template. Got %v, want %v&#34;, test.name, cert.IssuingCertificateURL, template.IssuingCertificateURL)
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>		}
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(cert.DNSNames, template.DNSNames) {
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: SAN DNS names differ from template. Got %v, want %v&#34;, test.name, cert.DNSNames, template.DNSNames)
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>		}
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(cert.EmailAddresses, template.EmailAddresses) {
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: SAN emails differ from template. Got %v, want %v&#34;, test.name, cert.EmailAddresses, template.EmailAddresses)
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>		}
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(cert.IPAddresses, template.IPAddresses) {
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: SAN IPs differ from template. Got %v, want %v&#34;, test.name, cert.IPAddresses, template.IPAddresses)
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>		}
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(cert.CRLDistributionPoints, template.CRLDistributionPoints) {
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: CRL distribution points differ from template. Got %v, want %v&#34;, test.name, cert.CRLDistributionPoints, template.CRLDistributionPoints)
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>		}
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>		if !bytes.Equal(cert.SubjectKeyId, []byte{4, 3, 2, 1}) {
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: ExtraExtensions didn&#39;t override SubjectKeyId&#34;, test.name)
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>		}
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>		if !bytes.Contains(derBytes, extraExtensionData) {
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: didn&#39;t find extra extension in DER output&#34;, test.name)
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>		}
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>		if test.checkSig {
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>			err = cert.CheckSignatureFrom(cert)
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>				t.Errorf(&#34;%s: signature verification failed: %s&#34;, test.name, err)
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>			}
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>		}
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>	}
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>}
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span><span class="comment">// Self-signed certificate using ECDSA with SHA1 &amp; secp256r1</span>
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>var ecdsaSHA1CertPem = `
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>MIICDjCCAbUCCQDF6SfN0nsnrjAJBgcqhkjOPQQBMIGPMQswCQYDVQQGEwJVUzET
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>MBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNTW91bnRhaW4gVmlldzEVMBMG
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>A1UECgwMR29vZ2xlLCBJbmMuMRcwFQYDVQQDDA53d3cuZ29vZ2xlLmNvbTEjMCEG
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>CSqGSIb3DQEJARYUZ29sYW5nLWRldkBnbWFpbC5jb20wHhcNMTIwNTIwMjAyMDUw
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>WhcNMjIwNTE4MjAyMDUwWjCBjzELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlm
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>b3JuaWExFjAUBgNVBAcMDU1vdW50YWluIFZpZXcxFTATBgNVBAoMDEdvb2dsZSwg
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>SW5jLjEXMBUGA1UEAwwOd3d3Lmdvb2dsZS5jb20xIzAhBgkqhkiG9w0BCQEWFGdv
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>bGFuZy1kZXZAZ21haWwuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/Wgn
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>WQDo5+bz71T0327ERgd5SDDXFbXLpzIZDXTkjpe8QTEbsF+ezsQfrekrpDPC4Cd3
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>P9LY0tG+aI8IyVKdUjAJBgcqhkjOPQQBA0gAMEUCIGlsqMcRqWVIWTD6wXwe6Jk2
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>DKxL46r/FLgJYnzBEH99AiEA3fBouObsvV1R3oVkb4BQYnD4/4LeId6lAT43YvyV
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>a/A=
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>-----END CERTIFICATE-----
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>`
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span><span class="comment">// Self-signed certificate using ECDSA with SHA256 &amp; secp256r1</span>
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>var ecdsaSHA256p256CertPem = `
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>MIICDzCCAbYCCQDlsuMWvgQzhTAKBggqhkjOPQQDAjCBjzELMAkGA1UEBhMCVVMx
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>EzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDU1vdW50YWluIFZpZXcxFTAT
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>BgNVBAoMDEdvb2dsZSwgSW5jLjEXMBUGA1UEAwwOd3d3Lmdvb2dsZS5jb20xIzAh
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>BgkqhkiG9w0BCQEWFGdvbGFuZy1kZXZAZ21haWwuY29tMB4XDTEyMDUyMTAwMTkx
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>NloXDTIyMDUxOTAwMTkxNlowgY8xCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxp
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>Zm9ybmlhMRYwFAYDVQQHDA1Nb3VudGFpbiBWaWV3MRUwEwYDVQQKDAxHb29nbGUs
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>IEluYy4xFzAVBgNVBAMMDnd3dy5nb29nbGUuY29tMSMwIQYJKoZIhvcNAQkBFhRn
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>b2xhbmctZGV2QGdtYWlsLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABPMt
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>2ErhxAty5EJRu9yM+MTy+hUXm3pdW1ensAv382KoGExSXAFWP7pjJnNtHO+XSwVm
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>YNtqjcAGFKpweoN//kQwCgYIKoZIzj0EAwIDRwAwRAIgIYSaUA/IB81gjbIw/hUV
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>70twxJr5EcgOo0hLp3Jm+EYCIFDO3NNcgmURbJ1kfoS3N/0O+irUtoPw38YoNkqJ
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>h5wi
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>-----END CERTIFICATE-----
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>`
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span><span class="comment">// Self-signed certificate using ECDSA with SHA256 &amp; secp384r1</span>
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>var ecdsaSHA256p384CertPem = `
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>MIICSjCCAdECCQDje/no7mXkVzAKBggqhkjOPQQDAjCBjjELMAkGA1UEBhMCVVMx
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>EzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDU1vdW50YWluIFZpZXcxFDAS
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>BgNVBAoMC0dvb2dsZSwgSW5jMRcwFQYDVQQDDA53d3cuZ29vZ2xlLmNvbTEjMCEG
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>CSqGSIb3DQEJARYUZ29sYW5nLWRldkBnbWFpbC5jb20wHhcNMTIwNTIxMDYxMDM0
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>WhcNMjIwNTE5MDYxMDM0WjCBjjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlm
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>b3JuaWExFjAUBgNVBAcMDU1vdW50YWluIFZpZXcxFDASBgNVBAoMC0dvb2dsZSwg
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>SW5jMRcwFQYDVQQDDA53d3cuZ29vZ2xlLmNvbTEjMCEGCSqGSIb3DQEJARYUZ29s
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>YW5nLWRldkBnbWFpbC5jb20wdjAQBgcqhkjOPQIBBgUrgQQAIgNiAARRuzRNIKRK
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>jIktEmXanNmrTR/q/FaHXLhWRZ6nHWe26Fw7Rsrbk+VjGy4vfWtNn7xSFKrOu5ze
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>qxKnmE0h5E480MNgrUiRkaGO2GMJJVmxx20aqkXOk59U8yGA4CghE6MwCgYIKoZI
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>zj0EAwIDZwAwZAIwBZEN8gvmRmfeP/9C1PRLzODIY4JqWub2PLRT4mv9GU+yw3Gr
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>PU9A3CHMdEcdw/MEAjBBO1lId8KOCh9UZunsSMfqXiVurpzmhWd6VYZ/32G+M+Mh
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>3yILeYQzllt/g0rKVRk=
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>-----END CERTIFICATE-----
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>`
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span><span class="comment">// Self-signed certificate using ECDSA with SHA384 &amp; secp521r1</span>
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>var ecdsaSHA384p521CertPem = `
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>MIICljCCAfcCCQDhp1AFD/ahKjAKBggqhkjOPQQDAzCBjjELMAkGA1UEBhMCVVMx
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>EzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDU1vdW50YWluIFZpZXcxFDAS
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>BgNVBAoMC0dvb2dsZSwgSW5jMRcwFQYDVQQDDA53d3cuZ29vZ2xlLmNvbTEjMCEG
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>CSqGSIb3DQEJARYUZ29sYW5nLWRldkBnbWFpbC5jb20wHhcNMTIwNTIxMTUwNDI5
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>WhcNMjIwNTE5MTUwNDI5WjCBjjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlm
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>b3JuaWExFjAUBgNVBAcMDU1vdW50YWluIFZpZXcxFDASBgNVBAoMC0dvb2dsZSwg
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>SW5jMRcwFQYDVQQDDA53d3cuZ29vZ2xlLmNvbTEjMCEGCSqGSIb3DQEJARYUZ29s
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>YW5nLWRldkBnbWFpbC5jb20wgZswEAYHKoZIzj0CAQYFK4EEACMDgYYABACqx9Rv
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>IssRs1LWYcNN+WffwlHw4Tv3y8/LIAA9MF1ZScIonU9nRMxt4a2uGJVCPDw6JHpz
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>PaYc0E9puLoE9AfKpwFr59Jkot7dBg55SKPEFkddoip/rvmN7NPAWjMBirOwjOkm
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>8FPthvPhGPqsu9AvgVuHu3PosWiHGNrhh379pva8MzAKBggqhkjOPQQDAwOBjAAw
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>gYgCQgEHNmswkUdPpHqrVxp9PvLVl+xxPuHBkT+75z9JizyxtqykHQo9Uh6SWCYH
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>BF9KLolo01wMt8DjoYP5Fb3j5MH7xwJCAbWZzTOp4l4DPkIvAh4LeC4VWbwPPyqh
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>kBg71w/iEcSY3wUKgHGcJJrObZw7wys91I5kENljqw/Samdr3ka+jBJa
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>-----END CERTIFICATE-----
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>`
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>var ecdsaTests = []struct {
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>	sigAlgo SignatureAlgorithm
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>	pemCert string
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>}{
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>	{ECDSAWithSHA1, ecdsaSHA1CertPem},
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>	{ECDSAWithSHA256, ecdsaSHA256p256CertPem},
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>	{ECDSAWithSHA256, ecdsaSHA256p384CertPem},
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>	{ECDSAWithSHA384, ecdsaSHA384p521CertPem},
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>}
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>func TestECDSA(t *testing.T) {
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>	for i, test := range ecdsaTests {
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>		pemBlock, _ := pem.Decode([]byte(test.pemCert))
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>		cert, err := ParseCertificate(pemBlock.Bytes)
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d: failed to parse certificate: %s&#34;, i, err)
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>			continue
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>		}
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>		if sa := cert.SignatureAlgorithm; sa != test.sigAlgo {
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d: signature algorithm is %v, want %v&#34;, i, sa, test.sigAlgo)
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>		}
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>		if parsedKey, ok := cert.PublicKey.(*ecdsa.PublicKey); !ok {
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d: wanted an ECDSA public key but found: %#v&#34;, i, parsedKey)
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>		}
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>		if pka := cert.PublicKeyAlgorithm; pka != ECDSA {
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d: public key algorithm is %v, want ECDSA&#34;, i, pka)
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>		}
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>		if err = cert.CheckSignatureFrom(cert); err != nil {
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d: certificate verification failed: %s&#34;, i, err)
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>		}
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>	}
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>}
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span><span class="comment">// Self-signed certificate using DSA with SHA1</span>
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>var dsaCertPem = `-----BEGIN CERTIFICATE-----
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>MIIEDTCCA82gAwIBAgIJALHPghaoxeDhMAkGByqGSM44BAMweTELMAkGA1UEBhMC
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>VVMxCzAJBgNVBAgTAk5DMQ8wDQYDVQQHEwZOZXd0b24xFDASBgNVBAoTC0dvb2ds
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>ZSwgSW5jMRIwEAYDVQQDEwlKb24gQWxsaWUxIjAgBgkqhkiG9w0BCQEWE2pvbmFs
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>bGllQGdvb2dsZS5jb20wHhcNMTEwNTE0MDMwMTQ1WhcNMTEwNjEzMDMwMTQ1WjB5
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>MQswCQYDVQQGEwJVUzELMAkGA1UECBMCTkMxDzANBgNVBAcTBk5ld3RvbjEUMBIG
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>A1UEChMLR29vZ2xlLCBJbmMxEjAQBgNVBAMTCUpvbiBBbGxpZTEiMCAGCSqGSIb3
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>DQEJARYTam9uYWxsaWVAZ29vZ2xlLmNvbTCCAbcwggEsBgcqhkjOOAQBMIIBHwKB
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>gQC8hLUnQ7FpFYu4WXTj6DKvXvz8QrJkNJCVMTpKAT7uBpobk32S5RrPKXocd4gN
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>8lyGB9ggS03EVlEwXvSmO0DH2MQtke2jl9j1HLydClMf4sbx5V6TV9IFw505U1iW
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>jL7awRMgxge+FsudtJK254FjMFo03ZnOQ8ZJJ9E6AEDrlwIVAJpnBn9moyP11Ox5
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>Asc/5dnjb6dPAoGBAJFHd4KVv1iTVCvEG6gGiYop5DJh28hUQcN9kul+2A0yPUSC
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>X93oN00P8Vh3eYgSaCWZsha7zDG53MrVJ0Zf6v/X/CoZNhLldeNOepivTRAzn+Rz
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>kKUYy5l1sxYLHQKF0UGNCXfFKZT0PCmgU+PWhYNBBMn6/cIh44vp85ideo5CA4GE
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>AAKBgFmifCafzeRaohYKXJgMGSEaggCVCRq5xdyDCat+wbOkjC4mfG01/um3G8u5
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>LxasjlWRKTR/tcAL7t0QuokVyQaYdVypZXNaMtx1db7YBuHjj3aP+8JOQRI9xz8c
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>bp5NDJ5pISiFOv4p3GZfqZPcqckDt78AtkQrmnal2txhhjF6o4HeMIHbMB0GA1Ud
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>DgQWBBQVyyr7hO11ZFFpWX50298Sa3V+rzCBqwYDVR0jBIGjMIGggBQVyyr7hO11
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>ZFFpWX50298Sa3V+r6F9pHsweTELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAk5DMQ8w
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>DQYDVQQHEwZOZXd0b24xFDASBgNVBAoTC0dvb2dsZSwgSW5jMRIwEAYDVQQDEwlK
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>b24gQWxsaWUxIjAgBgkqhkiG9w0BCQEWE2pvbmFsbGllQGdvb2dsZS5jb22CCQCx
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>z4IWqMXg4TAMBgNVHRMEBTADAQH/MAkGByqGSM44BAMDLwAwLAIUPtn/5j8Q1jJI
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>7ggOIsgrhgUdjGQCFCsmDq1H11q9+9Wp9IMeGrTSKHIM
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>-----END CERTIFICATE-----
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>`
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>func TestParseCertificateWithDsaPublicKey(t *testing.T) {
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>	expectedKey := &amp;dsa.PublicKey{
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>		Parameters: dsa.Parameters{
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>			P: bigFromHexString(&#34;00BC84B52743B169158BB85974E3E832AF5EFCFC42B264349095313A4A013EEE069A1B937D92E51ACF297A1C77880DF25C8607D8204B4DC45651305EF4A63B40C7D8C42D91EDA397D8F51CBC9D0A531FE2C6F1E55E9357D205C39D395358968CBEDAC11320C607BE16CB9DB492B6E78163305A34DD99CE43C64927D13A0040EB97&#34;),
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>			Q: bigFromHexString(&#34;009A67067F66A323F5D4EC7902C73FE5D9E36FA74F&#34;),
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>			G: bigFromHexString(&#34;009147778295BF5893542BC41BA806898A29E43261DBC85441C37D92E97ED80D323D44825FDDE8374D0FF15877798812682599B216BBCC31B9DCCAD527465FEAFFD7FC2A193612E575E34E7A98AF4D10339FE47390A518CB9975B3160B1D0285D1418D0977C52994F43C29A053E3D685834104C9FAFDC221E38BE9F3989D7A8E42&#34;),
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>		},
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>		Y: bigFromHexString(&#34;59A27C269FCDE45AA2160A5C980C19211A820095091AB9C5DC8309AB7EC1B3A48C2E267C6D35FEE9B71BCBB92F16AC8E559129347FB5C00BEEDD10BA8915C90698755CA965735A32DC7575BED806E1E38F768FFBC24E41123DC73F1C6E9E4D0C9E692128853AFE29DC665FA993DCA9C903B7BF00B6442B9A76A5DADC6186317A&#34;),
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>	}
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>	pemBlock, _ := pem.Decode([]byte(dsaCertPem))
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>	cert, err := ParseCertificate(pemBlock.Bytes)
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Failed to parse certificate: %s&#34;, err)
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	}
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>	if cert.PublicKeyAlgorithm != DSA {
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		t.Errorf(&#34;Parsed key algorithm was not DSA&#34;)
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>	}
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>	parsedKey, ok := cert.PublicKey.(*dsa.PublicKey)
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>	if !ok {
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Parsed key was not a DSA key: %s&#34;, err)
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>	}
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>	if expectedKey.Y.Cmp(parsedKey.Y) != 0 ||
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>		expectedKey.P.Cmp(parsedKey.P) != 0 ||
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>		expectedKey.Q.Cmp(parsedKey.Q) != 0 ||
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>		expectedKey.G.Cmp(parsedKey.G) != 0 {
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>		t.Fatal(&#34;Parsed key differs from expected key&#34;)
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>	}
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>}
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>func TestParseCertificateWithDSASignatureAlgorithm(t *testing.T) {
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>	pemBlock, _ := pem.Decode([]byte(dsaCertPem))
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>	cert, err := ParseCertificate(pemBlock.Bytes)
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Failed to parse certificate: %s&#34;, err)
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>	}
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>	if cert.SignatureAlgorithm != DSAWithSHA1 {
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>		t.Errorf(&#34;Parsed signature algorithm was not DSAWithSHA1&#34;)
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>	}
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>}
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>func TestVerifyCertificateWithDSASignature(t *testing.T) {
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>	pemBlock, _ := pem.Decode([]byte(dsaCertPem))
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>	cert, err := ParseCertificate(pemBlock.Bytes)
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Failed to parse certificate: %s&#34;, err)
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>	}
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>	<span class="comment">// test cert is self-signed</span>
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>	if err = cert.CheckSignatureFrom(cert); err != nil {
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>		t.Fatalf(&#34;DSA Certificate verification failed: %s&#34;, err)
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>	}
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>}
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>var rsaPSSSelfSignedPEM = `-----BEGIN CERTIFICATE-----
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>MIIGHjCCA9KgAwIBAgIBdjBBBgkqhkiG9w0BAQowNKAPMA0GCWCGSAFlAwQCAQUA
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>oRwwGgYJKoZIhvcNAQEIMA0GCWCGSAFlAwQCAQUAogMCASAwbjELMAkGA1UEBhMC
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>SlAxHDAaBgNVBAoME0phcGFuZXNlIEdvdmVybm1lbnQxKDAmBgNVBAsMH1RoZSBN
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>aW5pc3RyeSBvZiBGb3JlaWduIEFmZmFpcnMxFzAVBgNVBAMMDmUtcGFzc3BvcnRD
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>U0NBMB4XDTEzMDUxNDA1MDczMFoXDTI5MDUxNDA1MDczMFowbjELMAkGA1UEBhMC
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>SlAxHDAaBgNVBAoME0phcGFuZXNlIEdvdmVybm1lbnQxKDAmBgNVBAsMH1RoZSBN
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>aW5pc3RyeSBvZiBGb3JlaWduIEFmZmFpcnMxFzAVBgNVBAMMDmUtcGFzc3BvcnRD
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>U0NBMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAx/E3WRVxcCDXhoST
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>8nVSLjW6hwM4Ni99AegWzcGtfGFo0zjFA1Cl5URqxauvYu3gQgQHBGA1CovWeGrl
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>yVSRzOL1imcYsSgLOcnhVYB3Xcrof4ebv9+W+TwNdc9YzAwcj8rNd5nP6PKXIQ+W
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>PCkEOXdyb80YEnxuT+NPjkVfFSPBS7QYZpvT2fwy4fZ0eh48253+7VleSmTO0mqj
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>7TlzaG56q150SLZbhpOd8jD8bM/wACnLCPR88wj4hCcDLEwoLyY85HJCTIQQMnoT
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>UpqyzEeupPREIm6yi4d8C9YqIWFn2YTnRcWcmMaJLzq+kYwKoudfnoC6RW2vzZXn
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>defQs68IZuK+uALu9G3JWGPgu0CQGj0JNDT8zkiDV++4eNrZczWKjr1YnAL+VbLK
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>bApwL2u19l2WDpfUklimhWfraqHNIUKU6CjZOG31RzXcplIj0mtqs0E1r7r357Es
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>yFoB28iNo4cz1lCulh0E4WJzWzLZcT4ZspHHRCFyvYnXoibXEV1nULq8ByKKG0FS
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>7nn4SseoV+8PvjHLPhmHGMvi4mxkbcXdV3wthHT1/HXdqY84A4xHWt1+sB/TpTek
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>tDhFlEfcUygvTu58UtOnysomOVVeERmi7WSujfzKsGJAJYeetiA5R+zX7BxeyFVE
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>qW0zh1Tkwh0S8LRe5diJh4+6FG0CAwEAAaNfMF0wHQYDVR0OBBYEFD+oahaikBTV
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>Urk81Uz7kRS2sx0aMA4GA1UdDwEB/wQEAwIBBjAYBgNVHSAEETAPMA0GCyqDCIaP
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>fgYFAQEBMBIGA1UdEwEB/wQIMAYBAf8CAQAwQQYJKoZIhvcNAQEKMDSgDzANBglg
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>hkgBZQMEAgEFAKEcMBoGCSqGSIb3DQEBCDANBglghkgBZQMEAgEFAKIDAgEgA4IC
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>AQAaxWBQn5CZuNBfyzL57mn31ukHUFd61OMROSX3PT7oCv1Dy+C2AdRlxOcbN3/n
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>li0yfXUUqiY3COlLAHKRlkr97mLtxEFoJ0R8nVN2IQdChNQM/XSCzSGyY8NVa1OR
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>TTpEWLnexJ9kvIdbFXwUqdTnAkOI0m7Rg8j+E+lRRHg1xDAA1qKttrtUj3HRQWf3
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>kNTu628SiMvap6aIdncburaK56MP7gkR1Wr/ichOfjIA3Jgw2PapI31i0GqeMd66
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>U1+lC9FeyMAJpuSVp/SoiYzYo+79SFcVoM2yw3yAnIKg7q9GLYYqzncdykT6C06c
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>15gWFI6igmReAsD9ITSvYh0jLrLHfEYcPTOD3ZXJ4EwwHtWSoO3gq1EAtOYKu/Lv
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>C8zfBsZcFdsHvsSiYeBU8Oioe42mguky3Ax9O7D805Ek6R68ra07MW/G4YxvV7IN
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>2BfSaYy8MX9IG0ZMIOcoc0FeF5xkFmJ7kdrlTaJzC0IE9PNxNaH5QnOAFB8vxHcO
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>FioUxb6UKdHcPLR1VZtAdTdTMjSJxUqD/35Cdfqs7oDJXz8f6TXO2Tdy6G++YUs9
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>qsGZWxzFvvkXUkQSl0dQQ5jO/FtUJcAVXVVp20LxPemfatAHpW31WdJYeWSQWky2
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>+f9b5TXKXVyjlUL7uHxowWrT2AtTchDH22wTEtqLEF9Z3Q==
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>-----END CERTIFICATE-----`
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>func TestRSAPSSSelfSigned(t *testing.T) {
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>	der, _ := pem.Decode([]byte(rsaPSSSelfSignedPEM))
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>	if der == nil {
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>		t.Fatal(&#34;Failed to find PEM block&#34;)
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>	}
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>	cert, err := ParseCertificate(der.Bytes)
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>	}
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>	if err = cert.CheckSignatureFrom(cert); err != nil {
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>	}
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>}
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>const pemCertificate = `-----BEGIN CERTIFICATE-----
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>MIIDATCCAemgAwIBAgIRAKQkkrFx1T/dgB/Go/xBM5swDQYJKoZIhvcNAQELBQAw
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>EjEQMA4GA1UEChMHQWNtZSBDbzAeFw0xNjA4MTcyMDM2MDdaFw0xNzA4MTcyMDM2
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>MDdaMBIxEDAOBgNVBAoTB0FjbWUgQ28wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>ggEKAoIBAQDAoJtjG7M6InsWwIo+l3qq9u+g2rKFXNu9/mZ24XQ8XhV6PUR+5HQ4
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>jUFWC58ExYhottqK5zQtKGkw5NuhjowFUgWB/VlNGAUBHtJcWR/062wYrHBYRxJH
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>qVXOpYKbIWwFKoXu3hcpg/CkdOlDWGKoZKBCwQwUBhWE7MDhpVdQ+ZljUJWL+FlK
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>yQK5iRsJd5TGJ6VUzLzdT4fmN2DzeK6GLeyMpVpU3sWV90JJbxWQ4YrzkKzYhMmB
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>EcpXTG2wm+ujiHU/k2p8zlf8Sm7VBM/scmnMFt0ynNXop4FWvJzEm1G0xD2t+e2I
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>5Utr04dOZPCgkm++QJgYhtZvgW7ZZiGTAgMBAAGjUjBQMA4GA1UdDwEB/wQEAwIF
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>oDATBgNVHSUEDDAKBggrBgEFBQcDATAMBgNVHRMBAf8EAjAAMBsGA1UdEQQUMBKC
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>EHRlc3QuZXhhbXBsZS5jb20wDQYJKoZIhvcNAQELBQADggEBADpqKQxrthH5InC7
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>X96UP0OJCu/lLEMkrjoEWYIQaFl7uLPxKH5AmQPH4lYwF7u7gksR7owVG9QU9fs6
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>1fK7II9CVgCd/4tZ0zm98FmU4D0lHGtPARrrzoZaqVZcAvRnFTlPX5pFkPhVjjai
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>/mkxX9LpD8oK1445DFHxK5UjLMmPIIWd8EOi+v5a+hgGwnJpoW7hntSl8kHMtTmy
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>fnnktsblSUV4lRCit0ymC7Ojhe+gzCCwkgs5kDzVVag+tnl/0e2DloIjASwOhpbH
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>KVcg7fBd484ht/sS+l0dsB4KDOSpd8JzVDMF8OZqlaydizoJO0yWr9GbCN1+OKq5
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>EhLrEqU=
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>-----END CERTIFICATE-----`
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>func TestCRLCreation(t *testing.T) {
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>	block, _ := pem.Decode([]byte(pemPrivateKey))
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>	priv, _ := ParsePKCS1PrivateKey(block.Bytes)
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>	block, _ = pem.Decode([]byte(pemCertificate))
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>	cert, _ := ParseCertificate(block.Bytes)
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>	loc := time.FixedZone(&#34;Oz/Atlantis&#34;, int((2 * time.Hour).Seconds()))
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>	now := time.Unix(1000, 0).In(loc)
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>	nowUTC := now.UTC()
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>	expiry := time.Unix(10000, 0)
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>	revokedCerts := []pkix.RevokedCertificate{
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>		{
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>			SerialNumber:   big.NewInt(1),
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>			RevocationTime: nowUTC,
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>		},
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>		{
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>			SerialNumber: big.NewInt(42),
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>			<span class="comment">// RevocationTime should be converted to UTC before marshaling.</span>
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>			RevocationTime: now,
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>		},
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>	}
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>	expectedCerts := []pkix.RevokedCertificate{
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>		{
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>			SerialNumber:   big.NewInt(1),
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>			RevocationTime: nowUTC,
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>		},
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>		{
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>			SerialNumber:   big.NewInt(42),
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>			RevocationTime: nowUTC,
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>		},
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>	}
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>	crlBytes, err := cert.CreateCRL(rand.Reader, priv, revokedCerts, now, expiry)
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>		t.Errorf(&#34;error creating CRL: %s&#34;, err)
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>	}
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>	parsedCRL, err := ParseDERCRL(crlBytes)
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>		t.Errorf(&#34;error reparsing CRL: %s&#34;, err)
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>	}
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>	if !reflect.DeepEqual(parsedCRL.TBSCertList.RevokedCertificates, expectedCerts) {
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>		t.Errorf(&#34;RevokedCertificates mismatch: got %v; want %v.&#34;,
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>			parsedCRL.TBSCertList.RevokedCertificates, expectedCerts)
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>	}
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>}
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>func fromBase64(in string) []byte {
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>	out := make([]byte, base64.StdEncoding.DecodedLen(len(in)))
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>	n, err := base64.StdEncoding.Decode(out, []byte(in))
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>		panic(&#34;failed to base64 decode&#34;)
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>	}
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>	return out[:n]
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>}
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>func TestParseDERCRL(t *testing.T) {
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>	derBytes := fromBase64(derCRLBase64)
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>	certList, err := ParseDERCRL(derBytes)
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>		t.Errorf(&#34;error parsing: %s&#34;, err)
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>		return
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>	}
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>	numCerts := len(certList.TBSCertList.RevokedCertificates)
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>	expected := 88
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>	if numCerts != expected {
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>		t.Errorf(&#34;bad number of revoked certificates. got: %d want: %d&#34;, numCerts, expected)
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>	}
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>	if certList.HasExpired(time.Unix(1302517272, 0)) {
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>		t.Errorf(&#34;CRL has expired (but shouldn&#39;t have)&#34;)
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>	}
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>	<span class="comment">// Can&#39;t check the signature here without a package cycle.</span>
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>}
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>func TestCRLWithoutExpiry(t *testing.T) {
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>	derBytes := fromBase64(&#34;MIHYMIGZMAkGByqGSM44BAMwEjEQMA4GA1UEAxMHQ2FybERTUxcNOTkwODI3MDcwMDAwWjBpMBMCAgDIFw05OTA4MjIwNzAwMDBaMBMCAgDJFw05OTA4MjIwNzAwMDBaMBMCAgDTFw05OTA4MjIwNzAwMDBaMBMCAgDSFw05OTA4MjIwNzAwMDBaMBMCAgDUFw05OTA4MjQwNzAwMDBaMAkGByqGSM44BAMDLwAwLAIUfmVSdjP+NHMX0feW+aDU2G1cfT0CFAJ6W7fVWxjBz4fvftok8yqDnDWh&#34;)
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>	certList, err := ParseDERCRL(derBytes)
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>	}
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>	if !certList.TBSCertList.NextUpdate.IsZero() {
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>		t.Errorf(&#34;NextUpdate is not the zero value&#34;)
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>	}
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>}
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>func TestParsePEMCRL(t *testing.T) {
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>	pemBytes := fromBase64(pemCRLBase64)
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>	certList, err := ParseCRL(pemBytes)
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>		t.Errorf(&#34;error parsing: %s&#34;, err)
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>		return
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>	}
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>	numCerts := len(certList.TBSCertList.RevokedCertificates)
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span>	expected := 2
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>	if numCerts != expected {
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>		t.Errorf(&#34;bad number of revoked certificates. got: %d want: %d&#34;, numCerts, expected)
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>	}
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>	if certList.HasExpired(time.Unix(1302517272, 0)) {
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>		t.Errorf(&#34;CRL has expired (but shouldn&#39;t have)&#34;)
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>	}
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>	<span class="comment">// Can&#39;t check the signature here without a package cycle.</span>
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>}
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>func TestImports(t *testing.T) {
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>	testenv.MustHaveGoRun(t)
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>	if err := exec.Command(testenv.GoToolPath(t), &#34;run&#34;, &#34;x509_test_import.go&#34;).Run(); err != nil {
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>		t.Errorf(&#34;failed to run x509_test_import.go: %s&#34;, err)
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>	}
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>}
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>const derCRLBase64 = &#34;MIINqzCCDJMCAQEwDQYJKoZIhvcNAQEFBQAwVjEZMBcGA1UEAxMQUEtJIEZJTk1FQ0NBTklDQTEVMBMGA1UEChMMRklOTUVDQ0FOSUNBMRUwEwYDVQQLEwxGSU5NRUNDQU5JQ0ExCzAJBgNVBAYTAklUFw0xMTA1MDQxNjU3NDJaFw0xMTA1MDQyMDU3NDJaMIIMBzAhAg4Ze1od49Lt1qIXBydAzhcNMDkwNzE2MDg0MzIyWjAAMCECDl0HSL9bcZ1Ci/UHJ0DPFw0wOTA3MTYwODQzMTNaMAAwIQIOESB9tVAmX3cY7QcnQNAXDTA5MDcxNjA4NDUyMlowADAhAg4S1tGAQ3mHt8uVBydA1RcNMDkwODA0MTUyNTIyWjAAMCECDlQ249Y7vtC25ScHJ0DWFw0wOTA4MDQxNTI1MzdaMAAwIQIOISMop3NkA4PfYwcnQNkXDTA5MDgwNDExMDAzNFowADAhAg56/BMoS29KEShTBydA2hcNMDkwODA0MTEwMTAzWjAAMCECDnBp/22HPH5CSWoHJ0DbFw0wOTA4MDQxMDU0NDlaMAAwIQIOV9IP+8CD8bK+XAcnQNwXDTA5MDgwNDEwNTcxN1owADAhAg4v5aRz0IxWqYiXBydA3RcNMDkwODA0MTA1NzQ1WjAAMCECDlOU34VzvZAybQwHJ0DeFw0wOTA4MDQxMDU4MjFaMAAwIAINO4CD9lluIxcwBydBAxcNMDkwNzIyMTUzMTU5WjAAMCECDgOllfO8Y1QA7/wHJ0ExFw0wOTA3MjQxMTQxNDNaMAAwIQIOJBX7jbiCdRdyjgcnQUQXDTA5MDkxNjA5MzAwOFowADAhAg5iYSAgmDrlH/RZBydBRRcNMDkwOTE2MDkzMDE3WjAAMCECDmu6k6srP3jcMaQHJ0FRFw0wOTA4MDQxMDU2NDBaMAAwIQIOX8aHlO0V+WVH4QcnQVMXDTA5MDgwNDEwNTcyOVowADAhAg5flK2rg3NnsRgDBydBzhcNMTEwMjAxMTUzMzQ2WjAAMCECDg35yJDL1jOPTgoHJ0HPFw0xMTAyMDExNTM0MjZaMAAwIQIOMyFJ6+e9iiGVBQcnQdAXDTA5MDkxODEzMjAwNVowADAhAg5Emb/Oykucmn8fBydB1xcNMDkwOTIxMTAxMDQ3WjAAMCECDjQKCncV+MnUavMHJ0HaFw0wOTA5MjIwODE1MjZaMAAwIQIOaxiFUt3dpd+tPwcnQfQXDTEwMDYxODA4NDI1MVowADAhAg5G7P8nO0tkrMt7BydB9RcNMTAwNjE4MDg0MjMwWjAAMCECDmTCC3SXhmDRst4HJ0H2Fw0wOTA5MjgxMjA3MjBaMAAwIQIOHoGhUr/pRwzTKgcnQfcXDTA5MDkyODEyMDcyNFowADAhAg50wrcrCiw8mQmPBydCBBcNMTAwMjE2MTMwMTA2WjAAMCECDifWmkvwyhEqwEcHJ0IFFw0xMDAyMTYxMzAxMjBaMAAwIQIOfgPmlW9fg+osNgcnQhwXDTEwMDQxMzA5NTIwMFowADAhAg4YHAGuA6LgCk7tBydCHRcNMTAwNDEzMDk1MTM4WjAAMCECDi1zH1bxkNJhokAHJ0IsFw0xMDA0MTMwOTU5MzBaMAAwIQIOMipNccsb/wo2fwcnQi0XDTEwMDQxMzA5NTkwMFowADAhAg46lCmvPl4GpP6ABydCShcNMTAwMTE5MDk1MjE3WjAAMCECDjaTcaj+wBpcGAsHJ0JLFw0xMDAxMTkwOTUyMzRaMAAwIQIOOMC13EOrBuxIOQcnQloXDTEwMDIwMTA5NDcwNVowADAhAg5KmZl+krz4RsmrBydCWxcNMTAwMjAxMDk0NjQwWjAAMCECDmLG3zQJ/fzdSsUHJ0JiFw0xMDAzMDEwOTUxNDBaMAAwIQIOP39ksgHdojf4owcnQmMXDTEwMDMwMTA5NTExN1owADAhAg4LDQzvWNRlD6v9BydCZBcNMTAwMzAxMDk0NjIyWjAAMCECDkmNfeclaFhIaaUHJ0JlFw0xMDAzMDEwOTQ2MDVaMAAwIQIOT/qWWfpH/m8NTwcnQpQXDTEwMDUxMTA5MTgyMVowADAhAg5m/ksYxvCEgJSvBydClRcNMTAwNTExMDkxODAxWjAAMCECDgvf3Ohq6JOPU9AHJ0KWFw0xMDA1MTEwOTIxMjNaMAAwIQIOKSPas10z4jNVIQcnQpcXDTEwMDUxMTA5MjEwMlowADAhAg4mCWmhoZ3lyKCDBydCohcNMTEwNDI4MTEwMjI1WjAAMCECDkeiyRsBMK0Gvr4HJ0KjFw0xMTA0MjgxMTAyMDdaMAAwIQIOa09b/nH2+55SSwcnQq4XDTExMDQwMTA4Mjk0NlowADAhAg5O7M7iq7gGplr1BydCrxcNMTEwNDAxMDgzMDE3WjAAMCECDjlT6mJxUjTvyogHJ0K1Fw0xMTAxMjcxNTQ4NTJaMAAwIQIODS/l4UUFLe21NAcnQrYXDTExMDEyNzE1NDgyOFowADAhAg5lPRA0XdOUF6lSBydDHhcNMTEwMTI4MTQzNTA1WjAAMCECDixKX4fFGGpENwgHJ0MfFw0xMTAxMjgxNDM1MzBaMAAwIQIORNBkqsPnpKTtbAcnQ08XDTEwMDkwOTA4NDg0MlowADAhAg5QL+EMM3lohedEBydDUBcNMTAwOTA5MDg0ODE5WjAAMCECDlhDnHK+HiTRAXcHJ0NUFw0xMDEwMTkxNjIxNDBaMAAwIQIOdBFqAzq/INz53gcnQ1UXDTEwMTAxOTE2MjA0NFowADAhAg4OjR7s8MgKles1BydDWhcNMTEwMTI3MTY1MzM2WjAAMCECDmfR/elHee+d0SoHJ0NbFw0xMTAxMjcxNjUzNTZaMAAwIQIOBTKv2ui+KFMI+wcnQ5YXDTEwMDkxNTEwMjE1N1owADAhAg49F3c/GSah+oRUBydDmxcNMTEwMTI3MTczMjMzWjAAMCECDggv4I61WwpKFMMHJ0OcFw0xMTAxMjcxNzMyNTVaMAAwIQIOXx/Y8sEvwS10LAcnQ6UXDTExMDEyODExMjkzN1owADAhAg5LSLbnVrSKaw/9BydDphcNMTEwMTI4MTEyOTIwWjAAMCECDmFFoCuhKUeACQQHJ0PfFw0xMTAxMTExMDE3MzdaMAAwIQIOQTDdFh2fSPF6AAcnQ+AXDTExMDExMTEwMTcxMFowADAhAg5B8AOXX61FpvbbBydD5RcNMTAxMDA2MTAxNDM2WjAAMCECDh41P2Gmi7PkwI4HJ0PmFw0xMDEwMDYxMDE2MjVaMAAwIQIOWUHGLQCd+Ale9gcnQ/0XDTExMDUwMjA3NTYxMFowADAhAg5Z2c9AYkikmgWOBydD/hcNMTEwNTAyMDc1NjM0WjAAMCECDmf/UD+/h8nf+74HJ0QVFw0xMTA0MTUwNzI4MzNaMAAwIQIOICvj4epy3MrqfwcnRBYXDTExMDQxNTA3Mjg1NlowADAhAg4bouRMfOYqgv4xBydEHxcNMTEwMzA4MTYyNDI1WjAAMCECDhebWHGoKiTp7pEHJ0QgFw0xMTAzMDgxNjI0NDhaMAAwIQIOX+qnxxAqJ8LtawcnRDcXDTExMDEzMTE1MTIyOFowADAhAg4j0fICqZ+wkOdqBydEOBcNMTEwMTMxMTUxMTQxWjAAMCECDhmXjsV4SUpWtAMHJ0RLFw0xMTAxMjgxMTI0MTJaMAAwIQIODno/w+zG43kkTwcnREwXDTExMDEyODExMjM1MlowADAhAg4b1gc88767Fr+LBydETxcNMTEwMTI4MTEwMjA4WjAAMCECDn+M3Pa1w2nyFeUHJ0RQFw0xMTAxMjgxMDU4NDVaMAAwIQIOaduoyIH61tqybAcnRJUXDTEwMTIxNTA5NDMyMlowADAhAg4nLqQPkyi3ESAKBydElhcNMTAxMjE1MDk0MzM2WjAAMCECDi504NIMH8578gQHJ0SbFw0xMTAyMTQxNDA1NDFaMAAwIQIOGuaM8PDaC5u1egcnRJwXDTExMDIxNDE0MDYwNFowADAhAg4ehYq/BXGnB5PWBydEnxcNMTEwMjA0MDgwOTUxWjAAMCECDkSD4eS4FxW5H20HJ0SgFw0xMTAyMDQwODA5MjVaMAAwIQIOOCcb6ilYObt1egcnRKEXDTExMDEyNjEwNDEyOVowADAhAg58tISWCCwFnKGnBydEohcNMTEwMjA0MDgxMzQyWjAAMCECDn5rjtabY/L/WL0HJ0TJFw0xMTAyMDQxMTAzNDFaMAAwDQYJKoZIhvcNAQEFBQADggEBAGnF2Gs0+LNiYCW1Ipm83OXQYP/bd5tFFRzyz3iepFqNfYs4D68/QihjFoRHQoXEB0OEe1tvaVnnPGnEOpi6krwekquMxo4H88B5SlyiFIqemCOIss0SxlCFs69LmfRYvPPvPEhoXtQ3ZThe0UvKG83GOklhvGl6OaiRf4Mt+m8zOT4Wox/j6aOBK6cw6qKCdmD+Yj1rrNqFGg1CnSWMoD6S6mwNgkzwdBUJZ22BwrzAAo4RHa2Uy3ef1FjwD0XtU5N3uDSxGGBEDvOe5z82rps3E22FpAA8eYl8kaXtmWqyvYU0epp4brGuTxCuBMCAsxt/OjIjeNNQbBGkwxgfYA0=&#34;
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>const pemCRLBase64 = &#34;LS0tLS1CRUdJTiBYNTA5IENSTC0tLS0tDQpNSUlCOWpDQ0FWOENBUUV3RFFZSktvWklodmNOQVFFRkJRQXdiREVhTUJnR0ExVUVDaE1SVWxOQklGTmxZM1Z5DQphWFI1SUVsdVl5NHhIakFjQmdOVkJBTVRGVkpUUVNCUWRXSnNhV01nVW05dmRDQkRRU0IyTVRFdU1Dd0dDU3FHDQpTSWIzRFFFSkFSWWZjbk5oYTJWdmJuSnZiM1J6YVdkdVFISnpZWE5sWTNWeWFYUjVMbU52YlJjTk1URXdNakl6DQpNVGt5T0RNd1doY05NVEV3T0RJeU1Ua3lPRE13V2pDQmpEQktBaEVBckRxb2g5RkhKSFhUN09QZ3V1bjQrQmNODQpNRGt4TVRBeU1UUXlOekE1V2pBbU1Bb0dBMVVkRlFRRENnRUpNQmdHQTFVZEdBUVJHQTh5TURBNU1URXdNakUwDQpNalExTlZvd1BnSVJBTEd6blowOTVQQjVhQU9MUGc1N2ZNTVhEVEF5TVRBeU16RTBOVEF4TkZvd0dqQVlCZ05WDQpIUmdFRVJnUE1qQXdNakV3TWpNeE5EVXdNVFJhb0RBd0xqQWZCZ05WSFNNRUdEQVdnQlQxVERGNlVRTS9MTmVMDQpsNWx2cUhHUXEzZzltekFMQmdOVkhSUUVCQUlDQUlRd0RRWUpLb1pJaHZjTkFRRUZCUUFEZ1lFQUZVNUFzNk16DQpxNVBSc2lmYW9iUVBHaDFhSkx5QytNczVBZ2MwYld5QTNHQWR4dXI1U3BQWmVSV0NCamlQL01FSEJXSkNsQkhQDQpHUmNxNXlJZDNFakRrYUV5eFJhK2k2N0x6dmhJNmMyOUVlNks5cFNZd2ppLzdSVWhtbW5Qclh0VHhsTDBsckxyDQptUVFKNnhoRFJhNUczUUE0Q21VZHNITnZicnpnbUNZcHZWRT0NCi0tLS0tRU5EIFg1MDkgQ1JMLS0tLS0NCg0K&#34;
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>func TestCreateCertificateRequest(t *testing.T) {
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>	random := rand.Reader
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>	ecdsa256Priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Failed to generate ECDSA key: %s&#34;, err)
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>	}
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>	ecdsa384Priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Failed to generate ECDSA key: %s&#34;, err)
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>	}
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>	ecdsa521Priv, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Failed to generate ECDSA key: %s&#34;, err)
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>	}
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>		name    string
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>		priv    interface{}
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>		sigAlgo SignatureAlgorithm
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>	}{
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>		{&#34;RSA&#34;, testPrivateKey, SHA1WithRSA},
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>		{&#34;ECDSA-256&#34;, ecdsa256Priv, ECDSAWithSHA1},
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>		{&#34;ECDSA-384&#34;, ecdsa384Priv, ECDSAWithSHA1},
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>		{&#34;ECDSA-521&#34;, ecdsa521Priv, ECDSAWithSHA1},
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>	}
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>	for _, test := range tests {
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>		template := CertificateRequest{
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>			Subject: pkix.Name{
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>				CommonName:   &#34;test.example.com&#34;,
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>				Organization: []string{&#34;Σ Acme Co&#34;},
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>			},
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>			SignatureAlgorithm: test.sigAlgo,
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span>			DNSNames:           []string{&#34;test.example.com&#34;},
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>			EmailAddresses:     []string{&#34;gopher@golang.org&#34;},
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>			IPAddresses:        []net.IP{net.IPv4(127, 0, 0, 1).To4(), net.ParseIP(&#34;2001:4860:0:2001::68&#34;)},
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>		}
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>		derBytes, err := CreateCertificateRequest(random, &amp;template, test.priv)
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: failed to create certificate request: %s&#34;, test.name, err)
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>			continue
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>		}
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>		out, err := ParseCertificateRequest(derBytes)
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: failed to create certificate request: %s&#34;, test.name, err)
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>			continue
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>		}
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>		err = out.CheckSignature()
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: failed to check certificate request signature: %s&#34;, test.name, err)
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>			continue
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>		}
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>		if out.Subject.CommonName != template.Subject.CommonName {
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: output subject common name and template subject common name don&#39;t match&#34;, test.name)
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>		} else if len(out.Subject.Organization) != len(template.Subject.Organization) {
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: output subject organisation and template subject organisation don&#39;t match&#34;, test.name)
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>		} else if len(out.DNSNames) != len(template.DNSNames) {
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: output DNS names and template DNS names don&#39;t match&#34;, test.name)
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>		} else if len(out.EmailAddresses) != len(template.EmailAddresses) {
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: output email addresses and template email addresses don&#39;t match&#34;, test.name)
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span>		} else if len(out.IPAddresses) != len(template.IPAddresses) {
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: output IP addresses and template IP addresses names don&#39;t match&#34;, test.name)
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span>		}
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span>	}
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span>}
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span>
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span>func marshalAndParseCSR(t *testing.T, template *CertificateRequest) *CertificateRequest {
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span>	derBytes, err := CreateCertificateRequest(rand.Reader, template, testPrivateKey)
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span>	}
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span>
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span>	csr, err := ParseCertificateRequest(derBytes)
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span>	}
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span>
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span>	return csr
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span>}
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span>
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span>func TestCertificateRequestOverrides(t *testing.T) {
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span>	sanContents, err := marshalSANs([]string{&#34;foo.example.com&#34;}, nil, nil)
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span>	}
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span>
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span>	template := CertificateRequest{
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span>		Subject: pkix.Name{
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span>			CommonName:   &#34;test.example.com&#34;,
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span>			Organization: []string{&#34;Σ Acme Co&#34;},
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span>		},
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span>		DNSNames: []string{&#34;test.example.com&#34;},
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span>
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span>		<span class="comment">// An explicit extension should override the DNSNames from the</span>
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span>		<span class="comment">// template.</span>
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span>		ExtraExtensions: []pkix.Extension{
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span>			{
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span>				Id:    oidExtensionSubjectAltName,
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span>				Value: sanContents,
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span>			},
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>		},
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>	}
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span>
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span>	csr := marshalAndParseCSR(t, &amp;template)
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>	if len(csr.DNSNames) != 1 || csr.DNSNames[0] != &#34;foo.example.com&#34; {
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>		t.Errorf(&#34;Extension did not override template. Got %v\n&#34;, csr.DNSNames)
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>	}
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>	<span class="comment">// If there is already an attribute with X.509 extensions then the</span>
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span>	<span class="comment">// extra extensions should be added to it rather than creating a CSR</span>
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>	<span class="comment">// with two extension attributes.</span>
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>
+<span id="L1026" class="ln" data-content="  1026">&nbsp;&nbsp;</span>	template.Attributes = []pkix.AttributeTypeAndValueSET{
+<span id="L1027" class="ln" data-content="  1027">&nbsp;&nbsp;</span>		{
+<span id="L1028" class="ln" data-content="  1028">&nbsp;&nbsp;</span>			Type: oidExtensionRequest,
+<span id="L1029" class="ln" data-content="  1029">&nbsp;&nbsp;</span>			Value: [][]pkix.AttributeTypeAndValue{
+<span id="L1030" class="ln" data-content="  1030">&nbsp;&nbsp;</span>				{
+<span id="L1031" class="ln" data-content="  1031">&nbsp;&nbsp;</span>					{
+<span id="L1032" class="ln" data-content="  1032">&nbsp;&nbsp;</span>						Type:  oidExtensionAuthorityInfoAccess,
+<span id="L1033" class="ln" data-content="  1033">&nbsp;&nbsp;</span>						Value: []byte(&#34;foo&#34;),
+<span id="L1034" class="ln" data-content="  1034">&nbsp;&nbsp;</span>					},
+<span id="L1035" class="ln" data-content="  1035">&nbsp;&nbsp;</span>				},
+<span id="L1036" class="ln" data-content="  1036">&nbsp;&nbsp;</span>			},
+<span id="L1037" class="ln" data-content="  1037">&nbsp;&nbsp;</span>		},
+<span id="L1038" class="ln" data-content="  1038">&nbsp;&nbsp;</span>	}
+<span id="L1039" class="ln" data-content="  1039">&nbsp;&nbsp;</span>
+<span id="L1040" class="ln" data-content="  1040">&nbsp;&nbsp;</span>	csr = marshalAndParseCSR(t, &amp;template)
+<span id="L1041" class="ln" data-content="  1041">&nbsp;&nbsp;</span>	if l := len(csr.Attributes); l != 1 {
+<span id="L1042" class="ln" data-content="  1042">&nbsp;&nbsp;</span>		t.Errorf(&#34;incorrect number of attributes: %d\n&#34;, l)
+<span id="L1043" class="ln" data-content="  1043">&nbsp;&nbsp;</span>	}
+<span id="L1044" class="ln" data-content="  1044">&nbsp;&nbsp;</span>
+<span id="L1045" class="ln" data-content="  1045">&nbsp;&nbsp;</span>	if !csr.Attributes[0].Type.Equal(oidExtensionRequest) ||
+<span id="L1046" class="ln" data-content="  1046">&nbsp;&nbsp;</span>		len(csr.Attributes[0].Value) != 1 ||
+<span id="L1047" class="ln" data-content="  1047">&nbsp;&nbsp;</span>		len(csr.Attributes[0].Value[0]) != 2 {
+<span id="L1048" class="ln" data-content="  1048">&nbsp;&nbsp;</span>		t.Errorf(&#34;bad attributes: %#v\n&#34;, csr.Attributes)
+<span id="L1049" class="ln" data-content="  1049">&nbsp;&nbsp;</span>	}
+<span id="L1050" class="ln" data-content="  1050">&nbsp;&nbsp;</span>
+<span id="L1051" class="ln" data-content="  1051">&nbsp;&nbsp;</span>	sanContents2, err := marshalSANs([]string{&#34;foo2.example.com&#34;}, nil, nil)
+<span id="L1052" class="ln" data-content="  1052">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1053" class="ln" data-content="  1053">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1054" class="ln" data-content="  1054">&nbsp;&nbsp;</span>	}
+<span id="L1055" class="ln" data-content="  1055">&nbsp;&nbsp;</span>
+<span id="L1056" class="ln" data-content="  1056">&nbsp;&nbsp;</span>	<span class="comment">// Extensions in Attributes should override those in ExtraExtensions.</span>
+<span id="L1057" class="ln" data-content="  1057">&nbsp;&nbsp;</span>	template.Attributes[0].Value[0] = append(template.Attributes[0].Value[0], pkix.AttributeTypeAndValue{
+<span id="L1058" class="ln" data-content="  1058">&nbsp;&nbsp;</span>		Type:  oidExtensionSubjectAltName,
+<span id="L1059" class="ln" data-content="  1059">&nbsp;&nbsp;</span>		Value: sanContents2,
+<span id="L1060" class="ln" data-content="  1060">&nbsp;&nbsp;</span>	})
+<span id="L1061" class="ln" data-content="  1061">&nbsp;&nbsp;</span>
+<span id="L1062" class="ln" data-content="  1062">&nbsp;&nbsp;</span>	csr = marshalAndParseCSR(t, &amp;template)
+<span id="L1063" class="ln" data-content="  1063">&nbsp;&nbsp;</span>
+<span id="L1064" class="ln" data-content="  1064">&nbsp;&nbsp;</span>	if len(csr.DNSNames) != 1 || csr.DNSNames[0] != &#34;foo2.example.com&#34; {
+<span id="L1065" class="ln" data-content="  1065">&nbsp;&nbsp;</span>		t.Errorf(&#34;Attributes did not override ExtraExtensions. Got %v\n&#34;, csr.DNSNames)
+<span id="L1066" class="ln" data-content="  1066">&nbsp;&nbsp;</span>	}
+<span id="L1067" class="ln" data-content="  1067">&nbsp;&nbsp;</span>}
+<span id="L1068" class="ln" data-content="  1068">&nbsp;&nbsp;</span>
+<span id="L1069" class="ln" data-content="  1069">&nbsp;&nbsp;</span>func TestParseCertificateRequest(t *testing.T) {
+<span id="L1070" class="ln" data-content="  1070">&nbsp;&nbsp;</span>	for _, csrBase64 := range csrBase64Array {
+<span id="L1071" class="ln" data-content="  1071">&nbsp;&nbsp;</span>		csrBytes := fromBase64(csrBase64)
+<span id="L1072" class="ln" data-content="  1072">&nbsp;&nbsp;</span>		csr, err := ParseCertificateRequest(csrBytes)
+<span id="L1073" class="ln" data-content="  1073">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L1074" class="ln" data-content="  1074">&nbsp;&nbsp;</span>			t.Fatalf(&#34;failed to parse CSR: %s&#34;, err)
+<span id="L1075" class="ln" data-content="  1075">&nbsp;&nbsp;</span>		}
+<span id="L1076" class="ln" data-content="  1076">&nbsp;&nbsp;</span>
+<span id="L1077" class="ln" data-content="  1077">&nbsp;&nbsp;</span>		if len(csr.EmailAddresses) != 1 || csr.EmailAddresses[0] != &#34;gopher@golang.org&#34; {
+<span id="L1078" class="ln" data-content="  1078">&nbsp;&nbsp;</span>			t.Errorf(&#34;incorrect email addresses found: %v&#34;, csr.EmailAddresses)
+<span id="L1079" class="ln" data-content="  1079">&nbsp;&nbsp;</span>		}
+<span id="L1080" class="ln" data-content="  1080">&nbsp;&nbsp;</span>
+<span id="L1081" class="ln" data-content="  1081">&nbsp;&nbsp;</span>		if len(csr.DNSNames) != 1 || csr.DNSNames[0] != &#34;test.example.com&#34; {
+<span id="L1082" class="ln" data-content="  1082">&nbsp;&nbsp;</span>			t.Errorf(&#34;incorrect DNS names found: %v&#34;, csr.DNSNames)
+<span id="L1083" class="ln" data-content="  1083">&nbsp;&nbsp;</span>		}
+<span id="L1084" class="ln" data-content="  1084">&nbsp;&nbsp;</span>
+<span id="L1085" class="ln" data-content="  1085">&nbsp;&nbsp;</span>		if len(csr.Subject.Country) != 1 || csr.Subject.Country[0] != &#34;AU&#34; {
+<span id="L1086" class="ln" data-content="  1086">&nbsp;&nbsp;</span>			t.Errorf(&#34;incorrect Subject name: %v&#34;, csr.Subject)
+<span id="L1087" class="ln" data-content="  1087">&nbsp;&nbsp;</span>		}
+<span id="L1088" class="ln" data-content="  1088">&nbsp;&nbsp;</span>
+<span id="L1089" class="ln" data-content="  1089">&nbsp;&nbsp;</span>		found := false
+<span id="L1090" class="ln" data-content="  1090">&nbsp;&nbsp;</span>		for _, e := range csr.Extensions {
+<span id="L1091" class="ln" data-content="  1091">&nbsp;&nbsp;</span>			if e.Id.Equal(oidExtensionBasicConstraints) {
+<span id="L1092" class="ln" data-content="  1092">&nbsp;&nbsp;</span>				found = true
+<span id="L1093" class="ln" data-content="  1093">&nbsp;&nbsp;</span>				break
+<span id="L1094" class="ln" data-content="  1094">&nbsp;&nbsp;</span>			}
+<span id="L1095" class="ln" data-content="  1095">&nbsp;&nbsp;</span>		}
+<span id="L1096" class="ln" data-content="  1096">&nbsp;&nbsp;</span>		if !found {
+<span id="L1097" class="ln" data-content="  1097">&nbsp;&nbsp;</span>			t.Errorf(&#34;basic constraints extension not found in CSR&#34;)
+<span id="L1098" class="ln" data-content="  1098">&nbsp;&nbsp;</span>		}
+<span id="L1099" class="ln" data-content="  1099">&nbsp;&nbsp;</span>	}
+<span id="L1100" class="ln" data-content="  1100">&nbsp;&nbsp;</span>}
+<span id="L1101" class="ln" data-content="  1101">&nbsp;&nbsp;</span>
+<span id="L1102" class="ln" data-content="  1102">&nbsp;&nbsp;</span>func TestCriticalFlagInCSRRequestedExtensions(t *testing.T) {
+<span id="L1103" class="ln" data-content="  1103">&nbsp;&nbsp;</span>	<span class="comment">// This CSR contains an extension request where the extensions have a</span>
+<span id="L1104" class="ln" data-content="  1104">&nbsp;&nbsp;</span>	<span class="comment">// critical flag in them. In the past we failed to handle this.</span>
+<span id="L1105" class="ln" data-content="  1105">&nbsp;&nbsp;</span>	const csrBase64 = &#34;MIICrTCCAZUCAQIwMzEgMB4GA1UEAwwXU0NFUCBDQSBmb3IgRGV2ZWxlciBTcmwxDzANBgNVBAsMBjQzNTk3MTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALFMAJ7Zy9YyfgbNlbUWAW0LalNRMPs7aXmLANsCpjhnw3lLlfDPaLeWyKh1nK5I5ojaJOW6KIOSAcJkDUe3rrE0wR0RVt3UxArqs0R/ND3u5Q+bDQY2X1HAFUHzUzcdm5JRAIA355v90teMckaWAIlkRQjDE22Lzc6NAl64KOd1rqOUNj8+PfX6fSo20jm94Pp1+a6mfk3G/RUWVuSm7owO5DZI/Fsi2ijdmb4NUar6K/bDKYTrDFkzcqAyMfP3TitUtBp19Mp3B1yAlHjlbp/r5fSSXfOGHZdgIvp0WkLuK2u5eQrX5l7HMB/5epgUs3HQxKY6ljhh5wAjDwz//LsCAwEAAaA1MDMGCSqGSIb3DQEJDjEmMCQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAoQwDQYJKoZIhvcNAQEFBQADggEBAAMq3bxJSPQEgzLYR/yaVvgjCDrc3zUbIwdOis6Go06Q4RnjH5yRaSZAqZQTDsPurQcnz2I39VMGEiSkFJFavf4QHIZ7QFLkyXadMtALc87tm17Ej719SbHcBSSZayR9VYJUNXRLayI6HvyUrmqcMKh+iX3WY3ICr59/wlM0tYa8DYN4yzmOa2Onb29gy3YlaF5A2AKAMmk003cRT9gY26mjpv7d21czOSSeNyVIoZ04IR9ee71vWTMdv0hu/af5kSjQ+ZG5/Qgc0+mnECLz/1gtxt1srLYbtYQ/qAY8oX1DCSGFS61tN/vl+4cxGMD/VGcGzADRLRHSlVqy2Qgss6Q=&#34;
+<span id="L1106" class="ln" data-content="  1106">&nbsp;&nbsp;</span>
+<span id="L1107" class="ln" data-content="  1107">&nbsp;&nbsp;</span>	csrBytes := fromBase64(csrBase64)
+<span id="L1108" class="ln" data-content="  1108">&nbsp;&nbsp;</span>	csr, err := ParseCertificateRequest(csrBytes)
+<span id="L1109" class="ln" data-content="  1109">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1110" class="ln" data-content="  1110">&nbsp;&nbsp;</span>		t.Fatalf(&#34;failed to parse CSR: %s&#34;, err)
+<span id="L1111" class="ln" data-content="  1111">&nbsp;&nbsp;</span>	}
+<span id="L1112" class="ln" data-content="  1112">&nbsp;&nbsp;</span>
+<span id="L1113" class="ln" data-content="  1113">&nbsp;&nbsp;</span>	expected := []struct {
+<span id="L1114" class="ln" data-content="  1114">&nbsp;&nbsp;</span>		Id    asn1.ObjectIdentifier
+<span id="L1115" class="ln" data-content="  1115">&nbsp;&nbsp;</span>		Value []byte
+<span id="L1116" class="ln" data-content="  1116">&nbsp;&nbsp;</span>	}{
+<span id="L1117" class="ln" data-content="  1117">&nbsp;&nbsp;</span>		{oidExtensionBasicConstraints, fromBase64(&#34;MAYBAf8CAQA=&#34;)},
+<span id="L1118" class="ln" data-content="  1118">&nbsp;&nbsp;</span>		{oidExtensionKeyUsage, fromBase64(&#34;AwIChA==&#34;)},
+<span id="L1119" class="ln" data-content="  1119">&nbsp;&nbsp;</span>	}
+<span id="L1120" class="ln" data-content="  1120">&nbsp;&nbsp;</span>
+<span id="L1121" class="ln" data-content="  1121">&nbsp;&nbsp;</span>	if n := len(csr.Extensions); n != len(expected) {
+<span id="L1122" class="ln" data-content="  1122">&nbsp;&nbsp;</span>		t.Fatalf(&#34;expected to find %d extensions but found %d&#34;, len(expected), n)
+<span id="L1123" class="ln" data-content="  1123">&nbsp;&nbsp;</span>	}
+<span id="L1124" class="ln" data-content="  1124">&nbsp;&nbsp;</span>
+<span id="L1125" class="ln" data-content="  1125">&nbsp;&nbsp;</span>	for i, extension := range csr.Extensions {
+<span id="L1126" class="ln" data-content="  1126">&nbsp;&nbsp;</span>		if !extension.Id.Equal(expected[i].Id) {
+<span id="L1127" class="ln" data-content="  1127">&nbsp;&nbsp;</span>			t.Fatalf(&#34;extension #%d has unexpected type %v (expected %v)&#34;, i, extension.Id, expected[i].Id)
+<span id="L1128" class="ln" data-content="  1128">&nbsp;&nbsp;</span>		}
+<span id="L1129" class="ln" data-content="  1129">&nbsp;&nbsp;</span>
+<span id="L1130" class="ln" data-content="  1130">&nbsp;&nbsp;</span>		if !bytes.Equal(extension.Value, expected[i].Value) {
+<span id="L1131" class="ln" data-content="  1131">&nbsp;&nbsp;</span>			t.Fatalf(&#34;extension #%d has unexpected contents %x (expected %x)&#34;, i, extension.Value, expected[i].Value)
+<span id="L1132" class="ln" data-content="  1132">&nbsp;&nbsp;</span>		}
+<span id="L1133" class="ln" data-content="  1133">&nbsp;&nbsp;</span>	}
+<span id="L1134" class="ln" data-content="  1134">&nbsp;&nbsp;</span>}
+<span id="L1135" class="ln" data-content="  1135">&nbsp;&nbsp;</span>
+<span id="L1136" class="ln" data-content="  1136">&nbsp;&nbsp;</span><span class="comment">// serialiseAndParse generates a self-signed certificate from template and</span>
+<span id="L1137" class="ln" data-content="  1137">&nbsp;&nbsp;</span><span class="comment">// returns a parsed version of it.</span>
+<span id="L1138" class="ln" data-content="  1138">&nbsp;&nbsp;</span>func serialiseAndParse(t *testing.T, template *Certificate) *Certificate {
+<span id="L1139" class="ln" data-content="  1139">&nbsp;&nbsp;</span>	derBytes, err := CreateCertificate(rand.Reader, template, template, &amp;testPrivateKey.PublicKey, testPrivateKey)
+<span id="L1140" class="ln" data-content="  1140">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1141" class="ln" data-content="  1141">&nbsp;&nbsp;</span>		t.Fatalf(&#34;failed to create certificate: %s&#34;, err)
+<span id="L1142" class="ln" data-content="  1142">&nbsp;&nbsp;</span>		return nil
+<span id="L1143" class="ln" data-content="  1143">&nbsp;&nbsp;</span>	}
+<span id="L1144" class="ln" data-content="  1144">&nbsp;&nbsp;</span>
+<span id="L1145" class="ln" data-content="  1145">&nbsp;&nbsp;</span>	cert, err := ParseCertificate(derBytes)
+<span id="L1146" class="ln" data-content="  1146">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1147" class="ln" data-content="  1147">&nbsp;&nbsp;</span>		t.Fatalf(&#34;failed to parse certificate: %s&#34;, err)
+<span id="L1148" class="ln" data-content="  1148">&nbsp;&nbsp;</span>		return nil
+<span id="L1149" class="ln" data-content="  1149">&nbsp;&nbsp;</span>	}
+<span id="L1150" class="ln" data-content="  1150">&nbsp;&nbsp;</span>
+<span id="L1151" class="ln" data-content="  1151">&nbsp;&nbsp;</span>	return cert
+<span id="L1152" class="ln" data-content="  1152">&nbsp;&nbsp;</span>}
+<span id="L1153" class="ln" data-content="  1153">&nbsp;&nbsp;</span>
+<span id="L1154" class="ln" data-content="  1154">&nbsp;&nbsp;</span>func TestMaxPathLen(t *testing.T) {
+<span id="L1155" class="ln" data-content="  1155">&nbsp;&nbsp;</span>	template := &amp;Certificate{
+<span id="L1156" class="ln" data-content="  1156">&nbsp;&nbsp;</span>		SerialNumber: big.NewInt(1),
+<span id="L1157" class="ln" data-content="  1157">&nbsp;&nbsp;</span>		Subject: pkix.Name{
+<span id="L1158" class="ln" data-content="  1158">&nbsp;&nbsp;</span>			CommonName: &#34;Σ Acme Co&#34;,
+<span id="L1159" class="ln" data-content="  1159">&nbsp;&nbsp;</span>		},
+<span id="L1160" class="ln" data-content="  1160">&nbsp;&nbsp;</span>		NotBefore: time.Unix(1000, 0),
+<span id="L1161" class="ln" data-content="  1161">&nbsp;&nbsp;</span>		NotAfter:  time.Unix(100000, 0),
+<span id="L1162" class="ln" data-content="  1162">&nbsp;&nbsp;</span>
+<span id="L1163" class="ln" data-content="  1163">&nbsp;&nbsp;</span>		BasicConstraintsValid: true,
+<span id="L1164" class="ln" data-content="  1164">&nbsp;&nbsp;</span>		IsCA: true,
+<span id="L1165" class="ln" data-content="  1165">&nbsp;&nbsp;</span>	}
+<span id="L1166" class="ln" data-content="  1166">&nbsp;&nbsp;</span>
+<span id="L1167" class="ln" data-content="  1167">&nbsp;&nbsp;</span>	cert1 := serialiseAndParse(t, template)
+<span id="L1168" class="ln" data-content="  1168">&nbsp;&nbsp;</span>	if m := cert1.MaxPathLen; m != -1 {
+<span id="L1169" class="ln" data-content="  1169">&nbsp;&nbsp;</span>		t.Errorf(&#34;Omitting MaxPathLen didn&#39;t turn into -1, got %d&#34;, m)
+<span id="L1170" class="ln" data-content="  1170">&nbsp;&nbsp;</span>	}
+<span id="L1171" class="ln" data-content="  1171">&nbsp;&nbsp;</span>	if cert1.MaxPathLenZero {
+<span id="L1172" class="ln" data-content="  1172">&nbsp;&nbsp;</span>		t.Errorf(&#34;Omitting MaxPathLen resulted in MaxPathLenZero&#34;)
+<span id="L1173" class="ln" data-content="  1173">&nbsp;&nbsp;</span>	}
+<span id="L1174" class="ln" data-content="  1174">&nbsp;&nbsp;</span>
+<span id="L1175" class="ln" data-content="  1175">&nbsp;&nbsp;</span>	template.MaxPathLen = 1
+<span id="L1176" class="ln" data-content="  1176">&nbsp;&nbsp;</span>	cert2 := serialiseAndParse(t, template)
+<span id="L1177" class="ln" data-content="  1177">&nbsp;&nbsp;</span>	if m := cert2.MaxPathLen; m != 1 {
+<span id="L1178" class="ln" data-content="  1178">&nbsp;&nbsp;</span>		t.Errorf(&#34;Setting MaxPathLen didn&#39;t work. Got %d but set 1&#34;, m)
+<span id="L1179" class="ln" data-content="  1179">&nbsp;&nbsp;</span>	}
+<span id="L1180" class="ln" data-content="  1180">&nbsp;&nbsp;</span>	if cert2.MaxPathLenZero {
+<span id="L1181" class="ln" data-content="  1181">&nbsp;&nbsp;</span>		t.Errorf(&#34;Setting MaxPathLen resulted in MaxPathLenZero&#34;)
+<span id="L1182" class="ln" data-content="  1182">&nbsp;&nbsp;</span>	}
+<span id="L1183" class="ln" data-content="  1183">&nbsp;&nbsp;</span>
+<span id="L1184" class="ln" data-content="  1184">&nbsp;&nbsp;</span>	template.MaxPathLen = 0
+<span id="L1185" class="ln" data-content="  1185">&nbsp;&nbsp;</span>	template.MaxPathLenZero = true
+<span id="L1186" class="ln" data-content="  1186">&nbsp;&nbsp;</span>	cert3 := serialiseAndParse(t, template)
+<span id="L1187" class="ln" data-content="  1187">&nbsp;&nbsp;</span>	if m := cert3.MaxPathLen; m != 0 {
+<span id="L1188" class="ln" data-content="  1188">&nbsp;&nbsp;</span>		t.Errorf(&#34;Setting MaxPathLenZero didn&#39;t work, got %d&#34;, m)
+<span id="L1189" class="ln" data-content="  1189">&nbsp;&nbsp;</span>	}
+<span id="L1190" class="ln" data-content="  1190">&nbsp;&nbsp;</span>	if !cert3.MaxPathLenZero {
+<span id="L1191" class="ln" data-content="  1191">&nbsp;&nbsp;</span>		t.Errorf(&#34;Setting MaxPathLen to zero didn&#39;t result in MaxPathLenZero&#34;)
+<span id="L1192" class="ln" data-content="  1192">&nbsp;&nbsp;</span>	}
+<span id="L1193" class="ln" data-content="  1193">&nbsp;&nbsp;</span>}
+<span id="L1194" class="ln" data-content="  1194">&nbsp;&nbsp;</span>
+<span id="L1195" class="ln" data-content="  1195">&nbsp;&nbsp;</span>func TestNoAuthorityKeyIdInSelfSignedCert(t *testing.T) {
+<span id="L1196" class="ln" data-content="  1196">&nbsp;&nbsp;</span>	template := &amp;Certificate{
+<span id="L1197" class="ln" data-content="  1197">&nbsp;&nbsp;</span>		SerialNumber: big.NewInt(1),
+<span id="L1198" class="ln" data-content="  1198">&nbsp;&nbsp;</span>		Subject: pkix.Name{
+<span id="L1199" class="ln" data-content="  1199">&nbsp;&nbsp;</span>			CommonName: &#34;Σ Acme Co&#34;,
+<span id="L1200" class="ln" data-content="  1200">&nbsp;&nbsp;</span>		},
+<span id="L1201" class="ln" data-content="  1201">&nbsp;&nbsp;</span>		NotBefore: time.Unix(1000, 0),
+<span id="L1202" class="ln" data-content="  1202">&nbsp;&nbsp;</span>		NotAfter:  time.Unix(100000, 0),
+<span id="L1203" class="ln" data-content="  1203">&nbsp;&nbsp;</span>
+<span id="L1204" class="ln" data-content="  1204">&nbsp;&nbsp;</span>		BasicConstraintsValid: true,
+<span id="L1205" class="ln" data-content="  1205">&nbsp;&nbsp;</span>		IsCA:         true,
+<span id="L1206" class="ln" data-content="  1206">&nbsp;&nbsp;</span>		SubjectKeyId: []byte{1, 2, 3, 4},
+<span id="L1207" class="ln" data-content="  1207">&nbsp;&nbsp;</span>	}
+<span id="L1208" class="ln" data-content="  1208">&nbsp;&nbsp;</span>
+<span id="L1209" class="ln" data-content="  1209">&nbsp;&nbsp;</span>	if cert := serialiseAndParse(t, template); len(cert.AuthorityKeyId) != 0 {
+<span id="L1210" class="ln" data-content="  1210">&nbsp;&nbsp;</span>		t.Fatalf(&#34;self-signed certificate contained default authority key id&#34;)
+<span id="L1211" class="ln" data-content="  1211">&nbsp;&nbsp;</span>	}
+<span id="L1212" class="ln" data-content="  1212">&nbsp;&nbsp;</span>
+<span id="L1213" class="ln" data-content="  1213">&nbsp;&nbsp;</span>	template.AuthorityKeyId = []byte{1, 2, 3, 4}
+<span id="L1214" class="ln" data-content="  1214">&nbsp;&nbsp;</span>	if cert := serialiseAndParse(t, template); len(cert.AuthorityKeyId) == 0 {
+<span id="L1215" class="ln" data-content="  1215">&nbsp;&nbsp;</span>		t.Fatalf(&#34;self-signed certificate erased explicit authority key id&#34;)
+<span id="L1216" class="ln" data-content="  1216">&nbsp;&nbsp;</span>	}
+<span id="L1217" class="ln" data-content="  1217">&nbsp;&nbsp;</span>}
+<span id="L1218" class="ln" data-content="  1218">&nbsp;&nbsp;</span>
+<span id="L1219" class="ln" data-content="  1219">&nbsp;&nbsp;</span>func TestASN1BitLength(t *testing.T) {
+<span id="L1220" class="ln" data-content="  1220">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L1221" class="ln" data-content="  1221">&nbsp;&nbsp;</span>		bytes  []byte
+<span id="L1222" class="ln" data-content="  1222">&nbsp;&nbsp;</span>		bitLen int
+<span id="L1223" class="ln" data-content="  1223">&nbsp;&nbsp;</span>	}{
+<span id="L1224" class="ln" data-content="  1224">&nbsp;&nbsp;</span>		{nil, 0},
+<span id="L1225" class="ln" data-content="  1225">&nbsp;&nbsp;</span>		{[]byte{0x00}, 0},
+<span id="L1226" class="ln" data-content="  1226">&nbsp;&nbsp;</span>		{[]byte{0x00, 0x00}, 0},
+<span id="L1227" class="ln" data-content="  1227">&nbsp;&nbsp;</span>		{[]byte{0xf0}, 4},
+<span id="L1228" class="ln" data-content="  1228">&nbsp;&nbsp;</span>		{[]byte{0x88}, 5},
+<span id="L1229" class="ln" data-content="  1229">&nbsp;&nbsp;</span>		{[]byte{0xff}, 8},
+<span id="L1230" class="ln" data-content="  1230">&nbsp;&nbsp;</span>		{[]byte{0xff, 0x80}, 9},
+<span id="L1231" class="ln" data-content="  1231">&nbsp;&nbsp;</span>		{[]byte{0xff, 0x81}, 16},
+<span id="L1232" class="ln" data-content="  1232">&nbsp;&nbsp;</span>	}
+<span id="L1233" class="ln" data-content="  1233">&nbsp;&nbsp;</span>
+<span id="L1234" class="ln" data-content="  1234">&nbsp;&nbsp;</span>	for i, test := range tests {
+<span id="L1235" class="ln" data-content="  1235">&nbsp;&nbsp;</span>		if got := asn1BitLength(test.bytes); got != test.bitLen {
+<span id="L1236" class="ln" data-content="  1236">&nbsp;&nbsp;</span>			t.Errorf(&#34;#%d: calculated bit-length of %d for %x, wanted %d&#34;, i, got, test.bytes, test.bitLen)
+<span id="L1237" class="ln" data-content="  1237">&nbsp;&nbsp;</span>		}
+<span id="L1238" class="ln" data-content="  1238">&nbsp;&nbsp;</span>	}
+<span id="L1239" class="ln" data-content="  1239">&nbsp;&nbsp;</span>}
+<span id="L1240" class="ln" data-content="  1240">&nbsp;&nbsp;</span>
+<span id="L1241" class="ln" data-content="  1241">&nbsp;&nbsp;</span>func TestVerifyEmptyCertificate(t *testing.T) {
+<span id="L1242" class="ln" data-content="  1242">&nbsp;&nbsp;</span>	if _, err := new(Certificate).Verify(VerifyOptions{}); err != errNotParsed {
+<span id="L1243" class="ln" data-content="  1243">&nbsp;&nbsp;</span>		t.Errorf(&#34;Verifying empty certificate resulted in unexpected error: %q (wanted %q)&#34;, err, errNotParsed)
+<span id="L1244" class="ln" data-content="  1244">&nbsp;&nbsp;</span>	}
+<span id="L1245" class="ln" data-content="  1245">&nbsp;&nbsp;</span>}
+<span id="L1246" class="ln" data-content="  1246">&nbsp;&nbsp;</span>
+<span id="L1247" class="ln" data-content="  1247">&nbsp;&nbsp;</span>func TestInsecureAlgorithmErrorString(t *testing.T) {
+<span id="L1248" class="ln" data-content="  1248">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L1249" class="ln" data-content="  1249">&nbsp;&nbsp;</span>		sa   SignatureAlgorithm
+<span id="L1250" class="ln" data-content="  1250">&nbsp;&nbsp;</span>		want string
+<span id="L1251" class="ln" data-content="  1251">&nbsp;&nbsp;</span>	}{
+<span id="L1252" class="ln" data-content="  1252">&nbsp;&nbsp;</span>		{MD2WithRSA, &#34;x509: cannot verify signature: insecure algorithm MD2-RSA&#34;},
+<span id="L1253" class="ln" data-content="  1253">&nbsp;&nbsp;</span>		{-1, &#34;x509: cannot verify signature: insecure algorithm -1&#34;},
+<span id="L1254" class="ln" data-content="  1254">&nbsp;&nbsp;</span>		{0, &#34;x509: cannot verify signature: insecure algorithm 0&#34;},
+<span id="L1255" class="ln" data-content="  1255">&nbsp;&nbsp;</span>		{9999, &#34;x509: cannot verify signature: insecure algorithm 9999&#34;},
+<span id="L1256" class="ln" data-content="  1256">&nbsp;&nbsp;</span>	}
+<span id="L1257" class="ln" data-content="  1257">&nbsp;&nbsp;</span>	for i, tt := range tests {
+<span id="L1258" class="ln" data-content="  1258">&nbsp;&nbsp;</span>		if got := fmt.Sprint(InsecureAlgorithmError(tt.sa)); got != tt.want {
+<span id="L1259" class="ln" data-content="  1259">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d. mismatch.\n got: %s\nwant: %s\n&#34;, i, got, tt.want)
+<span id="L1260" class="ln" data-content="  1260">&nbsp;&nbsp;</span>		}
+<span id="L1261" class="ln" data-content="  1261">&nbsp;&nbsp;</span>	}
+<span id="L1262" class="ln" data-content="  1262">&nbsp;&nbsp;</span>}
+<span id="L1263" class="ln" data-content="  1263">&nbsp;&nbsp;</span>
+<span id="L1264" class="ln" data-content="  1264">&nbsp;&nbsp;</span><span class="comment">// These CSR was generated with OpenSSL:</span>
+<span id="L1265" class="ln" data-content="  1265">&nbsp;&nbsp;</span><span class="comment">//  openssl req -out CSR.csr -new -sha256 -nodes -keyout privateKey.key -config openssl.cnf</span>
+<span id="L1266" class="ln" data-content="  1266">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1267" class="ln" data-content="  1267">&nbsp;&nbsp;</span><span class="comment">// With openssl.cnf containing the following sections:</span>
+<span id="L1268" class="ln" data-content="  1268">&nbsp;&nbsp;</span><span class="comment">//   [ v3_req ]</span>
+<span id="L1269" class="ln" data-content="  1269">&nbsp;&nbsp;</span><span class="comment">//   basicConstraints = CA:FALSE</span>
+<span id="L1270" class="ln" data-content="  1270">&nbsp;&nbsp;</span><span class="comment">//   keyUsage = nonRepudiation, digitalSignature, keyEncipherment</span>
+<span id="L1271" class="ln" data-content="  1271">&nbsp;&nbsp;</span><span class="comment">//   subjectAltName = email:gopher@golang.org,DNS:test.example.com</span>
+<span id="L1272" class="ln" data-content="  1272">&nbsp;&nbsp;</span><span class="comment">//   [ req_attributes ]</span>
+<span id="L1273" class="ln" data-content="  1273">&nbsp;&nbsp;</span><span class="comment">//   challengePassword = ignored challenge</span>
+<span id="L1274" class="ln" data-content="  1274">&nbsp;&nbsp;</span><span class="comment">//   unstructuredName  = ignored unstructured name</span>
+<span id="L1275" class="ln" data-content="  1275">&nbsp;&nbsp;</span>var csrBase64Array = [...]string{
+<span id="L1276" class="ln" data-content="  1276">&nbsp;&nbsp;</span>	<span class="comment">// Just [ v3_req ]</span>
+<span id="L1277" class="ln" data-content="  1277">&nbsp;&nbsp;</span>	&#34;MIIDHDCCAgQCAQAwfjELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoMGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDEUMBIGA1UEAwwLQ29tbW9uIE5hbWUxITAfBgkqhkiG9w0BCQEWEnRlc3RAZW1haWwuYWRkcmVzczCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAK1GY4YFx2ujlZEOJxQVYmsjUnLsd5nFVnNpLE4cV+77sgv9NPNlB8uhn3MXt5leD34rm/2BisCHOifPucYlSrszo2beuKhvwn4+2FxDmWtBEMu/QA16L5IvoOfYZm/gJTsPwKDqvaR0tTU67a9OtxwNTBMI56YKtmwd/o8d3hYv9cg+9ZGAZ/gKONcg/OWYx/XRh6bd0g8DMbCikpWgXKDsvvK1Nk+VtkDO1JxuBaj4Lz/p/MifTfnHoqHxWOWl4EaTs4Ychxsv34/rSj1KD1tJqorIv5Xv2aqv4sjxfbrYzX4kvS5SC1goIovLnhj5UjmQ3Qy8u65eow/LLWw+YFcCAwEAAaBZMFcGCSqGSIb3DQEJDjFKMEgwCQYDVR0TBAIwADALBgNVHQ8EBAMCBeAwLgYDVR0RBCcwJYERZ29waGVyQGdvbGFuZy5vcmeCEHRlc3QuZXhhbXBsZS5jb20wDQYJKoZIhvcNAQELBQADggEBAB6VPMRrchvNW61Tokyq3ZvO6/NoGIbuwUn54q6l5VZW0Ep5Nq8juhegSSnaJ0jrovmUgKDN9vEo2KxuAtwG6udS6Ami3zP+hRd4k9Q8djJPb78nrjzWiindLK5Fps9U5mMoi1ER8ViveyAOTfnZt/jsKUaRsscY2FzE9t9/o5moE6LTcHUS4Ap1eheR+J72WOnQYn3cifYaemsA9MJuLko+kQ6xseqttbh9zjqd9fiCSh/LNkzos9c+mg2yMADitaZinAh+HZi50ooEbjaT3erNq9O6RqwJlgD00g6MQdoz9bTAryCUhCQfkIaepmQ7BxS0pqWNW3MMwfDwx/Snz6g=&#34;,
+<span id="L1278" class="ln" data-content="  1278">&nbsp;&nbsp;</span>	<span class="comment">// Both [ v3_req ] and [ req_attributes ]</span>
+<span id="L1279" class="ln" data-content="  1279">&nbsp;&nbsp;</span>	&#34;MIIDaTCCAlECAQAwfjELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoMGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDEUMBIGA1UEAwwLQ29tbW9uIE5hbWUxITAfBgkqhkiG9w0BCQEWEnRlc3RAZW1haWwuYWRkcmVzczCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAK1GY4YFx2ujlZEOJxQVYmsjUnLsd5nFVnNpLE4cV+77sgv9NPNlB8uhn3MXt5leD34rm/2BisCHOifPucYlSrszo2beuKhvwn4+2FxDmWtBEMu/QA16L5IvoOfYZm/gJTsPwKDqvaR0tTU67a9OtxwNTBMI56YKtmwd/o8d3hYv9cg+9ZGAZ/gKONcg/OWYx/XRh6bd0g8DMbCikpWgXKDsvvK1Nk+VtkDO1JxuBaj4Lz/p/MifTfnHoqHxWOWl4EaTs4Ychxsv34/rSj1KD1tJqorIv5Xv2aqv4sjxfbrYzX4kvS5SC1goIovLnhj5UjmQ3Qy8u65eow/LLWw+YFcCAwEAAaCBpTAgBgkqhkiG9w0BCQcxEwwRaWdub3JlZCBjaGFsbGVuZ2UwKAYJKoZIhvcNAQkCMRsMGWlnbm9yZWQgdW5zdHJ1Y3R1cmVkIG5hbWUwVwYJKoZIhvcNAQkOMUowSDAJBgNVHRMEAjAAMAsGA1UdDwQEAwIF4DAuBgNVHREEJzAlgRFnb3BoZXJAZ29sYW5nLm9yZ4IQdGVzdC5leGFtcGxlLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEAgxe2N5O48EMsYE7o0rZBB0wi3Ov5/yYfnmmVI22Y3sP6VXbLDW0+UWIeSccOhzUCcZ/G4qcrfhhx6gTZTeA01nP7TdTJURvWAH5iFqj9sQ0qnLq6nEcVHij3sG6M5+BxAIVClQBk6lTCzgphc835Fjj6qSLuJ20XHdL5UfUbiJxx299CHgyBRL+hBUIPfz8p+ZgamyAuDLfnj54zzcRVyLlrmMLNPZNll1Q70RxoU6uWvLH8wB8vQe3Q/guSGubLyLRTUQVPh+dw1L4t8MKFWfX/48jwRM4gIRHFHPeAAE9D9YAoqdIvj/iFm/eQ++7DP8MDwOZWsXeB6jjwHuLmkQ==&#34;,
+<span id="L1280" class="ln" data-content="  1280">&nbsp;&nbsp;</span>}
+<span id="L1281" class="ln" data-content="  1281">&nbsp;&nbsp;</span>
+<span id="L1282" class="ln" data-content="  1282">&nbsp;&nbsp;</span>var md5cert = `
+<span id="L1283" class="ln" data-content="  1283">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L1284" class="ln" data-content="  1284">&nbsp;&nbsp;</span>MIIB4TCCAUoCCQCfmw3vMgPS5TANBgkqhkiG9w0BAQQFADA1MQswCQYDVQQGEwJB
+<span id="L1285" class="ln" data-content="  1285">&nbsp;&nbsp;</span>VTETMBEGA1UECBMKU29tZS1TdGF0ZTERMA8GA1UEChMITUQ1IEluYy4wHhcNMTUx
+<span id="L1286" class="ln" data-content="  1286">&nbsp;&nbsp;</span>MjAzMTkyOTMyWhcNMjkwODEyMTkyOTMyWjA1MQswCQYDVQQGEwJBVTETMBEGA1UE
+<span id="L1287" class="ln" data-content="  1287">&nbsp;&nbsp;</span>CBMKU29tZS1TdGF0ZTERMA8GA1UEChMITUQ1IEluYy4wgZ8wDQYJKoZIhvcNAQEB
+<span id="L1288" class="ln" data-content="  1288">&nbsp;&nbsp;</span>BQADgY0AMIGJAoGBANrq2nhLQj5mlXbpVX3QUPhfEm/vdEqPkoWtR/jRZIWm4WGf
+<span id="L1289" class="ln" data-content="  1289">&nbsp;&nbsp;</span>Wpq/LKHJx2Pqwn+t117syN8l4U5unyAi1BJSXjBwPZNd7dXjcuJ+bRLV7FZ/iuvs
+<span id="L1290" class="ln" data-content="  1290">&nbsp;&nbsp;</span>cfYyQQFTxan4TaJMd0x1HoNDbNbjHa02IyjjYE/r3mb/PIg+J2t5AZEh80lPAgMB
+<span id="L1291" class="ln" data-content="  1291">&nbsp;&nbsp;</span>AAEwDQYJKoZIhvcNAQEEBQADgYEAjGzp3K3ey/YfKHohf33yHHWd695HQxDAP+wY
+<span id="L1292" class="ln" data-content="  1292">&nbsp;&nbsp;</span>cs9/TAyLR+gJzJP7d18EcDDLJWVi7bhfa4EAD86di05azOh9kWSn4b3o9QYRGCSw
+<span id="L1293" class="ln" data-content="  1293">&nbsp;&nbsp;</span>GNnI3Zk0cwNKA49hZntKKiy22DhRk7JAHF01d6Bu3KkHkmENrtJ+zj/+159WAnUa
+<span id="L1294" class="ln" data-content="  1294">&nbsp;&nbsp;</span>qViorq4=
+<span id="L1295" class="ln" data-content="  1295">&nbsp;&nbsp;</span>-----END CERTIFICATE-----
+<span id="L1296" class="ln" data-content="  1296">&nbsp;&nbsp;</span>`
+<span id="L1297" class="ln" data-content="  1297">&nbsp;&nbsp;</span>
+<span id="L1298" class="ln" data-content="  1298">&nbsp;&nbsp;</span>func TestMD5(t *testing.T) {
+<span id="L1299" class="ln" data-content="  1299">&nbsp;&nbsp;</span>	pemBlock, _ := pem.Decode([]byte(md5cert))
+<span id="L1300" class="ln" data-content="  1300">&nbsp;&nbsp;</span>	cert, err := ParseCertificate(pemBlock.Bytes)
+<span id="L1301" class="ln" data-content="  1301">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1302" class="ln" data-content="  1302">&nbsp;&nbsp;</span>		t.Fatalf(&#34;failed to parse certificate: %s&#34;, err)
+<span id="L1303" class="ln" data-content="  1303">&nbsp;&nbsp;</span>	}
+<span id="L1304" class="ln" data-content="  1304">&nbsp;&nbsp;</span>	if sa := cert.SignatureAlgorithm; sa != MD5WithRSA {
+<span id="L1305" class="ln" data-content="  1305">&nbsp;&nbsp;</span>		t.Errorf(&#34;signature algorithm is %v, want %v&#34;, sa, MD5WithRSA)
+<span id="L1306" class="ln" data-content="  1306">&nbsp;&nbsp;</span>	}
+<span id="L1307" class="ln" data-content="  1307">&nbsp;&nbsp;</span>	if err = cert.CheckSignatureFrom(cert); err == nil {
+<span id="L1308" class="ln" data-content="  1308">&nbsp;&nbsp;</span>		t.Fatalf(&#34;certificate verification succeeded incorrectly&#34;)
+<span id="L1309" class="ln" data-content="  1309">&nbsp;&nbsp;</span>	}
+<span id="L1310" class="ln" data-content="  1310">&nbsp;&nbsp;</span>	if _, ok := err.(InsecureAlgorithmError); !ok {
+<span id="L1311" class="ln" data-content="  1311">&nbsp;&nbsp;</span>		t.Fatalf(&#34;certificate verification returned %v (%T), wanted InsecureAlgorithmError&#34;, err, err)
+<span id="L1312" class="ln" data-content="  1312">&nbsp;&nbsp;</span>	}
+<span id="L1313" class="ln" data-content="  1313">&nbsp;&nbsp;</span>}
+<span id="L1314" class="ln" data-content="  1314">&nbsp;&nbsp;</span>
+<span id="L1315" class="ln" data-content="  1315">&nbsp;&nbsp;</span><span class="comment">// certMissingRSANULL contains an RSA public key where the AlgorithmIdentifer</span>
+<span id="L1316" class="ln" data-content="  1316">&nbsp;&nbsp;</span><span class="comment">// parameters are omitted rather than being an ASN.1 NULL.</span>
+<span id="L1317" class="ln" data-content="  1317">&nbsp;&nbsp;</span>const certMissingRSANULL = `
+<span id="L1318" class="ln" data-content="  1318">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L1319" class="ln" data-content="  1319">&nbsp;&nbsp;</span>MIIB7TCCAVigAwIBAgIBADALBgkqhkiG9w0BAQUwJjEQMA4GA1UEChMHQWNtZSBD
+<span id="L1320" class="ln" data-content="  1320">&nbsp;&nbsp;</span>bzESMBAGA1UEAxMJMTI3LjAuMC4xMB4XDTExMTIwODA3NTUxMloXDTEyMTIwNzA4
+<span id="L1321" class="ln" data-content="  1321">&nbsp;&nbsp;</span>MDAxMlowJjEQMA4GA1UEChMHQWNtZSBDbzESMBAGA1UEAxMJMTI3LjAuMC4xMIGc
+<span id="L1322" class="ln" data-content="  1322">&nbsp;&nbsp;</span>MAsGCSqGSIb3DQEBAQOBjAAwgYgCgYBO0Hsx44Jk2VnAwoekXh6LczPHY1PfZpIG
+<span id="L1323" class="ln" data-content="  1323">&nbsp;&nbsp;</span>hPZk1Y/kNqcdK+izIDZFI7Xjla7t4PUgnI2V339aEu+H5Fto5OkOdOwEin/ekyfE
+<span id="L1324" class="ln" data-content="  1324">&nbsp;&nbsp;</span>ARl6vfLcPRSr0FTKIQzQTW6HLlzF0rtNS0/Otiz3fojsfNcCkXSmHgwa2uNKWi7e
+<span id="L1325" class="ln" data-content="  1325">&nbsp;&nbsp;</span>E5xMQIhZkwIDAQABozIwMDAOBgNVHQ8BAf8EBAMCAKAwDQYDVR0OBAYEBAECAwQw
+<span id="L1326" class="ln" data-content="  1326">&nbsp;&nbsp;</span>DwYDVR0jBAgwBoAEAQIDBDALBgkqhkiG9w0BAQUDgYEANh+zegx1yW43RmEr1b3A
+<span id="L1327" class="ln" data-content="  1327">&nbsp;&nbsp;</span>p0vMRpqBWHyFeSnIyMZn3TJWRSt1tukkqVCavh9a+hoV2cxVlXIWg7nCto/9iIw4
+<span id="L1328" class="ln" data-content="  1328">&nbsp;&nbsp;</span>hB2rXZIxE0/9gzvGnfERYraL7KtnvshksBFQRlgXa5kc0x38BvEO5ZaoDPl4ILdE
+<span id="L1329" class="ln" data-content="  1329">&nbsp;&nbsp;</span>GFGNEH5PlGffo05wc46QkYU=
+<span id="L1330" class="ln" data-content="  1330">&nbsp;&nbsp;</span>-----END CERTIFICATE-----`
+<span id="L1331" class="ln" data-content="  1331">&nbsp;&nbsp;</span>
+<span id="L1332" class="ln" data-content="  1332">&nbsp;&nbsp;</span>func TestRSAMissingNULLParameters(t *testing.T) {
+<span id="L1333" class="ln" data-content="  1333">&nbsp;&nbsp;</span>	block, _ := pem.Decode([]byte(certMissingRSANULL))
+<span id="L1334" class="ln" data-content="  1334">&nbsp;&nbsp;</span>	if _, err := ParseCertificate(block.Bytes); err == nil {
+<span id="L1335" class="ln" data-content="  1335">&nbsp;&nbsp;</span>		t.Error(&#34;unexpected success when parsing certificate with missing RSA NULL parameter&#34;)
+<span id="L1336" class="ln" data-content="  1336">&nbsp;&nbsp;</span>	} else if !strings.Contains(err.Error(), &#34;missing NULL&#34;) {
+<span id="L1337" class="ln" data-content="  1337">&nbsp;&nbsp;</span>		t.Errorf(&#34;unrecognised error when parsing certificate with missing RSA NULL parameter: %s&#34;, err)
+<span id="L1338" class="ln" data-content="  1338">&nbsp;&nbsp;</span>	}
+<span id="L1339" class="ln" data-content="  1339">&nbsp;&nbsp;</span>}
+<span id="L1340" class="ln" data-content="  1340">&nbsp;&nbsp;</span>
+<span id="L1341" class="ln" data-content="  1341">&nbsp;&nbsp;</span>const certISOOID = `
+<span id="L1342" class="ln" data-content="  1342">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L1343" class="ln" data-content="  1343">&nbsp;&nbsp;</span>MIIB5TCCAVKgAwIBAgIQtwyL3RPWV7dJQp34HwZG9DAJBgUrDgMCHQUAMBExDzAN
+<span id="L1344" class="ln" data-content="  1344">&nbsp;&nbsp;</span>BgNVBAMTBm15dGVzdDAeFw0xNjA4MDkyMjExMDVaFw0zOTEyMzEyMzU5NTlaMBEx
+<span id="L1345" class="ln" data-content="  1345">&nbsp;&nbsp;</span>DzANBgNVBAMTBm15dGVzdDCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEArzIH
+<span id="L1346" class="ln" data-content="  1346">&nbsp;&nbsp;</span>GsyDB3ohIGkkvijF2PTRUX1bvOtY1eUUpjwHyu0twpAKSuaQv2Ha+/63+aHe8O86
+<span id="L1347" class="ln" data-content="  1347">&nbsp;&nbsp;</span>BT+98wjXFX6RFSagtAujo80rIF2dSm33BGt18pDN8v6zp93dnAm0jRaSQrHJ75xw
+<span id="L1348" class="ln" data-content="  1348">&nbsp;&nbsp;</span>5O+S1oEYR1LtUoFJy6qB104j6aINBAgOiLIKiMkCAwEAAaNGMEQwQgYDVR0BBDsw
+<span id="L1349" class="ln" data-content="  1349">&nbsp;&nbsp;</span>OYAQVuYVQ/WDjdGSkZRlTtJDNKETMBExDzANBgNVBAMTBm15dGVzdIIQtwyL3RPW
+<span id="L1350" class="ln" data-content="  1350">&nbsp;&nbsp;</span>V7dJQp34HwZG9DAJBgUrDgMCHQUAA4GBABngrSkH7vG5lY4sa4AZF59lAAXqBVJE
+<span id="L1351" class="ln" data-content="  1351">&nbsp;&nbsp;</span>J4TBiKC62hCdZv18rBleP6ETfhbPg7pTs8p4ebQbpmtNxRS9Lw3MzQ8Ya5Ybwzj2
+<span id="L1352" class="ln" data-content="  1352">&nbsp;&nbsp;</span>NwBSyCtCQl7mrEg4nJqJl4A2EUhnET/oVxU0oTV/SZ3ziGXcY1oG1s6vidV7TZTu
+<span id="L1353" class="ln" data-content="  1353">&nbsp;&nbsp;</span>MCRtdSdaM7g3
+<span id="L1354" class="ln" data-content="  1354">&nbsp;&nbsp;</span>-----END CERTIFICATE-----`
+<span id="L1355" class="ln" data-content="  1355">&nbsp;&nbsp;</span>
+<span id="L1356" class="ln" data-content="  1356">&nbsp;&nbsp;</span>func TestISOOIDInCertificate(t *testing.T) {
+<span id="L1357" class="ln" data-content="  1357">&nbsp;&nbsp;</span>	block, _ := pem.Decode([]byte(certISOOID))
+<span id="L1358" class="ln" data-content="  1358">&nbsp;&nbsp;</span>	if cert, err := ParseCertificate(block.Bytes); err != nil {
+<span id="L1359" class="ln" data-content="  1359">&nbsp;&nbsp;</span>		t.Errorf(&#34;certificate with ISO OID failed to parse: %s&#34;, err)
+<span id="L1360" class="ln" data-content="  1360">&nbsp;&nbsp;</span>	} else if cert.SignatureAlgorithm == UnknownSignatureAlgorithm {
+<span id="L1361" class="ln" data-content="  1361">&nbsp;&nbsp;</span>		t.Errorf(&#34;ISO OID not recognised in certificate&#34;)
+<span id="L1362" class="ln" data-content="  1362">&nbsp;&nbsp;</span>	}
+<span id="L1363" class="ln" data-content="  1363">&nbsp;&nbsp;</span>}
+<span id="L1364" class="ln" data-content="  1364">&nbsp;&nbsp;</span>
+<span id="L1365" class="ln" data-content="  1365">&nbsp;&nbsp;</span><span class="comment">// certMultipleRDN contains a RelativeDistinguishedName with two elements (the</span>
+<span id="L1366" class="ln" data-content="  1366">&nbsp;&nbsp;</span><span class="comment">// common name and serial number). This particular certificate was the first</span>
+<span id="L1367" class="ln" data-content="  1367">&nbsp;&nbsp;</span><span class="comment">// such certificate in the “Pilot” Certificate Transparency log.</span>
+<span id="L1368" class="ln" data-content="  1368">&nbsp;&nbsp;</span>const certMultipleRDN = `
+<span id="L1369" class="ln" data-content="  1369">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L1370" class="ln" data-content="  1370">&nbsp;&nbsp;</span>MIIFRzCCBC+gAwIBAgIEOl59NTANBgkqhkiG9w0BAQUFADA9MQswCQYDVQQGEwJz
+<span id="L1371" class="ln" data-content="  1371">&nbsp;&nbsp;</span>aTEbMBkGA1UEChMSc3RhdGUtaW5zdGl0dXRpb25zMREwDwYDVQQLEwhzaWdvdi1j
+<span id="L1372" class="ln" data-content="  1372">&nbsp;&nbsp;</span>YTAeFw0xMjExMTYxMDUyNTdaFw0xNzExMTYxMjQ5MDVaMIGLMQswCQYDVQQGEwJz
+<span id="L1373" class="ln" data-content="  1373">&nbsp;&nbsp;</span>aTEbMBkGA1UEChMSc3RhdGUtaW5zdGl0dXRpb25zMRkwFwYDVQQLExB3ZWItY2Vy
+<span id="L1374" class="ln" data-content="  1374">&nbsp;&nbsp;</span>dGlmaWNhdGVzMRAwDgYDVQQLEwdTZXJ2ZXJzMTIwFAYDVQQFEw0xMjM2NDg0MDEw
+<span id="L1375" class="ln" data-content="  1375">&nbsp;&nbsp;</span>MDEwMBoGA1UEAxMTZXBvcnRhbC5tc3MuZWR1cy5zaTCCASIwDQYJKoZIhvcNAQEB
+<span id="L1376" class="ln" data-content="  1376">&nbsp;&nbsp;</span>BQADggEPADCCAQoCggEBAMrNkZH9MPuBTjMGNk3sJX8V+CkFx/4ru7RTlLS6dlYM
+<span id="L1377" class="ln" data-content="  1377">&nbsp;&nbsp;</span>098dtSfJ3s2w0p/1NB9UmR8j0yS0Kg6yoZ3ShsSO4DWBtcQD8820a6BYwqxxQTNf
+<span id="L1378" class="ln" data-content="  1378">&nbsp;&nbsp;</span>HSRZOc+N/4TQrvmK6t4k9Aw+YEYTMrWOU4UTeyhDeCcUsBdh7HjfWsVaqNky+2sv
+<span id="L1379" class="ln" data-content="  1379">&nbsp;&nbsp;</span>oic3zP5gF+2QfPkvOoHT3FLR8olNhViIE6Kk3eFIEs4dkq/ZzlYdLb8pHQoj/sGI
+<span id="L1380" class="ln" data-content="  1380">&nbsp;&nbsp;</span>zFmA5AFvm1HURqOmJriFjBwaCtn8AVEYOtQrnUCzJYu1ex8azyS2ZgYMX0u8A5Z/
+<span id="L1381" class="ln" data-content="  1381">&nbsp;&nbsp;</span>y2aMS/B2W+H79WcgLpK28vPwe7vam0oFrVytAd+u65ECAwEAAaOCAf4wggH6MA4G
+<span id="L1382" class="ln" data-content="  1382">&nbsp;&nbsp;</span>A1UdDwEB/wQEAwIFoDBABgNVHSAEOTA3MDUGCisGAQQBr1kBAwMwJzAlBggrBgEF
+<span id="L1383" class="ln" data-content="  1383">&nbsp;&nbsp;</span>BQcCARYZaHR0cDovL3d3dy5jYS5nb3Yuc2kvY3BzLzAfBgNVHREEGDAWgRRwb2Rw
+<span id="L1384" class="ln" data-content="  1384">&nbsp;&nbsp;</span>b3JhLm1pemtzQGdvdi5zaTCB8QYDVR0fBIHpMIHmMFWgU6BRpE8wTTELMAkGA1UE
+<span id="L1385" class="ln" data-content="  1385">&nbsp;&nbsp;</span>BhMCc2kxGzAZBgNVBAoTEnN0YXRlLWluc3RpdHV0aW9uczERMA8GA1UECxMIc2ln
+<span id="L1386" class="ln" data-content="  1386">&nbsp;&nbsp;</span>b3YtY2ExDjAMBgNVBAMTBUNSTDM5MIGMoIGJoIGGhldsZGFwOi8veDUwMC5nb3Yu
+<span id="L1387" class="ln" data-content="  1387">&nbsp;&nbsp;</span>c2kvb3U9c2lnb3YtY2Esbz1zdGF0ZS1pbnN0aXR1dGlvbnMsYz1zaT9jZXJ0aWZp
+<span id="L1388" class="ln" data-content="  1388">&nbsp;&nbsp;</span>Y2F0ZVJldm9jYXRpb25MaXN0P2Jhc2WGK2h0dHA6Ly93d3cuc2lnb3YtY2EuZ292
+<span id="L1389" class="ln" data-content="  1389">&nbsp;&nbsp;</span>LnNpL2NybC9zaWdvdi1jYS5jcmwwKwYDVR0QBCQwIoAPMjAxMjExMTYxMDUyNTda
+<span id="L1390" class="ln" data-content="  1390">&nbsp;&nbsp;</span>gQ8yMDE3MTExNjEyNDkwNVowHwYDVR0jBBgwFoAUHvjUU2uzgwbpBAZXAvmlv8ZY
+<span id="L1391" class="ln" data-content="  1391">&nbsp;&nbsp;</span>PHIwHQYDVR0OBBYEFGI1Duuu+wTGDZka/xHNbwcbM69ZMAkGA1UdEwQCMAAwGQYJ
+<span id="L1392" class="ln" data-content="  1392">&nbsp;&nbsp;</span>KoZIhvZ9B0EABAwwChsEVjcuMQMCA6gwDQYJKoZIhvcNAQEFBQADggEBAHny0K1y
+<span id="L1393" class="ln" data-content="  1393">&nbsp;&nbsp;</span>BQznrzDu3DDpBcGYguKU0dvU9rqsV1ua4nxkriSMWjgsX6XJFDdDW60I3P4VWab5
+<span id="L1394" class="ln" data-content="  1394">&nbsp;&nbsp;</span>ag5fZzbGqi8kva/CzGgZh+CES0aWCPy+4Gb8lwOTt+854/laaJvd6kgKTER7z7U9
+<span id="L1395" class="ln" data-content="  1395">&nbsp;&nbsp;</span>9C86Ch2y4sXNwwwPJ1A9dmrZJZOcJjS/WYZgwaafY2Hdxub5jqPE5nehwYUPVu9R
+<span id="L1396" class="ln" data-content="  1396">&nbsp;&nbsp;</span>uH6/skk4OEKcfOtN0hCnISOVuKYyS4ANARWRG5VGHIH06z3lGUVARFRJ61gtAprd
+<span id="L1397" class="ln" data-content="  1397">&nbsp;&nbsp;</span>La+fgSS+LVZ+kU2TkeoWAKvGq8MAgDq4D4Xqwekg7WKFeuyusi/NI5rm40XgjBMF
+<span id="L1398" class="ln" data-content="  1398">&nbsp;&nbsp;</span>DF72IUofoVt7wo0=
+<span id="L1399" class="ln" data-content="  1399">&nbsp;&nbsp;</span>-----END CERTIFICATE-----`
+<span id="L1400" class="ln" data-content="  1400">&nbsp;&nbsp;</span>
+<span id="L1401" class="ln" data-content="  1401">&nbsp;&nbsp;</span>func TestMultipleRDN(t *testing.T) {
+<span id="L1402" class="ln" data-content="  1402">&nbsp;&nbsp;</span>	block, _ := pem.Decode([]byte(certMultipleRDN))
+<span id="L1403" class="ln" data-content="  1403">&nbsp;&nbsp;</span>	cert, err := ParseCertificate(block.Bytes)
+<span id="L1404" class="ln" data-content="  1404">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1405" class="ln" data-content="  1405">&nbsp;&nbsp;</span>		t.Fatalf(&#34;certificate with two elements in an RDN failed to parse: %v&#34;, err)
+<span id="L1406" class="ln" data-content="  1406">&nbsp;&nbsp;</span>	}
+<span id="L1407" class="ln" data-content="  1407">&nbsp;&nbsp;</span>
+<span id="L1408" class="ln" data-content="  1408">&nbsp;&nbsp;</span>	if want := &#34;eportal.mss.edus.si&#34;; cert.Subject.CommonName != want {
+<span id="L1409" class="ln" data-content="  1409">&nbsp;&nbsp;</span>		t.Errorf(&#34;got common name of %q, but want %q&#34;, cert.Subject.CommonName, want)
+<span id="L1410" class="ln" data-content="  1410">&nbsp;&nbsp;</span>	}
+<span id="L1411" class="ln" data-content="  1411">&nbsp;&nbsp;</span>
+<span id="L1412" class="ln" data-content="  1412">&nbsp;&nbsp;</span>	if want := &#34;1236484010010&#34;; cert.Subject.SerialNumber != want {
+<span id="L1413" class="ln" data-content="  1413">&nbsp;&nbsp;</span>		t.Errorf(&#34;got serial number of %q, but want %q&#34;, cert.Subject.SerialNumber, want)
+<span id="L1414" class="ln" data-content="  1414">&nbsp;&nbsp;</span>	}
+<span id="L1415" class="ln" data-content="  1415">&nbsp;&nbsp;</span>}
+<span id="L1416" class="ln" data-content="  1416">&nbsp;&nbsp;</span>
+<span id="L1417" class="ln" data-content="  1417">&nbsp;&nbsp;</span>func TestSystemCertPool(t *testing.T) {
+<span id="L1418" class="ln" data-content="  1418">&nbsp;&nbsp;</span>	if runtime.GOOS == &#34;windows&#34; {
+<span id="L1419" class="ln" data-content="  1419">&nbsp;&nbsp;</span>		t.Skip(&#34;not implemented on Windows; Issue 16736, 18609&#34;)
+<span id="L1420" class="ln" data-content="  1420">&nbsp;&nbsp;</span>	}
+<span id="L1421" class="ln" data-content="  1421">&nbsp;&nbsp;</span>	_, err := SystemCertPool()
+<span id="L1422" class="ln" data-content="  1422">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1423" class="ln" data-content="  1423">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1424" class="ln" data-content="  1424">&nbsp;&nbsp;</span>	}
+<span id="L1425" class="ln" data-content="  1425">&nbsp;&nbsp;</span>}
+<span id="L1426" class="ln" data-content="  1426">&nbsp;&nbsp;</span>
+</pre><p><a href="x509_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/tls/handshake_server_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="handshake_server_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../tls.1.html">tls</a>/<span class="text-muted">handshake_server_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/tls.1.html">crypto/tls</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package tls
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;crypto/ecdsa&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;crypto/elliptic&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;crypto/rsa&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;encoding/hex&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;encoding/pem&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;math/big&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;net&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;os&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	&#34;os/exec&#34;
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;path/filepath&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>)
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span><span class="comment">// zeroSource is an io.Reader that returns an unlimited number of zero bytes.</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>type zeroSource struct{}
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>func (zeroSource) Read(b []byte) (n int, err error) {
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	for i := range b {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>		b[i] = 0
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	return len(b), nil
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>}
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>var testConfig *Config
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>func allCipherSuites() []uint16 {
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	ids := make([]uint16, len(cipherSuites))
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	for i, suite := range cipherSuites {
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		ids[i] = suite.id
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	}
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	return ids
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>}
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>func init() {
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	testConfig = &amp;Config{
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>		Time:               func() time.Time { return time.Unix(0, 0) },
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>		Rand:               zeroSource{},
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>		Certificates:       make([]Certificate, 2),
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>		InsecureSkipVerify: true,
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>		MinVersion:         VersionSSL30,
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>		MaxVersion:         VersionTLS12,
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>		CipherSuites:       allCipherSuites(),
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	}
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	testConfig.Certificates[0].Certificate = [][]byte{testRSACertificate}
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	testConfig.Certificates[0].PrivateKey = testRSAPrivateKey
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	testConfig.Certificates[1].Certificate = [][]byte{testSNICertificate}
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	testConfig.Certificates[1].PrivateKey = testRSAPrivateKey
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	testConfig.BuildNameToCertificate()
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>}
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>func testClientHello(t *testing.T, serverConfig *Config, m handshakeMessage) {
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	testClientHelloFailure(t, serverConfig, m, &#34;&#34;)
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>}
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>func testClientHelloFailure(t *testing.T, serverConfig *Config, m handshakeMessage, expectedSubStr string) {
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>	<span class="comment">// Create in-memory network connection,</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	<span class="comment">// send message to server. Should return</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	<span class="comment">// expected error.</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	c, s := net.Pipe()
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	go func() {
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>		cli := Client(c, testConfig)
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>		if ch, ok := m.(*clientHelloMsg); ok {
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>			cli.vers = ch.vers
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		}
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>		cli.writeRecord(recordTypeHandshake, m.marshal())
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>		c.Close()
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	}()
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	hs := serverHandshakeState{
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>		c: Server(s, serverConfig),
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	}
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	_, err := hs.readClientHello()
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	s.Close()
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	if len(expectedSubStr) == 0 {
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>		if err != nil &amp;&amp; err != io.EOF {
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>			t.Errorf(&#34;Got error: %s; expected to succeed&#34;, err)
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>		}
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	} else if err == nil || !strings.Contains(err.Error(), expectedSubStr) {
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>		t.Errorf(&#34;Got error: %s; expected to match substring &#39;%s&#39;&#34;, err, expectedSubStr)
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	}
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>}
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>func TestSimpleError(t *testing.T) {
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	testClientHelloFailure(t, testConfig, &amp;serverHelloDoneMsg{}, &#34;unexpected handshake message&#34;)
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>}
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>var badProtocolVersions = []uint16{0x0000, 0x0005, 0x0100, 0x0105, 0x0200, 0x0205}
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>func TestRejectBadProtocolVersion(t *testing.T) {
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	for _, v := range badProtocolVersions {
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		testClientHelloFailure(t, testConfig, &amp;clientHelloMsg{vers: v}, &#34;unsupported, maximum protocol version&#34;)
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	}
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>}
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>func TestNoSuiteOverlap(t *testing.T) {
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{0xff00},
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	}
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>	testClientHelloFailure(t, testConfig, clientHello, &#34;no cipher suite supported by both client and server&#34;)
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>}
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>func TestNoCompressionOverlap(t *testing.T) {
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{TLS_RSA_WITH_RC4_128_SHA},
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>		compressionMethods: []uint8{0xff},
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	}
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	testClientHelloFailure(t, testConfig, clientHello, &#34;client does not support uncompressed connections&#34;)
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>}
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>func TestNoRC4ByDefault(t *testing.T) {
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{TLS_RSA_WITH_RC4_128_SHA},
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	}
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	serverConfig := testConfig.Clone()
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	<span class="comment">// Reset the enabled cipher suites to nil in order to test the</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	<span class="comment">// defaults.</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	serverConfig.CipherSuites = nil
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	testClientHelloFailure(t, serverConfig, clientHello, &#34;no cipher suite supported by both client and server&#34;)
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>}
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>func TestRejectSNIWithTrailingDot(t *testing.T) {
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	testClientHelloFailure(t, testConfig, &amp;clientHelloMsg{vers: VersionTLS12, serverName: &#34;foo.com.&#34;}, &#34;unexpected message&#34;)
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>}
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>func TestDontSelectECDSAWithRSAKey(t *testing.T) {
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	<span class="comment">// Test that, even when both sides support an ECDSA cipher suite, it</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	<span class="comment">// won&#39;t be selected if the server&#39;s private key doesn&#39;t support it.</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA},
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		supportedCurves:    []CurveID{CurveP256},
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>		supportedPoints:    []uint8{pointFormatUncompressed},
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>	}
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	serverConfig := testConfig.Clone()
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	serverConfig.CipherSuites = clientHello.cipherSuites
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>	serverConfig.Certificates = make([]Certificate, 1)
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>	serverConfig.Certificates[0].Certificate = [][]byte{testECDSACertificate}
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>	serverConfig.Certificates[0].PrivateKey = testECDSAPrivateKey
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	serverConfig.BuildNameToCertificate()
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	<span class="comment">// First test that it *does* work when the server&#39;s key is ECDSA.</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	testClientHello(t, serverConfig, clientHello)
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	<span class="comment">// Now test that switching to an RSA key causes the expected error (and</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>	<span class="comment">// not an internal error about a signing failure).</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>	serverConfig.Certificates = testConfig.Certificates
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	testClientHelloFailure(t, serverConfig, clientHello, &#34;no cipher suite supported by both client and server&#34;)
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>}
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>func TestDontSelectRSAWithECDSAKey(t *testing.T) {
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	<span class="comment">// Test that, even when both sides support an RSA cipher suite, it</span>
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	<span class="comment">// won&#39;t be selected if the server&#39;s private key doesn&#39;t support it.</span>
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA},
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		supportedCurves:    []CurveID{CurveP256},
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		supportedPoints:    []uint8{pointFormatUncompressed},
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	}
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>	serverConfig := testConfig.Clone()
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	serverConfig.CipherSuites = clientHello.cipherSuites
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	<span class="comment">// First test that it *does* work when the server&#39;s key is RSA.</span>
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	testClientHello(t, serverConfig, clientHello)
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>	<span class="comment">// Now test that switching to an ECDSA key causes the expected error</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>	<span class="comment">// (and not an internal error about a signing failure).</span>
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	serverConfig.Certificates = make([]Certificate, 1)
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	serverConfig.Certificates[0].Certificate = [][]byte{testECDSACertificate}
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	serverConfig.Certificates[0].PrivateKey = testECDSAPrivateKey
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	serverConfig.BuildNameToCertificate()
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	testClientHelloFailure(t, serverConfig, clientHello, &#34;no cipher suite supported by both client and server&#34;)
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>}
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>func TestRenegotiationExtension(t *testing.T) {
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>		vers:               VersionTLS12,
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		random:             make([]byte, 32),
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>		secureRenegotiationSupported: true,
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>		cipherSuites:                 []uint16{TLS_RSA_WITH_RC4_128_SHA},
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	}
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	var buf []byte
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	c, s := net.Pipe()
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	go func() {
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		cli := Client(c, testConfig)
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>		cli.vers = clientHello.vers
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		buf = make([]byte, 1024)
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>		n, err := c.Read(buf)
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>			t.Errorf(&#34;Server read returned error: %s&#34;, err)
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>			return
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		}
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>		buf = buf[:n]
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>		c.Close()
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	}()
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	Server(s, testConfig).Handshake()
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>	if len(buf) &lt; 5+4 {
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Server returned short message of length %d&#34;, len(buf))
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	}
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	<span class="comment">// buf contains a TLS record, with a 5 byte record header and a 4 byte</span>
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	<span class="comment">// handshake header. The length of the ServerHello is taken from the</span>
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	<span class="comment">// handshake header.</span>
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	serverHelloLen := int(buf[6])&lt;&lt;16 | int(buf[7])&lt;&lt;8 | int(buf[8])
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	var serverHello serverHelloMsg
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	<span class="comment">// unmarshal expects to be given the handshake header, but</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	<span class="comment">// serverHelloLen doesn&#39;t include it.</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	if !serverHello.unmarshal(buf[5 : 9+serverHelloLen]) {
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Failed to parse ServerHello&#34;)
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	}
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	if !serverHello.secureRenegotiationSupported {
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>		t.Errorf(&#34;Secure renegotiation extension was not echoed.&#34;)
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	}
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>}
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>func TestTLS12OnlyCipherSuites(t *testing.T) {
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	<span class="comment">// Test that a Server doesn&#39;t select a TLS 1.2-only cipher suite when</span>
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	<span class="comment">// the client negotiates TLS 1.1.</span>
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	var zeros [32]byte
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>		vers:   VersionTLS11,
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		random: zeros[:],
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>		cipherSuites: []uint16{
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>			<span class="comment">// The Server, by default, will use the client&#39;s</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>			<span class="comment">// preference order. So the GCM cipher suite</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>			<span class="comment">// will be selected unless it&#39;s excluded because</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>			<span class="comment">// of the version in this ClientHello.</span>
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>			TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>			TLS_RSA_WITH_RC4_128_SHA,
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>		},
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>		supportedCurves:    []CurveID{CurveP256, CurveP384, CurveP521},
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>		supportedPoints:    []uint8{pointFormatUncompressed},
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>	}
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>	c, s := net.Pipe()
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	var reply interface{}
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	var clientErr error
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	go func() {
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>		cli := Client(c, testConfig)
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>		cli.vers = clientHello.vers
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>		reply, clientErr = cli.readHandshake()
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		c.Close()
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	}()
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	config.CipherSuites = clientHello.cipherSuites
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	Server(s, config).Handshake()
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	s.Close()
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	if clientErr != nil {
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		t.Fatal(clientErr)
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	}
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	serverHello, ok := reply.(*serverHelloMsg)
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	if !ok {
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>		t.Fatalf(&#34;didn&#39;t get ServerHello message in reply. Got %v\n&#34;, reply)
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>	}
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	if s := serverHello.cipherSuite; s != TLS_RSA_WITH_RC4_128_SHA {
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>		t.Fatalf(&#34;bad cipher suite from server: %x&#34;, s)
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	}
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>}
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>func TestAlertForwarding(t *testing.T) {
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>	c, s := net.Pipe()
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>	go func() {
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>		Client(c, testConfig).sendAlert(alertUnknownCA)
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>		c.Close()
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	}()
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	err := Server(s, testConfig).Handshake()
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	s.Close()
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	if e, ok := err.(*net.OpError); !ok || e.Err != error(alertUnknownCA) {
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>		t.Errorf(&#34;Got error: %s; expected: %s&#34;, err, error(alertUnknownCA))
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>	}
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>}
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>func TestClose(t *testing.T) {
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	c, s := net.Pipe()
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>	go c.Close()
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>	err := Server(s, testConfig).Handshake()
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>	s.Close()
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	if err != io.EOF {
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>		t.Errorf(&#34;Got error: %s; expected: %s&#34;, err, io.EOF)
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	}
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>}
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>func testHandshake(clientConfig, serverConfig *Config) (serverState, clientState ConnectionState, err error) {
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	c, s := net.Pipe()
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>	done := make(chan bool)
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	go func() {
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		cli := Client(c, clientConfig)
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>		cli.Handshake()
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>		clientState = cli.ConnectionState()
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>		c.Close()
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>		done &lt;- true
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	}()
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>	server := Server(s, serverConfig)
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>	err = server.Handshake()
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	if err == nil {
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>		serverState = server.ConnectionState()
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>	}
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>	s.Close()
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	&lt;-done
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	return
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>}
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>func TestVersion(t *testing.T) {
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	serverConfig := &amp;Config{
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>		Certificates: testConfig.Certificates,
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>		MaxVersion:   VersionTLS11,
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>	}
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	clientConfig := &amp;Config{
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>		InsecureSkipVerify: true,
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	}
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>	state, _, err := testHandshake(clientConfig, serverConfig)
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	}
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	if state.Version != VersionTLS11 {
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Incorrect version %x, should be %x&#34;, state.Version, VersionTLS11)
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	}
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>}
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>func TestCipherSuitePreference(t *testing.T) {
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>	serverConfig := &amp;Config{
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>		CipherSuites: []uint16{TLS_RSA_WITH_RC4_128_SHA, TLS_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_RC4_128_SHA},
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>		Certificates: testConfig.Certificates,
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>		MaxVersion:   VersionTLS11,
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	}
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	clientConfig := &amp;Config{
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>		CipherSuites:       []uint16{TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_RC4_128_SHA},
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>		InsecureSkipVerify: true,
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	}
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	state, _, err := testHandshake(clientConfig, serverConfig)
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	}
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	if state.CipherSuite != TLS_RSA_WITH_AES_128_CBC_SHA {
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>		<span class="comment">// By default the server should use the client&#39;s preference.</span>
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Client&#39;s preference was not used, got %x&#34;, state.CipherSuite)
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	}
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	serverConfig.PreferServerCipherSuites = true
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>	state, _, err = testHandshake(clientConfig, serverConfig)
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	}
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	if state.CipherSuite != TLS_RSA_WITH_RC4_128_SHA {
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Server&#39;s preference was not used, got %x&#34;, state.CipherSuite)
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>	}
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>}
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>func TestSCTHandshake(t *testing.T) {
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>	expected := [][]byte{[]byte(&#34;certificate&#34;), []byte(&#34;transparency&#34;)}
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	serverConfig := &amp;Config{
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>		Certificates: []Certificate{{
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>			Certificate:                 [][]byte{testRSACertificate},
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>			PrivateKey:                  testRSAPrivateKey,
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>			SignedCertificateTimestamps: expected,
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>		}},
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	}
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>	clientConfig := &amp;Config{
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>		InsecureSkipVerify: true,
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>	}
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	_, state, err := testHandshake(clientConfig, serverConfig)
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>	}
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>	actual := state.SignedCertificateTimestamps
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>	if len(actual) != len(expected) {
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>		t.Fatalf(&#34;got %d scts, want %d&#34;, len(actual), len(expected))
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>	}
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	for i, sct := range expected {
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>		if !bytes.Equal(sct, actual[i]) {
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>			t.Fatalf(&#34;SCT #%d was %x, but expected %x&#34;, i, actual[i], sct)
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>		}
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>	}
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>}
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>func TestCrossVersionResume(t *testing.T) {
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>	serverConfig := &amp;Config{
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>		CipherSuites: []uint16{TLS_RSA_WITH_AES_128_CBC_SHA},
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>		Certificates: testConfig.Certificates,
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>	}
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	clientConfig := &amp;Config{
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>		CipherSuites:       []uint16{TLS_RSA_WITH_AES_128_CBC_SHA},
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		InsecureSkipVerify: true,
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		ClientSessionCache: NewLRUClientSessionCache(1),
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>		ServerName:         &#34;servername&#34;,
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>	}
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>	<span class="comment">// Establish a session at TLS 1.1.</span>
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>	clientConfig.MaxVersion = VersionTLS11
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>	_, _, err := testHandshake(clientConfig, serverConfig)
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	}
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>	<span class="comment">// The client session cache now contains a TLS 1.1 session.</span>
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>	state, _, err := testHandshake(clientConfig, serverConfig)
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	}
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>	if !state.DidResume {
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake did not resume at the same version&#34;)
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	}
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	<span class="comment">// Test that the server will decline to resume at a lower version.</span>
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>	clientConfig.MaxVersion = VersionTLS10
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>	state, _, err = testHandshake(clientConfig, serverConfig)
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>	}
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>	if state.DidResume {
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake resumed at a lower version&#34;)
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	}
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	<span class="comment">// The client session cache now contains a TLS 1.0 session.</span>
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>	state, _, err = testHandshake(clientConfig, serverConfig)
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>	}
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>	if !state.DidResume {
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake did not resume at the same version&#34;)
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>	}
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>	<span class="comment">// Test that the server will decline to resume at a higher version.</span>
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>	clientConfig.MaxVersion = VersionTLS11
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>	state, _, err = testHandshake(clientConfig, serverConfig)
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake failed: %s&#34;, err)
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>	}
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>	if state.DidResume {
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>		t.Fatalf(&#34;handshake resumed at a higher version&#34;)
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>	}
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>}
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span><span class="comment">// Note: see comment in handshake_test.go for details of how the reference</span>
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span><span class="comment">// tests work.</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span><span class="comment">// serverTest represents a test of the TLS server handshake against a reference</span>
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span><span class="comment">// implementation.</span>
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>type serverTest struct {
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>	<span class="comment">// name is a freeform string identifying the test and the file in which</span>
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>	<span class="comment">// the expected results will be stored.</span>
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>	name string
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	<span class="comment">// command, if not empty, contains a series of arguments for the</span>
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>	<span class="comment">// command to run for the reference server.</span>
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>	command []string
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>	<span class="comment">// expectedPeerCerts contains a list of PEM blocks of expected</span>
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>	<span class="comment">// certificates from the client.</span>
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	expectedPeerCerts []string
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	<span class="comment">// config, if not nil, contains a custom Config to use for this test.</span>
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>	config *Config
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>	<span class="comment">// expectHandshakeErrorIncluding, when not empty, contains a string</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>	<span class="comment">// that must be a substring of the error resulting from the handshake.</span>
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>	expectHandshakeErrorIncluding string
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>	<span class="comment">// validate, if not nil, is a function that will be called with the</span>
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>	<span class="comment">// ConnectionState of the resulting connection. It returns false if the</span>
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>	<span class="comment">// ConnectionState is unacceptable.</span>
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>	validate func(ConnectionState) error
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>}
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>var defaultClientCommand = []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;}
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span><span class="comment">// connFromCommand starts opens a listening socket and starts the reference</span>
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span><span class="comment">// client to connect to it. It returns a recordingConn that wraps the resulting</span>
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span><span class="comment">// connection.</span>
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>func (test *serverTest) connFromCommand() (conn *recordingConn, child *exec.Cmd, err error) {
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>	l, err := net.ListenTCP(&#34;tcp&#34;, &amp;net.TCPAddr{
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>		IP:   net.IPv4(127, 0, 0, 1),
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>		Port: 0,
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>	})
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>		return nil, nil, err
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>	}
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>	defer l.Close()
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>	port := l.Addr().(*net.TCPAddr).Port
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>	var command []string
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>	command = append(command, test.command...)
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>	if len(command) == 0 {
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>		command = defaultClientCommand
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>	}
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>	command = append(command, &#34;-connect&#34;)
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>	command = append(command, fmt.Sprintf(&#34;127.0.0.1:%d&#34;, port))
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>	cmd := exec.Command(command[0], command[1:]...)
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>	cmd.Stdin = nil
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>	var output bytes.Buffer
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>	cmd.Stdout = &amp;output
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>	cmd.Stderr = &amp;output
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>	if err := cmd.Start(); err != nil {
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>		return nil, nil, err
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>	}
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>	connChan := make(chan interface{})
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>	go func() {
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>		tcpConn, err := l.Accept()
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>			connChan &lt;- err
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		}
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>		connChan &lt;- tcpConn
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>	}()
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>	var tcpConn net.Conn
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>	select {
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>	case connOrError := &lt;-connChan:
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>		if err, ok := connOrError.(error); ok {
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>			return nil, nil, err
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>		}
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>		tcpConn = connOrError.(net.Conn)
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	case &lt;-time.After(2 * time.Second):
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>		output.WriteTo(os.Stdout)
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		return nil, nil, errors.New(&#34;timed out waiting for connection from child process&#34;)
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	}
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>	record := &amp;recordingConn{
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>		Conn: tcpConn,
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>	}
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>	return record, cmd, nil
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>}
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>func (test *serverTest) dataPath() string {
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>	return filepath.Join(&#34;testdata&#34;, &#34;Server-&#34;+test.name)
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>}
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>func (test *serverTest) loadData() (flows [][]byte, err error) {
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>	in, err := os.Open(test.dataPath())
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>		return nil, err
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>	}
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>	defer in.Close()
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>	return parseTestData(in)
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>}
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>func (test *serverTest) run(t *testing.T, write bool) {
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>	checkOpenSSLVersion(t)
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>	var clientConn, serverConn net.Conn
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>	var recordingConn *recordingConn
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>	var childProcess *exec.Cmd
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>	if write {
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>		var err error
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		recordingConn, childProcess, err = test.connFromCommand()
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>			t.Fatalf(&#34;Failed to start subcommand: %s&#34;, err)
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>		}
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>		serverConn = recordingConn
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>	} else {
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>		clientConn, serverConn = net.Pipe()
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>	}
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>	config := test.config
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>	if config == nil {
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>		config = testConfig
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>	}
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>	server := Server(serverConn, config)
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>	connStateChan := make(chan ConnectionState, 1)
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>	go func() {
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>		_, err := server.Write([]byte(&#34;hello, world\n&#34;))
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>		if len(test.expectHandshakeErrorIncluding) &gt; 0 {
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>			if err == nil {
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>				t.Errorf(&#34;Error expected, but no error returned&#34;)
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>			} else if s := err.Error(); !strings.Contains(s, test.expectHandshakeErrorIncluding) {
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>				t.Errorf(&#34;Error expected containing &#39;%s&#39; but got &#39;%s&#39;&#34;, test.expectHandshakeErrorIncluding, s)
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>			}
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>		} else {
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>				t.Logf(&#34;Error from Server.Write: &#39;%s&#39;&#34;, err)
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>			}
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>		}
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>		server.Close()
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>		serverConn.Close()
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>		connStateChan &lt;- server.ConnectionState()
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>	}()
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>	if !write {
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>		flows, err := test.loadData()
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>			t.Fatalf(&#34;%s: failed to load data from %s&#34;, test.name, test.dataPath())
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>		}
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>		for i, b := range flows {
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>			if i%2 == 0 {
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>				clientConn.Write(b)
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>				continue
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>			}
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>			bb := make([]byte, len(b))
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>			n, err := io.ReadFull(clientConn, bb)
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>				t.Fatalf(&#34;%s #%d: %s\nRead %d, wanted %d, got %x, wanted %x\n&#34;, test.name, i+1, err, n, len(bb), bb[:n], b)
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>			}
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>			if !bytes.Equal(b, bb) {
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>				t.Fatalf(&#34;%s #%d: mismatch on read: got:%x want:%x&#34;, test.name, i+1, bb, b)
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>			}
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>		}
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>		clientConn.Close()
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>	}
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>	connState := &lt;-connStateChan
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>	peerCerts := connState.PeerCertificates
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>	if len(peerCerts) == len(test.expectedPeerCerts) {
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>		for i, peerCert := range peerCerts {
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>			block, _ := pem.Decode([]byte(test.expectedPeerCerts[i]))
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>			if !bytes.Equal(block.Bytes, peerCert.Raw) {
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>				t.Fatalf(&#34;%s: mismatch on peer cert %d&#34;, test.name, i+1)
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>			}
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>		}
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>	} else {
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>		t.Fatalf(&#34;%s: mismatch on peer list length: %d (wanted) != %d (got)&#34;, test.name, len(test.expectedPeerCerts), len(peerCerts))
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>	}
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>	if test.validate != nil {
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>		if err := test.validate(connState); err != nil {
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>			t.Fatalf(&#34;validate callback returned error: %s&#34;, err)
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>		}
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>	}
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>	if write {
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>		path := test.dataPath()
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>		out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>			t.Fatalf(&#34;Failed to create output file: %s&#34;, err)
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>		}
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>		defer out.Close()
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>		recordingConn.Close()
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>		if len(recordingConn.flows) &lt; 3 {
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>			childProcess.Stdout.(*bytes.Buffer).WriteTo(os.Stdout)
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>			if len(test.expectHandshakeErrorIncluding) == 0 {
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>				t.Fatalf(&#34;Handshake failed&#34;)
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>			}
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>		}
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>		recordingConn.WriteTo(out)
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>		fmt.Printf(&#34;Wrote %s\n&#34;, path)
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>		childProcess.Wait()
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>	}
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>}
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>func runServerTestForVersion(t *testing.T, template *serverTest, prefix, option string) {
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>	setParallel(t)
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>	test := *template
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>	test.name = prefix + test.name
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>	if len(test.command) == 0 {
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>		test.command = defaultClientCommand
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>	}
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	test.command = append([]string(nil), test.command...)
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>	test.command = append(test.command, option)
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>	test.run(t, *update)
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>}
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>func runServerTestSSLv3(t *testing.T, template *serverTest) {
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>	runServerTestForVersion(t, template, &#34;SSLv3-&#34;, &#34;-ssl3&#34;)
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>}
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>func runServerTestTLS10(t *testing.T, template *serverTest) {
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>	runServerTestForVersion(t, template, &#34;TLSv10-&#34;, &#34;-tls1&#34;)
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>}
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>func runServerTestTLS11(t *testing.T, template *serverTest) {
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	runServerTestForVersion(t, template, &#34;TLSv11-&#34;, &#34;-tls1_1&#34;)
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>}
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>func runServerTestTLS12(t *testing.T, template *serverTest) {
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>	runServerTestForVersion(t, template, &#34;TLSv12-&#34;, &#34;-tls1_2&#34;)
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>}
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>func TestHandshakeServerRSARC4(t *testing.T) {
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>		name:    &#34;RSA-RC4&#34;,
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;RC4-SHA&#34;},
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>	}
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>	runServerTestSSLv3(t, test)
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>	runServerTestTLS10(t, test)
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>	runServerTestTLS11(t, test)
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>}
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>func TestHandshakeServerRSA3DES(t *testing.T) {
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>		name:    &#34;RSA-3DES&#34;,
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;DES-CBC3-SHA&#34;},
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>	}
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>	runServerTestSSLv3(t, test)
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>	runServerTestTLS10(t, test)
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>}
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>func TestHandshakeServerRSAAES(t *testing.T) {
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>		name:    &#34;RSA-AES&#34;,
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;},
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>	}
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>	runServerTestSSLv3(t, test)
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>	runServerTestTLS10(t, test)
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>}
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>func TestHandshakeServerAESGCM(t *testing.T) {
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>		name:    &#34;RSA-AES-GCM&#34;,
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;ECDHE-RSA-AES128-GCM-SHA256&#34;},
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>	}
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>}
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>func TestHandshakeServerAES256GCMSHA384(t *testing.T) {
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>		name:    &#34;RSA-AES256-GCM-SHA384&#34;,
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;ECDHE-RSA-AES256-GCM-SHA384&#34;},
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>	}
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>}
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>func TestHandshakeServerECDHEECDSAAES(t *testing.T) {
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>	config.Certificates = make([]Certificate, 1)
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>	config.Certificates[0].Certificate = [][]byte{testECDSACertificate}
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>	config.Certificates[0].PrivateKey = testECDSAPrivateKey
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>	config.BuildNameToCertificate()
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>		name:    &#34;ECDHE-ECDSA-AES&#34;,
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;ECDHE-ECDSA-AES256-SHA&#34;},
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>		config:  config,
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>	}
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>	runServerTestTLS10(t, test)
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>}
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>func TestHandshakeServerX25519(t *testing.T) {
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>	config.CurvePreferences = []CurveID{X25519}
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>		name:    &#34;X25519-ECDHE-RSA-AES-GCM&#34;,
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;ECDHE-RSA-AES128-GCM-SHA256&#34;},
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>		config:  config,
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>	}
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>}
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>func TestHandshakeServerALPN(t *testing.T) {
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>	config.NextProtos = []string{&#34;proto1&#34;, &#34;proto2&#34;}
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>		name: &#34;ALPN&#34;,
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>		<span class="comment">// Note that this needs OpenSSL 1.0.2 because that is the first</span>
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>		<span class="comment">// version that supports the -alpn flag.</span>
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-alpn&#34;, &#34;proto2,proto1&#34;},
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>		config:  config,
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>		validate: func(state ConnectionState) error {
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>			<span class="comment">// The server&#39;s preferences should override the client.</span>
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>			if state.NegotiatedProtocol != &#34;proto1&#34; {
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>				return fmt.Errorf(&#34;Got protocol %q, wanted proto1&#34;, state.NegotiatedProtocol)
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>			}
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>			return nil
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>		},
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>	}
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>}
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>func TestHandshakeServerALPNNoMatch(t *testing.T) {
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>	config.NextProtos = []string{&#34;proto3&#34;}
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>		name: &#34;ALPN-NoMatch&#34;,
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>		<span class="comment">// Note that this needs OpenSSL 1.0.2 because that is the first</span>
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>		<span class="comment">// version that supports the -alpn flag.</span>
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-alpn&#34;, &#34;proto2,proto1&#34;},
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>		config:  config,
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>		validate: func(state ConnectionState) error {
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>			<span class="comment">// Rather than reject the connection, Go doesn&#39;t select</span>
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>			<span class="comment">// a protocol when there is no overlap.</span>
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>			if state.NegotiatedProtocol != &#34;&#34; {
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>				return fmt.Errorf(&#34;Got protocol %q, wanted &#39;&#39;&#34;, state.NegotiatedProtocol)
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>			}
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>			return nil
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>		},
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>	}
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>}
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span><span class="comment">// TestHandshakeServerSNI involves a client sending an SNI extension of</span>
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span><span class="comment">// &#34;snitest.com&#34;, which happens to match the CN of testSNICertificate. The test</span>
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span><span class="comment">// verifies that the server correctly selects that certificate.</span>
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>func TestHandshakeServerSNI(t *testing.T) {
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>		name:    &#34;SNI&#34;,
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-servername&#34;, &#34;snitest.com&#34;},
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>	}
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>}
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span><span class="comment">// TestHandshakeServerSNICertForName is similar to TestHandshakeServerSNI, but</span>
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span><span class="comment">// tests the dynamic GetCertificate method</span>
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>func TestHandshakeServerSNIGetCertificate(t *testing.T) {
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>	<span class="comment">// Replace the NameToCertificate map with a GetCertificate function</span>
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>	nameToCert := config.NameToCertificate
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>	config.NameToCertificate = nil
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>	config.GetCertificate = func(clientHello *ClientHelloInfo) (*Certificate, error) {
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>		cert, _ := nameToCert[clientHello.ServerName]
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>		return cert, nil
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>	}
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>		name:    &#34;SNI-GetCertificate&#34;,
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-servername&#34;, &#34;snitest.com&#34;},
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>		config:  config,
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>	}
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>}
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span><span class="comment">// TestHandshakeServerSNICertForNameNotFound is similar to</span>
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span><span class="comment">// TestHandshakeServerSNICertForName, but tests to make sure that when the</span>
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span><span class="comment">// GetCertificate method doesn&#39;t return a cert, we fall back to what&#39;s in</span>
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span><span class="comment">// the NameToCertificate map.</span>
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>func TestHandshakeServerSNIGetCertificateNotFound(t *testing.T) {
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>	config.GetCertificate = func(clientHello *ClientHelloInfo) (*Certificate, error) {
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>		return nil, nil
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>	}
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>		name:    &#34;SNI-GetCertificateNotFound&#34;,
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-servername&#34;, &#34;snitest.com&#34;},
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>		config:  config,
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>	}
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>}
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span><span class="comment">// TestHandshakeServerSNICertForNameError tests to make sure that errors in</span>
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span><span class="comment">// GetCertificate result in a tls alert.</span>
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>func TestHandshakeServerSNIGetCertificateError(t *testing.T) {
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>	const errMsg = &#34;TestHandshakeServerSNIGetCertificateError error&#34;
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>	serverConfig := testConfig.Clone()
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>	serverConfig.GetCertificate = func(clientHello *ClientHelloInfo) (*Certificate, error) {
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>		return nil, errors.New(errMsg)
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>	}
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{TLS_RSA_WITH_RC4_128_SHA},
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>		serverName:         &#34;test&#34;,
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>	}
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>	testClientHelloFailure(t, serverConfig, clientHello, errMsg)
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>}
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span><span class="comment">// TestHandshakeServerEmptyCertificates tests that GetCertificates is called in</span>
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span><span class="comment">// the case that Certificates is empty, even without SNI.</span>
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>func TestHandshakeServerEmptyCertificates(t *testing.T) {
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>	const errMsg = &#34;TestHandshakeServerEmptyCertificates error&#34;
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>	serverConfig := testConfig.Clone()
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>	serverConfig.GetCertificate = func(clientHello *ClientHelloInfo) (*Certificate, error) {
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>		return nil, errors.New(errMsg)
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>	}
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>	serverConfig.Certificates = nil
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{TLS_RSA_WITH_RC4_128_SHA},
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>	}
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>	testClientHelloFailure(t, serverConfig, clientHello, errMsg)
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>	<span class="comment">// With an empty Certificates and a nil GetCertificate, the server</span>
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>	<span class="comment">// should always return a “no certificates” error.</span>
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>	serverConfig.GetCertificate = nil
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>	clientHello = &amp;clientHelloMsg{
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{TLS_RSA_WITH_RC4_128_SHA},
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>	}
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>	testClientHelloFailure(t, serverConfig, clientHello, &#34;no certificates&#34;)
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>}
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span><span class="comment">// TestCipherSuiteCertPreferance ensures that we select an RSA ciphersuite with</span>
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span><span class="comment">// an RSA certificate and an ECDSA ciphersuite with an ECDSA certificate.</span>
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>func TestCipherSuiteCertPreferenceECDSA(t *testing.T) {
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>	config.CipherSuites = []uint16{TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA}
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>	config.PreferServerCipherSuites = true
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>		name:   &#34;CipherSuiteCertPreferenceRSA&#34;,
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>		config: config,
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>	}
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>	config = testConfig.Clone()
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>	config.CipherSuites = []uint16{TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA}
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>	config.Certificates = []Certificate{
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>		{
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>			Certificate: [][]byte{testECDSACertificate},
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>			PrivateKey:  testECDSAPrivateKey,
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>		},
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>	}
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>	config.BuildNameToCertificate()
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>	config.PreferServerCipherSuites = true
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>	test = &amp;serverTest{
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>		name:   &#34;CipherSuiteCertPreferenceECDSA&#34;,
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>		config: config,
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>	}
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>}
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span>func TestResumption(t *testing.T) {
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>	sessionFilePath := tempFile(&#34;&#34;)
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>	defer os.Remove(sessionFilePath)
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>		name:    &#34;IssueTicket&#34;,
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-sess_out&#34;, sessionFilePath},
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>	}
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>	test = &amp;serverTest{
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>		name:    &#34;Resume&#34;,
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-sess_in&#34;, sessionFilePath},
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>	}
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>}
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>func TestResumptionDisabled(t *testing.T) {
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>	sessionFilePath := tempFile(&#34;&#34;)
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>	defer os.Remove(sessionFilePath)
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>		name:    &#34;IssueTicketPreDisable&#34;,
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-sess_out&#34;, sessionFilePath},
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>		config:  config,
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>	}
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>	config.SessionTicketsDisabled = true
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span>
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span>	test = &amp;serverTest{
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span>		name:    &#34;ResumeDisabled&#34;,
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-sess_in&#34;, sessionFilePath},
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span>		config:  config,
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span>	}
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span>
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span>	<span class="comment">// One needs to manually confirm that the handshake in the golden data</span>
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span>	<span class="comment">// file for ResumeDisabled does not include a resumption handshake.</span>
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span>}
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span>
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span>func TestFallbackSCSV(t *testing.T) {
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span>	serverConfig := Config{
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span>		Certificates: testConfig.Certificates,
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span>	}
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span>		name:   &#34;FallbackSCSV&#34;,
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span>		config: &amp;serverConfig,
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span>		<span class="comment">// OpenSSL 1.0.1j is needed for the -fallback_scsv option.</span>
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-fallback_scsv&#34;},
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span>		expectHandshakeErrorIncluding: &#34;inappropriate protocol fallback&#34;,
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span>	}
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span>	runServerTestTLS11(t, test)
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span>}
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span>
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span><span class="comment">// clientCertificatePEM and clientKeyPEM were generated with generate_cert.go</span>
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span><span class="comment">// Thus, they have no ExtKeyUsage fields and trigger an error when verification</span>
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span><span class="comment">// is turned on.</span>
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span>
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span>const clientCertificatePEM = `
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span>MIIB7zCCAVigAwIBAgIQXBnBiWWDVW/cC8m5k5/pvDANBgkqhkiG9w0BAQsFADAS
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span>MRAwDgYDVQQKEwdBY21lIENvMB4XDTE2MDgxNzIxNTIzMVoXDTE3MDgxNzIxNTIz
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span>MVowEjEQMA4GA1UEChMHQWNtZSBDbzCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkC
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span>gYEAum+qhr3Pv5/y71yUYHhv6BPy0ZZvzdkybiI3zkH5yl0prOEn2mGi7oHLEMff
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span>NFiVhuk9GeZcJ3NgyI14AvQdpJgJoxlwaTwlYmYqqyIjxXuFOE8uCXMyp70+m63K
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span>hAfmDzr/d8WdQYUAirab7rCkPy1MTOZCPrtRyN1IVPQMjkcCAwEAAaNGMEQwDgYD
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span>VR0PAQH/BAQDAgWgMBMGA1UdJQQMMAoGCCsGAQUFBwMBMAwGA1UdEwEB/wQCMAAw
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span>DwYDVR0RBAgwBocEfwAAATANBgkqhkiG9w0BAQsFAAOBgQBGq0Si+yhU+Fpn+GKU
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>8ZqyGJ7ysd4dfm92lam6512oFmyc9wnTN+RLKzZ8Aa1B0jLYw9KT+RBrjpW5LBeK
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>o0RIvFkTgxYEiKSBXCUNmAysEbEoVr4dzWFihAm/1oDGRY2CLLTYg5vbySK3KhIR
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span>e/oCO8HJ/+rJnahJ05XX1Q7lNQ==
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span>-----END CERTIFICATE-----`
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>const clientKeyPEM = `
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>-----BEGIN RSA PRIVATE KEY-----
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>MIICXQIBAAKBgQC6b6qGvc+/n/LvXJRgeG/oE/LRlm/N2TJuIjfOQfnKXSms4Sfa
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>YaLugcsQx980WJWG6T0Z5lwnc2DIjXgC9B2kmAmjGXBpPCViZiqrIiPFe4U4Ty4J
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>czKnvT6brcqEB+YPOv93xZ1BhQCKtpvusKQ/LUxM5kI+u1HI3UhU9AyORwIDAQAB
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span>AoGAEJZ03q4uuMb7b26WSQsOMeDsftdatT747LGgs3pNRkMJvTb/O7/qJjxoG+Mc
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>qeSj0TAZXp+PXXc3ikCECAc+R8rVMfWdmp903XgO/qYtmZGCorxAHEmR80SrfMXv
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>PJnznLQWc8U9nphQErR+tTESg7xWEzmFcPKwnZd1xg8ERYkCQQDTGtrFczlB2b/Z
+<span id="L1026" class="ln" data-content="  1026">&nbsp;&nbsp;</span>9TjNMqUlMnTLIk/a/rPE2fLLmAYhK5sHnJdvDURaH2mF4nso0EGtENnTsh6LATnY
+<span id="L1027" class="ln" data-content="  1027">&nbsp;&nbsp;</span>dkrxXGm9AkEA4hXHG2q3MnhgK1Z5hjv+Fnqd+8bcbII9WW4flFs15EKoMgS1w/PJ
+<span id="L1028" class="ln" data-content="  1028">&nbsp;&nbsp;</span>zbsySaSy5IVS8XeShmT9+3lrleed4sy+UwJBAJOOAbxhfXP5r4+5R6ql66jES75w
+<span id="L1029" class="ln" data-content="  1029">&nbsp;&nbsp;</span>jUCVJzJA5ORJrn8g64u2eGK28z/LFQbv9wXgCwfc72R468BdawFSLa/m2EECQGbZ
+<span id="L1030" class="ln" data-content="  1030">&nbsp;&nbsp;</span>rWiFla26IVXV0xcD98VWJsTBZMlgPnSOqoMdM1kSEd4fUmlAYI/dFzV1XYSkOmVr
+<span id="L1031" class="ln" data-content="  1031">&nbsp;&nbsp;</span>FhdZnklmpVDeu27P4c0CQQCuCOup0FlJSBpWY1TTfun/KMBkBatMz0VMA3d7FKIU
+<span id="L1032" class="ln" data-content="  1032">&nbsp;&nbsp;</span>csPezl677Yjo8u1r/KzeI6zLg87Z8E6r6ZWNc9wBSZK6
+<span id="L1033" class="ln" data-content="  1033">&nbsp;&nbsp;</span>-----END RSA PRIVATE KEY-----`
+<span id="L1034" class="ln" data-content="  1034">&nbsp;&nbsp;</span>
+<span id="L1035" class="ln" data-content="  1035">&nbsp;&nbsp;</span>const clientECDSACertificatePEM = `
+<span id="L1036" class="ln" data-content="  1036">&nbsp;&nbsp;</span>-----BEGIN CERTIFICATE-----
+<span id="L1037" class="ln" data-content="  1037">&nbsp;&nbsp;</span>MIIB/DCCAV4CCQCaMIRsJjXZFzAJBgcqhkjOPQQBMEUxCzAJBgNVBAYTAkFVMRMw
+<span id="L1038" class="ln" data-content="  1038">&nbsp;&nbsp;</span>EQYDVQQIEwpTb21lLVN0YXRlMSEwHwYDVQQKExhJbnRlcm5ldCBXaWRnaXRzIFB0
+<span id="L1039" class="ln" data-content="  1039">&nbsp;&nbsp;</span>eSBMdGQwHhcNMTIxMTE0MTMyNTUzWhcNMjIxMTEyMTMyNTUzWjBBMQswCQYDVQQG
+<span id="L1040" class="ln" data-content="  1040">&nbsp;&nbsp;</span>EwJBVTEMMAoGA1UECBMDTlNXMRAwDgYDVQQHEwdQeXJtb250MRIwEAYDVQQDEwlK
+<span id="L1041" class="ln" data-content="  1041">&nbsp;&nbsp;</span>b2VsIFNpbmcwgZswEAYHKoZIzj0CAQYFK4EEACMDgYYABACVjJF1FMBexFe01MNv
+<span id="L1042" class="ln" data-content="  1042">&nbsp;&nbsp;</span>ja5oHt1vzobhfm6ySD6B5U7ixohLZNz1MLvT/2XMW/TdtWo+PtAd3kfDdq0Z9kUs
+<span id="L1043" class="ln" data-content="  1043">&nbsp;&nbsp;</span>jLzYHQFMH3CQRnZIi4+DzEpcj0B22uCJ7B0rxE4wdihBsmKo+1vx+U56jb0JuK7q
+<span id="L1044" class="ln" data-content="  1044">&nbsp;&nbsp;</span>ixgnTy5w/hOWusPTQBbNZU6sER7m8TAJBgcqhkjOPQQBA4GMADCBiAJCAOAUxGBg
+<span id="L1045" class="ln" data-content="  1045">&nbsp;&nbsp;</span>C3JosDJdYUoCdFzCgbkWqD8pyDbHgf9stlvZcPE4O1BIKJTLCRpS8V3ujfK58PDa
+<span id="L1046" class="ln" data-content="  1046">&nbsp;&nbsp;</span>2RU6+b0DeoeiIzXsAkIBo9SKeDUcSpoj0gq+KxAxnZxfvuiRs9oa9V2jI/Umi0Vw
+<span id="L1047" class="ln" data-content="  1047">&nbsp;&nbsp;</span>jWVim34BmT0Y9hCaOGGbLlfk+syxis7iI6CH8OFnUes=
+<span id="L1048" class="ln" data-content="  1048">&nbsp;&nbsp;</span>-----END CERTIFICATE-----`
+<span id="L1049" class="ln" data-content="  1049">&nbsp;&nbsp;</span>
+<span id="L1050" class="ln" data-content="  1050">&nbsp;&nbsp;</span>const clientECDSAKeyPEM = `
+<span id="L1051" class="ln" data-content="  1051">&nbsp;&nbsp;</span>-----BEGIN EC PARAMETERS-----
+<span id="L1052" class="ln" data-content="  1052">&nbsp;&nbsp;</span>BgUrgQQAIw==
+<span id="L1053" class="ln" data-content="  1053">&nbsp;&nbsp;</span>-----END EC PARAMETERS-----
+<span id="L1054" class="ln" data-content="  1054">&nbsp;&nbsp;</span>-----BEGIN EC PRIVATE KEY-----
+<span id="L1055" class="ln" data-content="  1055">&nbsp;&nbsp;</span>MIHcAgEBBEIBkJN9X4IqZIguiEVKMqeBUP5xtRsEv4HJEtOpOGLELwO53SD78Ew8
+<span id="L1056" class="ln" data-content="  1056">&nbsp;&nbsp;</span>k+wLWoqizS3NpQyMtrU8JFdWfj+C57UNkOugBwYFK4EEACOhgYkDgYYABACVjJF1
+<span id="L1057" class="ln" data-content="  1057">&nbsp;&nbsp;</span>FMBexFe01MNvja5oHt1vzobhfm6ySD6B5U7ixohLZNz1MLvT/2XMW/TdtWo+PtAd
+<span id="L1058" class="ln" data-content="  1058">&nbsp;&nbsp;</span>3kfDdq0Z9kUsjLzYHQFMH3CQRnZIi4+DzEpcj0B22uCJ7B0rxE4wdihBsmKo+1vx
+<span id="L1059" class="ln" data-content="  1059">&nbsp;&nbsp;</span>+U56jb0JuK7qixgnTy5w/hOWusPTQBbNZU6sER7m8Q==
+<span id="L1060" class="ln" data-content="  1060">&nbsp;&nbsp;</span>-----END EC PRIVATE KEY-----`
+<span id="L1061" class="ln" data-content="  1061">&nbsp;&nbsp;</span>
+<span id="L1062" class="ln" data-content="  1062">&nbsp;&nbsp;</span>func TestClientAuth(t *testing.T) {
+<span id="L1063" class="ln" data-content="  1063">&nbsp;&nbsp;</span>	setParallel(t)
+<span id="L1064" class="ln" data-content="  1064">&nbsp;&nbsp;</span>	var certPath, keyPath, ecdsaCertPath, ecdsaKeyPath string
+<span id="L1065" class="ln" data-content="  1065">&nbsp;&nbsp;</span>
+<span id="L1066" class="ln" data-content="  1066">&nbsp;&nbsp;</span>	if *update {
+<span id="L1067" class="ln" data-content="  1067">&nbsp;&nbsp;</span>		certPath = tempFile(clientCertificatePEM)
+<span id="L1068" class="ln" data-content="  1068">&nbsp;&nbsp;</span>		defer os.Remove(certPath)
+<span id="L1069" class="ln" data-content="  1069">&nbsp;&nbsp;</span>		keyPath = tempFile(clientKeyPEM)
+<span id="L1070" class="ln" data-content="  1070">&nbsp;&nbsp;</span>		defer os.Remove(keyPath)
+<span id="L1071" class="ln" data-content="  1071">&nbsp;&nbsp;</span>		ecdsaCertPath = tempFile(clientECDSACertificatePEM)
+<span id="L1072" class="ln" data-content="  1072">&nbsp;&nbsp;</span>		defer os.Remove(ecdsaCertPath)
+<span id="L1073" class="ln" data-content="  1073">&nbsp;&nbsp;</span>		ecdsaKeyPath = tempFile(clientECDSAKeyPEM)
+<span id="L1074" class="ln" data-content="  1074">&nbsp;&nbsp;</span>		defer os.Remove(ecdsaKeyPath)
+<span id="L1075" class="ln" data-content="  1075">&nbsp;&nbsp;</span>	}
+<span id="L1076" class="ln" data-content="  1076">&nbsp;&nbsp;</span>
+<span id="L1077" class="ln" data-content="  1077">&nbsp;&nbsp;</span>	config := testConfig.Clone()
+<span id="L1078" class="ln" data-content="  1078">&nbsp;&nbsp;</span>	config.ClientAuth = RequestClientCert
+<span id="L1079" class="ln" data-content="  1079">&nbsp;&nbsp;</span>
+<span id="L1080" class="ln" data-content="  1080">&nbsp;&nbsp;</span>	test := &amp;serverTest{
+<span id="L1081" class="ln" data-content="  1081">&nbsp;&nbsp;</span>		name:    &#34;ClientAuthRequestedNotGiven&#34;,
+<span id="L1082" class="ln" data-content="  1082">&nbsp;&nbsp;</span>		command: []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;},
+<span id="L1083" class="ln" data-content="  1083">&nbsp;&nbsp;</span>		config:  config,
+<span id="L1084" class="ln" data-content="  1084">&nbsp;&nbsp;</span>	}
+<span id="L1085" class="ln" data-content="  1085">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L1086" class="ln" data-content="  1086">&nbsp;&nbsp;</span>
+<span id="L1087" class="ln" data-content="  1087">&nbsp;&nbsp;</span>	test = &amp;serverTest{
+<span id="L1088" class="ln" data-content="  1088">&nbsp;&nbsp;</span>		name:              &#34;ClientAuthRequestedAndGiven&#34;,
+<span id="L1089" class="ln" data-content="  1089">&nbsp;&nbsp;</span>		command:           []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-cert&#34;, certPath, &#34;-key&#34;, keyPath},
+<span id="L1090" class="ln" data-content="  1090">&nbsp;&nbsp;</span>		config:            config,
+<span id="L1091" class="ln" data-content="  1091">&nbsp;&nbsp;</span>		expectedPeerCerts: []string{clientCertificatePEM},
+<span id="L1092" class="ln" data-content="  1092">&nbsp;&nbsp;</span>	}
+<span id="L1093" class="ln" data-content="  1093">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L1094" class="ln" data-content="  1094">&nbsp;&nbsp;</span>
+<span id="L1095" class="ln" data-content="  1095">&nbsp;&nbsp;</span>	test = &amp;serverTest{
+<span id="L1096" class="ln" data-content="  1096">&nbsp;&nbsp;</span>		name:              &#34;ClientAuthRequestedAndECDSAGiven&#34;,
+<span id="L1097" class="ln" data-content="  1097">&nbsp;&nbsp;</span>		command:           []string{&#34;openssl&#34;, &#34;s_client&#34;, &#34;-no_ticket&#34;, &#34;-cipher&#34;, &#34;AES128-SHA&#34;, &#34;-cert&#34;, ecdsaCertPath, &#34;-key&#34;, ecdsaKeyPath},
+<span id="L1098" class="ln" data-content="  1098">&nbsp;&nbsp;</span>		config:            config,
+<span id="L1099" class="ln" data-content="  1099">&nbsp;&nbsp;</span>		expectedPeerCerts: []string{clientECDSACertificatePEM},
+<span id="L1100" class="ln" data-content="  1100">&nbsp;&nbsp;</span>	}
+<span id="L1101" class="ln" data-content="  1101">&nbsp;&nbsp;</span>	runServerTestTLS12(t, test)
+<span id="L1102" class="ln" data-content="  1102">&nbsp;&nbsp;</span>}
+<span id="L1103" class="ln" data-content="  1103">&nbsp;&nbsp;</span>
+<span id="L1104" class="ln" data-content="  1104">&nbsp;&nbsp;</span>func TestSNIGivenOnFailure(t *testing.T) {
+<span id="L1105" class="ln" data-content="  1105">&nbsp;&nbsp;</span>	const expectedServerName = &#34;test.testing&#34;
+<span id="L1106" class="ln" data-content="  1106">&nbsp;&nbsp;</span>
+<span id="L1107" class="ln" data-content="  1107">&nbsp;&nbsp;</span>	clientHello := &amp;clientHelloMsg{
+<span id="L1108" class="ln" data-content="  1108">&nbsp;&nbsp;</span>		vers:               VersionTLS10,
+<span id="L1109" class="ln" data-content="  1109">&nbsp;&nbsp;</span>		cipherSuites:       []uint16{TLS_RSA_WITH_RC4_128_SHA},
+<span id="L1110" class="ln" data-content="  1110">&nbsp;&nbsp;</span>		compressionMethods: []uint8{compressionNone},
+<span id="L1111" class="ln" data-content="  1111">&nbsp;&nbsp;</span>		serverName:         expectedServerName,
+<span id="L1112" class="ln" data-content="  1112">&nbsp;&nbsp;</span>	}
+<span id="L1113" class="ln" data-content="  1113">&nbsp;&nbsp;</span>
+<span id="L1114" class="ln" data-content="  1114">&nbsp;&nbsp;</span>	serverConfig := testConfig.Clone()
+<span id="L1115" class="ln" data-content="  1115">&nbsp;&nbsp;</span>	<span class="comment">// Erase the server&#39;s cipher suites to ensure the handshake fails.</span>
+<span id="L1116" class="ln" data-content="  1116">&nbsp;&nbsp;</span>	serverConfig.CipherSuites = nil
+<span id="L1117" class="ln" data-content="  1117">&nbsp;&nbsp;</span>
+<span id="L1118" class="ln" data-content="  1118">&nbsp;&nbsp;</span>	c, s := net.Pipe()
+<span id="L1119" class="ln" data-content="  1119">&nbsp;&nbsp;</span>	go func() {
+<span id="L1120" class="ln" data-content="  1120">&nbsp;&nbsp;</span>		cli := Client(c, testConfig)
+<span id="L1121" class="ln" data-content="  1121">&nbsp;&nbsp;</span>		cli.vers = clientHello.vers
+<span id="L1122" class="ln" data-content="  1122">&nbsp;&nbsp;</span>		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+<span id="L1123" class="ln" data-content="  1123">&nbsp;&nbsp;</span>		c.Close()
+<span id="L1124" class="ln" data-content="  1124">&nbsp;&nbsp;</span>	}()
+<span id="L1125" class="ln" data-content="  1125">&nbsp;&nbsp;</span>	hs := serverHandshakeState{
+<span id="L1126" class="ln" data-content="  1126">&nbsp;&nbsp;</span>		c: Server(s, serverConfig),
+<span id="L1127" class="ln" data-content="  1127">&nbsp;&nbsp;</span>	}
+<span id="L1128" class="ln" data-content="  1128">&nbsp;&nbsp;</span>	_, err := hs.readClientHello()
+<span id="L1129" class="ln" data-content="  1129">&nbsp;&nbsp;</span>	defer s.Close()
+<span id="L1130" class="ln" data-content="  1130">&nbsp;&nbsp;</span>
+<span id="L1131" class="ln" data-content="  1131">&nbsp;&nbsp;</span>	if err == nil {
+<span id="L1132" class="ln" data-content="  1132">&nbsp;&nbsp;</span>		t.Error(&#34;No error reported from server&#34;)
+<span id="L1133" class="ln" data-content="  1133">&nbsp;&nbsp;</span>	}
+<span id="L1134" class="ln" data-content="  1134">&nbsp;&nbsp;</span>
+<span id="L1135" class="ln" data-content="  1135">&nbsp;&nbsp;</span>	cs := hs.c.ConnectionState()
+<span id="L1136" class="ln" data-content="  1136">&nbsp;&nbsp;</span>	if cs.HandshakeComplete {
+<span id="L1137" class="ln" data-content="  1137">&nbsp;&nbsp;</span>		t.Error(&#34;Handshake registered as complete&#34;)
+<span id="L1138" class="ln" data-content="  1138">&nbsp;&nbsp;</span>	}
+<span id="L1139" class="ln" data-content="  1139">&nbsp;&nbsp;</span>
+<span id="L1140" class="ln" data-content="  1140">&nbsp;&nbsp;</span>	if cs.ServerName != expectedServerName {
+<span id="L1141" class="ln" data-content="  1141">&nbsp;&nbsp;</span>		t.Errorf(&#34;Expected ServerName of %q, but got %q&#34;, expectedServerName, cs.ServerName)
+<span id="L1142" class="ln" data-content="  1142">&nbsp;&nbsp;</span>	}
+<span id="L1143" class="ln" data-content="  1143">&nbsp;&nbsp;</span>}
+<span id="L1144" class="ln" data-content="  1144">&nbsp;&nbsp;</span>
+<span id="L1145" class="ln" data-content="  1145">&nbsp;&nbsp;</span>var getConfigForClientTests = []struct {
+<span id="L1146" class="ln" data-content="  1146">&nbsp;&nbsp;</span>	setup          func(config *Config)
+<span id="L1147" class="ln" data-content="  1147">&nbsp;&nbsp;</span>	callback       func(clientHello *ClientHelloInfo) (*Config, error)
+<span id="L1148" class="ln" data-content="  1148">&nbsp;&nbsp;</span>	errorSubstring string
+<span id="L1149" class="ln" data-content="  1149">&nbsp;&nbsp;</span>	verify         func(config *Config) error
+<span id="L1150" class="ln" data-content="  1150">&nbsp;&nbsp;</span>}{
+<span id="L1151" class="ln" data-content="  1151">&nbsp;&nbsp;</span>	{
+<span id="L1152" class="ln" data-content="  1152">&nbsp;&nbsp;</span>		nil,
+<span id="L1153" class="ln" data-content="  1153">&nbsp;&nbsp;</span>		func(clientHello *ClientHelloInfo) (*Config, error) {
+<span id="L1154" class="ln" data-content="  1154">&nbsp;&nbsp;</span>			return nil, nil
+<span id="L1155" class="ln" data-content="  1155">&nbsp;&nbsp;</span>		},
+<span id="L1156" class="ln" data-content="  1156">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L1157" class="ln" data-content="  1157">&nbsp;&nbsp;</span>		nil,
+<span id="L1158" class="ln" data-content="  1158">&nbsp;&nbsp;</span>	},
+<span id="L1159" class="ln" data-content="  1159">&nbsp;&nbsp;</span>	{
+<span id="L1160" class="ln" data-content="  1160">&nbsp;&nbsp;</span>		nil,
+<span id="L1161" class="ln" data-content="  1161">&nbsp;&nbsp;</span>		func(clientHello *ClientHelloInfo) (*Config, error) {
+<span id="L1162" class="ln" data-content="  1162">&nbsp;&nbsp;</span>			return nil, errors.New(&#34;should bubble up&#34;)
+<span id="L1163" class="ln" data-content="  1163">&nbsp;&nbsp;</span>		},
+<span id="L1164" class="ln" data-content="  1164">&nbsp;&nbsp;</span>		&#34;should bubble up&#34;,
+<span id="L1165" class="ln" data-content="  1165">&nbsp;&nbsp;</span>		nil,
+<span id="L1166" class="ln" data-content="  1166">&nbsp;&nbsp;</span>	},
+<span id="L1167" class="ln" data-content="  1167">&nbsp;&nbsp;</span>	{
+<span id="L1168" class="ln" data-content="  1168">&nbsp;&nbsp;</span>		nil,
+<span id="L1169" class="ln" data-content="  1169">&nbsp;&nbsp;</span>		func(clientHello *ClientHelloInfo) (*Config, error) {
+<span id="L1170" class="ln" data-content="  1170">&nbsp;&nbsp;</span>			config := testConfig.Clone()
+<span id="L1171" class="ln" data-content="  1171">&nbsp;&nbsp;</span>			<span class="comment">// Setting a maximum version of TLS 1.1 should cause</span>
+<span id="L1172" class="ln" data-content="  1172">&nbsp;&nbsp;</span>			<span class="comment">// the handshake to fail.</span>
+<span id="L1173" class="ln" data-content="  1173">&nbsp;&nbsp;</span>			config.MaxVersion = VersionTLS11
+<span id="L1174" class="ln" data-content="  1174">&nbsp;&nbsp;</span>			return config, nil
+<span id="L1175" class="ln" data-content="  1175">&nbsp;&nbsp;</span>		},
+<span id="L1176" class="ln" data-content="  1176">&nbsp;&nbsp;</span>		&#34;version 301 when expecting version 302&#34;,
+<span id="L1177" class="ln" data-content="  1177">&nbsp;&nbsp;</span>		nil,
+<span id="L1178" class="ln" data-content="  1178">&nbsp;&nbsp;</span>	},
+<span id="L1179" class="ln" data-content="  1179">&nbsp;&nbsp;</span>	{
+<span id="L1180" class="ln" data-content="  1180">&nbsp;&nbsp;</span>		func(config *Config) {
+<span id="L1181" class="ln" data-content="  1181">&nbsp;&nbsp;</span>			for i := range config.SessionTicketKey {
+<span id="L1182" class="ln" data-content="  1182">&nbsp;&nbsp;</span>				config.SessionTicketKey[i] = byte(i)
+<span id="L1183" class="ln" data-content="  1183">&nbsp;&nbsp;</span>			}
+<span id="L1184" class="ln" data-content="  1184">&nbsp;&nbsp;</span>			config.sessionTicketKeys = nil
+<span id="L1185" class="ln" data-content="  1185">&nbsp;&nbsp;</span>		},
+<span id="L1186" class="ln" data-content="  1186">&nbsp;&nbsp;</span>		func(clientHello *ClientHelloInfo) (*Config, error) {
+<span id="L1187" class="ln" data-content="  1187">&nbsp;&nbsp;</span>			config := testConfig.Clone()
+<span id="L1188" class="ln" data-content="  1188">&nbsp;&nbsp;</span>			for i := range config.SessionTicketKey {
+<span id="L1189" class="ln" data-content="  1189">&nbsp;&nbsp;</span>				config.SessionTicketKey[i] = 0
+<span id="L1190" class="ln" data-content="  1190">&nbsp;&nbsp;</span>			}
+<span id="L1191" class="ln" data-content="  1191">&nbsp;&nbsp;</span>			config.sessionTicketKeys = nil
+<span id="L1192" class="ln" data-content="  1192">&nbsp;&nbsp;</span>			return config, nil
+<span id="L1193" class="ln" data-content="  1193">&nbsp;&nbsp;</span>		},
+<span id="L1194" class="ln" data-content="  1194">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L1195" class="ln" data-content="  1195">&nbsp;&nbsp;</span>		func(config *Config) error {
+<span id="L1196" class="ln" data-content="  1196">&nbsp;&nbsp;</span>			<span class="comment">// The value of SessionTicketKey should have been</span>
+<span id="L1197" class="ln" data-content="  1197">&nbsp;&nbsp;</span>			<span class="comment">// duplicated into the per-connection Config.</span>
+<span id="L1198" class="ln" data-content="  1198">&nbsp;&nbsp;</span>			for i := range config.SessionTicketKey {
+<span id="L1199" class="ln" data-content="  1199">&nbsp;&nbsp;</span>				if b := config.SessionTicketKey[i]; b != byte(i) {
+<span id="L1200" class="ln" data-content="  1200">&nbsp;&nbsp;</span>					return fmt.Errorf(&#34;SessionTicketKey was not duplicated from original Config: byte %d has value %d&#34;, i, b)
+<span id="L1201" class="ln" data-content="  1201">&nbsp;&nbsp;</span>				}
+<span id="L1202" class="ln" data-content="  1202">&nbsp;&nbsp;</span>			}
+<span id="L1203" class="ln" data-content="  1203">&nbsp;&nbsp;</span>			return nil
+<span id="L1204" class="ln" data-content="  1204">&nbsp;&nbsp;</span>		},
+<span id="L1205" class="ln" data-content="  1205">&nbsp;&nbsp;</span>	},
+<span id="L1206" class="ln" data-content="  1206">&nbsp;&nbsp;</span>	{
+<span id="L1207" class="ln" data-content="  1207">&nbsp;&nbsp;</span>		func(config *Config) {
+<span id="L1208" class="ln" data-content="  1208">&nbsp;&nbsp;</span>			var dummyKey [32]byte
+<span id="L1209" class="ln" data-content="  1209">&nbsp;&nbsp;</span>			for i := range dummyKey {
+<span id="L1210" class="ln" data-content="  1210">&nbsp;&nbsp;</span>				dummyKey[i] = byte(i)
+<span id="L1211" class="ln" data-content="  1211">&nbsp;&nbsp;</span>			}
+<span id="L1212" class="ln" data-content="  1212">&nbsp;&nbsp;</span>
+<span id="L1213" class="ln" data-content="  1213">&nbsp;&nbsp;</span>			config.SetSessionTicketKeys([][32]byte{dummyKey})
+<span id="L1214" class="ln" data-content="  1214">&nbsp;&nbsp;</span>		},
+<span id="L1215" class="ln" data-content="  1215">&nbsp;&nbsp;</span>		func(clientHello *ClientHelloInfo) (*Config, error) {
+<span id="L1216" class="ln" data-content="  1216">&nbsp;&nbsp;</span>			config := testConfig.Clone()
+<span id="L1217" class="ln" data-content="  1217">&nbsp;&nbsp;</span>			config.sessionTicketKeys = nil
+<span id="L1218" class="ln" data-content="  1218">&nbsp;&nbsp;</span>			return config, nil
+<span id="L1219" class="ln" data-content="  1219">&nbsp;&nbsp;</span>		},
+<span id="L1220" class="ln" data-content="  1220">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L1221" class="ln" data-content="  1221">&nbsp;&nbsp;</span>		func(config *Config) error {
+<span id="L1222" class="ln" data-content="  1222">&nbsp;&nbsp;</span>			<span class="comment">// The session ticket keys should have been duplicated</span>
+<span id="L1223" class="ln" data-content="  1223">&nbsp;&nbsp;</span>			<span class="comment">// into the per-connection Config.</span>
+<span id="L1224" class="ln" data-content="  1224">&nbsp;&nbsp;</span>			if l := len(config.sessionTicketKeys); l != 1 {
+<span id="L1225" class="ln" data-content="  1225">&nbsp;&nbsp;</span>				return fmt.Errorf(&#34;got len(sessionTicketKeys) == %d, wanted 1&#34;, l)
+<span id="L1226" class="ln" data-content="  1226">&nbsp;&nbsp;</span>			}
+<span id="L1227" class="ln" data-content="  1227">&nbsp;&nbsp;</span>			return nil
+<span id="L1228" class="ln" data-content="  1228">&nbsp;&nbsp;</span>		},
+<span id="L1229" class="ln" data-content="  1229">&nbsp;&nbsp;</span>	},
+<span id="L1230" class="ln" data-content="  1230">&nbsp;&nbsp;</span>}
+<span id="L1231" class="ln" data-content="  1231">&nbsp;&nbsp;</span>
+<span id="L1232" class="ln" data-content="  1232">&nbsp;&nbsp;</span>func TestGetConfigForClient(t *testing.T) {
+<span id="L1233" class="ln" data-content="  1233">&nbsp;&nbsp;</span>	serverConfig := testConfig.Clone()
+<span id="L1234" class="ln" data-content="  1234">&nbsp;&nbsp;</span>	clientConfig := testConfig.Clone()
+<span id="L1235" class="ln" data-content="  1235">&nbsp;&nbsp;</span>	clientConfig.MinVersion = VersionTLS12
+<span id="L1236" class="ln" data-content="  1236">&nbsp;&nbsp;</span>
+<span id="L1237" class="ln" data-content="  1237">&nbsp;&nbsp;</span>	for i, test := range getConfigForClientTests {
+<span id="L1238" class="ln" data-content="  1238">&nbsp;&nbsp;</span>		if test.setup != nil {
+<span id="L1239" class="ln" data-content="  1239">&nbsp;&nbsp;</span>			test.setup(serverConfig)
+<span id="L1240" class="ln" data-content="  1240">&nbsp;&nbsp;</span>		}
+<span id="L1241" class="ln" data-content="  1241">&nbsp;&nbsp;</span>
+<span id="L1242" class="ln" data-content="  1242">&nbsp;&nbsp;</span>		var configReturned *Config
+<span id="L1243" class="ln" data-content="  1243">&nbsp;&nbsp;</span>		serverConfig.GetConfigForClient = func(clientHello *ClientHelloInfo) (*Config, error) {
+<span id="L1244" class="ln" data-content="  1244">&nbsp;&nbsp;</span>			config, err := test.callback(clientHello)
+<span id="L1245" class="ln" data-content="  1245">&nbsp;&nbsp;</span>			configReturned = config
+<span id="L1246" class="ln" data-content="  1246">&nbsp;&nbsp;</span>			return config, err
+<span id="L1247" class="ln" data-content="  1247">&nbsp;&nbsp;</span>		}
+<span id="L1248" class="ln" data-content="  1248">&nbsp;&nbsp;</span>		c, s := net.Pipe()
+<span id="L1249" class="ln" data-content="  1249">&nbsp;&nbsp;</span>		done := make(chan error)
+<span id="L1250" class="ln" data-content="  1250">&nbsp;&nbsp;</span>
+<span id="L1251" class="ln" data-content="  1251">&nbsp;&nbsp;</span>		go func() {
+<span id="L1252" class="ln" data-content="  1252">&nbsp;&nbsp;</span>			defer s.Close()
+<span id="L1253" class="ln" data-content="  1253">&nbsp;&nbsp;</span>			done &lt;- Server(s, serverConfig).Handshake()
+<span id="L1254" class="ln" data-content="  1254">&nbsp;&nbsp;</span>		}()
+<span id="L1255" class="ln" data-content="  1255">&nbsp;&nbsp;</span>
+<span id="L1256" class="ln" data-content="  1256">&nbsp;&nbsp;</span>		clientErr := Client(c, clientConfig).Handshake()
+<span id="L1257" class="ln" data-content="  1257">&nbsp;&nbsp;</span>		c.Close()
+<span id="L1258" class="ln" data-content="  1258">&nbsp;&nbsp;</span>
+<span id="L1259" class="ln" data-content="  1259">&nbsp;&nbsp;</span>		serverErr := &lt;-done
+<span id="L1260" class="ln" data-content="  1260">&nbsp;&nbsp;</span>
+<span id="L1261" class="ln" data-content="  1261">&nbsp;&nbsp;</span>		if len(test.errorSubstring) == 0 {
+<span id="L1262" class="ln" data-content="  1262">&nbsp;&nbsp;</span>			if serverErr != nil || clientErr != nil {
+<span id="L1263" class="ln" data-content="  1263">&nbsp;&nbsp;</span>				t.Errorf(&#34;test[%d]: expected no error but got serverErr: %q, clientErr: %q&#34;, i, serverErr, clientErr)
+<span id="L1264" class="ln" data-content="  1264">&nbsp;&nbsp;</span>			}
+<span id="L1265" class="ln" data-content="  1265">&nbsp;&nbsp;</span>			if test.verify != nil {
+<span id="L1266" class="ln" data-content="  1266">&nbsp;&nbsp;</span>				if err := test.verify(configReturned); err != nil {
+<span id="L1267" class="ln" data-content="  1267">&nbsp;&nbsp;</span>					t.Errorf(&#34;test[%d]: verify returned error: %v&#34;, i, err)
+<span id="L1268" class="ln" data-content="  1268">&nbsp;&nbsp;</span>				}
+<span id="L1269" class="ln" data-content="  1269">&nbsp;&nbsp;</span>			}
+<span id="L1270" class="ln" data-content="  1270">&nbsp;&nbsp;</span>		} else {
+<span id="L1271" class="ln" data-content="  1271">&nbsp;&nbsp;</span>			if serverErr == nil {
+<span id="L1272" class="ln" data-content="  1272">&nbsp;&nbsp;</span>				t.Errorf(&#34;test[%d]: expected error containing %q but got no error&#34;, i, test.errorSubstring)
+<span id="L1273" class="ln" data-content="  1273">&nbsp;&nbsp;</span>			} else if !strings.Contains(serverErr.Error(), test.errorSubstring) {
+<span id="L1274" class="ln" data-content="  1274">&nbsp;&nbsp;</span>				t.Errorf(&#34;test[%d]: expected error to contain %q but it was %q&#34;, i, test.errorSubstring, serverErr)
+<span id="L1275" class="ln" data-content="  1275">&nbsp;&nbsp;</span>			}
+<span id="L1276" class="ln" data-content="  1276">&nbsp;&nbsp;</span>		}
+<span id="L1277" class="ln" data-content="  1277">&nbsp;&nbsp;</span>	}
+<span id="L1278" class="ln" data-content="  1278">&nbsp;&nbsp;</span>}
+<span id="L1279" class="ln" data-content="  1279">&nbsp;&nbsp;</span>
+<span id="L1280" class="ln" data-content="  1280">&nbsp;&nbsp;</span>func bigFromString(s string) *big.Int {
+<span id="L1281" class="ln" data-content="  1281">&nbsp;&nbsp;</span>	ret := new(big.Int)
+<span id="L1282" class="ln" data-content="  1282">&nbsp;&nbsp;</span>	ret.SetString(s, 10)
+<span id="L1283" class="ln" data-content="  1283">&nbsp;&nbsp;</span>	return ret
+<span id="L1284" class="ln" data-content="  1284">&nbsp;&nbsp;</span>}
+<span id="L1285" class="ln" data-content="  1285">&nbsp;&nbsp;</span>
+<span id="L1286" class="ln" data-content="  1286">&nbsp;&nbsp;</span>func fromHex(s string) []byte {
+<span id="L1287" class="ln" data-content="  1287">&nbsp;&nbsp;</span>	b, _ := hex.DecodeString(s)
+<span id="L1288" class="ln" data-content="  1288">&nbsp;&nbsp;</span>	return b
+<span id="L1289" class="ln" data-content="  1289">&nbsp;&nbsp;</span>}
+<span id="L1290" class="ln" data-content="  1290">&nbsp;&nbsp;</span>
+<span id="L1291" class="ln" data-content="  1291">&nbsp;&nbsp;</span>var testRSACertificate = fromHex(&#34;3082024b308201b4a003020102020900e8f09d3fe25beaa6300d06092a864886f70d01010b0500301f310b3009060355040a1302476f3110300e06035504031307476f20526f6f74301e170d3136303130313030303030305a170d3235303130313030303030305a301a310b3009060355040a1302476f310b300906035504031302476f30819f300d06092a864886f70d010101050003818d0030818902818100db467d932e12270648bc062821ab7ec4b6a25dfe1e5245887a3647a5080d92425bc281c0be97799840fb4f6d14fd2b138bc2a52e67d8d4099ed62238b74a0b74732bc234f1d193e596d9747bf3589f6c613cc0b041d4d92b2b2423775b1c3bbd755dce2054cfa163871d1e24c4f31d1a508baab61443ed97a77562f414c852d70203010001a38193308190300e0603551d0f0101ff0404030205a0301d0603551d250416301406082b0601050507030106082b06010505070302300c0603551d130101ff0402300030190603551d0e041204109f91161f43433e49a6de6db680d79f60301b0603551d230414301280104813494d137e1631bba301d5acab6e7b30190603551d1104123010820e6578616d706c652e676f6c616e67300d06092a864886f70d01010b0500038181009d30cc402b5b50a061cbbae55358e1ed8328a9581aa938a495a1ac315a1a84663d43d32dd90bf297dfd320643892243a00bccf9c7db74020015faad3166109a276fd13c3cce10c5ceeb18782f16c04ed73bbb343778d0c1cf10fa1d8408361c94c722b9daedb4606064df4c1b33ec0d1bd42d4dbfe3d1360845c21d33be9fae7&#34;)
+<span id="L1292" class="ln" data-content="  1292">&nbsp;&nbsp;</span>
+<span id="L1293" class="ln" data-content="  1293">&nbsp;&nbsp;</span>var testRSACertificateIssuer = fromHex(&#34;3082021930820182a003020102020900ca5e4e811a965964300d06092a864886f70d01010b0500301f310b3009060355040a1302476f3110300e06035504031307476f20526f6f74301e170d3136303130313030303030305a170d3235303130313030303030305a301f310b3009060355040a1302476f3110300e06035504031307476f20526f6f7430819f300d06092a864886f70d010101050003818d0030818902818100d667b378bb22f34143b6cd2008236abefaf2852adf3ab05e01329e2c14834f5105df3f3073f99dab5442d45ee5f8f57b0111c8cb682fbb719a86944eebfffef3406206d898b8c1b1887797c9c5006547bb8f00e694b7a063f10839f269f2c34fff7a1f4b21fbcd6bfdfb13ac792d1d11f277b5c5b48600992203059f2a8f8cc50203010001a35d305b300e0603551d0f0101ff040403020204301d0603551d250416301406082b0601050507030106082b06010505070302300f0603551d130101ff040530030101ff30190603551d0e041204104813494d137e1631bba301d5acab6e7b300d06092a864886f70d01010b050003818100c1154b4bab5266221f293766ae4138899bd4c5e36b13cee670ceeaa4cbdf4f6679017e2fe649765af545749fe4249418a56bd38a04b81e261f5ce86b8d5c65413156a50d12449554748c59a30c515bc36a59d38bddf51173e899820b282e40aa78c806526fd184fb6b4cf186ec728edffa585440d2b3225325f7ab580e87dd76&#34;)
+<span id="L1294" class="ln" data-content="  1294">&nbsp;&nbsp;</span>
+<span id="L1295" class="ln" data-content="  1295">&nbsp;&nbsp;</span>var testECDSACertificate = fromHex(&#34;3082020030820162020900b8bf2d47a0d2ebf4300906072a8648ce3d04013045310b3009060355040613024155311330110603550408130a536f6d652d53746174653121301f060355040a1318496e7465726e6574205769646769747320507479204c7464301e170d3132313132323135303633325a170d3232313132303135303633325a3045310b3009060355040613024155311330110603550408130a536f6d652d53746174653121301f060355040a1318496e7465726e6574205769646769747320507479204c746430819b301006072a8648ce3d020106052b81040023038186000400c4a1edbe98f90b4873367ec316561122f23d53c33b4d213dcd6b75e6f6b0dc9adf26c1bcb287f072327cb3642f1c90bcea6823107efee325c0483a69e0286dd33700ef0462dd0da09c706283d881d36431aa9e9731bd96b068c09b23de76643f1a5c7fe9120e5858b65f70dd9bd8ead5d7f5d5ccb9b69f30665b669a20e227e5bffe3b300906072a8648ce3d040103818c0030818802420188a24febe245c5487d1bacf5ed989dae4770c05e1bb62fbdf1b64db76140d311a2ceee0b7e927eff769dc33b7ea53fcefa10e259ec472d7cacda4e970e15a06fd00242014dfcbe67139c2d050ebd3fa38c25c13313830d9406bbd4377af6ec7ac9862eddd711697f857c56defb31782be4c7780daecbbe9e4e3624317b6a0f399512078f2a&#34;)
+<span id="L1296" class="ln" data-content="  1296">&nbsp;&nbsp;</span>
+<span id="L1297" class="ln" data-content="  1297">&nbsp;&nbsp;</span>var testSNICertificate = fromHex(&#34;0441883421114c81480804c430820237308201a0a003020102020900e8f09d3fe25beaa6300d06092a864886f70d01010b0500301f310b3009060355040a1302476f3110300e06035504031307476f20526f6f74301e170d3136303130313030303030305a170d3235303130313030303030305a3023310b3009060355040a1302476f311430120603550403130b736e69746573742e636f6d30819f300d06092a864886f70d010101050003818d0030818902818100db467d932e12270648bc062821ab7ec4b6a25dfe1e5245887a3647a5080d92425bc281c0be97799840fb4f6d14fd2b138bc2a52e67d8d4099ed62238b74a0b74732bc234f1d193e596d9747bf3589f6c613cc0b041d4d92b2b2423775b1c3bbd755dce2054cfa163871d1e24c4f31d1a508baab61443ed97a77562f414c852d70203010001a3773075300e0603551d0f0101ff0404030205a0301d0603551d250416301406082b0601050507030106082b06010505070302300c0603551d130101ff0402300030190603551d0e041204109f91161f43433e49a6de6db680d79f60301b0603551d230414301280104813494d137e1631bba301d5acab6e7b300d06092a864886f70d01010b0500038181007beeecff0230dbb2e7a334af65430b7116e09f327c3bbf918107fc9c66cb497493207ae9b4dbb045cb63d605ec1b5dd485bb69124d68fa298dc776699b47632fd6d73cab57042acb26f083c4087459bc5a3bb3ca4d878d7fe31016b7bc9a627438666566e3389bfaeebe6becc9a0093ceed18d0f9ac79d56f3a73f18188988ed&#34;)
+<span id="L1298" class="ln" data-content="  1298">&nbsp;&nbsp;</span>
+<span id="L1299" class="ln" data-content="  1299">&nbsp;&nbsp;</span>var testRSAPrivateKey = &amp;rsa.PrivateKey{
+<span id="L1300" class="ln" data-content="  1300">&nbsp;&nbsp;</span>	PublicKey: rsa.PublicKey{
+<span id="L1301" class="ln" data-content="  1301">&nbsp;&nbsp;</span>		N: bigFromString(&#34;153980389784927331788354528594524332344709972855165340650588877572729725338415474372475094155672066328274535240275856844648695200875763869073572078279316458648124537905600131008790701752441155668003033945258023841165089852359980273279085783159654751552359397986180318708491098942831252291841441726305535546071&#34;),
+<span id="L1302" class="ln" data-content="  1302">&nbsp;&nbsp;</span>		E: 65537,
+<span id="L1303" class="ln" data-content="  1303">&nbsp;&nbsp;</span>	},
+<span id="L1304" class="ln" data-content="  1304">&nbsp;&nbsp;</span>	D: bigFromString(&#34;7746362285745539358014631136245887418412633787074173796862711588221766398229333338511838891484974940633857861775630560092874987828057333663969469797013996401149696897591265769095952887917296740109742927689053276850469671231961384712725169432413343763989564437170644270643461665184965150423819594083121075825&#34;),
+<span id="L1305" class="ln" data-content="  1305">&nbsp;&nbsp;</span>	Primes: []*big.Int{
+<span id="L1306" class="ln" data-content="  1306">&nbsp;&nbsp;</span>		bigFromString(&#34;13299275414352936908236095374926261633419699590839189494995965049151460173257838079863316944311313904000258169883815802963543635820059341150014695560313417&#34;),
+<span id="L1307" class="ln" data-content="  1307">&nbsp;&nbsp;</span>		bigFromString(&#34;11578103692682951732111718237224894755352163854919244905974423810539077224889290605729035287537520656160688625383765857517518932447378594964220731750802463&#34;),
+<span id="L1308" class="ln" data-content="  1308">&nbsp;&nbsp;</span>	},
+<span id="L1309" class="ln" data-content="  1309">&nbsp;&nbsp;</span>}
+<span id="L1310" class="ln" data-content="  1310">&nbsp;&nbsp;</span>
+<span id="L1311" class="ln" data-content="  1311">&nbsp;&nbsp;</span>var testECDSAPrivateKey = &amp;ecdsa.PrivateKey{
+<span id="L1312" class="ln" data-content="  1312">&nbsp;&nbsp;</span>	PublicKey: ecdsa.PublicKey{
+<span id="L1313" class="ln" data-content="  1313">&nbsp;&nbsp;</span>		Curve: elliptic.P521(),
+<span id="L1314" class="ln" data-content="  1314">&nbsp;&nbsp;</span>		X:     bigFromString(&#34;2636411247892461147287360222306590634450676461695221912739908880441342231985950069527906976759812296359387337367668045707086543273113073382714101597903639351&#34;),
+<span id="L1315" class="ln" data-content="  1315">&nbsp;&nbsp;</span>		Y:     bigFromString(&#34;3204695818431246682253994090650952614555094516658732116404513121125038617915183037601737180082382202488628239201196033284060130040574800684774115478859677243&#34;),
+<span id="L1316" class="ln" data-content="  1316">&nbsp;&nbsp;</span>	},
+<span id="L1317" class="ln" data-content="  1317">&nbsp;&nbsp;</span>	D: bigFromString(&#34;5477294338614160138026852784385529180817726002953041720191098180813046231640184669647735805135001309477695746518160084669446643325196003346204701381388769751&#34;),
+<span id="L1318" class="ln" data-content="  1318">&nbsp;&nbsp;</span>}
+<span id="L1319" class="ln" data-content="  1319">&nbsp;&nbsp;</span>
+</pre><p><a href="handshake_server_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

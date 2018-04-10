@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/floor_amd64.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="floor_amd64.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<span class="text-muted">floor_amd64.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:6060/pkg/math">math</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2012 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	#include &#34;textflag.h&#34;
+<span id="L6" class="ln">     6</span>	
+<span id="L7" class="ln">     7</span>	#define Big		0x4330000000000000 // 2**52
+<span id="L8" class="ln">     8</span>	
+<span id="L9" class="ln">     9</span>	// func Floor(x float64) float64
+<span id="L10" class="ln">    10</span>	TEXT ·Floor(SB),NOSPLIT,$0
+<span id="L11" class="ln">    11</span>		CMPB    ·useSSE41(SB), $1
+<span id="L12" class="ln">    12</span>		JNE     nosse4
+<span id="L13" class="ln">    13</span>		ROUNDSD $1, x+0(FP), X0
+<span id="L14" class="ln">    14</span>		MOVQ X0, ret+8(FP)
+<span id="L15" class="ln">    15</span>		RET
+<span id="L16" class="ln">    16</span>	nosse4:
+<span id="L17" class="ln">    17</span>		MOVQ	x+0(FP), AX
+<span id="L18" class="ln">    18</span>		MOVQ	$~(1&lt;&lt;63), DX // sign bit mask
+<span id="L19" class="ln">    19</span>		ANDQ	AX,DX // DX = |x|
+<span id="L20" class="ln">    20</span>		SUBQ	$1,DX
+<span id="L21" class="ln">    21</span>		MOVQ    $(Big - 1), CX // if |x| &gt;= 2**52-1 or IsNaN(x) or |x| == 0, return x
+<span id="L22" class="ln">    22</span>		CMPQ	DX,CX
+<span id="L23" class="ln">    23</span>		JAE     isBig_floor
+<span id="L24" class="ln">    24</span>		MOVQ	AX, X0 // X0 = x
+<span id="L25" class="ln">    25</span>		CVTTSD2SQ	X0, AX
+<span id="L26" class="ln">    26</span>		CVTSQ2SD	AX, X1 // X1 = float(int(x))
+<span id="L27" class="ln">    27</span>		CMPSD	X1, X0, 1 // compare LT; X0 = 0xffffffffffffffff or 0
+<span id="L28" class="ln">    28</span>		MOVSD	$(-1.0), X2
+<span id="L29" class="ln">    29</span>		ANDPD	X2, X0 // if x &lt; float(int(x)) {X0 = -1} else {X0 = 0}
+<span id="L30" class="ln">    30</span>		ADDSD	X1, X0
+<span id="L31" class="ln">    31</span>		MOVSD	X0, ret+8(FP)
+<span id="L32" class="ln">    32</span>		RET
+<span id="L33" class="ln">    33</span>	isBig_floor:
+<span id="L34" class="ln">    34</span>		MOVQ    AX, ret+8(FP) // return x
+<span id="L35" class="ln">    35</span>		RET
+<span id="L36" class="ln">    36</span>	
+<span id="L37" class="ln">    37</span>	// func Ceil(x float64) float64
+<span id="L38" class="ln">    38</span>	TEXT ·Ceil(SB),NOSPLIT,$0
+<span id="L39" class="ln">    39</span>		CMPB    ·useSSE41(SB), $1
+<span id="L40" class="ln">    40</span>		JNE     nosse4
+<span id="L41" class="ln">    41</span>		ROUNDSD $2, x+0(FP), X0
+<span id="L42" class="ln">    42</span>		MOVQ X0, ret+8(FP)
+<span id="L43" class="ln">    43</span>		RET
+<span id="L44" class="ln">    44</span>	nosse4:
+<span id="L45" class="ln">    45</span>		MOVQ	x+0(FP), AX
+<span id="L46" class="ln">    46</span>		MOVQ	$~(1&lt;&lt;63), DX // sign bit mask
+<span id="L47" class="ln">    47</span>		MOVQ	AX, BX // BX = copy of x
+<span id="L48" class="ln">    48</span>		ANDQ    DX, BX // BX = |x|
+<span id="L49" class="ln">    49</span>		MOVQ    $Big, CX // if |x| &gt;= 2**52 or IsNaN(x), return x
+<span id="L50" class="ln">    50</span>		CMPQ    BX, CX
+<span id="L51" class="ln">    51</span>		JAE     isBig_ceil
+<span id="L52" class="ln">    52</span>		MOVQ	AX, X0 // X0 = x
+<span id="L53" class="ln">    53</span>		MOVQ	DX, X2 // X2 = sign bit mask
+<span id="L54" class="ln">    54</span>		CVTTSD2SQ	X0, AX
+<span id="L55" class="ln">    55</span>		ANDNPD	X0, X2 // X2 = sign
+<span id="L56" class="ln">    56</span>		CVTSQ2SD	AX, X1	// X1 = float(int(x))
+<span id="L57" class="ln">    57</span>		CMPSD	X1, X0, 2 // compare LE; X0 = 0xffffffffffffffff or 0
+<span id="L58" class="ln">    58</span>		ORPD	X2, X1 // if X1 = 0.0, incorporate sign
+<span id="L59" class="ln">    59</span>		MOVSD	$1.0, X3
+<span id="L60" class="ln">    60</span>		ANDNPD	X3, X0
+<span id="L61" class="ln">    61</span>		ORPD	X2, X0 // if float(int(x)) &lt;= x {X0 = 1} else {X0 = -0}
+<span id="L62" class="ln">    62</span>		ADDSD	X1, X0
+<span id="L63" class="ln">    63</span>		MOVSD	X0, ret+8(FP)
+<span id="L64" class="ln">    64</span>		RET
+<span id="L65" class="ln">    65</span>	isBig_ceil:
+<span id="L66" class="ln">    66</span>		MOVQ	AX, ret+8(FP)
+<span id="L67" class="ln">    67</span>		RET
+<span id="L68" class="ln">    68</span>	
+<span id="L69" class="ln">    69</span>	// func Trunc(x float64) float64
+<span id="L70" class="ln">    70</span>	TEXT ·Trunc(SB),NOSPLIT,$0
+<span id="L71" class="ln">    71</span>		MOVQ	x+0(FP), AX
+<span id="L72" class="ln">    72</span>		MOVQ	$~(1&lt;&lt;63), DX // sign bit mask
+<span id="L73" class="ln">    73</span>		MOVQ	AX, BX // BX = copy of x
+<span id="L74" class="ln">    74</span>		ANDQ    DX, BX // BX = |x|
+<span id="L75" class="ln">    75</span>		MOVQ    $Big, CX // if |x| &gt;= 2**52 or IsNaN(x), return x
+<span id="L76" class="ln">    76</span>		CMPQ    BX, CX
+<span id="L77" class="ln">    77</span>		JAE     isBig_trunc
+<span id="L78" class="ln">    78</span>		MOVQ	AX, X0
+<span id="L79" class="ln">    79</span>		MOVQ	DX, X2 // X2 = sign bit mask
+<span id="L80" class="ln">    80</span>		CVTTSD2SQ	X0, AX
+<span id="L81" class="ln">    81</span>		ANDNPD	X0, X2 // X2 = sign
+<span id="L82" class="ln">    82</span>		CVTSQ2SD	AX, X0 // X0 = float(int(x))
+<span id="L83" class="ln">    83</span>		ORPD	X2, X0 // if X0 = 0.0, incorporate sign
+<span id="L84" class="ln">    84</span>		MOVSD	X0, ret+8(FP)
+<span id="L85" class="ln">    85</span>		RET
+<span id="L86" class="ln">    86</span>	isBig_trunc:
+<span id="L87" class="ln">    87</span>		MOVQ    AX, ret+8(FP) // return x
+<span id="L88" class="ln">    88</span>		RET
+</pre><p><a href="floor_amd64.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

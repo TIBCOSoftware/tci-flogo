@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/hash/crc64/crc64_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="crc64_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/hash">hash</a>/<a href="../crc64.1.html">crc64</a>/<span class="text-muted">crc64_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/hash/crc64.1.html">hash/crc64</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package crc64
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>)
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>type test struct {
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	outISO  uint64
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	outECMA uint64
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	in      string
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>}
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>var golden = []test{
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	{0x0, 0x0, &#34;&#34;},
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	{0x3420000000000000, 0x330284772e652b05, &#34;a&#34;},
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	{0x36c4200000000000, 0xbc6573200e84b046, &#34;ab&#34;},
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	{0x3776c42000000000, 0x2cd8094a1a277627, &#34;abc&#34;},
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	{0x336776c420000000, 0x3c9d28596e5960ba, &#34;abcd&#34;},
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	{0x32d36776c4200000, 0x40bdf58fb0895f2, &#34;abcde&#34;},
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	{0x3002d36776c42000, 0xd08e9f8545a700f4, &#34;abcdef&#34;},
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	{0x31b002d36776c420, 0xec20a3a8cc710e66, &#34;abcdefg&#34;},
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	{0xe21b002d36776c4, 0x67b4f30a647a0c59, &#34;abcdefgh&#34;},
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	{0x8b6e21b002d36776, 0x9966f6c89d56ef8e, &#34;abcdefghi&#34;},
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	{0x7f5b6e21b002d367, 0x32093a2ecd5773f4, &#34;abcdefghij&#34;},
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	{0x8ec0e7c835bf9cdf, 0x8a0825223ea6d221, &#34;Discard medicine more than two years old.&#34;},
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	{0xc7db1759e2be5ab4, 0x8562c0ac2ab9a00d, &#34;He who has a shady past knows that nice guys finish last.&#34;},
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	{0xfbf9d9603a6fa020, 0x3ee2a39c083f38b4, &#34;I wouldn&#39;t marry him with a ten foot pole.&#34;},
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	{0xeafc4211a6daa0ef, 0x1f603830353e518a, &#34;Free! Free!/A trip/to Mars/for 900/empty jars/Burma Shave&#34;},
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	{0x3e05b21c7a4dc4da, 0x2fd681d7b2421fd, &#34;The days of the digital watch are numbered.  -Tom Stoppard&#34;},
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	{0x5255866ad6ef28a6, 0x790ef2b16a745a41, &#34;Nepal premier won&#39;t resign.&#34;},
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	{0x8a79895be1e9c361, 0x3ef8f06daccdcddf, &#34;For every action there is an equal and opposite government program.&#34;},
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	{0x8878963a649d4916, 0x49e41b2660b106d, &#34;His money is twice tainted: &#39;taint yours and &#39;taint mine.&#34;},
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	{0xa7b9d53ea87eb82f, 0x561cc0cfa235ac68, &#34;There is no reason for any individual to have a computer in their home. -Ken Olsen, 1977&#34;},
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	{0xdb6805c0966a2f9c, 0xd4fe9ef082e69f59, &#34;It&#39;s a tiny change to the code and not completely disgusting. - Bob Manchek&#34;},
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	{0xf3553c65dacdadd2, 0xe3b5e46cd8d63a4d, &#34;size:  a.out:  bad magic&#34;},
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	{0x9d5e034087a676b9, 0x865aaf6b94f2a051, &#34;The major problem is with sendmail.  -Mark Horton&#34;},
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	{0xa6db2d7f8da96417, 0x7eca10d2f8136eb4, &#34;Give me a rock, paper and scissors and I will move the world.  CCFestoon&#34;},
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	{0x325e00cd2fe819f9, 0xd7dd118c98e98727, &#34;If the enemy is within range, then so are you.&#34;},
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	{0x88c6600ce58ae4c6, 0x70fb33c119c29318, &#34;It&#39;s well we cannot hear the screams/That we create in others&#39; dreams.&#34;},
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	{0x28c4a3f3b769e078, 0x57c891e39a97d9b7, &#34;You remind me of a TV show, but that&#39;s all right: I watch it anyway.&#34;},
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	{0xa698a34c9d9f1dca, 0xa1f46ba20ad06eb7, &#34;C is as portable as Stonehedge!!&#34;},
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	{0xf6c1e2a8c26c5cfc, 0x7ad25fafa1710407, &#34;Even if I could be Shakespeare, I think I should still choose to be Faraday. - A. Huxley&#34;},
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	{0xd402559dfe9b70c, 0x73cef1666185c13f, &#34;The fugacity of a constituent in a mixture of gases at a given temperature is proportional to its mole fraction.  Lewis-Randall Rule&#34;},
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	{0xdb6efff26aa94946, 0xb41858f73c389602, &#34;How can you write a big system without C++?  -Paul Glick&#34;},
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	{0xe7fcf1006b503b61, 0x27db187fc15bbc72, &#34;This is a test of the emergency broadcast system.&#34;},
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>}
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>func TestGolden(t *testing.T) {
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	tabISO := MakeTable(ISO)
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	tabECMA := MakeTable(ECMA)
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(golden); i++ {
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>		g := golden[i]
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>		c := New(tabISO)
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		io.WriteString(c, g.in)
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>		s := c.Sum64()
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>		if s != g.outISO {
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>			t.Errorf(&#34;ISO crc64(%s) = 0x%x want 0x%x&#34;, g.in, s, g.outISO)
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>			t.FailNow()
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>		}
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>		c = New(tabECMA)
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		io.WriteString(c, g.in)
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>		s = c.Sum64()
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		if s != g.outECMA {
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>			t.Errorf(&#34;ECMA crc64(%s) = 0x%x want 0x%x&#34;, g.in, s, g.outECMA)
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>			t.FailNow()
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>		}
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	}
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>}
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>func bench(b *testing.B, poly uint64, size int64) {
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	b.SetBytes(size)
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	data := make([]byte, size)
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	for i := range data {
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		data[i] = byte(i)
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	}
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	h := New(MakeTable(poly))
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	in := make([]byte, 0, h.Size())
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	b.ResetTimer()
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	for i := 0; i &lt; b.N; i++ {
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>		h.Reset()
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>		h.Write(data)
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>		h.Sum(in)
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	}
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>}
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>func BenchmarkCrc64(b *testing.B) {
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	b.Run(&#34;ISO64KB&#34;, func(b *testing.B) {
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>		bench(b, ISO, 64&lt;&lt;10)
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	})
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	b.Run(&#34;ISO4KB&#34;, func(b *testing.B) {
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>		bench(b, ISO, 4&lt;&lt;10)
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	})
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	b.Run(&#34;ISO1KB&#34;, func(b *testing.B) {
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>		bench(b, ISO, 1&lt;&lt;10)
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	})
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	b.Run(&#34;ECMA64KB&#34;, func(b *testing.B) {
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>		bench(b, ECMA, 64&lt;&lt;10)
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	})
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	b.Run(&#34;Random64KB&#34;, func(b *testing.B) {
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>		bench(b, 0x777, 64&lt;&lt;10)
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	})
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	b.Run(&#34;Random16KB&#34;, func(b *testing.B) {
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		bench(b, 0x777, 16&lt;&lt;10)
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>	})
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>}
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>
+</pre><p><a href="crc64_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

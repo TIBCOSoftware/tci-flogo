@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/intmarsh.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./intmarsh.go%3Fs=398:439.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">intmarsh.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2015 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// This file implements encoding/decoding of Ints.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>package big
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>import &#34;fmt&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span><span class="comment">// Gob codec version. Permits backward-compatible changes to the encoding.</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>const intGobVersion byte = 1
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// GobEncode implements the gob.GobEncoder interface.</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="selection">func (x *Int) GobEncode() ([]byte, error)</span> {
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	if x == nil {
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>		return nil, nil
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	}
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	buf := make([]byte, 1+len(x.abs)*_S) <span class="comment">// extra byte for version and sign bit</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	i := x.abs.bytes(buf) - 1            <span class="comment">// i &gt;= 0</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	b := intGobVersion &lt;&lt; 1              <span class="comment">// make space for sign bit</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	if x.neg {
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>		b |= 1
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	}
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	buf[i] = b
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	return buf[i:], nil
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>}
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span><span class="comment">// GobDecode implements the gob.GobDecoder interface.</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>func (z *Int) GobDecode(buf []byte) error {
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	if len(buf) == 0 {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>		<span class="comment">// Other side sent a nil or default value.</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>		*z = Int{}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>		return nil
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	}
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	b := buf[0]
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	if b&gt;&gt;1 != intGobVersion {
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>		return fmt.Errorf(&#34;Int.GobDecode: encoding version %d not supported&#34;, b&gt;&gt;1)
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	}
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	z.neg = b&amp;1 != 0
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	z.abs = z.abs.setBytes(buf[1:])
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	return nil
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>}
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span><span class="comment">// MarshalText implements the encoding.TextMarshaler interface.</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>func (x *Int) MarshalText() (text []byte, err error) {
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	if x == nil {
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>		return []byte(&#34;&lt;nil&gt;&#34;), nil
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	}
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	return x.abs.itoa(x.neg, 10), nil
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>}
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span><span class="comment">// UnmarshalText implements the encoding.TextUnmarshaler interface.</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>func (z *Int) UnmarshalText(text []byte) error {
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri): get rid of the []byte/string conversion</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	if _, ok := z.SetString(string(text), 0); !ok {
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>		return fmt.Errorf(&#34;math/big: cannot unmarshal %q into a *big.Int&#34;, text)
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	}
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	return nil
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>}
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span><span class="comment">// The JSON marshalers are only here for API backward compatibility</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span><span class="comment">// (programs that explicitly look for these two methods). JSON works</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span><span class="comment">// fine with the TextMarshaler only.</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span><span class="comment">// MarshalJSON implements the json.Marshaler interface.</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>func (x *Int) MarshalJSON() ([]byte, error) {
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>	return x.MarshalText()
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>}
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span><span class="comment">// UnmarshalJSON implements the json.Unmarshaler interface.</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>func (z *Int) UnmarshalJSON(text []byte) error {
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	<span class="comment">// Ignore null, like in the main JSON package.</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	if string(text) == &#34;null&#34; {
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>		return nil
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	}
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	return z.UnmarshalText(text)
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>}
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>
+</pre><p><a href="intmarsh.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

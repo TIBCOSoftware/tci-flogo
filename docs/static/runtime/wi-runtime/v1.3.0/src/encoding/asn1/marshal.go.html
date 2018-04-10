@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/encoding/asn1/marshal.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="marshal.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/encoding">encoding</a>/<a href="../asn1.1.html">asn1</a>/<span class="text-muted">marshal.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/encoding/asn1.1.html">encoding/asn1</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package asn1
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;math/big&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;unicode/utf8&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>)
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>var (
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	byte00Encoder encoder = byteEncoder(0x00)
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	byteFFEncoder encoder = byteEncoder(0xff)
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>)
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span><span class="comment">// encoder represents a ASN.1 element that is waiting to be marshaled.</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>type encoder interface {
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	<span class="comment">// Len returns the number of bytes needed to marshal this element.</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	Len() int
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	<span class="comment">// Encode encodes this element by writing Len() bytes to dst.</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	Encode(dst []byte)
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>}
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>type byteEncoder byte
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>func (c byteEncoder) Len() int {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	return 1
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>func (c byteEncoder) Encode(dst []byte) {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	dst[0] = byte(c)
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>}
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>type bytesEncoder []byte
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>func (b bytesEncoder) Len() int {
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	return len(b)
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>}
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>func (b bytesEncoder) Encode(dst []byte) {
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	if copy(dst, b) != len(b) {
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>		panic(&#34;internal error&#34;)
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	}
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>}
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>type stringEncoder string
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>func (s stringEncoder) Len() int {
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	return len(s)
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>}
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>func (s stringEncoder) Encode(dst []byte) {
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	if copy(dst, s) != len(s) {
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		panic(&#34;internal error&#34;)
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	}
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>}
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>type multiEncoder []encoder
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>func (m multiEncoder) Len() int {
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>	var size int
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	for _, e := range m {
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		size += e.Len()
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	}
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	return size
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>}
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>func (m multiEncoder) Encode(dst []byte) {
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	var off int
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	for _, e := range m {
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>		e.Encode(dst[off:])
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>		off += e.Len()
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	}
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>}
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>type taggedEncoder struct {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	<span class="comment">// scratch contains temporary space for encoding the tag and length of</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	<span class="comment">// an element in order to avoid extra allocations.</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	scratch [8]byte
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	tag     encoder
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	body    encoder
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>}
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>func (t *taggedEncoder) Len() int {
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>	return t.tag.Len() + t.body.Len()
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>}
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>func (t *taggedEncoder) Encode(dst []byte) {
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	t.tag.Encode(dst)
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	t.body.Encode(dst[t.tag.Len():])
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>}
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>type int64Encoder int64
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>func (i int64Encoder) Len() int {
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	n := 1
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	for i &gt; 127 {
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		n++
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		i &gt;&gt;= 8
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	}
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	for i &lt; -128 {
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		n++
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		i &gt;&gt;= 8
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	}
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	return n
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>}
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>func (i int64Encoder) Encode(dst []byte) {
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	n := i.Len()
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	for j := 0; j &lt; n; j++ {
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>		dst[j] = byte(i &gt;&gt; uint((n-1-j)*8))
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	}
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>}
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>func base128IntLength(n int64) int {
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	if n == 0 {
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>		return 1
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	}
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	l := 0
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	for i := n; i &gt; 0; i &gt;&gt;= 7 {
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>		l++
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	}
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	return l
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>}
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>func appendBase128Int(dst []byte, n int64) []byte {
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	l := base128IntLength(n)
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>	for i := l - 1; i &gt;= 0; i-- {
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>		o := byte(n &gt;&gt; uint(i*7))
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>		o &amp;= 0x7f
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>		if i != 0 {
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>			o |= 0x80
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>		}
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>		dst = append(dst, o)
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	}
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	return dst
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>}
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>func makeBigInt(n *big.Int) (encoder, error) {
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	if n == nil {
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>		return nil, StructuralError{&#34;empty integer&#34;}
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>	}
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>	if n.Sign() &lt; 0 {
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		<span class="comment">// A negative number has to be converted to two&#39;s-complement</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		<span class="comment">// form. So we&#39;ll invert and subtract 1. If the</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>		<span class="comment">// most-significant-bit isn&#39;t set then we&#39;ll need to pad the</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>		<span class="comment">// beginning with 0xff in order to keep the number negative.</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		nMinus1 := new(big.Int).Neg(n)
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>		nMinus1.Sub(nMinus1, bigOne)
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>		bytes := nMinus1.Bytes()
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>		for i := range bytes {
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>			bytes[i] ^= 0xff
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		}
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>		if len(bytes) == 0 || bytes[0]&amp;0x80 == 0 {
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>			return multiEncoder([]encoder{byteFFEncoder, bytesEncoder(bytes)}), nil
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		}
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		return bytesEncoder(bytes), nil
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	} else if n.Sign() == 0 {
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		<span class="comment">// Zero is written as a single 0 zero rather than no bytes.</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		return byte00Encoder, nil
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>	} else {
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		bytes := n.Bytes()
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>		if len(bytes) &gt; 0 &amp;&amp; bytes[0]&amp;0x80 != 0 {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>			<span class="comment">// We&#39;ll have to pad this with 0x00 in order to stop it</span>
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>			<span class="comment">// looking like a negative number.</span>
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>			return multiEncoder([]encoder{byte00Encoder, bytesEncoder(bytes)}), nil
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>		}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>		return bytesEncoder(bytes), nil
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>	}
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>}
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>func appendLength(dst []byte, i int) []byte {
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	n := lengthLength(i)
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	for ; n &gt; 0; n-- {
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>		dst = append(dst, byte(i&gt;&gt;uint((n-1)*8)))
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>	}
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	return dst
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>}
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>func lengthLength(i int) (numBytes int) {
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	numBytes = 1
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	for i &gt; 255 {
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>		numBytes++
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		i &gt;&gt;= 8
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	}
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	return
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>}
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>func appendTagAndLength(dst []byte, t tagAndLength) []byte {
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	b := uint8(t.class) &lt;&lt; 6
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>	if t.isCompound {
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>		b |= 0x20
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	}
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	if t.tag &gt;= 31 {
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>		b |= 0x1f
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>		dst = append(dst, b)
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>		dst = appendBase128Int(dst, int64(t.tag))
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>	} else {
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>		b |= uint8(t.tag)
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>		dst = append(dst, b)
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	}
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	if t.length &gt;= 128 {
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>		l := lengthLength(t.length)
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>		dst = append(dst, 0x80|byte(l))
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		dst = appendLength(dst, t.length)
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	} else {
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>		dst = append(dst, byte(t.length))
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	}
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	return dst
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>}
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>type bitStringEncoder BitString
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>func (b bitStringEncoder) Len() int {
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	return len(b.Bytes) + 1
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>}
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>func (b bitStringEncoder) Encode(dst []byte) {
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	dst[0] = byte((8 - b.BitLength%8) % 8)
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	if copy(dst[1:], b.Bytes) != len(b.Bytes) {
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>		panic(&#34;internal error&#34;)
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	}
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>}
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>type oidEncoder []int
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>func (oid oidEncoder) Len() int {
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	l := base128IntLength(int64(oid[0]*40 + oid[1]))
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>	for i := 2; i &lt; len(oid); i++ {
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		l += base128IntLength(int64(oid[i]))
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>	}
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	return l
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>}
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>func (oid oidEncoder) Encode(dst []byte) {
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	dst = appendBase128Int(dst[:0], int64(oid[0]*40+oid[1]))
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	for i := 2; i &lt; len(oid); i++ {
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>		dst = appendBase128Int(dst, int64(oid[i]))
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	}
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>}
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>func makeObjectIdentifier(oid []int) (e encoder, err error) {
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	if len(oid) &lt; 2 || oid[0] &gt; 2 || (oid[0] &lt; 2 &amp;&amp; oid[1] &gt;= 40) {
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>		return nil, StructuralError{&#34;invalid object identifier&#34;}
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	}
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	return oidEncoder(oid), nil
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>}
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>func makePrintableString(s string) (e encoder, err error) {
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		if !isPrintable(s[i]) {
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>			return nil, StructuralError{&#34;PrintableString contains invalid character&#34;}
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>		}
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	}
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	return stringEncoder(s), nil
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>}
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>func makeIA5String(s string) (e encoder, err error) {
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>		if s[i] &gt; 127 {
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>			return nil, StructuralError{&#34;IA5String contains invalid character&#34;}
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		}
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	return stringEncoder(s), nil
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>}
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>func makeUTF8String(s string) encoder {
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>	return stringEncoder(s)
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>}
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>func appendTwoDigits(dst []byte, v int) []byte {
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	return append(dst, byte(&#39;0&#39;+(v/10)%10), byte(&#39;0&#39;+v%10))
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>}
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>func appendFourDigits(dst []byte, v int) []byte {
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	var bytes [4]byte
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	for i := range bytes {
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		bytes[3-i] = &#39;0&#39; + byte(v%10)
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>		v /= 10
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	}
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	return append(dst, bytes[:]...)
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>}
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>func outsideUTCRange(t time.Time) bool {
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>	year := t.Year()
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>	return year &lt; 1950 || year &gt;= 2050
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>}
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>func makeUTCTime(t time.Time) (e encoder, err error) {
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	dst := make([]byte, 0, 18)
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	dst, err = appendUTCTime(dst, t)
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>		return nil, err
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	}
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>	return bytesEncoder(dst), nil
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>}
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>func makeGeneralizedTime(t time.Time) (e encoder, err error) {
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	dst := make([]byte, 0, 20)
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>	dst, err = appendGeneralizedTime(dst, t)
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>		return nil, err
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>	}
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	return bytesEncoder(dst), nil
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>}
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>func appendUTCTime(dst []byte, t time.Time) (ret []byte, err error) {
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>	year := t.Year()
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>	switch {
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	case 1950 &lt;= year &amp;&amp; year &lt; 2000:
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		dst = appendTwoDigits(dst, year-1900)
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	case 2000 &lt;= year &amp;&amp; year &lt; 2050:
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>		dst = appendTwoDigits(dst, year-2000)
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	default:
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>		return nil, StructuralError{&#34;cannot represent time as UTCTime&#34;}
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	}
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	return appendTimeCommon(dst, t), nil
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>}
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>func appendGeneralizedTime(dst []byte, t time.Time) (ret []byte, err error) {
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>	year := t.Year()
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	if year &lt; 0 || year &gt; 9999 {
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>		return nil, StructuralError{&#34;cannot represent time as GeneralizedTime&#34;}
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>	}
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>	dst = appendFourDigits(dst, year)
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	return appendTimeCommon(dst, t), nil
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>}
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>func appendTimeCommon(dst []byte, t time.Time) []byte {
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	_, month, day := t.Date()
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	dst = appendTwoDigits(dst, int(month))
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	dst = appendTwoDigits(dst, day)
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	hour, min, sec := t.Clock()
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	dst = appendTwoDigits(dst, hour)
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	dst = appendTwoDigits(dst, min)
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	dst = appendTwoDigits(dst, sec)
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>	_, offset := t.Zone()
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	switch {
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	case offset/60 == 0:
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>		return append(dst, &#39;Z&#39;)
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>	case offset &gt; 0:
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>		dst = append(dst, &#39;+&#39;)
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>	case offset &lt; 0:
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>		dst = append(dst, &#39;-&#39;)
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>	}
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	offsetMinutes := offset / 60
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>	if offsetMinutes &lt; 0 {
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		offsetMinutes = -offsetMinutes
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>	}
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>	dst = appendTwoDigits(dst, offsetMinutes/60)
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	dst = appendTwoDigits(dst, offsetMinutes%60)
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>	return dst
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>}
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>func stripTagAndLength(in []byte) []byte {
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>	_, offset, err := parseTagAndLength(in, 0)
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>		return in
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>	}
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>	return in[offset:]
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>}
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>func makeBody(value reflect.Value, params fieldParameters) (e encoder, err error) {
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	switch value.Type() {
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>	case flagType:
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>		return bytesEncoder(nil), nil
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>	case timeType:
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>		t := value.Interface().(time.Time)
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>		if params.timeType == TagGeneralizedTime || outsideUTCRange(t) {
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>			return makeGeneralizedTime(t)
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>		}
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>		return makeUTCTime(t)
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>	case bitStringType:
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>		return bitStringEncoder(value.Interface().(BitString)), nil
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>	case objectIdentifierType:
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		return makeObjectIdentifier(value.Interface().(ObjectIdentifier))
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>	case bigIntType:
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>		return makeBigInt(value.Interface().(*big.Int))
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>	}
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>	switch v := value; v.Kind() {
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>	case reflect.Bool:
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>		if v.Bool() {
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>			return byteFFEncoder, nil
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>		}
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>		return byte00Encoder, nil
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>		return int64Encoder(v.Int()), nil
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>	case reflect.Struct:
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>		t := v.Type()
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>		for i := 0; i &lt; t.NumField(); i++ {
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>			if t.Field(i).PkgPath != &#34;&#34; {
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>				return nil, StructuralError{&#34;struct contains unexported fields&#34;}
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>			}
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>		}
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>		startingField := 0
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>		n := t.NumField()
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>		if n == 0 {
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>			return bytesEncoder(nil), nil
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>		}
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>		<span class="comment">// If the first element of the structure is a non-empty</span>
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>		<span class="comment">// RawContents, then we don&#39;t bother serializing the rest.</span>
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>		if t.Field(0).Type == rawContentsType {
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>			s := v.Field(0)
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>			if s.Len() &gt; 0 {
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>				bytes := s.Bytes()
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>				<span class="comment">/* The RawContents will contain the tag and
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>				 * length fields but we&#39;ll also be writing
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>				 * those ourselves, so we strip them out of
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>				 * bytes */</span>
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>				return bytesEncoder(stripTagAndLength(bytes)), nil
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>			}
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>			startingField = 1
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>		}
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>		switch n1 := n - startingField; n1 {
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>		case 0:
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>			return bytesEncoder(nil), nil
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>		case 1:
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>			return makeField(v.Field(startingField), parseFieldParameters(t.Field(startingField).Tag.Get(&#34;asn1&#34;)))
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>		default:
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>			m := make([]encoder, n1)
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>			for i := 0; i &lt; n1; i++ {
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>				m[i], err = makeField(v.Field(i+startingField), parseFieldParameters(t.Field(i+startingField).Tag.Get(&#34;asn1&#34;)))
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>				if err != nil {
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>					return nil, err
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>				}
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>			}
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>			return multiEncoder(m), nil
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>		}
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>	case reflect.Slice:
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>		sliceType := v.Type()
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>		if sliceType.Elem().Kind() == reflect.Uint8 {
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>			return bytesEncoder(v.Bytes()), nil
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>		}
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		var fp fieldParameters
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>		switch l := v.Len(); l {
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>		case 0:
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>			return bytesEncoder(nil), nil
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		case 1:
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>			return makeField(v.Index(0), fp)
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>		default:
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>			m := make([]encoder, l)
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>			for i := 0; i &lt; l; i++ {
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>				m[i], err = makeField(v.Index(i), fp)
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>				if err != nil {
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>					return nil, err
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>				}
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>			}
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>			return multiEncoder(m), nil
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>		}
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>	case reflect.String:
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>		switch params.stringType {
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>		case TagIA5String:
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>			return makeIA5String(v.String())
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>		case TagPrintableString:
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>			return makePrintableString(v.String())
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>		default:
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>			return makeUTF8String(v.String()), nil
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>		}
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>	}
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>	return nil, StructuralError{&#34;unknown Go type&#34;}
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>}
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>func makeField(v reflect.Value, params fieldParameters) (e encoder, err error) {
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>	if !v.IsValid() {
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>		return nil, fmt.Errorf(&#34;asn1: cannot marshal nil value&#34;)
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>	}
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>	<span class="comment">// If the field is an interface{} then recurse into it.</span>
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>	if v.Kind() == reflect.Interface &amp;&amp; v.Type().NumMethod() == 0 {
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>		return makeField(v.Elem(), params)
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>	}
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>	if v.Kind() == reflect.Slice &amp;&amp; v.Len() == 0 &amp;&amp; params.omitEmpty {
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>		return bytesEncoder(nil), nil
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>	}
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>	if params.optional &amp;&amp; params.defaultValue != nil &amp;&amp; canHaveDefaultValue(v.Kind()) {
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>		defaultValue := reflect.New(v.Type()).Elem()
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		defaultValue.SetInt(*params.defaultValue)
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>		if reflect.DeepEqual(v.Interface(), defaultValue.Interface()) {
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>			return bytesEncoder(nil), nil
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>		}
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>	}
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>	<span class="comment">// If no default value is given then the zero value for the type is</span>
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>	<span class="comment">// assumed to be the default value. This isn&#39;t obviously the correct</span>
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>	<span class="comment">// behavior, but it&#39;s what Go has traditionally done.</span>
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	if params.optional &amp;&amp; params.defaultValue == nil {
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>		if reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()).Interface()) {
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>			return bytesEncoder(nil), nil
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		}
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	}
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>	if v.Type() == rawValueType {
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>		rv := v.Interface().(RawValue)
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>		if len(rv.FullBytes) != 0 {
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>			return bytesEncoder(rv.FullBytes), nil
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>		}
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>		t := new(taggedEncoder)
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>		t.tag = bytesEncoder(appendTagAndLength(t.scratch[:0], tagAndLength{rv.Class, rv.Tag, len(rv.Bytes), rv.IsCompound}))
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>		t.body = bytesEncoder(rv.Bytes)
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>		return t, nil
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>	}
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>	tag, isCompound, ok := getUniversalType(v.Type())
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>	if !ok {
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>		return nil, StructuralError{fmt.Sprintf(&#34;unknown Go type: %v&#34;, v.Type())}
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>	}
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>	class := ClassUniversal
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	if params.timeType != 0 &amp;&amp; tag != TagUTCTime {
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>		return nil, StructuralError{&#34;explicit time type given to non-time member&#34;}
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>	}
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>	if params.stringType != 0 &amp;&amp; tag != TagPrintableString {
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>		return nil, StructuralError{&#34;explicit string type given to non-string member&#34;}
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>	}
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>	switch tag {
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>	case TagPrintableString:
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>		if params.stringType == 0 {
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>			<span class="comment">// This is a string without an explicit string type. We&#39;ll use</span>
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>			<span class="comment">// a PrintableString if the character set in the string is</span>
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>			<span class="comment">// sufficiently limited, otherwise we&#39;ll use a UTF8String.</span>
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>			for _, r := range v.String() {
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>				if r &gt;= utf8.RuneSelf || !isPrintable(byte(r)) {
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>					if !utf8.ValidString(v.String()) {
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>						return nil, errors.New(&#34;asn1: string not valid UTF-8&#34;)
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>					}
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>					tag = TagUTF8String
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>					break
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>				}
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>			}
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>		} else {
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>			tag = params.stringType
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>		}
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>	case TagUTCTime:
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>		if params.timeType == TagGeneralizedTime || outsideUTCRange(v.Interface().(time.Time)) {
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>			tag = TagGeneralizedTime
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>		}
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>	}
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>	if params.set {
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>		if tag != TagSequence {
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>			return nil, StructuralError{&#34;non sequence tagged as set&#34;}
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>		}
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>		tag = TagSet
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>	}
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>	t := new(taggedEncoder)
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>	t.body, err = makeBody(v, params)
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>		return nil, err
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>	}
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>	bodyLen := t.body.Len()
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>	if params.explicit {
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>		t.tag = bytesEncoder(appendTagAndLength(t.scratch[:0], tagAndLength{class, tag, bodyLen, isCompound}))
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>		tt := new(taggedEncoder)
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>		tt.body = t
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>		tt.tag = bytesEncoder(appendTagAndLength(tt.scratch[:0], tagAndLength{
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>			class:      ClassContextSpecific,
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>			tag:        *params.tag,
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>			length:     bodyLen + t.tag.Len(),
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>			isCompound: true,
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>		}))
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>		return tt, nil
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>	}
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>	if params.tag != nil {
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>		<span class="comment">// implicit tag.</span>
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>		tag = *params.tag
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>		class = ClassContextSpecific
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>	}
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>	t.tag = bytesEncoder(appendTagAndLength(t.scratch[:0], tagAndLength{class, tag, bodyLen, isCompound}))
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>	return t, nil
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>}
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span><span class="comment">// Marshal returns the ASN.1 encoding of val.</span>
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span><span class="comment">// In addition to the struct tags recognised by Unmarshal, the following can be</span>
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span><span class="comment">// used:</span>
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span><span class="comment">//	ia5:         causes strings to be marshaled as ASN.1, IA5String values</span>
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span><span class="comment">//	omitempty:   causes empty slices to be skipped</span>
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span><span class="comment">//	printable:   causes strings to be marshaled as ASN.1, PrintableString values</span>
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span><span class="comment">//	utf8:        causes strings to be marshaled as ASN.1, UTF8String values</span>
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span><span class="comment">//	utc:         causes time.Time to be marshaled as ASN.1, UTCTime values</span>
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span><span class="comment">//	generalized: causes time.Time to be marshaled as ASN.1, GeneralizedTime values</span>
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>func Marshal(val interface{}) ([]byte, error) {
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>	e, err := makeField(reflect.ValueOf(val), fieldParameters{})
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>		return nil, err
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>	}
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>	b := make([]byte, e.Len())
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>	e.Encode(b)
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>	return b, nil
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>}
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>
+</pre><p><a href="marshal.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

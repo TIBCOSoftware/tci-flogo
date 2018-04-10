@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/sha512/sha512block_ppc64le.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="sha512block_ppc64le.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../sha512.1.html">sha512</a>/<span class="text-muted">sha512block_ppc64le.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/sha512.1.html">crypto/sha512</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2016 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	// This is a derived work from OpenSSL of SHA-2 using assembly optimizations. The
+<span id="L6" class="ln">     6</span>	// original code was written by Andy Polyakov &lt;appro@openssl.org&gt; and it&#39;s dual
+<span id="L7" class="ln">     7</span>	// licensed under OpenSSL and CRYPTOGAMS licenses depending on where you obtain
+<span id="L8" class="ln">     8</span>	// it. For further details see http://www.openssl.org/~appro/cryptogams/.
+<span id="L9" class="ln">     9</span>	
+<span id="L10" class="ln">    10</span>	#include &#34;textflag.h&#34;
+<span id="L11" class="ln">    11</span>	
+<span id="L12" class="ln">    12</span>	// SHA512 block routine. See sha512block.go for Go equivalent.
+<span id="L13" class="ln">    13</span>	//
+<span id="L14" class="ln">    14</span>	// The algorithm is detailed in FIPS 180-4:
+<span id="L15" class="ln">    15</span>	//
+<span id="L16" class="ln">    16</span>	//  http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf
+<span id="L17" class="ln">    17</span>	//
+<span id="L18" class="ln">    18</span>	// Wt = Mt; for 0 &lt;= t &lt;= 15
+<span id="L19" class="ln">    19</span>	// Wt = SIGMA1(Wt-2) + SIGMA0(Wt-15) + Wt-16; for 16 &lt;= t &lt;= 79
+<span id="L20" class="ln">    20</span>	//
+<span id="L21" class="ln">    21</span>	// a = H0
+<span id="L22" class="ln">    22</span>	// b = H1
+<span id="L23" class="ln">    23</span>	// c = H2
+<span id="L24" class="ln">    24</span>	// d = H3
+<span id="L25" class="ln">    25</span>	// e = H4
+<span id="L26" class="ln">    26</span>	// f = H5
+<span id="L27" class="ln">    27</span>	// g = H6
+<span id="L28" class="ln">    28</span>	// h = H7
+<span id="L29" class="ln">    29</span>	//
+<span id="L30" class="ln">    30</span>	// for t = 0 to 79 {
+<span id="L31" class="ln">    31</span>	//    T1 = h + BIGSIGMA1(e) + Ch(e,f,g) + Kt + Wt
+<span id="L32" class="ln">    32</span>	//    T2 = BIGSIGMA0(a) + Maj(a,b,c)
+<span id="L33" class="ln">    33</span>	//    h = g
+<span id="L34" class="ln">    34</span>	//    g = f
+<span id="L35" class="ln">    35</span>	//    f = e
+<span id="L36" class="ln">    36</span>	//    e = d + T1
+<span id="L37" class="ln">    37</span>	//    d = c
+<span id="L38" class="ln">    38</span>	//    c = b
+<span id="L39" class="ln">    39</span>	//    b = a
+<span id="L40" class="ln">    40</span>	//    a = T1 + T2
+<span id="L41" class="ln">    41</span>	// }
+<span id="L42" class="ln">    42</span>	//
+<span id="L43" class="ln">    43</span>	// H0 = a + H0
+<span id="L44" class="ln">    44</span>	// H1 = b + H1
+<span id="L45" class="ln">    45</span>	// H2 = c + H2
+<span id="L46" class="ln">    46</span>	// H3 = d + H3
+<span id="L47" class="ln">    47</span>	// H4 = e + H4
+<span id="L48" class="ln">    48</span>	// H5 = f + H5
+<span id="L49" class="ln">    49</span>	// H6 = g + H6
+<span id="L50" class="ln">    50</span>	// H7 = h + H7
+<span id="L51" class="ln">    51</span>	
+<span id="L52" class="ln">    52</span>	#define CTX	R3
+<span id="L53" class="ln">    53</span>	#define INP	R4
+<span id="L54" class="ln">    54</span>	#define END	R5
+<span id="L55" class="ln">    55</span>	#define TBL	R6
+<span id="L56" class="ln">    56</span>	#define IDX	R7
+<span id="L57" class="ln">    57</span>	#define CNT	R8
+<span id="L58" class="ln">    58</span>	#define LEN	R9
+<span id="L59" class="ln">    59</span>	#define OFFLOAD	R11
+<span id="L60" class="ln">    60</span>	#define TEMP	R12
+<span id="L61" class="ln">    61</span>	
+<span id="L62" class="ln">    62</span>	#define HEX00	R0
+<span id="L63" class="ln">    63</span>	#define HEX10	R10
+<span id="L64" class="ln">    64</span>	#define HEX20	R25
+<span id="L65" class="ln">    65</span>	#define HEX30	R26
+<span id="L66" class="ln">    66</span>	#define HEX40	R27
+<span id="L67" class="ln">    67</span>	#define HEX50	R28
+<span id="L68" class="ln">    68</span>	#define HEX60	R29
+<span id="L69" class="ln">    69</span>	#define HEX70	R31
+<span id="L70" class="ln">    70</span>	
+<span id="L71" class="ln">    71</span>	// V0-V7 are A-H
+<span id="L72" class="ln">    72</span>	// V8-V23 are used for the message schedule
+<span id="L73" class="ln">    73</span>	#define KI	V24
+<span id="L74" class="ln">    74</span>	#define FUNC	V25
+<span id="L75" class="ln">    75</span>	#define S0	V26
+<span id="L76" class="ln">    76</span>	#define S1	V27
+<span id="L77" class="ln">    77</span>	#define s0	V28
+<span id="L78" class="ln">    78</span>	#define s1	V29
+<span id="L79" class="ln">    79</span>	#define LEMASK	V31	// Permutation control register for little endian
+<span id="L80" class="ln">    80</span>	
+<span id="L81" class="ln">    81</span>	// 2 copies of each Kt, to fill both doublewords of a vector register
+<span id="L82" class="ln">    82</span>	DATA  ·kcon+0x000(SB)/8, $0x428a2f98d728ae22
+<span id="L83" class="ln">    83</span>	DATA  ·kcon+0x008(SB)/8, $0x428a2f98d728ae22
+<span id="L84" class="ln">    84</span>	DATA  ·kcon+0x010(SB)/8, $0x7137449123ef65cd
+<span id="L85" class="ln">    85</span>	DATA  ·kcon+0x018(SB)/8, $0x7137449123ef65cd
+<span id="L86" class="ln">    86</span>	DATA  ·kcon+0x020(SB)/8, $0xb5c0fbcfec4d3b2f
+<span id="L87" class="ln">    87</span>	DATA  ·kcon+0x028(SB)/8, $0xb5c0fbcfec4d3b2f
+<span id="L88" class="ln">    88</span>	DATA  ·kcon+0x030(SB)/8, $0xe9b5dba58189dbbc
+<span id="L89" class="ln">    89</span>	DATA  ·kcon+0x038(SB)/8, $0xe9b5dba58189dbbc
+<span id="L90" class="ln">    90</span>	DATA  ·kcon+0x040(SB)/8, $0x3956c25bf348b538
+<span id="L91" class="ln">    91</span>	DATA  ·kcon+0x048(SB)/8, $0x3956c25bf348b538
+<span id="L92" class="ln">    92</span>	DATA  ·kcon+0x050(SB)/8, $0x59f111f1b605d019
+<span id="L93" class="ln">    93</span>	DATA  ·kcon+0x058(SB)/8, $0x59f111f1b605d019
+<span id="L94" class="ln">    94</span>	DATA  ·kcon+0x060(SB)/8, $0x923f82a4af194f9b
+<span id="L95" class="ln">    95</span>	DATA  ·kcon+0x068(SB)/8, $0x923f82a4af194f9b
+<span id="L96" class="ln">    96</span>	DATA  ·kcon+0x070(SB)/8, $0xab1c5ed5da6d8118
+<span id="L97" class="ln">    97</span>	DATA  ·kcon+0x078(SB)/8, $0xab1c5ed5da6d8118
+<span id="L98" class="ln">    98</span>	DATA  ·kcon+0x080(SB)/8, $0xd807aa98a3030242
+<span id="L99" class="ln">    99</span>	DATA  ·kcon+0x088(SB)/8, $0xd807aa98a3030242
+<span id="L100" class="ln">   100</span>	DATA  ·kcon+0x090(SB)/8, $0x12835b0145706fbe
+<span id="L101" class="ln">   101</span>	DATA  ·kcon+0x098(SB)/8, $0x12835b0145706fbe
+<span id="L102" class="ln">   102</span>	DATA  ·kcon+0x0A0(SB)/8, $0x243185be4ee4b28c
+<span id="L103" class="ln">   103</span>	DATA  ·kcon+0x0A8(SB)/8, $0x243185be4ee4b28c
+<span id="L104" class="ln">   104</span>	DATA  ·kcon+0x0B0(SB)/8, $0x550c7dc3d5ffb4e2
+<span id="L105" class="ln">   105</span>	DATA  ·kcon+0x0B8(SB)/8, $0x550c7dc3d5ffb4e2
+<span id="L106" class="ln">   106</span>	DATA  ·kcon+0x0C0(SB)/8, $0x72be5d74f27b896f
+<span id="L107" class="ln">   107</span>	DATA  ·kcon+0x0C8(SB)/8, $0x72be5d74f27b896f
+<span id="L108" class="ln">   108</span>	DATA  ·kcon+0x0D0(SB)/8, $0x80deb1fe3b1696b1
+<span id="L109" class="ln">   109</span>	DATA  ·kcon+0x0D8(SB)/8, $0x80deb1fe3b1696b1
+<span id="L110" class="ln">   110</span>	DATA  ·kcon+0x0E0(SB)/8, $0x9bdc06a725c71235
+<span id="L111" class="ln">   111</span>	DATA  ·kcon+0x0E8(SB)/8, $0x9bdc06a725c71235
+<span id="L112" class="ln">   112</span>	DATA  ·kcon+0x0F0(SB)/8, $0xc19bf174cf692694
+<span id="L113" class="ln">   113</span>	DATA  ·kcon+0x0F8(SB)/8, $0xc19bf174cf692694
+<span id="L114" class="ln">   114</span>	DATA  ·kcon+0x100(SB)/8, $0xe49b69c19ef14ad2
+<span id="L115" class="ln">   115</span>	DATA  ·kcon+0x108(SB)/8, $0xe49b69c19ef14ad2
+<span id="L116" class="ln">   116</span>	DATA  ·kcon+0x110(SB)/8, $0xefbe4786384f25e3
+<span id="L117" class="ln">   117</span>	DATA  ·kcon+0x118(SB)/8, $0xefbe4786384f25e3
+<span id="L118" class="ln">   118</span>	DATA  ·kcon+0x120(SB)/8, $0x0fc19dc68b8cd5b5
+<span id="L119" class="ln">   119</span>	DATA  ·kcon+0x128(SB)/8, $0x0fc19dc68b8cd5b5
+<span id="L120" class="ln">   120</span>	DATA  ·kcon+0x130(SB)/8, $0x240ca1cc77ac9c65
+<span id="L121" class="ln">   121</span>	DATA  ·kcon+0x138(SB)/8, $0x240ca1cc77ac9c65
+<span id="L122" class="ln">   122</span>	DATA  ·kcon+0x140(SB)/8, $0x2de92c6f592b0275
+<span id="L123" class="ln">   123</span>	DATA  ·kcon+0x148(SB)/8, $0x2de92c6f592b0275
+<span id="L124" class="ln">   124</span>	DATA  ·kcon+0x150(SB)/8, $0x4a7484aa6ea6e483
+<span id="L125" class="ln">   125</span>	DATA  ·kcon+0x158(SB)/8, $0x4a7484aa6ea6e483
+<span id="L126" class="ln">   126</span>	DATA  ·kcon+0x160(SB)/8, $0x5cb0a9dcbd41fbd4
+<span id="L127" class="ln">   127</span>	DATA  ·kcon+0x168(SB)/8, $0x5cb0a9dcbd41fbd4
+<span id="L128" class="ln">   128</span>	DATA  ·kcon+0x170(SB)/8, $0x76f988da831153b5
+<span id="L129" class="ln">   129</span>	DATA  ·kcon+0x178(SB)/8, $0x76f988da831153b5
+<span id="L130" class="ln">   130</span>	DATA  ·kcon+0x180(SB)/8, $0x983e5152ee66dfab
+<span id="L131" class="ln">   131</span>	DATA  ·kcon+0x188(SB)/8, $0x983e5152ee66dfab
+<span id="L132" class="ln">   132</span>	DATA  ·kcon+0x190(SB)/8, $0xa831c66d2db43210
+<span id="L133" class="ln">   133</span>	DATA  ·kcon+0x198(SB)/8, $0xa831c66d2db43210
+<span id="L134" class="ln">   134</span>	DATA  ·kcon+0x1A0(SB)/8, $0xb00327c898fb213f
+<span id="L135" class="ln">   135</span>	DATA  ·kcon+0x1A8(SB)/8, $0xb00327c898fb213f
+<span id="L136" class="ln">   136</span>	DATA  ·kcon+0x1B0(SB)/8, $0xbf597fc7beef0ee4
+<span id="L137" class="ln">   137</span>	DATA  ·kcon+0x1B8(SB)/8, $0xbf597fc7beef0ee4
+<span id="L138" class="ln">   138</span>	DATA  ·kcon+0x1C0(SB)/8, $0xc6e00bf33da88fc2
+<span id="L139" class="ln">   139</span>	DATA  ·kcon+0x1C8(SB)/8, $0xc6e00bf33da88fc2
+<span id="L140" class="ln">   140</span>	DATA  ·kcon+0x1D0(SB)/8, $0xd5a79147930aa725
+<span id="L141" class="ln">   141</span>	DATA  ·kcon+0x1D8(SB)/8, $0xd5a79147930aa725
+<span id="L142" class="ln">   142</span>	DATA  ·kcon+0x1E0(SB)/8, $0x06ca6351e003826f
+<span id="L143" class="ln">   143</span>	DATA  ·kcon+0x1E8(SB)/8, $0x06ca6351e003826f
+<span id="L144" class="ln">   144</span>	DATA  ·kcon+0x1F0(SB)/8, $0x142929670a0e6e70
+<span id="L145" class="ln">   145</span>	DATA  ·kcon+0x1F8(SB)/8, $0x142929670a0e6e70
+<span id="L146" class="ln">   146</span>	DATA  ·kcon+0x200(SB)/8, $0x27b70a8546d22ffc
+<span id="L147" class="ln">   147</span>	DATA  ·kcon+0x208(SB)/8, $0x27b70a8546d22ffc
+<span id="L148" class="ln">   148</span>	DATA  ·kcon+0x210(SB)/8, $0x2e1b21385c26c926
+<span id="L149" class="ln">   149</span>	DATA  ·kcon+0x218(SB)/8, $0x2e1b21385c26c926
+<span id="L150" class="ln">   150</span>	DATA  ·kcon+0x220(SB)/8, $0x4d2c6dfc5ac42aed
+<span id="L151" class="ln">   151</span>	DATA  ·kcon+0x228(SB)/8, $0x4d2c6dfc5ac42aed
+<span id="L152" class="ln">   152</span>	DATA  ·kcon+0x230(SB)/8, $0x53380d139d95b3df
+<span id="L153" class="ln">   153</span>	DATA  ·kcon+0x238(SB)/8, $0x53380d139d95b3df
+<span id="L154" class="ln">   154</span>	DATA  ·kcon+0x240(SB)/8, $0x650a73548baf63de
+<span id="L155" class="ln">   155</span>	DATA  ·kcon+0x248(SB)/8, $0x650a73548baf63de
+<span id="L156" class="ln">   156</span>	DATA  ·kcon+0x250(SB)/8, $0x766a0abb3c77b2a8
+<span id="L157" class="ln">   157</span>	DATA  ·kcon+0x258(SB)/8, $0x766a0abb3c77b2a8
+<span id="L158" class="ln">   158</span>	DATA  ·kcon+0x260(SB)/8, $0x81c2c92e47edaee6
+<span id="L159" class="ln">   159</span>	DATA  ·kcon+0x268(SB)/8, $0x81c2c92e47edaee6
+<span id="L160" class="ln">   160</span>	DATA  ·kcon+0x270(SB)/8, $0x92722c851482353b
+<span id="L161" class="ln">   161</span>	DATA  ·kcon+0x278(SB)/8, $0x92722c851482353b
+<span id="L162" class="ln">   162</span>	DATA  ·kcon+0x280(SB)/8, $0xa2bfe8a14cf10364
+<span id="L163" class="ln">   163</span>	DATA  ·kcon+0x288(SB)/8, $0xa2bfe8a14cf10364
+<span id="L164" class="ln">   164</span>	DATA  ·kcon+0x290(SB)/8, $0xa81a664bbc423001
+<span id="L165" class="ln">   165</span>	DATA  ·kcon+0x298(SB)/8, $0xa81a664bbc423001
+<span id="L166" class="ln">   166</span>	DATA  ·kcon+0x2A0(SB)/8, $0xc24b8b70d0f89791
+<span id="L167" class="ln">   167</span>	DATA  ·kcon+0x2A8(SB)/8, $0xc24b8b70d0f89791
+<span id="L168" class="ln">   168</span>	DATA  ·kcon+0x2B0(SB)/8, $0xc76c51a30654be30
+<span id="L169" class="ln">   169</span>	DATA  ·kcon+0x2B8(SB)/8, $0xc76c51a30654be30
+<span id="L170" class="ln">   170</span>	DATA  ·kcon+0x2C0(SB)/8, $0xd192e819d6ef5218
+<span id="L171" class="ln">   171</span>	DATA  ·kcon+0x2C8(SB)/8, $0xd192e819d6ef5218
+<span id="L172" class="ln">   172</span>	DATA  ·kcon+0x2D0(SB)/8, $0xd69906245565a910
+<span id="L173" class="ln">   173</span>	DATA  ·kcon+0x2D8(SB)/8, $0xd69906245565a910
+<span id="L174" class="ln">   174</span>	DATA  ·kcon+0x2E0(SB)/8, $0xf40e35855771202a
+<span id="L175" class="ln">   175</span>	DATA  ·kcon+0x2E8(SB)/8, $0xf40e35855771202a
+<span id="L176" class="ln">   176</span>	DATA  ·kcon+0x2F0(SB)/8, $0x106aa07032bbd1b8
+<span id="L177" class="ln">   177</span>	DATA  ·kcon+0x2F8(SB)/8, $0x106aa07032bbd1b8
+<span id="L178" class="ln">   178</span>	DATA  ·kcon+0x300(SB)/8, $0x19a4c116b8d2d0c8
+<span id="L179" class="ln">   179</span>	DATA  ·kcon+0x308(SB)/8, $0x19a4c116b8d2d0c8
+<span id="L180" class="ln">   180</span>	DATA  ·kcon+0x310(SB)/8, $0x1e376c085141ab53
+<span id="L181" class="ln">   181</span>	DATA  ·kcon+0x318(SB)/8, $0x1e376c085141ab53
+<span id="L182" class="ln">   182</span>	DATA  ·kcon+0x320(SB)/8, $0x2748774cdf8eeb99
+<span id="L183" class="ln">   183</span>	DATA  ·kcon+0x328(SB)/8, $0x2748774cdf8eeb99
+<span id="L184" class="ln">   184</span>	DATA  ·kcon+0x330(SB)/8, $0x34b0bcb5e19b48a8
+<span id="L185" class="ln">   185</span>	DATA  ·kcon+0x338(SB)/8, $0x34b0bcb5e19b48a8
+<span id="L186" class="ln">   186</span>	DATA  ·kcon+0x340(SB)/8, $0x391c0cb3c5c95a63
+<span id="L187" class="ln">   187</span>	DATA  ·kcon+0x348(SB)/8, $0x391c0cb3c5c95a63
+<span id="L188" class="ln">   188</span>	DATA  ·kcon+0x350(SB)/8, $0x4ed8aa4ae3418acb
+<span id="L189" class="ln">   189</span>	DATA  ·kcon+0x358(SB)/8, $0x4ed8aa4ae3418acb
+<span id="L190" class="ln">   190</span>	DATA  ·kcon+0x360(SB)/8, $0x5b9cca4f7763e373
+<span id="L191" class="ln">   191</span>	DATA  ·kcon+0x368(SB)/8, $0x5b9cca4f7763e373
+<span id="L192" class="ln">   192</span>	DATA  ·kcon+0x370(SB)/8, $0x682e6ff3d6b2b8a3
+<span id="L193" class="ln">   193</span>	DATA  ·kcon+0x378(SB)/8, $0x682e6ff3d6b2b8a3
+<span id="L194" class="ln">   194</span>	DATA  ·kcon+0x380(SB)/8, $0x748f82ee5defb2fc
+<span id="L195" class="ln">   195</span>	DATA  ·kcon+0x388(SB)/8, $0x748f82ee5defb2fc
+<span id="L196" class="ln">   196</span>	DATA  ·kcon+0x390(SB)/8, $0x78a5636f43172f60
+<span id="L197" class="ln">   197</span>	DATA  ·kcon+0x398(SB)/8, $0x78a5636f43172f60
+<span id="L198" class="ln">   198</span>	DATA  ·kcon+0x3A0(SB)/8, $0x84c87814a1f0ab72
+<span id="L199" class="ln">   199</span>	DATA  ·kcon+0x3A8(SB)/8, $0x84c87814a1f0ab72
+<span id="L200" class="ln">   200</span>	DATA  ·kcon+0x3B0(SB)/8, $0x8cc702081a6439ec
+<span id="L201" class="ln">   201</span>	DATA  ·kcon+0x3B8(SB)/8, $0x8cc702081a6439ec
+<span id="L202" class="ln">   202</span>	DATA  ·kcon+0x3C0(SB)/8, $0x90befffa23631e28
+<span id="L203" class="ln">   203</span>	DATA  ·kcon+0x3C8(SB)/8, $0x90befffa23631e28
+<span id="L204" class="ln">   204</span>	DATA  ·kcon+0x3D0(SB)/8, $0xa4506cebde82bde9
+<span id="L205" class="ln">   205</span>	DATA  ·kcon+0x3D8(SB)/8, $0xa4506cebde82bde9
+<span id="L206" class="ln">   206</span>	DATA  ·kcon+0x3E0(SB)/8, $0xbef9a3f7b2c67915
+<span id="L207" class="ln">   207</span>	DATA  ·kcon+0x3E8(SB)/8, $0xbef9a3f7b2c67915
+<span id="L208" class="ln">   208</span>	DATA  ·kcon+0x3F0(SB)/8, $0xc67178f2e372532b
+<span id="L209" class="ln">   209</span>	DATA  ·kcon+0x3F8(SB)/8, $0xc67178f2e372532b
+<span id="L210" class="ln">   210</span>	DATA  ·kcon+0x400(SB)/8, $0xca273eceea26619c
+<span id="L211" class="ln">   211</span>	DATA  ·kcon+0x408(SB)/8, $0xca273eceea26619c
+<span id="L212" class="ln">   212</span>	DATA  ·kcon+0x410(SB)/8, $0xd186b8c721c0c207
+<span id="L213" class="ln">   213</span>	DATA  ·kcon+0x418(SB)/8, $0xd186b8c721c0c207
+<span id="L214" class="ln">   214</span>	DATA  ·kcon+0x420(SB)/8, $0xeada7dd6cde0eb1e
+<span id="L215" class="ln">   215</span>	DATA  ·kcon+0x428(SB)/8, $0xeada7dd6cde0eb1e
+<span id="L216" class="ln">   216</span>	DATA  ·kcon+0x430(SB)/8, $0xf57d4f7fee6ed178
+<span id="L217" class="ln">   217</span>	DATA  ·kcon+0x438(SB)/8, $0xf57d4f7fee6ed178
+<span id="L218" class="ln">   218</span>	DATA  ·kcon+0x440(SB)/8, $0x06f067aa72176fba
+<span id="L219" class="ln">   219</span>	DATA  ·kcon+0x448(SB)/8, $0x06f067aa72176fba
+<span id="L220" class="ln">   220</span>	DATA  ·kcon+0x450(SB)/8, $0x0a637dc5a2c898a6
+<span id="L221" class="ln">   221</span>	DATA  ·kcon+0x458(SB)/8, $0x0a637dc5a2c898a6
+<span id="L222" class="ln">   222</span>	DATA  ·kcon+0x460(SB)/8, $0x113f9804bef90dae
+<span id="L223" class="ln">   223</span>	DATA  ·kcon+0x468(SB)/8, $0x113f9804bef90dae
+<span id="L224" class="ln">   224</span>	DATA  ·kcon+0x470(SB)/8, $0x1b710b35131c471b
+<span id="L225" class="ln">   225</span>	DATA  ·kcon+0x478(SB)/8, $0x1b710b35131c471b
+<span id="L226" class="ln">   226</span>	DATA  ·kcon+0x480(SB)/8, $0x28db77f523047d84
+<span id="L227" class="ln">   227</span>	DATA  ·kcon+0x488(SB)/8, $0x28db77f523047d84
+<span id="L228" class="ln">   228</span>	DATA  ·kcon+0x490(SB)/8, $0x32caab7b40c72493
+<span id="L229" class="ln">   229</span>	DATA  ·kcon+0x498(SB)/8, $0x32caab7b40c72493
+<span id="L230" class="ln">   230</span>	DATA  ·kcon+0x4A0(SB)/8, $0x3c9ebe0a15c9bebc
+<span id="L231" class="ln">   231</span>	DATA  ·kcon+0x4A8(SB)/8, $0x3c9ebe0a15c9bebc
+<span id="L232" class="ln">   232</span>	DATA  ·kcon+0x4B0(SB)/8, $0x431d67c49c100d4c
+<span id="L233" class="ln">   233</span>	DATA  ·kcon+0x4B8(SB)/8, $0x431d67c49c100d4c
+<span id="L234" class="ln">   234</span>	DATA  ·kcon+0x4C0(SB)/8, $0x4cc5d4becb3e42b6
+<span id="L235" class="ln">   235</span>	DATA  ·kcon+0x4C8(SB)/8, $0x4cc5d4becb3e42b6
+<span id="L236" class="ln">   236</span>	DATA  ·kcon+0x4D0(SB)/8, $0x597f299cfc657e2a
+<span id="L237" class="ln">   237</span>	DATA  ·kcon+0x4D8(SB)/8, $0x597f299cfc657e2a
+<span id="L238" class="ln">   238</span>	DATA  ·kcon+0x4E0(SB)/8, $0x5fcb6fab3ad6faec
+<span id="L239" class="ln">   239</span>	DATA  ·kcon+0x4E8(SB)/8, $0x5fcb6fab3ad6faec
+<span id="L240" class="ln">   240</span>	DATA  ·kcon+0x4F0(SB)/8, $0x6c44198c4a475817
+<span id="L241" class="ln">   241</span>	DATA  ·kcon+0x4F8(SB)/8, $0x6c44198c4a475817
+<span id="L242" class="ln">   242</span>	DATA  ·kcon+0x500(SB)/8, $0x0000000000000000
+<span id="L243" class="ln">   243</span>	DATA  ·kcon+0x508(SB)/8, $0x0000000000000000
+<span id="L244" class="ln">   244</span>	DATA  ·kcon+0x510(SB)/8, $0x1011121314151617
+<span id="L245" class="ln">   245</span>	DATA  ·kcon+0x518(SB)/8, $0x0001020304050607
+<span id="L246" class="ln">   246</span>	GLOBL ·kcon(SB), RODATA, $1312
+<span id="L247" class="ln">   247</span>	
+<span id="L248" class="ln">   248</span>	#define SHA512ROUND0(a, b, c, d, e, f, g, h, xi) \
+<span id="L249" class="ln">   249</span>		VSEL		g, f, e, FUNC; \
+<span id="L250" class="ln">   250</span>		VSHASIGMAD	$15, e, $1, S1; \
+<span id="L251" class="ln">   251</span>		VADDUDM		xi, h, h; \
+<span id="L252" class="ln">   252</span>		VSHASIGMAD	$0, a, $1, S0; \
+<span id="L253" class="ln">   253</span>		VADDUDM		FUNC, h, h; \
+<span id="L254" class="ln">   254</span>		VXOR		b, a, FUNC; \
+<span id="L255" class="ln">   255</span>		VADDUDM		S1, h, h; \
+<span id="L256" class="ln">   256</span>		VSEL		b, c, FUNC, FUNC; \
+<span id="L257" class="ln">   257</span>		VADDUDM		KI, g, g; \
+<span id="L258" class="ln">   258</span>		VADDUDM		h, d, d; \
+<span id="L259" class="ln">   259</span>		VADDUDM		FUNC, S0, S0; \
+<span id="L260" class="ln">   260</span>		LVX		(TBL)(IDX), KI; \
+<span id="L261" class="ln">   261</span>		ADD		$16, IDX; \
+<span id="L262" class="ln">   262</span>		VADDUDM		S0, h, h
+<span id="L263" class="ln">   263</span>	
+<span id="L264" class="ln">   264</span>	#define SHA512ROUND1(a, b, c, d, e, f, g, h, xi, xj, xj_1, xj_9, xj_14) \
+<span id="L265" class="ln">   265</span>		VSHASIGMAD	$0, xj_1, $0, s0; \
+<span id="L266" class="ln">   266</span>		VSEL		g, f, e, FUNC; \
+<span id="L267" class="ln">   267</span>		VSHASIGMAD	$15, e, $1, S1; \
+<span id="L268" class="ln">   268</span>		VADDUDM		xi, h, h; \
+<span id="L269" class="ln">   269</span>		VSHASIGMAD	$0, a, $1, S0; \
+<span id="L270" class="ln">   270</span>		VSHASIGMAD	$15, xj_14, $0, s1; \
+<span id="L271" class="ln">   271</span>		VADDUDM		FUNC, h, h; \
+<span id="L272" class="ln">   272</span>		VXOR		b, a, FUNC; \
+<span id="L273" class="ln">   273</span>		VADDUDM		xj_9, xj, xj; \
+<span id="L274" class="ln">   274</span>		VADDUDM		S1, h, h; \
+<span id="L275" class="ln">   275</span>		VSEL		b, c, FUNC, FUNC; \
+<span id="L276" class="ln">   276</span>		VADDUDM		KI, g, g; \
+<span id="L277" class="ln">   277</span>		VADDUDM		h, d, d; \
+<span id="L278" class="ln">   278</span>		VADDUDM		FUNC, S0, S0; \
+<span id="L279" class="ln">   279</span>		VADDUDM		s0, xj, xj; \
+<span id="L280" class="ln">   280</span>		LVX		(TBL)(IDX), KI; \
+<span id="L281" class="ln">   281</span>		ADD		$16, IDX; \
+<span id="L282" class="ln">   282</span>		VADDUDM		S0, h, h; \
+<span id="L283" class="ln">   283</span>		VADDUDM		s1, xj, xj
+<span id="L284" class="ln">   284</span>	
+<span id="L285" class="ln">   285</span>	// func block(dig *digest, p []byte)
+<span id="L286" class="ln">   286</span>	TEXT ·block(SB),0,$128-32
+<span id="L287" class="ln">   287</span>		MOVD	dig+0(FP), CTX
+<span id="L288" class="ln">   288</span>		MOVD	p_base+8(FP), INP
+<span id="L289" class="ln">   289</span>		MOVD	p_len+16(FP), LEN
+<span id="L290" class="ln">   290</span>	
+<span id="L291" class="ln">   291</span>		SRD	$6, LEN
+<span id="L292" class="ln">   292</span>		SLD	$6, LEN
+<span id="L293" class="ln">   293</span>	
+<span id="L294" class="ln">   294</span>		ADD	INP, LEN, END
+<span id="L295" class="ln">   295</span>	
+<span id="L296" class="ln">   296</span>		CMP	INP, END
+<span id="L297" class="ln">   297</span>		BEQ	end
+<span id="L298" class="ln">   298</span>	
+<span id="L299" class="ln">   299</span>		MOVD	$·kcon(SB), TBL
+<span id="L300" class="ln">   300</span>		MOVD	R1, OFFLOAD
+<span id="L301" class="ln">   301</span>	
+<span id="L302" class="ln">   302</span>		MOVD	R0, CNT
+<span id="L303" class="ln">   303</span>		MOVWZ	$0x10, HEX10
+<span id="L304" class="ln">   304</span>		MOVWZ	$0x20, HEX20
+<span id="L305" class="ln">   305</span>		MOVWZ	$0x30, HEX30
+<span id="L306" class="ln">   306</span>		MOVWZ	$0x40, HEX40
+<span id="L307" class="ln">   307</span>		MOVWZ	$0x50, HEX50
+<span id="L308" class="ln">   308</span>		MOVWZ	$0x60, HEX60
+<span id="L309" class="ln">   309</span>		MOVWZ	$0x70, HEX70
+<span id="L310" class="ln">   310</span>	
+<span id="L311" class="ln">   311</span>		MOVWZ	$8, IDX
+<span id="L312" class="ln">   312</span>		LVSL	(IDX)(R0), LEMASK
+<span id="L313" class="ln">   313</span>		VSPLTISB	$0x0F, KI
+<span id="L314" class="ln">   314</span>		VXOR	KI, LEMASK, LEMASK
+<span id="L315" class="ln">   315</span>	
+<span id="L316" class="ln">   316</span>		LXVD2X	(CTX)(HEX00), VS32	// v0 = vs32
+<span id="L317" class="ln">   317</span>		LXVD2X	(CTX)(HEX10), VS34	// v2 = vs34
+<span id="L318" class="ln">   318</span>		LXVD2X	(CTX)(HEX20), VS36	// v4 = vs36
+<span id="L319" class="ln">   319</span>		// unpack the input values into vector registers
+<span id="L320" class="ln">   320</span>		VSLDOI	$8, V0, V0, V1
+<span id="L321" class="ln">   321</span>		LXVD2X	(CTX)(HEX30), VS38	// v6 = vs38
+<span id="L322" class="ln">   322</span>		VSLDOI	$8, V2, V2, V3
+<span id="L323" class="ln">   323</span>		VSLDOI	$8, V4, V4, V5
+<span id="L324" class="ln">   324</span>		VSLDOI	$8, V6, V6, V7
+<span id="L325" class="ln">   325</span>	
+<span id="L326" class="ln">   326</span>	loop:
+<span id="L327" class="ln">   327</span>		LVX	(TBL)(HEX00), KI
+<span id="L328" class="ln">   328</span>		MOVWZ	$16, IDX
+<span id="L329" class="ln">   329</span>	
+<span id="L330" class="ln">   330</span>		LXVD2X	(INP)(R0), VS40	// load v8 (=vs40) in advance
+<span id="L331" class="ln">   331</span>		ADD	$16, INP
+<span id="L332" class="ln">   332</span>	
+<span id="L333" class="ln">   333</span>		STVX	V0, (OFFLOAD+HEX00)
+<span id="L334" class="ln">   334</span>		STVX	V1, (OFFLOAD+HEX10)
+<span id="L335" class="ln">   335</span>		STVX	V2, (OFFLOAD+HEX20)
+<span id="L336" class="ln">   336</span>		STVX	V3, (OFFLOAD+HEX30)
+<span id="L337" class="ln">   337</span>		STVX	V4, (OFFLOAD+HEX40)
+<span id="L338" class="ln">   338</span>		STVX	V5, (OFFLOAD+HEX50)
+<span id="L339" class="ln">   339</span>		STVX	V6, (OFFLOAD+HEX60)
+<span id="L340" class="ln">   340</span>		STVX	V7, (OFFLOAD+HEX70)
+<span id="L341" class="ln">   341</span>	
+<span id="L342" class="ln">   342</span>		VADDUDM	KI, V7, V7	// h+K[i]
+<span id="L343" class="ln">   343</span>		LVX	(TBL)(IDX), KI
+<span id="L344" class="ln">   344</span>		ADD	$16, IDX
+<span id="L345" class="ln">   345</span>	
+<span id="L346" class="ln">   346</span>		VPERM	V8, V8, LEMASK, V8
+<span id="L347" class="ln">   347</span>		SHA512ROUND0(V0, V1, V2, V3, V4, V5, V6, V7, V8)
+<span id="L348" class="ln">   348</span>		LXVD2X	(INP)(R0), VS42	// load v10 (=vs42) in advance
+<span id="L349" class="ln">   349</span>		ADD	$16, INP, INP
+<span id="L350" class="ln">   350</span>		VSLDOI	$8, V8, V8, V9
+<span id="L351" class="ln">   351</span>		SHA512ROUND0(V7, V0, V1, V2, V3, V4, V5, V6, V9)
+<span id="L352" class="ln">   352</span>		VPERM	V10, V10, LEMASK, V10
+<span id="L353" class="ln">   353</span>		SHA512ROUND0(V6, V7, V0, V1, V2, V3, V4, V5, V10)
+<span id="L354" class="ln">   354</span>		LXVD2X	(INP)(R0), VS44	// load v12 (=vs44) in advance
+<span id="L355" class="ln">   355</span>		ADD	$16, INP, INP
+<span id="L356" class="ln">   356</span>		VSLDOI	$8, V10, V10, V11
+<span id="L357" class="ln">   357</span>		SHA512ROUND0(V5, V6, V7, V0, V1, V2, V3, V4, V11)
+<span id="L358" class="ln">   358</span>		VPERM	V12, V12, LEMASK, V12
+<span id="L359" class="ln">   359</span>		SHA512ROUND0(V4, V5, V6, V7, V0, V1, V2, V3, V12)
+<span id="L360" class="ln">   360</span>		LXVD2X	(INP)(R0), VS46	// load v14 (=vs46) in advance
+<span id="L361" class="ln">   361</span>		ADD	$16, INP, INP
+<span id="L362" class="ln">   362</span>		VSLDOI	$8, V12, V12, V13
+<span id="L363" class="ln">   363</span>		SHA512ROUND0(V3, V4, V5, V6, V7, V0, V1, V2, V13)
+<span id="L364" class="ln">   364</span>		VPERM	V14, V14, LEMASK, V14
+<span id="L365" class="ln">   365</span>		SHA512ROUND0(V2, V3, V4, V5, V6, V7, V0, V1, V14)
+<span id="L366" class="ln">   366</span>		LXVD2X	(INP)(R0), VS48	// load v16 (=vs48) in advance
+<span id="L367" class="ln">   367</span>		ADD	$16, INP, INP
+<span id="L368" class="ln">   368</span>		VSLDOI	$8, V14, V14, V15
+<span id="L369" class="ln">   369</span>		SHA512ROUND0(V1, V2, V3, V4, V5, V6, V7, V0, V15)
+<span id="L370" class="ln">   370</span>		VPERM	V16, V16, LEMASK, V16
+<span id="L371" class="ln">   371</span>		SHA512ROUND0(V0, V1, V2, V3, V4, V5, V6, V7, V16)
+<span id="L372" class="ln">   372</span>		LXVD2X	(INP)(R0), VS50	// load v18 (=vs50) in advance
+<span id="L373" class="ln">   373</span>		ADD	$16, INP, INP
+<span id="L374" class="ln">   374</span>		VSLDOI	$8, V16, V16, V17
+<span id="L375" class="ln">   375</span>		SHA512ROUND0(V7, V0, V1, V2, V3, V4, V5, V6, V17)
+<span id="L376" class="ln">   376</span>		VPERM	V18, V18, LEMASK, V18
+<span id="L377" class="ln">   377</span>		SHA512ROUND0(V6, V7, V0, V1, V2, V3, V4, V5, V18)
+<span id="L378" class="ln">   378</span>		LXVD2X	(INP)(R0), VS52	// load v20 (=vs52) in advance
+<span id="L379" class="ln">   379</span>		ADD	$16, INP, INP
+<span id="L380" class="ln">   380</span>		VSLDOI	$8, V18, V18, V19
+<span id="L381" class="ln">   381</span>		SHA512ROUND0(V5, V6, V7, V0, V1, V2, V3, V4, V19)
+<span id="L382" class="ln">   382</span>		VPERM	V20, V20, LEMASK, V20
+<span id="L383" class="ln">   383</span>		SHA512ROUND0(V4, V5, V6, V7, V0, V1, V2, V3, V20)
+<span id="L384" class="ln">   384</span>		LXVD2X	(INP)(R0), VS54	// load v22 (=vs54) in advance
+<span id="L385" class="ln">   385</span>		ADD	$16, INP, INP
+<span id="L386" class="ln">   386</span>		VSLDOI	$8, V20, V20, V21
+<span id="L387" class="ln">   387</span>		SHA512ROUND0(V3, V4, V5, V6, V7, V0, V1, V2, V21)
+<span id="L388" class="ln">   388</span>		VPERM	V22, V22, LEMASK, V22
+<span id="L389" class="ln">   389</span>		SHA512ROUND0(V2, V3, V4, V5, V6, V7, V0, V1, V22)
+<span id="L390" class="ln">   390</span>		VSLDOI	$8, V22, V22, V23
+<span id="L391" class="ln">   391</span>		SHA512ROUND1(V1, V2, V3, V4, V5, V6, V7, V0, V23, V8, V9, V17, V22)
+<span id="L392" class="ln">   392</span>	
+<span id="L393" class="ln">   393</span>		MOVWZ	$4, TEMP
+<span id="L394" class="ln">   394</span>		MOVWZ	TEMP, CTR
+<span id="L395" class="ln">   395</span>	
+<span id="L396" class="ln">   396</span>	L16_xx:
+<span id="L397" class="ln">   397</span>		SHA512ROUND1(V0, V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V18, V23)
+<span id="L398" class="ln">   398</span>		SHA512ROUND1(V7, V0, V1, V2, V3, V4, V5, V6, V9, V10, V11, V19, V8)
+<span id="L399" class="ln">   399</span>		SHA512ROUND1(V6, V7, V0, V1, V2, V3, V4, V5, V10, V11, V12, V20, V9)
+<span id="L400" class="ln">   400</span>		SHA512ROUND1(V5, V6, V7, V0, V1, V2, V3, V4, V11, V12, V13, V21, V10)
+<span id="L401" class="ln">   401</span>		SHA512ROUND1(V4, V5, V6, V7, V0, V1, V2, V3, V12, V13, V14, V22, V11)
+<span id="L402" class="ln">   402</span>		SHA512ROUND1(V3, V4, V5, V6, V7, V0, V1, V2, V13, V14, V15, V23, V12)
+<span id="L403" class="ln">   403</span>		SHA512ROUND1(V2, V3, V4, V5, V6, V7, V0, V1, V14, V15, V16, V8, V13)
+<span id="L404" class="ln">   404</span>		SHA512ROUND1(V1, V2, V3, V4, V5, V6, V7, V0, V15, V16, V17, V9, V14)
+<span id="L405" class="ln">   405</span>		SHA512ROUND1(V0, V1, V2, V3, V4, V5, V6, V7, V16, V17, V18, V10, V15)
+<span id="L406" class="ln">   406</span>		SHA512ROUND1(V7, V0, V1, V2, V3, V4, V5, V6, V17, V18, V19, V11, V16)
+<span id="L407" class="ln">   407</span>		SHA512ROUND1(V6, V7, V0, V1, V2, V3, V4, V5, V18, V19, V20, V12, V17)
+<span id="L408" class="ln">   408</span>		SHA512ROUND1(V5, V6, V7, V0, V1, V2, V3, V4, V19, V20, V21, V13, V18)
+<span id="L409" class="ln">   409</span>		SHA512ROUND1(V4, V5, V6, V7, V0, V1, V2, V3, V20, V21, V22, V14, V19)
+<span id="L410" class="ln">   410</span>		SHA512ROUND1(V3, V4, V5, V6, V7, V0, V1, V2, V21, V22, V23, V15, V20)
+<span id="L411" class="ln">   411</span>		SHA512ROUND1(V2, V3, V4, V5, V6, V7, V0, V1, V22, V23, V8, V16, V21)
+<span id="L412" class="ln">   412</span>		SHA512ROUND1(V1, V2, V3, V4, V5, V6, V7, V0, V23, V8, V9, V17, V22)
+<span id="L413" class="ln">   413</span>	
+<span id="L414" class="ln">   414</span>		BC	0x10, 0, L16_xx		// bdnz
+<span id="L415" class="ln">   415</span>	
+<span id="L416" class="ln">   416</span>		LVX	(OFFLOAD)(HEX00), V10
+<span id="L417" class="ln">   417</span>	
+<span id="L418" class="ln">   418</span>		LVX	(OFFLOAD)(HEX10), V11
+<span id="L419" class="ln">   419</span>		VADDUDM	V10, V0, V0
+<span id="L420" class="ln">   420</span>		LVX	(OFFLOAD)(HEX20), V12
+<span id="L421" class="ln">   421</span>		VADDUDM	V11, V1, V1
+<span id="L422" class="ln">   422</span>		LVX	(OFFLOAD)(HEX30), V13
+<span id="L423" class="ln">   423</span>		VADDUDM	V12, V2, V2
+<span id="L424" class="ln">   424</span>		LVX	(OFFLOAD)(HEX40), V14
+<span id="L425" class="ln">   425</span>		VADDUDM	V13, V3, V3
+<span id="L426" class="ln">   426</span>		LVX	(OFFLOAD)(HEX50), V15
+<span id="L427" class="ln">   427</span>		VADDUDM	V14, V4, V4
+<span id="L428" class="ln">   428</span>		LVX	(OFFLOAD)(HEX60), V16
+<span id="L429" class="ln">   429</span>		VADDUDM	V15, V5, V5
+<span id="L430" class="ln">   430</span>		LVX	(OFFLOAD)(HEX70), V17
+<span id="L431" class="ln">   431</span>		VADDUDM	V16, V6, V6
+<span id="L432" class="ln">   432</span>		VADDUDM	V17, V7, V7
+<span id="L433" class="ln">   433</span>	
+<span id="L434" class="ln">   434</span>		CMPU	INP, END
+<span id="L435" class="ln">   435</span>		BLT	loop
+<span id="L436" class="ln">   436</span>	
+<span id="L437" class="ln">   437</span>		VPERM	V0, V1, KI, V0
+<span id="L438" class="ln">   438</span>		VPERM	V2, V3, KI, V2
+<span id="L439" class="ln">   439</span>		VPERM	V4, V5, KI, V4
+<span id="L440" class="ln">   440</span>		VPERM	V6, V7, KI, V6
+<span id="L441" class="ln">   441</span>		STXVD2X	VS32, (CTX+HEX00)	// v0 = vs32
+<span id="L442" class="ln">   442</span>		STXVD2X	VS34, (CTX+HEX10)	// v2 = vs34
+<span id="L443" class="ln">   443</span>		STXVD2X	VS36, (CTX+HEX20)	// v4 = vs36
+<span id="L444" class="ln">   444</span>		STXVD2X	VS38, (CTX+HEX30)	// v6 = vs38
+<span id="L445" class="ln">   445</span>	
+<span id="L446" class="ln">   446</span>	end:
+<span id="L447" class="ln">   447</span>		RET
+<span id="L448" class="ln">   448</span>	
+</pre><p><a href="sha512block_ppc64le.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

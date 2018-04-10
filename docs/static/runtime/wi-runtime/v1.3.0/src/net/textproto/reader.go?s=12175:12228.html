@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/textproto/reader.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./reader.go%3Fs=12175:12228.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/net">net</a>/<a href="../textproto.1.html">textproto</a>/<span class="text-muted">reader.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/net/textproto.1.html">net/textproto</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package textproto
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bufio&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;io/ioutil&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;strconv&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>)
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// A Reader implements convenience methods for reading requests</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// or responses from a text protocol network connection.</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>type Reader struct {
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	R   *bufio.Reader
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	dot *dotReader
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	buf []byte <span class="comment">// a re-usable buffer for readContinuedLineSlice</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>}
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span><span class="comment">// NewReader returns a new Reader reading from r.</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span><span class="comment">// To avoid denial of service attacks, the provided bufio.Reader</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span><span class="comment">// should be reading from an io.LimitReader or similar Reader to bound</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span><span class="comment">// the size of responses.</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>func NewReader(r *bufio.Reader) *Reader {
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	return &amp;Reader{R: r}
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>}
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span><span class="comment">// ReadLine reads a single line from r,</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span><span class="comment">// eliding the final \n or \r\n from the returned string.</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>func (r *Reader) ReadLine() (string, error) {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	line, err := r.readLineSlice()
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	return string(line), err
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>}
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span><span class="comment">// ReadLineBytes is like ReadLine but returns a []byte instead of a string.</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>func (r *Reader) ReadLineBytes() ([]byte, error) {
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	line, err := r.readLineSlice()
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	if line != nil {
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		buf := make([]byte, len(line))
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>		copy(buf, line)
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>		line = buf
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	}
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	return line, err
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>}
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>func (r *Reader) readLineSlice() ([]byte, error) {
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	r.closeDot()
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	var line []byte
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	for {
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>		l, more, err := r.R.ReadLine()
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>			return nil, err
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>		}
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		<span class="comment">// Avoid the copy if the first call produced a full line.</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>		if line == nil &amp;&amp; !more {
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>			return l, nil
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>		}
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>		line = append(line, l...)
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>		if !more {
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>			break
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		}
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	}
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>	return line, nil
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>}
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span><span class="comment">// ReadContinuedLine reads a possibly continued line from r,</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span><span class="comment">// eliding the final trailing ASCII white space.</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span><span class="comment">// Lines after the first are considered continuations if they</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span><span class="comment">// begin with a space or tab character. In the returned data,</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span><span class="comment">// continuation lines are separated from the previous line</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span><span class="comment">// only by a single space: the newline and leading white space</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span><span class="comment">// are removed.</span>
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span><span class="comment">// For example, consider this input:</span>
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span><span class="comment">//	Line 1</span>
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span><span class="comment">//	  continued...</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span><span class="comment">//	Line 2</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span><span class="comment">// The first call to ReadContinuedLine will return &#34;Line 1 continued...&#34;</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span><span class="comment">// and the second will return &#34;Line 2&#34;.</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span><span class="comment">// A line consisting of only white space is never continued.</span>
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>func (r *Reader) ReadContinuedLine() (string, error) {
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	line, err := r.readContinuedLineSlice()
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	return string(line), err
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>}
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span><span class="comment">// trim returns s with leading and trailing spaces and tabs removed.</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span><span class="comment">// It does not assume Unicode or UTF-8.</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>func trim(s []byte) []byte {
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	i := 0
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	for i &lt; len(s) &amp;&amp; (s[i] == &#39; &#39; || s[i] == &#39;\t&#39;) {
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>		i++
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	}
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	n := len(s)
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	for n &gt; i &amp;&amp; (s[n-1] == &#39; &#39; || s[n-1] == &#39;\t&#39;) {
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		n--
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	}
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	return s[i:n]
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>}
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span><span class="comment">// ReadContinuedLineBytes is like ReadContinuedLine but</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span><span class="comment">// returns a []byte instead of a string.</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>func (r *Reader) ReadContinuedLineBytes() ([]byte, error) {
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>	line, err := r.readContinuedLineSlice()
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	if line != nil {
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		buf := make([]byte, len(line))
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>		copy(buf, line)
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>		line = buf
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	}
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	return line, err
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>}
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>func (r *Reader) readContinuedLineSlice() ([]byte, error) {
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	<span class="comment">// Read the first line.</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	line, err := r.readLineSlice()
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>		return nil, err
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	}
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	if len(line) == 0 { <span class="comment">// blank line - no continuation</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>		return line, nil
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	}
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	<span class="comment">// Optimistically assume that we have started to buffer the next line</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	<span class="comment">// and it starts with an ASCII letter (the next header key), so we can</span>
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	<span class="comment">// avoid copying that buffered data around in memory and skipping over</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	<span class="comment">// non-existent whitespace.</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	if r.R.Buffered() &gt; 1 {
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>		peek, err := r.R.Peek(1)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>		if err == nil &amp;&amp; isASCIILetter(peek[0]) {
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>			return trim(line), nil
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>		}
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>	}
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	<span class="comment">// ReadByte or the next readLineSlice will flush the read buffer;</span>
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	<span class="comment">// copy the slice into buf.</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>	r.buf = append(r.buf[:0], trim(line)...)
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	<span class="comment">// Read continuation lines.</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>	for r.skipSpace() &gt; 0 {
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		line, err := r.readLineSlice()
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>			break
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		}
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>		r.buf = append(r.buf, &#39; &#39;)
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>		r.buf = append(r.buf, trim(line)...)
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	}
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	return r.buf, nil
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>}
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span><span class="comment">// skipSpace skips R over all spaces and returns the number of bytes skipped.</span>
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>func (r *Reader) skipSpace() int {
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	n := 0
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	for {
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>		c, err := r.R.ReadByte()
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>			<span class="comment">// Bufio will keep err until next read.</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>			break
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>		}
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>		if c != &#39; &#39; &amp;&amp; c != &#39;\t&#39; {
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>			r.R.UnreadByte()
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>			break
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>		}
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		n++
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	}
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	return n
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>}
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>func (r *Reader) readCodeLine(expectCode int) (code int, continued bool, message string, err error) {
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	line, err := r.ReadLine()
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		return
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	}
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	return parseCodeLine(line, expectCode)
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>func parseCodeLine(line string, expectCode int) (code int, continued bool, message string, err error) {
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>	if len(line) &lt; 4 || line[3] != &#39; &#39; &amp;&amp; line[3] != &#39;-&#39; {
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		err = ProtocolError(&#34;short response: &#34; + line)
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>		return
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	}
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	continued = line[3] == &#39;-&#39;
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	code, err = strconv.Atoi(line[0:3])
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	if err != nil || code &lt; 100 {
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>		err = ProtocolError(&#34;invalid response code: &#34; + line)
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>		return
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	}
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	message = line[4:]
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	if 1 &lt;= expectCode &amp;&amp; expectCode &lt; 10 &amp;&amp; code/100 != expectCode ||
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		10 &lt;= expectCode &amp;&amp; expectCode &lt; 100 &amp;&amp; code/10 != expectCode ||
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>		100 &lt;= expectCode &amp;&amp; expectCode &lt; 1000 &amp;&amp; code != expectCode {
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>		err = &amp;Error{code, message}
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	}
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	return
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>}
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span><span class="comment">// ReadCodeLine reads a response code line of the form</span>
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span><span class="comment">//	code message</span>
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span><span class="comment">// where code is a three-digit status code and the message</span>
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span><span class="comment">// extends to the rest of the line. An example of such a line is:</span>
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span><span class="comment">//	220 plan9.bell-labs.com ESMTP</span>
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span><span class="comment">// If the prefix of the status does not match the digits in expectCode,</span>
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span><span class="comment">// ReadCodeLine returns with err set to &amp;Error{code, message}.</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span><span class="comment">// For example, if expectCode is 31, an error will be returned if</span>
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span><span class="comment">// the status is not in the range [310,319].</span>
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span><span class="comment">// If the response is multi-line, ReadCodeLine returns an error.</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span><span class="comment">// An expectCode &lt;= 0 disables the check of the status code.</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>func (r *Reader) ReadCodeLine(expectCode int) (code int, message string, err error) {
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	code, continued, message, err := r.readCodeLine(expectCode)
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	if err == nil &amp;&amp; continued {
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>		err = ProtocolError(&#34;unexpected multi-line response: &#34; + message)
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	}
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	return
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>}
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span><span class="comment">// ReadResponse reads a multi-line response of the form:</span>
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span><span class="comment">//	code-message line 1</span>
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span><span class="comment">//	code-message line 2</span>
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span><span class="comment">//	...</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span><span class="comment">//	code message line n</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span><span class="comment">// where code is a three-digit status code. The first line starts with the</span>
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span><span class="comment">// code and a hyphen. The response is terminated by a line that starts</span>
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span><span class="comment">// with the same code followed by a space. Each line in message is</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span><span class="comment">// separated by a newline (\n).</span>
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span><span class="comment">// See page 36 of RFC 959 (http://www.ietf.org/rfc/rfc959.txt) for</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span><span class="comment">// details of another form of response accepted:</span>
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span><span class="comment">//  code-message line 1</span>
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span><span class="comment">//  message line 2</span>
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span><span class="comment">//  ...</span>
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span><span class="comment">//  code message line n</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span><span class="comment">// If the prefix of the status does not match the digits in expectCode,</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span><span class="comment">// ReadResponse returns with err set to &amp;Error{code, message}.</span>
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span><span class="comment">// For example, if expectCode is 31, an error will be returned if</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span><span class="comment">// the status is not in the range [310,319].</span>
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span><span class="comment">// An expectCode &lt;= 0 disables the check of the status code.</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>func (r *Reader) ReadResponse(expectCode int) (code int, message string, err error) {
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	code, continued, message, err := r.readCodeLine(expectCode)
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	multi := continued
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	for continued {
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>		line, err := r.ReadLine()
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>			return 0, &#34;&#34;, err
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>		}
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>		var code2 int
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>		var moreMessage string
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>		code2, continued, moreMessage, err = parseCodeLine(line, 0)
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>		if err != nil || code2 != code {
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>			message += &#34;\n&#34; + strings.TrimRight(line, &#34;\r\n&#34;)
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>			continued = true
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>			continue
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>		}
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		message += &#34;\n&#34; + moreMessage
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	}
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	if err != nil &amp;&amp; multi &amp;&amp; message != &#34;&#34; {
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>		<span class="comment">// replace one line error message with all lines (full message)</span>
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>		err = &amp;Error{code, message}
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	}
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	return
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>}
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span><span class="comment">// DotReader returns a new Reader that satisfies Reads using the</span>
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span><span class="comment">// decoded text of a dot-encoded block read from r.</span>
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span><span class="comment">// The returned Reader is only valid until the next call</span>
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span><span class="comment">// to a method on r.</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span><span class="comment">// Dot encoding is a common framing used for data blocks</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span><span class="comment">// in text protocols such as SMTP.  The data consists of a sequence</span>
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span><span class="comment">// of lines, each of which ends in &#34;\r\n&#34;.  The sequence itself</span>
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span><span class="comment">// ends at a line containing just a dot: &#34;.\r\n&#34;.  Lines beginning</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span><span class="comment">// with a dot are escaped with an additional dot to avoid</span>
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span><span class="comment">// looking like the end of the sequence.</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span><span class="comment">// The decoded form returned by the Reader&#39;s Read method</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span><span class="comment">// rewrites the &#34;\r\n&#34; line endings into the simpler &#34;\n&#34;,</span>
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span><span class="comment">// removes leading dot escapes if present, and stops with error io.EOF</span>
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span><span class="comment">// after consuming (and discarding) the end-of-sequence line.</span>
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>func (r *Reader) DotReader() io.Reader {
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	r.closeDot()
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	r.dot = &amp;dotReader{r: r}
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	return r.dot
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>}
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>type dotReader struct {
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	r     *Reader
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	state int
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>}
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span><span class="comment">// Read satisfies reads by decoding dot-encoded data read from d.r.</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>func (d *dotReader) Read(b []byte) (n int, err error) {
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	<span class="comment">// Run data through a simple state machine to</span>
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	<span class="comment">// elide leading dots, rewrite trailing \r\n into \n,</span>
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	<span class="comment">// and detect ending .\r\n line.</span>
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	const (
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		stateBeginLine = iota <span class="comment">// beginning of line; initial state; must be zero</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		stateDot              <span class="comment">// read . at beginning of line</span>
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		stateDotCR            <span class="comment">// read .\r at beginning of line</span>
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>		stateCR               <span class="comment">// read \r (possibly at end of line)</span>
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>		stateData             <span class="comment">// reading data in middle of line</span>
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		stateEOF              <span class="comment">// reached .\r\n end marker line</span>
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>	)
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>	br := d.r.R
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	for n &lt; len(b) &amp;&amp; d.state != stateEOF {
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>		var c byte
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>		c, err = br.ReadByte()
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>			if err == io.EOF {
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>				err = io.ErrUnexpectedEOF
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>			}
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>			break
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>		}
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>		switch d.state {
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>		case stateBeginLine:
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>			if c == &#39;.&#39; {
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>				d.state = stateDot
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>				continue
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>			}
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>			if c == &#39;\r&#39; {
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>				d.state = stateCR
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>				continue
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>			}
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>			d.state = stateData
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>		case stateDot:
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>			if c == &#39;\r&#39; {
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>				d.state = stateDotCR
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>				continue
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>			}
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>			if c == &#39;\n&#39; {
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>				d.state = stateEOF
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>				continue
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>			}
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>			d.state = stateData
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>		case stateDotCR:
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>			if c == &#39;\n&#39; {
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>				d.state = stateEOF
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>				continue
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>			}
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>			<span class="comment">// Not part of .\r\n.</span>
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>			<span class="comment">// Consume leading dot and emit saved \r.</span>
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>			br.UnreadByte()
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>			c = &#39;\r&#39;
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>			d.state = stateData
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>		case stateCR:
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>			if c == &#39;\n&#39; {
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>				d.state = stateBeginLine
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>				break
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>			}
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>			<span class="comment">// Not part of \r\n. Emit saved \r</span>
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>			br.UnreadByte()
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>			c = &#39;\r&#39;
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>			d.state = stateData
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>		case stateData:
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>			if c == &#39;\r&#39; {
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>				d.state = stateCR
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>				continue
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>			}
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>			if c == &#39;\n&#39; {
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>				d.state = stateBeginLine
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>			}
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>		}
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>		b[n] = c
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		n++
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>	}
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>	if err == nil &amp;&amp; d.state == stateEOF {
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>		err = io.EOF
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	}
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>	if err != nil &amp;&amp; d.r.dot == d {
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>		d.r.dot = nil
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>	}
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	return
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>}
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span><span class="comment">// closeDot drains the current DotReader if any,</span>
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span><span class="comment">// making sure that it reads until the ending dot line.</span>
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>func (r *Reader) closeDot() {
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>	if r.dot == nil {
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>		return
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	}
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>	buf := make([]byte, 128)
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	for r.dot != nil {
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>		<span class="comment">// When Read reaches EOF or an error,</span>
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>		<span class="comment">// it will set r.dot == nil.</span>
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>		r.dot.Read(buf)
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>	}
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>}
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span><span class="comment">// ReadDotBytes reads a dot-encoding and returns the decoded data.</span>
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span><span class="comment">// See the documentation for the DotReader method for details about dot-encoding.</span>
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>func (r *Reader) ReadDotBytes() ([]byte, error) {
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>	return ioutil.ReadAll(r.DotReader())
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>}
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span><span class="comment">// ReadDotLines reads a dot-encoding and returns a slice</span>
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span><span class="comment">// containing the decoded lines, with the final \r\n or \n elided from each.</span>
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span><span class="comment">// See the documentation for the DotReader method for details about dot-encoding.</span>
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>func (r *Reader) ReadDotLines() ([]string, error) {
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>	<span class="comment">// We could use ReadDotBytes and then Split it,</span>
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	<span class="comment">// but reading a line at a time avoids needing a</span>
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>	<span class="comment">// large contiguous block of memory and is simpler.</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	var v []string
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>	var err error
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>	for {
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>		var line string
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>		line, err = r.ReadLine()
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>			if err == io.EOF {
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>				err = io.ErrUnexpectedEOF
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>			}
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>			break
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>		}
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>		<span class="comment">// Dot by itself marks end; otherwise cut one dot.</span>
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>		if len(line) &gt; 0 &amp;&amp; line[0] == &#39;.&#39; {
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>			if len(line) == 1 {
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>				break
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>			}
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>			line = line[1:]
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		}
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>		v = append(v, line)
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	}
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	return v, err
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>}
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span><span class="comment">// ReadMIMEHeader reads a MIME-style header from r.</span>
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span><span class="comment">// The header is a sequence of possibly continued Key: Value lines</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span><span class="comment">// ending in a blank line.</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span><span class="comment">// The returned map m maps CanonicalMIMEHeaderKey(key) to a</span>
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span><span class="comment">// sequence of values in the same order encountered in the input.</span>
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span><span class="comment">// For example, consider this input:</span>
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span><span class="comment">//	My-Key: Value 1</span>
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span><span class="comment">//	Long-Key: Even</span>
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span><span class="comment">//	       Longer Value</span>
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span><span class="comment">//	My-Key: Value 2</span>
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span><span class="comment">// Given that input, ReadMIMEHeader returns the map:</span>
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span><span class="comment">//	map[string][]string{</span>
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span><span class="comment">//		&#34;My-Key&#34;: {&#34;Value 1&#34;, &#34;Value 2&#34;},</span>
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span><span class="comment">//		&#34;Long-Key&#34;: {&#34;Even Longer Value&#34;},</span>
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span><span class="comment">//	}</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span><span class="selection">func (r *Reader) ReadMIMEHeader() (MIMEHeader, error)</span> {
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>	<span class="comment">// Avoid lots of small slice allocations later by allocating one</span>
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>	<span class="comment">// large one ahead of time which we&#39;ll cut up into smaller</span>
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>	<span class="comment">// slices. If this isn&#39;t big enough later, we allocate small ones.</span>
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>	var strs []string
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>	hint := r.upcomingHeaderNewlines()
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	if hint &gt; 0 {
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>		strs = make([]string, hint)
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>	}
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>	m := make(MIMEHeader, hint)
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	for {
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>		kv, err := r.readContinuedLineSlice()
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		if len(kv) == 0 {
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>			return m, err
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>		}
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>		<span class="comment">// Key ends at first colon; should not have spaces but</span>
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		<span class="comment">// they appear in the wild, violating specs, so we</span>
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>		<span class="comment">// remove them if present.</span>
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>		i := bytes.IndexByte(kv, &#39;:&#39;)
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>		if i &lt; 0 {
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>			return m, ProtocolError(&#34;malformed MIME header line: &#34; + string(kv))
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>		}
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>		endKey := i
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>		for endKey &gt; 0 &amp;&amp; kv[endKey-1] == &#39; &#39; {
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>			endKey--
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>		}
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>		key := canonicalMIMEHeaderKey(kv[:endKey])
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>		<span class="comment">// As per RFC 7230 field-name is a token, tokens consist of one or more chars.</span>
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>		<span class="comment">// We could return a ProtocolError here, but better to be liberal in what we</span>
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>		<span class="comment">// accept, so if we get an empty key, skip it.</span>
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>		if key == &#34;&#34; {
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>			continue
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>		}
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>		<span class="comment">// Skip initial spaces in value.</span>
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>		i++ <span class="comment">// skip colon</span>
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>		for i &lt; len(kv) &amp;&amp; (kv[i] == &#39; &#39; || kv[i] == &#39;\t&#39;) {
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>			i++
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>		}
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>		value := string(kv[i:])
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>		vv := m[key]
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>		if vv == nil &amp;&amp; len(strs) &gt; 0 {
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>			<span class="comment">// More than likely this will be a single-element key.</span>
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>			<span class="comment">// Most headers aren&#39;t multi-valued.</span>
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>			<span class="comment">// Set the capacity on strs[0] to 1, so any future append</span>
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>			<span class="comment">// won&#39;t extend the slice into the other strings.</span>
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>			vv, strs = strs[:1:1], strs[1:]
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>			vv[0] = value
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>			m[key] = vv
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>		} else {
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>			m[key] = append(vv, value)
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>		}
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>			return m, err
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>		}
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>	}
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>}
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span><span class="comment">// upcomingHeaderNewlines returns an approximation of the number of newlines</span>
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span><span class="comment">// that will be in this header. If it gets confused, it returns 0.</span>
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>func (r *Reader) upcomingHeaderNewlines() (n int) {
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>	<span class="comment">// Try to determine the &#39;hint&#39; size.</span>
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>	r.R.Peek(1) <span class="comment">// force a buffer load if empty</span>
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>	s := r.R.Buffered()
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>	if s == 0 {
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>		return
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	}
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	peek, _ := r.R.Peek(s)
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>	for len(peek) &gt; 0 {
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		i := bytes.IndexByte(peek, &#39;\n&#39;)
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>		if i &lt; 3 {
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>			<span class="comment">// Not present (-1) or found within the next few bytes,</span>
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>			<span class="comment">// implying we&#39;re at the end (&#34;\r\n\r\n&#34; or &#34;\n\n&#34;)</span>
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>			return
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>		}
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>		n++
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>		peek = peek[i+1:]
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>	}
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>	return
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>}
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span><span class="comment">// CanonicalMIMEHeaderKey returns the canonical format of the</span>
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span><span class="comment">// MIME header key s. The canonicalization converts the first</span>
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span><span class="comment">// letter and any letter following a hyphen to upper case;</span>
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span><span class="comment">// the rest are converted to lowercase. For example, the</span>
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span><span class="comment">// canonical key for &#34;accept-encoding&#34; is &#34;Accept-Encoding&#34;.</span>
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span><span class="comment">// MIME header keys are assumed to be ASCII only.</span>
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span><span class="comment">// If s contains a space or invalid header field bytes, it is</span>
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span><span class="comment">// returned without modifications.</span>
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>func CanonicalMIMEHeaderKey(s string) string {
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>	<span class="comment">// Quick check for canonical encoding.</span>
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>	upper := true
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>		c := s[i]
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>		if !validHeaderFieldByte(c) {
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>			return s
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>		}
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>		if upper &amp;&amp; &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;z&#39; {
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>			return canonicalMIMEHeaderKey([]byte(s))
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>		}
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>		if !upper &amp;&amp; &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;Z&#39; {
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>			return canonicalMIMEHeaderKey([]byte(s))
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>		}
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>		upper = c == &#39;-&#39;
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>	}
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>	return s
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>}
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>const toLower = &#39;a&#39; - &#39;A&#39;
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span><span class="comment">// validHeaderFieldByte reports whether b is a valid byte in a header</span>
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span><span class="comment">// field name. RFC 7230 says:</span>
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span><span class="comment">//   header-field   = field-name &#34;:&#34; OWS field-value OWS</span>
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span><span class="comment">//   field-name     = token</span>
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span><span class="comment">//   tchar = &#34;!&#34; / &#34;#&#34; / &#34;$&#34; / &#34;%&#34; / &#34;&amp;&#34; / &#34;&#39;&#34; / &#34;*&#34; / &#34;+&#34; / &#34;-&#34; / &#34;.&#34; /</span>
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span><span class="comment">//           &#34;^&#34; / &#34;_&#34; / &#34;`&#34; / &#34;|&#34; / &#34;~&#34; / DIGIT / ALPHA</span>
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span><span class="comment">//   token = 1*tchar</span>
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>func validHeaderFieldByte(b byte) bool {
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>	return int(b) &lt; len(isTokenTable) &amp;&amp; isTokenTable[b]
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>}
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span><span class="comment">// canonicalMIMEHeaderKey is like CanonicalMIMEHeaderKey but is</span>
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span><span class="comment">// allowed to mutate the provided byte slice before returning the</span>
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span><span class="comment">// string.</span>
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span><span class="comment">// For invalid inputs (if a contains spaces or non-token bytes), a</span>
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span><span class="comment">// is unchanged and a string copy is returned.</span>
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>func canonicalMIMEHeaderKey(a []byte) string {
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>	<span class="comment">// See if a looks like a header key. If not, return it unchanged.</span>
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>	for _, c := range a {
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>		if validHeaderFieldByte(c) {
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>			continue
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>		}
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>		<span class="comment">// Don&#39;t canonicalize.</span>
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>		return string(a)
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>	}
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>	upper := true
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>	for i, c := range a {
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>		<span class="comment">// Canonicalize: first letter upper case</span>
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>		<span class="comment">// and upper case after each dash.</span>
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>		<span class="comment">// (Host, User-Agent, If-Modified-Since).</span>
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>		<span class="comment">// MIME headers are ASCII only, so no Unicode issues.</span>
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>		if upper &amp;&amp; &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;z&#39; {
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>			c -= toLower
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>		} else if !upper &amp;&amp; &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;Z&#39; {
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>			c += toLower
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>		}
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>		a[i] = c
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>		upper = c == &#39;-&#39; <span class="comment">// for next time</span>
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>	}
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>	<span class="comment">// The compiler recognizes m[string(byteSlice)] as a special</span>
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>	<span class="comment">// case, so a copy of a&#39;s bytes into a new string does not</span>
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>	<span class="comment">// happen in this map lookup:</span>
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>	if v := commonHeader[string(a)]; v != &#34;&#34; {
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>		return v
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>	}
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>	return string(a)
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>}
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span><span class="comment">// commonHeader interns common header strings.</span>
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>var commonHeader = make(map[string]string)
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>func init() {
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>	for _, v := range []string{
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>		&#34;Accept&#34;,
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>		&#34;Accept-Charset&#34;,
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>		&#34;Accept-Encoding&#34;,
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>		&#34;Accept-Language&#34;,
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>		&#34;Accept-Ranges&#34;,
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>		&#34;Cache-Control&#34;,
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>		&#34;Cc&#34;,
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>		&#34;Connection&#34;,
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>		&#34;Content-Id&#34;,
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>		&#34;Content-Language&#34;,
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>		&#34;Content-Length&#34;,
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>		&#34;Content-Transfer-Encoding&#34;,
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>		&#34;Content-Type&#34;,
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>		&#34;Cookie&#34;,
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>		&#34;Date&#34;,
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>		&#34;Dkim-Signature&#34;,
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>		&#34;Etag&#34;,
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>		&#34;Expires&#34;,
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>		&#34;From&#34;,
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>		&#34;Host&#34;,
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>		&#34;If-Modified-Since&#34;,
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>		&#34;If-None-Match&#34;,
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>		&#34;In-Reply-To&#34;,
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>		&#34;Last-Modified&#34;,
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>		&#34;Location&#34;,
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>		&#34;Message-Id&#34;,
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>		&#34;Mime-Version&#34;,
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>		&#34;Pragma&#34;,
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>		&#34;Received&#34;,
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>		&#34;Return-Path&#34;,
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>		&#34;Server&#34;,
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>		&#34;Set-Cookie&#34;,
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>		&#34;Subject&#34;,
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>		&#34;To&#34;,
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>		&#34;User-Agent&#34;,
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>		&#34;Via&#34;,
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>		&#34;X-Forwarded-For&#34;,
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>		&#34;X-Imforwards&#34;,
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		&#34;X-Powered-By&#34;,
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>	} {
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>		commonHeader[v] = v
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>	}
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>}
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span><span class="comment">// isTokenTable is a copy of net/http/lex.go&#39;s isTokenTable.</span>
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span><span class="comment">// See https://httpwg.github.io/specs/rfc7230.html#rule.token.separators</span>
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>var isTokenTable = [127]bool{
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>	&#39;!&#39;:  true,
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>	&#39;#&#39;:  true,
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>	&#39;$&#39;:  true,
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	&#39;%&#39;:  true,
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>	&#39;&amp;&#39;:  true,
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>	&#39;\&#39;&#39;: true,
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>	&#39;*&#39;:  true,
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>	&#39;+&#39;:  true,
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>	&#39;-&#39;:  true,
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>	&#39;.&#39;:  true,
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>	&#39;0&#39;:  true,
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>	&#39;1&#39;:  true,
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>	&#39;2&#39;:  true,
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>	&#39;3&#39;:  true,
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>	&#39;4&#39;:  true,
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>	&#39;5&#39;:  true,
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>	&#39;6&#39;:  true,
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>	&#39;7&#39;:  true,
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>	&#39;8&#39;:  true,
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>	&#39;9&#39;:  true,
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>	&#39;A&#39;:  true,
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>	&#39;B&#39;:  true,
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>	&#39;C&#39;:  true,
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>	&#39;D&#39;:  true,
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>	&#39;E&#39;:  true,
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>	&#39;F&#39;:  true,
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>	&#39;G&#39;:  true,
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>	&#39;H&#39;:  true,
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>	&#39;I&#39;:  true,
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>	&#39;J&#39;:  true,
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>	&#39;K&#39;:  true,
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>	&#39;L&#39;:  true,
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>	&#39;M&#39;:  true,
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>	&#39;N&#39;:  true,
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>	&#39;O&#39;:  true,
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>	&#39;P&#39;:  true,
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>	&#39;Q&#39;:  true,
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>	&#39;R&#39;:  true,
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>	&#39;S&#39;:  true,
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>	&#39;T&#39;:  true,
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>	&#39;U&#39;:  true,
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>	&#39;W&#39;:  true,
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>	&#39;V&#39;:  true,
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>	&#39;X&#39;:  true,
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>	&#39;Y&#39;:  true,
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>	&#39;Z&#39;:  true,
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>	&#39;^&#39;:  true,
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>	&#39;_&#39;:  true,
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>	&#39;`&#39;:  true,
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>	&#39;a&#39;:  true,
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>	&#39;b&#39;:  true,
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>	&#39;c&#39;:  true,
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>	&#39;d&#39;:  true,
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>	&#39;e&#39;:  true,
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>	&#39;f&#39;:  true,
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>	&#39;g&#39;:  true,
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>	&#39;h&#39;:  true,
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>	&#39;i&#39;:  true,
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>	&#39;j&#39;:  true,
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>	&#39;k&#39;:  true,
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>	&#39;l&#39;:  true,
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>	&#39;m&#39;:  true,
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>	&#39;n&#39;:  true,
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>	&#39;o&#39;:  true,
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>	&#39;p&#39;:  true,
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>	&#39;q&#39;:  true,
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>	&#39;r&#39;:  true,
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>	&#39;s&#39;:  true,
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>	&#39;t&#39;:  true,
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>	&#39;u&#39;:  true,
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>	&#39;v&#39;:  true,
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>	&#39;w&#39;:  true,
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>	&#39;x&#39;:  true,
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>	&#39;y&#39;:  true,
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>	&#39;z&#39;:  true,
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>	&#39;|&#39;:  true,
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>	&#39;~&#39;:  true,
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>}
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>
+</pre><p><a href="reader.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

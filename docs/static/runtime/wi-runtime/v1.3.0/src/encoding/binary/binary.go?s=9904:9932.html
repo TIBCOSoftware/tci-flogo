@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/encoding/binary/binary.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./binary.go%3Fs=9904:9932.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/encoding">encoding</a>/<a href="../binary.1.html">binary</a>/<span class="text-muted">binary.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/encoding/binary.html">encoding/binary</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// Package binary implements simple translation between numbers and byte</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// sequences and encoding and decoding of varints.</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span><span class="comment">// Numbers are translated by reading and writing fixed-size values.</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span><span class="comment">// A fixed-size value is either a fixed-size arithmetic</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span><span class="comment">// type (bool, int8, uint8, int16, float32, complex64, ...)</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span><span class="comment">// or an array or struct containing only fixed-size values.</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span><span class="comment">// The varint functions encode and decode single integer values using</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// a variable-length encoding; smaller values require fewer bytes.</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">// For a specification, see</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// https://developers.google.com/protocol-buffers/docs/encoding.</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">// This package favors simplicity over efficiency. Clients that require</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span><span class="comment">// high-performance serialization, especially for large data structures,</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span><span class="comment">// should look at more advanced solutions such as the encoding/gob</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span><span class="comment">// package or protocol buffers.</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>package binary
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>import (
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	&#34;math&#34;
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>)
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span><span class="comment">// A ByteOrder specifies how to convert byte sequences into</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span><span class="comment">// 16-, 32-, or 64-bit unsigned integers.</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>type ByteOrder interface {
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	Uint16([]byte) uint16
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	Uint32([]byte) uint32
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	Uint64([]byte) uint64
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	PutUint16([]byte, uint16)
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	PutUint32([]byte, uint32)
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	PutUint64([]byte, uint64)
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	String() string
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>}
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span><span class="comment">// LittleEndian is the little-endian implementation of ByteOrder.</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>var LittleEndian littleEndian
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span><span class="comment">// BigEndian is the big-endian implementation of ByteOrder.</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>var BigEndian bigEndian
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>type littleEndian struct{}
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>func (littleEndian) Uint16(b []byte) uint16 {
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	_ = b[1] <span class="comment">// bounds check hint to compiler; see golang.org/issue/14808</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	return uint16(b[0]) | uint16(b[1])&lt;&lt;8
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>}
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>func (littleEndian) PutUint16(b []byte, v uint16) {
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	_ = b[1] <span class="comment">// early bounds check to guarantee safety of writes below</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	b[0] = byte(v)
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	b[1] = byte(v &gt;&gt; 8)
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>}
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>func (littleEndian) Uint32(b []byte) uint32 {
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	_ = b[3] <span class="comment">// bounds check hint to compiler; see golang.org/issue/14808</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	return uint32(b[0]) | uint32(b[1])&lt;&lt;8 | uint32(b[2])&lt;&lt;16 | uint32(b[3])&lt;&lt;24
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>}
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>func (littleEndian) PutUint32(b []byte, v uint32) {
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>	_ = b[3] <span class="comment">// early bounds check to guarantee safety of writes below</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	b[0] = byte(v)
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	b[1] = byte(v &gt;&gt; 8)
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>	b[2] = byte(v &gt;&gt; 16)
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	b[3] = byte(v &gt;&gt; 24)
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>}
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>func (littleEndian) Uint64(b []byte) uint64 {
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	_ = b[7] <span class="comment">// bounds check hint to compiler; see golang.org/issue/14808</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	return uint64(b[0]) | uint64(b[1])&lt;&lt;8 | uint64(b[2])&lt;&lt;16 | uint64(b[3])&lt;&lt;24 |
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>		uint64(b[4])&lt;&lt;32 | uint64(b[5])&lt;&lt;40 | uint64(b[6])&lt;&lt;48 | uint64(b[7])&lt;&lt;56
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>}
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>func (littleEndian) PutUint64(b []byte, v uint64) {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	_ = b[7] <span class="comment">// early bounds check to guarantee safety of writes below</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	b[0] = byte(v)
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	b[1] = byte(v &gt;&gt; 8)
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	b[2] = byte(v &gt;&gt; 16)
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	b[3] = byte(v &gt;&gt; 24)
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	b[4] = byte(v &gt;&gt; 32)
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	b[5] = byte(v &gt;&gt; 40)
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	b[6] = byte(v &gt;&gt; 48)
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>	b[7] = byte(v &gt;&gt; 56)
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>}
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>func (littleEndian) String() string { return &#34;LittleEndian&#34; }
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>func (littleEndian) GoString() string { return &#34;binary.LittleEndian&#34; }
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>type bigEndian struct{}
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>func (bigEndian) Uint16(b []byte) uint16 {
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	_ = b[1] <span class="comment">// bounds check hint to compiler; see golang.org/issue/14808</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	return uint16(b[1]) | uint16(b[0])&lt;&lt;8
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>}
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>func (bigEndian) PutUint16(b []byte, v uint16) {
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	_ = b[1] <span class="comment">// early bounds check to guarantee safety of writes below</span>
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	b[0] = byte(v &gt;&gt; 8)
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	b[1] = byte(v)
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>}
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>func (bigEndian) Uint32(b []byte) uint32 {
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	_ = b[3] <span class="comment">// bounds check hint to compiler; see golang.org/issue/14808</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>	return uint32(b[3]) | uint32(b[2])&lt;&lt;8 | uint32(b[1])&lt;&lt;16 | uint32(b[0])&lt;&lt;24
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>}
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>func (bigEndian) PutUint32(b []byte, v uint32) {
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	_ = b[3] <span class="comment">// early bounds check to guarantee safety of writes below</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	b[0] = byte(v &gt;&gt; 24)
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	b[1] = byte(v &gt;&gt; 16)
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	b[2] = byte(v &gt;&gt; 8)
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	b[3] = byte(v)
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>}
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>func (bigEndian) Uint64(b []byte) uint64 {
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	_ = b[7] <span class="comment">// bounds check hint to compiler; see golang.org/issue/14808</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	return uint64(b[7]) | uint64(b[6])&lt;&lt;8 | uint64(b[5])&lt;&lt;16 | uint64(b[4])&lt;&lt;24 |
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>		uint64(b[3])&lt;&lt;32 | uint64(b[2])&lt;&lt;40 | uint64(b[1])&lt;&lt;48 | uint64(b[0])&lt;&lt;56
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>}
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>func (bigEndian) PutUint64(b []byte, v uint64) {
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	_ = b[7] <span class="comment">// early bounds check to guarantee safety of writes below</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	b[0] = byte(v &gt;&gt; 56)
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	b[1] = byte(v &gt;&gt; 48)
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	b[2] = byte(v &gt;&gt; 40)
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	b[3] = byte(v &gt;&gt; 32)
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	b[4] = byte(v &gt;&gt; 24)
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	b[5] = byte(v &gt;&gt; 16)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	b[6] = byte(v &gt;&gt; 8)
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	b[7] = byte(v)
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>}
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>func (bigEndian) String() string { return &#34;BigEndian&#34; }
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>func (bigEndian) GoString() string { return &#34;binary.BigEndian&#34; }
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span><span class="comment">// Read reads structured binary data from r into data.</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span><span class="comment">// Data must be a pointer to a fixed-size value or a slice</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span><span class="comment">// of fixed-size values.</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span><span class="comment">// Bytes read from r are decoded using the specified byte order</span>
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span><span class="comment">// and written to successive fields of the data.</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span><span class="comment">// When decoding boolean values, a zero byte is decoded as false, and</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span><span class="comment">// any other non-zero byte is decoded as true.</span>
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span><span class="comment">// When reading into structs, the field data for fields with</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span><span class="comment">// blank (_) field names is skipped; i.e., blank field names</span>
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span><span class="comment">// may be used for padding.</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span><span class="comment">// When reading into a struct, all non-blank fields must be exported</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span><span class="comment">// or Read may panic.</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span><span class="comment">// The error is EOF only if no bytes were read.</span>
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span><span class="comment">// If an EOF happens after reading some but not all the bytes,</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span><span class="comment">// Read returns ErrUnexpectedEOF.</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>func Read(r io.Reader, order ByteOrder, data interface{}) error {
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	<span class="comment">// Fast path for basic types and slices.</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	if n := intDataSize(data); n != 0 {
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>		var b [8]byte
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>		var bs []byte
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>		if n &gt; len(b) {
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>			bs = make([]byte, n)
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		} else {
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>			bs = b[:n]
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>		}
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		if _, err := io.ReadFull(r, bs); err != nil {
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>			return err
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>		}
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		switch data := data.(type) {
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		case *bool:
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>			*data = b[0] != 0
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		case *int8:
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>			*data = int8(b[0])
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		case *uint8:
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>			*data = b[0]
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		case *int16:
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>			*data = int16(order.Uint16(bs))
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>		case *uint16:
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>			*data = order.Uint16(bs)
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		case *int32:
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>			*data = int32(order.Uint32(bs))
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>		case *uint32:
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>			*data = order.Uint32(bs)
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>		case *int64:
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>			*data = int64(order.Uint64(bs))
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>		case *uint64:
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>			*data = order.Uint64(bs)
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>		case []bool:
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>			for i, x := range bs { <span class="comment">// Easier to loop over the input for 8-bit values.</span>
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>				data[i] = x != 0
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>			}
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		case []int8:
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>			for i, x := range bs {
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>				data[i] = int8(x)
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>			}
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		case []uint8:
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>			copy(data, bs)
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		case []int16:
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>			for i := range data {
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>				data[i] = int16(order.Uint16(bs[2*i:]))
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>			}
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>		case []uint16:
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>			for i := range data {
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>				data[i] = order.Uint16(bs[2*i:])
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>			}
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>		case []int32:
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>			for i := range data {
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>				data[i] = int32(order.Uint32(bs[4*i:]))
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>			}
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		case []uint32:
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>			for i := range data {
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>				data[i] = order.Uint32(bs[4*i:])
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>			}
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		case []int64:
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>			for i := range data {
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>				data[i] = int64(order.Uint64(bs[8*i:]))
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>			}
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		case []uint64:
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>			for i := range data {
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>				data[i] = order.Uint64(bs[8*i:])
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>			}
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>		}
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>		return nil
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	}
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	<span class="comment">// Fallback to reflect-based decoding.</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	v := reflect.ValueOf(data)
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	size := -1
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	switch v.Kind() {
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	case reflect.Ptr:
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>		v = v.Elem()
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>		size = dataSize(v)
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	case reflect.Slice:
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>		size = dataSize(v)
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>	}
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	if size &lt; 0 {
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>		return errors.New(&#34;binary.Read: invalid type &#34; + reflect.TypeOf(data).String())
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	}
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	d := &amp;decoder{order: order, buf: make([]byte, size)}
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	if _, err := io.ReadFull(r, d.buf); err != nil {
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>		return err
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	}
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>	d.value(v)
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	return nil
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>}
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span><span class="comment">// Write writes the binary representation of data into w.</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span><span class="comment">// Data must be a fixed-size value or a slice of fixed-size</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span><span class="comment">// values, or a pointer to such data.</span>
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span><span class="comment">// Boolean values encode as one byte: 1 for true, and 0 for false.</span>
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span><span class="comment">// Bytes written to w are encoded using the specified byte order</span>
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span><span class="comment">// and read from successive fields of the data.</span>
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span><span class="comment">// When writing structs, zero values are written for fields</span>
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span><span class="comment">// with blank (_) field names.</span>
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>func Write(w io.Writer, order ByteOrder, data interface{}) error {
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>	<span class="comment">// Fast path for basic types and slices.</span>
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	if n := intDataSize(data); n != 0 {
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>		var b [8]byte
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>		var bs []byte
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>		if n &gt; len(b) {
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>			bs = make([]byte, n)
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>		} else {
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>			bs = b[:n]
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>		}
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>		switch v := data.(type) {
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		case *bool:
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>			if *v {
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>				b[0] = 1
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>			} else {
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>				b[0] = 0
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>			}
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>		case bool:
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>			if v {
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>				b[0] = 1
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>			} else {
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>				b[0] = 0
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>			}
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		case []bool:
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>			for i, x := range v {
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>				if x {
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>					bs[i] = 1
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>				} else {
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>					bs[i] = 0
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>				}
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>			}
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>		case *int8:
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>			b[0] = byte(*v)
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>		case int8:
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>			b[0] = byte(v)
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>		case []int8:
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>			for i, x := range v {
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>				bs[i] = byte(x)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>			}
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>		case *uint8:
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>			b[0] = *v
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>		case uint8:
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>			b[0] = v
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>		case []uint8:
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>			bs = v
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>		case *int16:
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>			order.PutUint16(bs, uint16(*v))
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>		case int16:
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>			order.PutUint16(bs, uint16(v))
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>		case []int16:
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>			for i, x := range v {
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>				order.PutUint16(bs[2*i:], uint16(x))
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>			}
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		case *uint16:
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>			order.PutUint16(bs, *v)
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		case uint16:
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>			order.PutUint16(bs, v)
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>		case []uint16:
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>			for i, x := range v {
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>				order.PutUint16(bs[2*i:], x)
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>			}
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>		case *int32:
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>			order.PutUint32(bs, uint32(*v))
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>		case int32:
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>			order.PutUint32(bs, uint32(v))
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>		case []int32:
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>			for i, x := range v {
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>				order.PutUint32(bs[4*i:], uint32(x))
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>			}
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>		case *uint32:
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>			order.PutUint32(bs, *v)
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>		case uint32:
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>			order.PutUint32(bs, v)
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>		case []uint32:
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>			for i, x := range v {
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>				order.PutUint32(bs[4*i:], x)
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>			}
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>		case *int64:
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>			order.PutUint64(bs, uint64(*v))
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		case int64:
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>			order.PutUint64(bs, uint64(v))
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>		case []int64:
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>			for i, x := range v {
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>				order.PutUint64(bs[8*i:], uint64(x))
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>			}
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>		case *uint64:
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>			order.PutUint64(bs, *v)
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>		case uint64:
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>			order.PutUint64(bs, v)
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>		case []uint64:
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>			for i, x := range v {
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>				order.PutUint64(bs[8*i:], x)
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>			}
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>		}
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>		_, err := w.Write(bs)
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>		return err
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	}
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	<span class="comment">// Fallback to reflect-based encoding.</span>
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>	v := reflect.Indirect(reflect.ValueOf(data))
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	size := dataSize(v)
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	if size &lt; 0 {
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>		return errors.New(&#34;binary.Write: invalid type &#34; + reflect.TypeOf(data).String())
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	}
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	buf := make([]byte, size)
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	e := &amp;encoder{order: order, buf: buf}
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>	e.value(v)
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	_, err := w.Write(buf)
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	return err
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>}
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span><span class="comment">// Size returns how many bytes Write would generate to encode the value v, which</span>
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span><span class="comment">// must be a fixed-size value or a slice of fixed-size values, or a pointer to such data.</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span><span class="comment">// If v is neither of these, Size returns -1.</span>
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span><span class="selection">func Size(v interface{}) int</span> {
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	return dataSize(reflect.Indirect(reflect.ValueOf(v)))
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>}
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span><span class="comment">// dataSize returns the number of bytes the actual data represented by v occupies in memory.</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span><span class="comment">// For compound structures, it sums the sizes of the elements. Thus, for instance, for a slice</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span><span class="comment">// it returns the length of the slice times the element size and does not count the memory</span>
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span><span class="comment">// occupied by the header. If the type of v is not acceptable, dataSize returns -1.</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>func dataSize(v reflect.Value) int {
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>	if v.Kind() == reflect.Slice {
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		if s := sizeof(v.Type().Elem()); s &gt;= 0 {
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>			return s * v.Len()
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>		}
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>		return -1
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	}
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>	return sizeof(v.Type())
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>}
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span><span class="comment">// sizeof returns the size &gt;= 0 of variables for the given type or -1 if the type is not acceptable.</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>func sizeof(t reflect.Type) int {
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>	switch t.Kind() {
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>	case reflect.Array:
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>		if s := sizeof(t.Elem()); s &gt;= 0 {
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>			return s * t.Len()
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>		}
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	case reflect.Struct:
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>		sum := 0
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>		for i, n := 0, t.NumField(); i &lt; n; i++ {
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>			s := sizeof(t.Field(i).Type)
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>			if s &lt; 0 {
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>				return -1
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>			}
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>			sum += s
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>		}
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>		return sum
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>	case reflect.Bool,
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>		reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>		reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128:
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		return int(t.Size())
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>	}
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>	return -1
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>}
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>type coder struct {
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	order ByteOrder
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>	buf   []byte
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>}
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>type decoder coder
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>type encoder coder
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>func (d *decoder) bool() bool {
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	x := d.buf[0]
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>	d.buf = d.buf[1:]
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>	return x != 0
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>}
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>func (e *encoder) bool(x bool) {
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>	if x {
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>		e.buf[0] = 1
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>	} else {
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>		e.buf[0] = 0
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>	}
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>	e.buf = e.buf[1:]
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>}
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>func (d *decoder) uint8() uint8 {
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	x := d.buf[0]
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>	d.buf = d.buf[1:]
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>	return x
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>}
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>func (e *encoder) uint8(x uint8) {
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>	e.buf[0] = x
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>	e.buf = e.buf[1:]
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>}
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>func (d *decoder) uint16() uint16 {
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>	x := d.order.Uint16(d.buf[0:2])
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>	d.buf = d.buf[2:]
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>	return x
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>}
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>func (e *encoder) uint16(x uint16) {
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>	e.order.PutUint16(e.buf[0:2], x)
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>	e.buf = e.buf[2:]
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>}
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>func (d *decoder) uint32() uint32 {
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>	x := d.order.Uint32(d.buf[0:4])
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>	d.buf = d.buf[4:]
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>	return x
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>}
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>func (e *encoder) uint32(x uint32) {
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>	e.order.PutUint32(e.buf[0:4], x)
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	e.buf = e.buf[4:]
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>}
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>func (d *decoder) uint64() uint64 {
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>	x := d.order.Uint64(d.buf[0:8])
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	d.buf = d.buf[8:]
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	return x
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>}
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>func (e *encoder) uint64(x uint64) {
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>	e.order.PutUint64(e.buf[0:8], x)
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>	e.buf = e.buf[8:]
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>}
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>func (d *decoder) int8() int8 { return int8(d.uint8()) }
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>func (e *encoder) int8(x int8) { e.uint8(uint8(x)) }
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>func (d *decoder) int16() int16 { return int16(d.uint16()) }
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>func (e *encoder) int16(x int16) { e.uint16(uint16(x)) }
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>func (d *decoder) int32() int32 { return int32(d.uint32()) }
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>func (e *encoder) int32(x int32) { e.uint32(uint32(x)) }
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>func (d *decoder) int64() int64 { return int64(d.uint64()) }
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>func (e *encoder) int64(x int64) { e.uint64(uint64(x)) }
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>func (d *decoder) value(v reflect.Value) {
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>	switch v.Kind() {
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>	case reflect.Array:
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>		l := v.Len()
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>		for i := 0; i &lt; l; i++ {
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>			d.value(v.Index(i))
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>		}
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>	case reflect.Struct:
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>		t := v.Type()
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>		l := v.NumField()
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>		for i := 0; i &lt; l; i++ {
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>			<span class="comment">// Note: Calling v.CanSet() below is an optimization.</span>
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>			<span class="comment">// It would be sufficient to check the field name,</span>
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>			<span class="comment">// but creating the StructField info for each field is</span>
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>			<span class="comment">// costly (run &#34;go test -bench=ReadStruct&#34; and compare</span>
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>			<span class="comment">// results when making changes to this code).</span>
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>			if v := v.Field(i); v.CanSet() || t.Field(i).Name != &#34;_&#34; {
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>				d.value(v)
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>			} else {
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>				d.skip(v)
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>			}
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>		}
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>	case reflect.Slice:
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		l := v.Len()
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>		for i := 0; i &lt; l; i++ {
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>			d.value(v.Index(i))
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>		}
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>	case reflect.Bool:
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>		v.SetBool(d.bool())
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>	case reflect.Int8:
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>		v.SetInt(int64(d.int8()))
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	case reflect.Int16:
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>		v.SetInt(int64(d.int16()))
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>	case reflect.Int32:
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		v.SetInt(int64(d.int32()))
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	case reflect.Int64:
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>		v.SetInt(d.int64())
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>	case reflect.Uint8:
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>		v.SetUint(uint64(d.uint8()))
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>	case reflect.Uint16:
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>		v.SetUint(uint64(d.uint16()))
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>	case reflect.Uint32:
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>		v.SetUint(uint64(d.uint32()))
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>	case reflect.Uint64:
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>		v.SetUint(d.uint64())
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>	case reflect.Float32:
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>		v.SetFloat(float64(math.Float32frombits(d.uint32())))
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>	case reflect.Float64:
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>		v.SetFloat(math.Float64frombits(d.uint64()))
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>	case reflect.Complex64:
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>		v.SetComplex(complex(
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>			float64(math.Float32frombits(d.uint32())),
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>			float64(math.Float32frombits(d.uint32())),
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>		))
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	case reflect.Complex128:
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>		v.SetComplex(complex(
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>			math.Float64frombits(d.uint64()),
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>			math.Float64frombits(d.uint64()),
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>		))
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>	}
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>}
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>func (e *encoder) value(v reflect.Value) {
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>	switch v.Kind() {
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>	case reflect.Array:
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>		l := v.Len()
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>		for i := 0; i &lt; l; i++ {
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>			e.value(v.Index(i))
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>		}
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>	case reflect.Struct:
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>		t := v.Type()
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>		l := v.NumField()
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>		for i := 0; i &lt; l; i++ {
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>			<span class="comment">// see comment for corresponding code in decoder.value()</span>
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>			if v := v.Field(i); v.CanSet() || t.Field(i).Name != &#34;_&#34; {
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>				e.value(v)
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>			} else {
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>				e.skip(v)
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>			}
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>		}
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>	case reflect.Slice:
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>		l := v.Len()
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>		for i := 0; i &lt; l; i++ {
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>			e.value(v.Index(i))
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>		}
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>	case reflect.Bool:
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>		e.bool(v.Bool())
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>		switch v.Type().Kind() {
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>		case reflect.Int8:
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>			e.int8(int8(v.Int()))
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>		case reflect.Int16:
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>			e.int16(int16(v.Int()))
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>		case reflect.Int32:
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>			e.int32(int32(v.Int()))
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>		case reflect.Int64:
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>			e.int64(v.Int())
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>		}
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>		switch v.Type().Kind() {
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>		case reflect.Uint8:
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>			e.uint8(uint8(v.Uint()))
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>		case reflect.Uint16:
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>			e.uint16(uint16(v.Uint()))
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>		case reflect.Uint32:
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>			e.uint32(uint32(v.Uint()))
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>		case reflect.Uint64:
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>			e.uint64(v.Uint())
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>		}
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>	case reflect.Float32, reflect.Float64:
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>		switch v.Type().Kind() {
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>		case reflect.Float32:
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>			e.uint32(math.Float32bits(float32(v.Float())))
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>		case reflect.Float64:
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>			e.uint64(math.Float64bits(v.Float()))
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>		}
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>	case reflect.Complex64, reflect.Complex128:
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>		switch v.Type().Kind() {
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>		case reflect.Complex64:
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>			x := v.Complex()
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>			e.uint32(math.Float32bits(float32(real(x))))
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>			e.uint32(math.Float32bits(float32(imag(x))))
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>		case reflect.Complex128:
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>			x := v.Complex()
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>			e.uint64(math.Float64bits(real(x)))
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>			e.uint64(math.Float64bits(imag(x)))
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>		}
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>	}
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>}
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>func (d *decoder) skip(v reflect.Value) {
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>	d.buf = d.buf[dataSize(v):]
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>}
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>func (e *encoder) skip(v reflect.Value) {
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>	n := dataSize(v)
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	for i := range e.buf[0:n] {
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>		e.buf[i] = 0
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>	}
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>	e.buf = e.buf[n:]
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>}
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span><span class="comment">// intDataSize returns the size of the data required to represent the data when encoded.</span>
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span><span class="comment">// It returns zero if the type cannot be implemented by the fast path in Read or Write.</span>
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>func intDataSize(data interface{}) int {
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>	switch data := data.(type) {
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>	case bool, int8, uint8, *bool, *int8, *uint8:
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>		return 1
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>	case []int8:
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>		return len(data)
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>	case []uint8:
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>		return len(data)
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>	case int16, uint16, *int16, *uint16:
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>		return 2
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>	case []int16:
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>		return 2 * len(data)
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	case []uint16:
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>		return 2 * len(data)
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>	case int32, uint32, *int32, *uint32:
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>		return 4
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>	case []int32:
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>		return 4 * len(data)
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>	case []uint32:
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>		return 4 * len(data)
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>	case int64, uint64, *int64, *uint64:
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>		return 8
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>	case []int64:
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>		return 8 * len(data)
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>	case []uint64:
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>		return 8 * len(data)
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	}
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>	return 0
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>}
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>
+</pre><p><a href="binary.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

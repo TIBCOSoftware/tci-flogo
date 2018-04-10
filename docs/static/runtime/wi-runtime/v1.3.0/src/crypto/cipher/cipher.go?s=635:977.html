@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/cipher/cipher.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./cipher.go%3Fs=635:977.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../cipher.1.html">cipher</a>/<span class="text-muted">cipher.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/cipher.1.html">crypto/cipher</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// Package cipher implements standard block cipher modes that can be wrapped</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// around low-level block cipher implementations.</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">// See http://csrc.nist.gov/groups/ST/toolkit/BCM/current_modes.html</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span><span class="comment">// and NIST Special Publication 800-38A.</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>package cipher
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span><span class="comment">// A Block represents an implementation of block cipher</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span><span class="comment">// using a given key. It provides the capability to encrypt</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span><span class="comment">// or decrypt individual blocks. The mode implementations</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// extend that capability to streams of blocks.</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="selection">type Block interface {
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// BlockSize returns the cipher&#39;s block size.</span><span class="selection">
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	BlockSize() int
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// Encrypt encrypts the first block in src into dst.</span><span class="selection">
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// Dst and src may point at the same memory.</span><span class="selection">
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	Encrypt(dst, src []byte)
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// Decrypt decrypts the first block in src into dst.</span><span class="selection">
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	</span><span class="selection-comment">// Dst and src may point at the same memory.</span><span class="selection">
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	Decrypt(dst, src []byte)
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>}</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span><span class="comment">// A Stream represents a stream cipher.</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>type Stream interface {
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	<span class="comment">// XORKeyStream XORs each byte in the given slice with a byte from the</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	<span class="comment">// cipher&#39;s key stream. Dst and src may point to the same memory.</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	<span class="comment">// If len(dst) &lt; len(src), XORKeyStream should panic. It is acceptable</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	<span class="comment">// to pass a dst bigger than src, and in that case, XORKeyStream will</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	<span class="comment">// only update dst[:len(src)] and will not touch the rest of dst.</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	XORKeyStream(dst, src []byte)
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>}
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span><span class="comment">// A BlockMode represents a block cipher running in a block-based mode (CBC,</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span><span class="comment">// ECB etc).</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>type BlockMode interface {
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	<span class="comment">// BlockSize returns the mode&#39;s block size.</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	BlockSize() int
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	<span class="comment">// CryptBlocks encrypts or decrypts a number of blocks. The length of</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	<span class="comment">// src must be a multiple of the block size. Dst and src may point to</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	<span class="comment">// the same memory.</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	CryptBlocks(dst, src []byte)
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>}
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span><span class="comment">// Utility routines</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>func dup(p []byte) []byte {
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	q := make([]byte, len(p))
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	copy(q, p)
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	return q
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>}
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>
+</pre><p><a href="cipher.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

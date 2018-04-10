@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/cipher/gcm_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="gcm_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../cipher.1.html">cipher</a>/<span class="text-muted">gcm_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/cipher.1.html">crypto/cipher</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2013 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package cipher_test
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;crypto/aes&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;crypto/cipher&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;crypto/rand&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;encoding/hex&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>)
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>var aesGCMTests = []struct {
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	key, nonce, plaintext, ad, result string
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>}{
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	{
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>		&#34;11754cd72aec309bf52f7687212e8957&#34;,
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>		&#34;3c819d9a9bed087615030b65&#34;,
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>		&#34;250327c674aaf477aef2675748cf6971&#34;,
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	},
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	{
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>		&#34;ca47248ac0b6f8372a97ac43508308ed&#34;,
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>		&#34;ffd2b598feabc9019262d2be&#34;,
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>		&#34;60d20404af527d248d893ae495707d1a&#34;,
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	},
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	{
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>		&#34;fbe3467cc254f81be8e78d765a2e6333&#34;,
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>		&#34;c6697351ff4aec29cdbaabf2&#34;,
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>		&#34;67&#34;,
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		&#34;3659cdc25288bf499ac736c03bfc1159&#34;,
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	},
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	{
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		&#34;8a7f9d80d08ad0bd5a20fb689c88f9fc&#34;,
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>		&#34;88b7b27d800937fda4f47301&#34;,
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>		&#34;50edd0503e0d7b8c91608eb5a1&#34;,
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>		&#34;ed6f65322a4740011f91d2aae22dd44e&#34;,
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	},
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	{
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>		&#34;051758e95ed4abb2cdc69bb454110e82&#34;,
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>		&#34;c99a66320db73158a35a255d&#34;,
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>		&#34;67c6697351ff4aec29cdbaabf2fbe3467cc254f81be8e78d765a2e63339f&#34;,
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>		&#34;6ce77f1a5616c505b6aec09420234036&#34;,
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	},
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	{
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>		&#34;77be63708971c4e240d1cb79e8d77feb&#34;,
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		&#34;e0e00f19fed7ba0136a797f3&#34;,
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>		&#34;7a43ec1d9c0a5a78a0b16533a6213cab&#34;,
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>		&#34;209fcc8d3675ed938e9c7166709dd946&#34;,
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	},
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	{
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>		&#34;7680c5d3ca6154758e510f4d25b98820&#34;,
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		&#34;f8f105f9c3df4965780321f8&#34;,
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		&#34;c94c410194c765e3dcc7964379758ed3&#34;,
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>		&#34;94dca8edfcf90bb74b153c8d48a17930&#34;,
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	},
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>	{
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>		&#34;7fddb57453c241d03efbed3ac44e371c&#34;,
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>		&#34;ee283a3fc75575e33efd4887&#34;,
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>		&#34;d5de42b461646c255c87bd2962d3b9a2&#34;,
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>		&#34;2ccda4a5415cb91e135c2a0f78c9b2fdb36d1df9b9d5e596f83e8b7f52971cb3&#34;,
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	},
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	{
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		&#34;ab72c77b97cb5fe9a382d9fe81ffdbed&#34;,
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>		&#34;54cc7dc2c37ec006bcc6d1da&#34;,
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>		&#34;007c5e5b3e59df24a7c355584fc1518d&#34;,
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		&#34;0e1bde206a07a9c2c1b65300f8c649972b4401346697138c7a4891ee59867d0c&#34;,
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	},
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	{
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>		&#34;fe47fcce5fc32665d2ae399e4eec72ba&#34;,
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>		&#34;5adb9609dbaeb58cbd6e7275&#34;,
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>		&#34;7c0e88c88899a779228465074797cd4c2e1498d259b54390b85e3eef1c02df60e743f1b840382c4bccaf3bafb4ca8429bea063&#34;,
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>		&#34;88319d6e1d3ffa5f987199166c8a9b56c2aeba5a&#34;,
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>		&#34;98f4826f05a265e6dd2be82db241c0fbbbf9ffb1c173aa83964b7cf5393043736365253ddbc5db8778371495da76d269e5db3e291ef1982e4defedaa2249f898556b47&#34;,
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	},
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	{
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>		&#34;ec0c2ba17aa95cd6afffe949da9cc3a8&#34;,
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>		&#34;296bce5b50b7d66096d627ef&#34;,
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>		&#34;b85b3753535b825cbe5f632c0b843c741351f18aa484281aebec2f45bb9eea2d79d987b764b9611f6c0f8641843d5d58f3a242&#34;,
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>		&#34;f8d00f05d22bf68599bcdeb131292ad6e2df5d14&#34;,
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>		&#34;a7443d31c26bdf2a1c945e29ee4bd344a99cfaf3aa71f8b3f191f83c2adfc7a07162995506fde6309ffc19e716eddf1a828c5a890147971946b627c40016da1ecf3e77&#34;,
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	},
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	{
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>		&#34;2c1f21cf0f6fb3661943155c3e3d8492&#34;,
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>		&#34;23cb5ff362e22426984d1907&#34;,
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>		&#34;42f758836986954db44bf37c6ef5e4ac0adaf38f27252a1b82d02ea949c8a1a2dbc0d68b5615ba7c1220ff6510e259f06655d8&#34;,
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>		&#34;5d3624879d35e46849953e45a32a624d6a6c536ed9857c613b572b0333e701557a713e3f010ecdf9a6bd6c9e3e44b065208645aff4aabee611b391528514170084ccf587177f4488f33cfb5e979e42b6e1cfc0a60238982a7aec&#34;,
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		&#34;81824f0e0d523db30d3da369fdc0d60894c7a0a20646dd015073ad2732bd989b14a222b6ad57af43e1895df9dca2a5344a62cc57a3ee28136e94c74838997ae9823f3a&#34;,
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	},
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	{
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>		&#34;d9f7d2411091f947b4d6f1e2d1f0fb2e&#34;,
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>		&#34;e1934f5db57cc983e6b180e7&#34;,
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		&#34;73ed042327f70fe9c572a61545eda8b2a0c6e1d6c291ef19248e973aee6c312012f490c2c6f6166f4a59431e182663fcaea05a&#34;,
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		&#34;0a8a18a7150e940c3d87b38e73baee9a5c049ee21795663e264b694a949822b639092d0e67015e86363583fcf0ca645af9f43375f05fdb4ce84f411dcbca73c2220dea03a20115d2e51398344b16bee1ed7c499b353d6c597af8&#34;,
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		&#34;aaadbd5c92e9151ce3db7210b8714126b73e43436d242677afa50384f2149b831f1d573c7891c2a91fbc48db29967ec9542b2321b51ca862cb637cdd03b99a0f93b134&#34;,
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>	},
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	{
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		&#34;fe9bb47deb3a61e423c2231841cfd1fb&#34;,
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>		&#34;4d328eb776f500a2f7fb47aa&#34;,
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>		&#34;f1cc3818e421876bb6b8bbd6c9&#34;,
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>		&#34;b88c5c1977b35b517b0aeae96743fd4727fe5cdb4b5b42818dea7ef8c9&#34;,
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	},
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	{
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		&#34;6703df3701a7f54911ca72e24dca046a&#34;,
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>		&#34;12823ab601c350ea4bc2488c&#34;,
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>		&#34;793cd125b0b84a043e3ac67717&#34;,
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>		&#34;b2051c80014f42f08735a7b0cd38e6bcd29962e5f2c13626b85a877101&#34;,
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	},
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	<span class="comment">// These cases test non-standard nonce sizes.</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	{
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>		&#34;1672c3537afa82004c6b8a46f6f0d026&#34;,
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>		&#34;05&#34;,
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>		&#34;8e2ad721f9455f74d8b53d3141f27e8e&#34;,
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	},
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	{
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>		&#34;9a4fea86a621a91ab371e492457796c0&#34;,
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>		&#34;75&#34;,
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>		&#34;ca6131faf0ff210e4e693d6c31c109fc5b6f54224eb120f37de31dc59ec669b6&#34;,
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>		&#34;4f6e2585c161f05a9ae1f2f894e9f0ab52b45d0f&#34;,
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>		&#34;5698c0a384241d30004290aac56bb3ece6fe8eacc5c4be98954deb9c3ff6aebf5d50e1af100509e1fba2a5e8a0af9670&#34;,
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	},
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	{
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>		&#34;d0f1f4defa1e8c08b4b26d576392027c&#34;,
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		&#34;42b4f01eb9f5a1ea5b1eb73b0fb0baed54f387ecaa0393c7d7dffc6af50146ecc021abf7eb9038d4303d91f8d741a11743166c0860208bcc02c6258fd9511a2fa626f96d60b72fcff773af4e88e7a923506e4916ecbd814651e9f445adef4ad6a6b6c7290cc13b956130eef5b837c939fcac0cbbcc9656cd75b13823ee5acdac&#34;,
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>		&#34;7ab49b57ddf5f62c427950111c5c4f0d&#34;,
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	},
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	{
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>		&#34;4a0c00a3d284dea9d4bf8b8dde86685e&#34;,
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		&#34;f8cbe82588e784bcacbe092cd9089b51e01527297f635bf294b3aa787d91057ef23869789698ac960707857f163ecb242135a228ad93964f5dc4a4d7f88fd7b3b07dd0a5b37f9768fb05a523639f108c34c661498a56879e501a2321c8a4a94d7e1b89db255ac1f685e185263368e99735ebe62a7f2931b47282be8eb165e4d7&#34;,
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>		&#34;6d4bf87640a6a48a50d28797b7&#34;,
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>		&#34;8d8c7ffc55086d539b5a8f0d1232654c&#34;,
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>		&#34;0d803ec309482f35b8e6226f2b56303239298e06b281c2d51aaba3c125&#34;,
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	},
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>	{
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>		&#34;0e18a844ac5bf38e4cd72d9b0942e506&#34;,
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>		&#34;0870d4b28a2954489a0abcd5&#34;,
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		&#34;67c6697351ff4aec29cdbaabf2fbe3467cc254f81be8e78d765a2e63339fc99a66320db73158a35a255d051758e95ed4abb2cdc69bb454110e827441213ddc8770e93ea141e1fc673e017e97eadc6b968f385c2aecb03bfb32af3c54ec18db5c021afe43fbfaaa3afb29d1e6053c7c9475d8be6189f95cbba8990f95b1ebf1b3&#34;,
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		&#34;05eff700e9a13ae5ca0bcbd0484764bd1f231ea81c7b64c514735ac55e4b79633b706424119e09dcaad4acf21b10af3b33cde3504847155cbb6f2219ba9b7df50be11a1c7f23f829f8a41b13b5ca4ee8983238e0794d3d34bc5f4e77facb6c05ac86212baa1a55a2be70b5733b045cd33694b3afe2f0e49e4f321549fd824ea9&#34;,
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>		&#34;cace28f4976afd72e3c5128167eb788fbf6634dda0a2f53148d00f6fa557f5e9e8f736c12e450894af56cb67f7d99e1027258c8571bd91ee3b7360e0d508aa1f382411a16115f9c05251cc326d4016f62e0eb8151c048465b0c6c8ff12558d43310e18b2cb1889eec91557ce21ba05955cf4c1d4847aadfb1b0a83f3a3b82b7efa62a5f03c5d6eda381a85dd78dbc55c&#34;,
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	},
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	{
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>		&#34;1f6c3a3bc0542aabba4ef8f6c7169e73&#34;,
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>		&#34;f3584606472b260e0dd2ebb2&#34;,
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>		&#34;67c6697351ff4aec29cdbaabf2fbe3467cc254f81be8e78d765a2e63339fc99a66320db73158a35a255d051758e95ed4abb2cdc69bb454110e827441213ddc8770e93ea141e1fc673e017e97eadc6b968f385c2aecb03bfb32af3c54ec18db5c021afe43fbfaaa3afb29d1e6053c7c9475d8be6189f95cbba8990f95b1ebf1b305eff700e9a13ae5ca0bcbd0484764bd1f231ea81c7b64c514735ac55e4b79633b706424119e09dcaad4acf21b10af3b33cde3504847155cbb6f2219ba9b7df50be11a1c7f23f829f8a41b13b5ca4ee8983238e0794d3d34bc5f4e77facb6c05ac86212baa1a55a2be70b5733b045cd33694b3afe2f0e49e4f321549fd824ea90870d4b28a2954489a0abcd50e18a844ac5bf38e4cd72d9b0942e506c433afcda3847f2dadd47647de321cec4ac430f62023856cfbb20704f4ec0bb920ba86c33e05f1ecd96733b79950a3e314d3d934f75ea0f210a8f6059401beb4bc4478fa4969e623d01ada696a7e4c7e5125b34884533a94fb319990325744ee9bbce9e525cf08f5e9e25e5360aad2b2d085fa54d835e8d466826498d9a8877565705a8a3f62802944de7ca5894e5759d351adac869580ec17e485f18c0c66f17cc07cbb22fce466da610b63af62bc83b4692f3affaf271693ac071fb86d11342d8def4f89d4b66335c1c7e4248367d8ed9612ec453902d8e50af89d7709d1a596c1f41f&#34;,
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>		&#34;95aa82ca6c49ae90cd1668baac7aa6f2b4a8ca99b2c2372acb08cf61c9c3805e6e0328da4cd76a19edd2d3994c798b0022569ad418d1fee4d9cd45a391c601ffc92ad91501432fee150287617c13629e69fc7281cd7165a63eab49cf714bce3a75a74f76ea7e64ff81eb61fdfec39b67bf0de98c7e4e32bdf97c8c6ac75ba43c02f4b2ed7216ecf3014df000108b67cf99505b179f8ed4980a6103d1bca70dbe9bbfab0ed59801d6e5f2d6f67d3ec5168e212e2daf02c6b963c98a1f7097de0c56891a2b211b01070dd8fd8b16c2a1a4e3cfd292d2984b3561d555d16c33ddc2bcf7edde13efe520c7e2abdda44d81881c531aeeeb66244c3b791ea8acfb6a68&#34;,
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		&#34;55864065117e07650ca650a0f0d9ef4b02aee7c58928462fddb49045bf85355b4653fa26158210a7f3ef5b3ca48612e8b7adf5c025c1b821960af770d935df1c9a1dd25077d6b1c7f937b2e20ce981b07980880214698f3fad72fa370b3b7da257ce1d0cf352bc5304fada3e0f8927bd4e5c1abbffa563bdedcb567daa64faaed748cb361732200ba3506836a3c1c82aafa14c76dc07f6c4277ff2c61325f91fdbd6c1883e745fcaadd5a6d692eeaa5ad56eead6a9d74a595d22757ed89532a4b8831e2b9e2315baea70a9b95d228f09d491a5ed5ab7076766703457e3159bbb9b17b329525669863153079448c68cd2f200c0be9d43061a60639cb59d50993d276c05caaa565db8ce633b2673e4012bebbca02b1a64d779d04066f3e949ece173825885ec816468c819a8129007cc05d8785c48077d09eb1abcba14508dde85a6f16a744bc95faef24888d53a8020515ab20307efaecbdf143a26563c67989bceedc2d6d2bb9699bb6c615d93767e4158c1124e3b6c723aaa47796e59a60d3696cd85adfae9a62f2c02c22009f80ed494bdc587f31dd892c253b5c6d6b7db078fa72d23474ee54f8144d6561182d71c862941dbc0b2cb37a4d4b23cbad5637e6be901cc73f16d5aec39c60dddee631511e57b47520b61ae1892d2d1bd2b486e30faec892f171b6de98d96108016fac805604761f8e74742b3bb7dc8a290a46bf697c3e4446e6e65832cbae7cf1aaad1&#34;,
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	},
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	{
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		&#34;0795d80bc7f40f4d41c280271a2e4f7f&#34;,
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		&#34;ff824c906594aff365d3cb1f&#34;,
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>		&#34;1ad4e74d127f935beee57cff920665babe7ce56227377afe570ba786193ded3412d4812453157f42fafc418c02a746c1232c234a639d49baa8f041c12e2ef540027764568ce49886e0d913e28059a3a485c6eee96337a30b28e4cd5612c2961539fa6bc5de034cbedc5fa15db844013e0bef276e27ca7a4faf47a5c1093bd643354108144454d221b3737e6cb87faac36ed131959babe44af2890cfcc4e23ffa24470e689ce0894f5407bb0c8665cff536008ad2ac6f1c9ef8289abd0bd9b72f21c597bda5210cf928c805af2dd4a464d52e36819d521f967bba5386930ab5b4cf4c71746d7e6e964673457348e9d71d170d9eb560bd4bdb779e610ba816bf776231ebd0af5966f5cdab6815944032ab4dd060ad8dab880549e910f1ffcf6862005432afad&#34;,
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		&#34;98a47a430d8fd74dc1829a91e3481f8ed024d8ba34c9b903321b04864db333e558ae28653dffb2&#34;,
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		&#34;3b8f91443480e647473a0a0b03d571c622b7e70e4309a02c9bb7980053010d865e6aec161354dc9f481b2cd5213e09432b57ec4e58fbd0a8549dd15c8c4e74a6529f75fad0ce5a9e20e2beeb2f91eb638bf88999968de438d2f1cedbfb0a1c81f9e8e7362c738e0fddd963692a4f4df9276b7f040979ce874cf6fa3de26da0713784bdb25e4efcb840554ef5b38b5fe8380549a496bd8e423a7456df6f4ae78a07ebe2276a8e22fc2243ec4f78abe0c99c733fd67c8c492699fa5ee2289cdd0a8d469bf883520ee74efb854bfadc7366a49ee65ca4e894e3335e2b672618d362eee12a577dd8dc2ba55c49c1fc3ad68180e9b112d0234d4aa28f5661f1e036450ca6f18be0166676bd80f8a4890c6ddea306fabb7ff3cb2860aa32a827e3a312912a2dfa70f6bc1c07de238448f2d751bd0cf15bf7&#34;,
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>	},
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	{
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>		&#34;e2e001a36c60d2bf40d69ff5b2b1161ea218db263be16a4e&#34;,
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		&#34;84230643130d05425826641e&#34;,
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>		&#34;adb034f3f4a7ca45e2993812d113a9821d50df151af978bccc6d3bc113e15bc0918fb385377dca1916022ce816d56a332649484043c0fc0f2d37d040182b00a9bbb42ef231f80b48fb3730110d9a4433e38c73264c703579a705b9c031b969ec6d98de9f90e9e78b21179c2eb1e061946cd4bbb844f031ecf6eaac27a4151311adf1b03eda97c9fbae66295f468af4b35faf6ba39f9d8f95873bbc2b51cf3dfec0ed3c9b850696336cc093b24a8765a936d14dd56edc6bf518272169f75e67b74ba452d0aae90416a997c8f31e2e9d54ffea296dc69462debc8347b3e1af6a2d53bdfdfda601134f98db42b609df0a08c9347590c8d86e845bb6373d65a26ab85f67b50569c85401a396b8ad76c2b53ff62bcfbf033e435ef47b9b591d05117c6dc681d68e&#34;,
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		&#34;d5d7316b8fdee152942148bff007c22e4b2022c6bc7be3c18c5f2e52e004e0b5dc12206bf002bd&#34;,
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>		&#34;f2c39423ee630dfe961da81909159dba018ce09b1073a12a477108316af5b7a31f86be6a0548b572d604bd115ea737dde899e0bd7f7ac9b23e38910dc457551ecc15c814a9f46d8432a1a36097dc1afe2712d1ba0838fa88cb55d9f65a2e9bece0dbf8999562503989041a2c87d7eb80ef649769d2f4978ce5cf9664f2bd0849646aa81cb976e45e1ade2f17a8126219e917aadbb4bae5e2c4b3f57bbc7f13fcc807df7842d9727a1b389e0b749e5191482adacabd812627c6eae2c7a30caf0844ad2a22e08f39edddf0ae10413e47db433dfe3febbb5a5cec9ade21fbba1e548247579395880b747669a8eb7e2ec0c1bff7fed2defdb92b07a14edf07b1bde29c31ab052ff1214e6b5ebbefcb8f21b5d6f8f6e07ee57ad6e14d4e142cb3f51bb465ab3a28a2a12f01b7514ad0463f2bde0d71d221&#34;,
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	},
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>	{
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		&#34;5394e890d37ba55ec9d5f327f15680f6a63ef5279c79331643ad0af6d2623525&#34;,
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		&#34;815e840b7aca7af3b324583f&#34;,
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>		&#34;8e63067cd15359f796b43c68f093f55fdf3589fc5f2fdfad5f9d156668a617f7091d73da71cdd207810e6f71a165d0809a597df9885ca6e8f9bb4e616166586b83cc45f49917fc1a256b8bc7d05c476ab5c4633e20092619c4747b26dad3915e9fd65238ee4e5213badeda8a3a22f5efe6582d0762532026c89b4ca26fdd000eb45347a2a199b55b7790e6b1b2dba19833ce9f9522c0bcea5b088ccae68dd99ae0203c81b9f1dd3181c3e2339e83ccd1526b67742b235e872bea5111772aab574ae7d904d9b6355a79178e179b5ae8edc54f61f172bf789ea9c9af21f45b783e4251421b077776808f04972a5e801723cf781442378ce0e0568f014aea7a882dcbcb48d342be53d1c2ebfb206b12443a8a587cc1e55ca23beca385d61d0d03e9d84cbc1b0a&#34;,
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>		&#34;0feccdfae8ed65fa31a0858a1c466f79e8aa658c2f3ba93c3f92158b4e30955e1c62580450beff&#34;,
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>		&#34;b69a7e17bb5af688883274550a4ded0d1aff49a0b18343f4b382f745c163f7f714c9206a32a1ff012427e19431951edd0a755e5f491b0eedfd7df68bbc6085dd2888607a2f998c3e881eb1694109250db28291e71f4ad344a125624fb92e16ea9815047cd1111cabfdc9cb8c3b4b0f40aa91d31774009781231400789ed545404af6c3f76d07ddc984a7bd8f52728159782832e298cc4d529be96d17be898efd83e44dc7b0e2efc645849fd2bba61fef0ae7be0dcab233cc4e2b7ba4e887de9c64b97f2a1818aa54371a8d629dae37975f7784e5e3cc77055ed6e975b1e5f55e6bbacdc9f295ce4ada2c16113cd5b323cf78b7dde39f4a87aa8c141a31174e3584ccbd380cf5ec6d1dba539928b084fa9683e9c0953acf47cc3ac384a2c38914f1da01fb2cfd78905c2b58d36b2574b9df15535d82&#34;,
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	},
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>}
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>func TestAESGCM(t *testing.T) {
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	for i, test := range aesGCMTests {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>		key, _ := hex.DecodeString(test.key)
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>		aes, err := aes.NewCipher(key)
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>			t.Fatal(err)
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>		}
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		nonce, _ := hex.DecodeString(test.nonce)
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>		plaintext, _ := hex.DecodeString(test.plaintext)
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		ad, _ := hex.DecodeString(test.ad)
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>		aesgcm, err := cipher.NewGCMWithNonceSize(aes, len(nonce))
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>			t.Fatal(err)
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>		}
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>		ct := aesgcm.Seal(nil, nonce, plaintext, ad)
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		if ctHex := hex.EncodeToString(ct); ctHex != test.result {
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>			t.Errorf(&#34;#%d: got %s, want %s&#34;, i, ctHex, test.result)
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>			continue
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>		}
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		plaintext2, err := aesgcm.Open(nil, nonce, ct, ad)
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>			t.Errorf(&#34;#%d: Open failed&#34;, i)
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>			continue
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		}
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>		if !bytes.Equal(plaintext, plaintext2) {
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>			t.Errorf(&#34;#%d: plaintext&#39;s don&#39;t match: got %x vs %x&#34;, i, plaintext2, plaintext)
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>			continue
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>		}
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>		if len(ad) &gt; 0 {
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>			ad[0] ^= 0x80
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>			if _, err := aesgcm.Open(nil, nonce, ct, ad); err == nil {
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>				t.Errorf(&#34;#%d: Open was successful after altering additional data&#34;, i)
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>			}
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>			ad[0] ^= 0x80
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>		}
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>		nonce[0] ^= 0x80
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>		if _, err := aesgcm.Open(nil, nonce, ct, ad); err == nil {
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>			t.Errorf(&#34;#%d: Open was successful after altering nonce&#34;, i)
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>		}
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>		nonce[0] ^= 0x80
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>		ct[0] ^= 0x80
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>		if _, err := aesgcm.Open(nil, nonce, ct, ad); err == nil {
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>			t.Errorf(&#34;#%d: Open was successful after altering ciphertext&#34;, i)
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>		}
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>		ct[0] ^= 0x80
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	}
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>}
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>func TestTagFailureOverwrite(t *testing.T) {
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	<span class="comment">// The AESNI GCM code decrypts and authenticates concurrently and so</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>	<span class="comment">// overwrites the output buffer before checking the authentication tag.</span>
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	<span class="comment">// In order to be consistent across platforms, all implementations</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	<span class="comment">// should do this and this test checks that.</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	key, _ := hex.DecodeString(&#34;ab72c77b97cb5fe9a382d9fe81ffdbed&#34;)
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	nonce, _ := hex.DecodeString(&#34;54cc7dc2c37ec006bcc6d1db&#34;)
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	ciphertext, _ := hex.DecodeString(&#34;0e1bde206a07a9c2c1b65300f8c649972b4401346697138c7a4891ee59867d0c&#34;)
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	aes, _ := aes.NewCipher(key)
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	aesgcm, _ := cipher.NewGCM(aes)
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>	dst := make([]byte, len(ciphertext)-16)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	for i := range dst {
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>		dst[i] = 42
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	}
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	result, err := aesgcm.Open(dst[:0], nonce, ciphertext, nil)
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>	if err == nil {
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>		t.Fatal(&#34;Bad Open still resulted in nil error.&#34;)
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>	}
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	if result != nil {
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>		t.Fatal(&#34;Failed Open returned non-nil result.&#34;)
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	}
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	for i := range dst {
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		if dst[i] != 0 {
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>			t.Fatal(&#34;Failed Open didn&#39;t zero dst buffer&#34;)
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		}
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	}
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>}
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>func TestGCMCounterWrap(t *testing.T) {
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>	<span class="comment">// Test that the last 32-bits of the counter wrap correctly.</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>		nonce, tag string
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	}{
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		{&#34;0fa72e25&#34;, &#34;37e1948cdfff09fbde0c40ad99fee4a7&#34;},   <span class="comment">// counter: 7eb59e4d961dad0dfdd75aaffffffff0</span>
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>		{&#34;afe05cc1&#34;, &#34;438f3aa9fee5e54903b1927bca26bbdf&#34;},   <span class="comment">// counter: 75d492a7e6e6bfc979ad3a8ffffffff4</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>		{&#34;9ffecbef&#34;, &#34;7b88ca424df9703e9e8611071ec7e16e&#34;},   <span class="comment">// counter: c8bb108b0ecdc71747b9d57ffffffff5</span>
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>		{&#34;ffc3e5b3&#34;, &#34;38d49c86e0abe853ac250e66da54c01a&#34;},   <span class="comment">// counter: 706414d2de9b36ab3b900a9ffffffff6</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>		{&#34;cfdd729d&#34;, &#34;e08402eaac36a1a402e09b1bd56500e8&#34;},   <span class="comment">// counter: cd0b96fe36b04e750584e56ffffffff7</span>
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>		{&#34;010ae3d486&#34;, &#34;5405bb490b1f95d01e2ba735687154bc&#34;}, <span class="comment">// counter: e36c18e69406c49722808104fffffff8</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>		{&#34;01b1107a9d&#34;, &#34;939a585f342e01e17844627492d44dbf&#34;}, <span class="comment">// counter: e6d56eaf9127912b6d62c6dcffffffff</span>
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	}
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	key, err := aes.NewCipher(make([]byte, 16))
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	}
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	plaintext := make([]byte, 16*17+1)
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>	for i, test := range tests {
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>		nonce, _ := hex.DecodeString(test.nonce)
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>		want, _ := hex.DecodeString(test.tag)
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>		aead, err := cipher.NewGCMWithNonceSize(key, len(nonce))
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>			t.Fatal(err)
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>		}
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>		got := aead.Seal(nil, nonce, plaintext, nil)
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>		if !bytes.Equal(got[len(plaintext):], want) {
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>			t.Errorf(&#34;test[%v]: got: %x, want: %x&#34;, i, got[len(plaintext):], want)
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>		}
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>		_, err = aead.Open(nil, nonce, got, nil)
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>			t.Errorf(&#34;test[%v]: authentication failed&#34;, i)
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		}
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	}
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>}
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>var _ cipher.Block = (*wrapper)(nil)
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>type wrapper struct {
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	block cipher.Block
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>}
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>func (w *wrapper) BlockSize() int          { return w.block.BlockSize() }
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>func (w *wrapper) Encrypt(dst, src []byte) { w.block.Encrypt(dst, src) }
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>func (w *wrapper) Decrypt(dst, src []byte) { w.block.Decrypt(dst, src) }
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span><span class="comment">// wrap wraps the Block interface so that it does not fulfill</span>
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span><span class="comment">// any optimizing interfaces such as gcmAble.</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>func wrap(b cipher.Block) cipher.Block {
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	return &amp;wrapper{b}
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>}
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>func TestGCMAsm(t *testing.T) {
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	<span class="comment">// Create a new pair of AEADs, one using the assembly implementation</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>	<span class="comment">// and one using the generic Go implementation.</span>
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	newAESGCM := func(key []byte) (asm, generic cipher.AEAD, err error) {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		block, err := aes.NewCipher(key[:])
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>			return nil, nil, err
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>		}
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>		asm, err = cipher.NewGCM(block)
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>			return nil, nil, err
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>		}
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>		generic, err = cipher.NewGCM(wrap(block))
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>			return nil, nil, err
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>		}
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>		return asm, generic, nil
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>	}
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	<span class="comment">// check for assembly implementation</span>
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>	var key [16]byte
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	asm, generic, err := newAESGCM(key[:])
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	}
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>	if reflect.TypeOf(asm) == reflect.TypeOf(generic) {
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>		t.Skipf(&#34;no assembly implementation of GCM&#34;)
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	}
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	<span class="comment">// generate permutations</span>
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	type pair struct{ align, length int }
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	lengths := []int{0, 8192, 8193, 8208}
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>	keySizes := []int{16, 24, 32}
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	alignments := []int{0, 1, 2, 3}
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	if testing.Short() {
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>		keySizes = []int{16}
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>		alignments = []int{1}
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>	}
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	perms := make([]pair, 0)
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	for _, l := range lengths {
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>		for _, a := range alignments {
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>			if a != 0 &amp;&amp; l == 0 {
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>				continue
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>			}
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>			perms = append(perms, pair{align: a, length: l})
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>		}
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>	}
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	<span class="comment">// run test for all permutations</span>
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>	test := func(ks int, pt, ad []byte) error {
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		key := make([]byte, ks)
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>		if _, err := io.ReadFull(rand.Reader, key); err != nil {
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>			return err
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>		}
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>		asm, generic, err := newAESGCM(key)
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>			return err
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>		}
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>		if _, err := io.ReadFull(rand.Reader, pt); err != nil {
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>			return err
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>		}
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>		if _, err := io.ReadFull(rand.Reader, ad); err != nil {
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>			return err
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>		}
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>		nonce := make([]byte, 12)
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>			return err
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>		}
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>		want := generic.Seal(nil, nonce, pt, ad)
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>		got := asm.Seal(nil, nonce, pt, ad)
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>		if !bytes.Equal(want, got) {
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>			return errors.New(&#34;incorrect Seal output&#34;)
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>		}
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>		got, err = asm.Open(nil, nonce, want, ad)
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>			return errors.New(&#34;authentication failed&#34;)
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>		}
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>		if !bytes.Equal(pt, got) {
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>			return errors.New(&#34;incorrect Open output&#34;)
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>		}
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		return nil
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>	}
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>	for _, a := range perms {
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>		ad := make([]byte, a.align+a.length)
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>		ad = ad[a.align:]
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>		for _, p := range perms {
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>			pt := make([]byte, p.align+p.length)
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>			pt = pt[p.align:]
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>			for _, ks := range keySizes {
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>				if err := test(ks, pt, ad); err != nil {
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>					t.Error(err)
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>					t.Errorf(&#34;	key size: %v&#34;, ks)
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>					t.Errorf(&#34;	plaintext alignment: %v&#34;, p.align)
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>					t.Errorf(&#34;	plaintext length: %v&#34;, p.length)
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>					t.Errorf(&#34;	additionalData alignment: %v&#34;, a.align)
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>					t.Fatalf(&#34;	additionalData length: %v&#34;, a.length)
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>				}
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>			}
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>		}
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	}
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>}
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>
+</pre><p><a href="gcm_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

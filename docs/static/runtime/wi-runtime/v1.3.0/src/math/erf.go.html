@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/erf.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="erf.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<span class="text-muted">erf.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:6060/pkg/math">math</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package math
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">/*
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	Floating-point error function and complementary error function.
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>*/</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span><span class="comment">// The original C code and the long comment below are</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span><span class="comment">// from FreeBSD&#39;s /usr/src/lib/msun/src/s_erf.c and</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span><span class="comment">// came with this notice. The go code is a simplified</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// version of the original C.</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// ====================================================</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span><span class="comment">// Developed at SunPro, a Sun Microsystems, Inc. business.</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span><span class="comment">// Permission to use, copy, modify, and distribute this</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span><span class="comment">// software is freely granted, provided that this notice</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span><span class="comment">// is preserved.</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span><span class="comment">// ====================================================</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span><span class="comment">// double erf(double x)</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span><span class="comment">// double erfc(double x)</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span><span class="comment">//                           x</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span><span class="comment">//                    2      |\</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span><span class="comment">//     erf(x)  =  ---------  | exp(-t*t)dt</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span><span class="comment">//                 sqrt(pi) \|</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span><span class="comment">//                           0</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span><span class="comment">//     erfc(x) =  1-erf(x)</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span><span class="comment">//  Note that</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span><span class="comment">//              erf(-x) = -erf(x)</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span><span class="comment">//              erfc(-x) = 2 - erfc(x)</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span><span class="comment">// Method:</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span><span class="comment">//      1. For |x| in [0, 0.84375]</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span><span class="comment">//          erf(x)  = x + x*R(x**2)</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span><span class="comment">//          erfc(x) = 1 - erf(x)           if x in [-.84375,0.25]</span>
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span><span class="comment">//                  = 0.5 + ((0.5-x)-x*R)  if x in [0.25,0.84375]</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span><span class="comment">//         where R = P/Q where P is an odd poly of degree 8 and</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span><span class="comment">//         Q is an odd poly of degree 10.</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span><span class="comment">//                                               -57.90</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span><span class="comment">//                      | R - (erf(x)-x)/x | &lt;= 2</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span><span class="comment">//         Remark. The formula is derived by noting</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span><span class="comment">//          erf(x) = (2/sqrt(pi))*(x - x**3/3 + x**5/10 - x**7/42 + ....)</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span><span class="comment">//         and that</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span><span class="comment">//          2/sqrt(pi) = 1.128379167095512573896158903121545171688</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span><span class="comment">//         is close to one. The interval is chosen because the fix</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span><span class="comment">//         point of erf(x) is near 0.6174 (i.e., erf(x)=x when x is</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span><span class="comment">//         near 0.6174), and by some experiment, 0.84375 is chosen to</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span><span class="comment">//         guarantee the error is less than one ulp for erf.</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span><span class="comment">//      2. For |x| in [0.84375,1.25], let s = |x| - 1, and</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span><span class="comment">//         c = 0.84506291151 rounded to single (24 bits)</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span><span class="comment">//              erf(x)  = sign(x) * (c  + P1(s)/Q1(s))</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span><span class="comment">//              erfc(x) = (1-c)  - P1(s)/Q1(s) if x &gt; 0</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span><span class="comment">//                        1+(c+P1(s)/Q1(s))    if x &lt; 0</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span><span class="comment">//              |P1/Q1 - (erf(|x|)-c)| &lt;= 2**-59.06</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span><span class="comment">//         Remark: here we use the taylor series expansion at x=1.</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span><span class="comment">//              erf(1+s) = erf(1) + s*Poly(s)</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span><span class="comment">//                       = 0.845.. + P1(s)/Q1(s)</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span><span class="comment">//         That is, we use rational approximation to approximate</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span><span class="comment">//                      erf(1+s) - (c = (single)0.84506291151)</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span><span class="comment">//         Note that |P1/Q1|&lt; 0.078 for x in [0.84375,1.25]</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span><span class="comment">//         where</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span><span class="comment">//              P1(s) = degree 6 poly in s</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span><span class="comment">//              Q1(s) = degree 6 poly in s</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span><span class="comment">//      3. For x in [1.25,1/0.35(~2.857143)],</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span><span class="comment">//              erfc(x) = (1/x)*exp(-x*x-0.5625+R1/S1)</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span><span class="comment">//              erf(x)  = 1 - erfc(x)</span>
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span><span class="comment">//         where</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span><span class="comment">//              R1(z) = degree 7 poly in z, (z=1/x**2)</span>
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span><span class="comment">//              S1(z) = degree 8 poly in z</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span><span class="comment">//      4. For x in [1/0.35,28]</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span><span class="comment">//              erfc(x) = (1/x)*exp(-x*x-0.5625+R2/S2) if x &gt; 0</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span><span class="comment">//                      = 2.0 - (1/x)*exp(-x*x-0.5625+R2/S2) if -6&lt;x&lt;0</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span><span class="comment">//                      = 2.0 - tiny            (if x &lt;= -6)</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span><span class="comment">//              erf(x)  = sign(x)*(1.0 - erfc(x)) if x &lt; 6, else</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span><span class="comment">//              erf(x)  = sign(x)*(1.0 - tiny)</span>
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span><span class="comment">//         where</span>
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span><span class="comment">//              R2(z) = degree 6 poly in z, (z=1/x**2)</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span><span class="comment">//              S2(z) = degree 7 poly in z</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span><span class="comment">//      Note1:</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span><span class="comment">//         To compute exp(-x*x-0.5625+R/S), let s be a single</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span><span class="comment">//         precision number and s := x; then</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span><span class="comment">//              -x*x = -s*s + (s-x)*(s+x)</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span><span class="comment">//              exp(-x*x-0.5626+R/S) =</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span><span class="comment">//                      exp(-s*s-0.5625)*exp((s-x)*(s+x)+R/S);</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span><span class="comment">//      Note2:</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span><span class="comment">//         Here 4 and 5 make use of the asymptotic series</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span><span class="comment">//                        exp(-x*x)</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span><span class="comment">//              erfc(x) ~ ---------- * ( 1 + Poly(1/x**2) )</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span><span class="comment">//                        x*sqrt(pi)</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span><span class="comment">//         We use rational approximation to approximate</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span><span class="comment">//              g(s)=f(1/x**2) = log(erfc(x)*x) - x*x + 0.5625</span>
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span><span class="comment">//         Here is the error bound for R1/S1 and R2/S2</span>
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span><span class="comment">//              |R1/S1 - f(x)|  &lt; 2**(-62.57)</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span><span class="comment">//              |R2/S2 - f(x)|  &lt; 2**(-61.52)</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span><span class="comment">//      5. For inf &gt; x &gt;= 28</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span><span class="comment">//              erf(x)  = sign(x) *(1 - tiny)  (raise inexact)</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span><span class="comment">//              erfc(x) = tiny*tiny (raise underflow) if x &gt; 0</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span><span class="comment">//                      = 2 - tiny if x&lt;0</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span><span class="comment">//      7. Special case:</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span><span class="comment">//              erf(0)  = 0, erf(inf)  = 1, erf(-inf) = -1,</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span><span class="comment">//              erfc(0) = 1, erfc(inf) = 0, erfc(-inf) = 2,</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span><span class="comment">//              erfc/erf(NaN) is NaN</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>const (
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	erx = 8.45062911510467529297e-01 <span class="comment">// 0x3FEB0AC160000000</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	<span class="comment">// Coefficients for approximation to  erf in [0, 0.84375]</span>
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	efx  = 1.28379167095512586316e-01  <span class="comment">// 0x3FC06EBA8214DB69</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	efx8 = 1.02703333676410069053e+00  <span class="comment">// 0x3FF06EBA8214DB69</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	pp0  = 1.28379167095512558561e-01  <span class="comment">// 0x3FC06EBA8214DB68</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	pp1  = -3.25042107247001499370e-01 <span class="comment">// 0xBFD4CD7D691CB913</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	pp2  = -2.84817495755985104766e-02 <span class="comment">// 0xBF9D2A51DBD7194F</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	pp3  = -5.77027029648944159157e-03 <span class="comment">// 0xBF77A291236668E4</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	pp4  = -2.37630166566501626084e-05 <span class="comment">// 0xBEF8EAD6120016AC</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	qq1  = 3.97917223959155352819e-01  <span class="comment">// 0x3FD97779CDDADC09</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	qq2  = 6.50222499887672944485e-02  <span class="comment">// 0x3FB0A54C5536CEBA</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	qq3  = 5.08130628187576562776e-03  <span class="comment">// 0x3F74D022C4D36B0F</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	qq4  = 1.32494738004321644526e-04  <span class="comment">// 0x3F215DC9221C1A10</span>
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	qq5  = -3.96022827877536812320e-06 <span class="comment">// 0xBED09C4342A26120</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	<span class="comment">// Coefficients for approximation to  erf  in [0.84375, 1.25]</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	pa0 = -2.36211856075265944077e-03 <span class="comment">// 0xBF6359B8BEF77538</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	pa1 = 4.14856118683748331666e-01  <span class="comment">// 0x3FDA8D00AD92B34D</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	pa2 = -3.72207876035701323847e-01 <span class="comment">// 0xBFD7D240FBB8C3F1</span>
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	pa3 = 3.18346619901161753674e-01  <span class="comment">// 0x3FD45FCA805120E4</span>
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	pa4 = -1.10894694282396677476e-01 <span class="comment">// 0xBFBC63983D3E28EC</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>	pa5 = 3.54783043256182359371e-02  <span class="comment">// 0x3FA22A36599795EB</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	pa6 = -2.16637559486879084300e-03 <span class="comment">// 0xBF61BF380A96073F</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	qa1 = 1.06420880400844228286e-01  <span class="comment">// 0x3FBB3E6618EEE323</span>
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	qa2 = 5.40397917702171048937e-01  <span class="comment">// 0x3FE14AF092EB6F33</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>	qa3 = 7.18286544141962662868e-02  <span class="comment">// 0x3FB2635CD99FE9A7</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	qa4 = 1.26171219808761642112e-01  <span class="comment">// 0x3FC02660E763351F</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	qa5 = 1.36370839120290507362e-02  <span class="comment">// 0x3F8BEDC26B51DD1C</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>	qa6 = 1.19844998467991074170e-02  <span class="comment">// 0x3F888B545735151D</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	<span class="comment">// Coefficients for approximation to  erfc in [1.25, 1/0.35]</span>
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	ra0 = -9.86494403484714822705e-03 <span class="comment">// 0xBF843412600D6435</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	ra1 = -6.93858572707181764372e-01 <span class="comment">// 0xBFE63416E4BA7360</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>	ra2 = -1.05586262253232909814e+01 <span class="comment">// 0xC0251E0441B0E726</span>
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	ra3 = -6.23753324503260060396e+01 <span class="comment">// 0xC04F300AE4CBA38D</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>	ra4 = -1.62396669462573470355e+02 <span class="comment">// 0xC0644CB184282266</span>
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	ra5 = -1.84605092906711035994e+02 <span class="comment">// 0xC067135CEBCCABB2</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	ra6 = -8.12874355063065934246e+01 <span class="comment">// 0xC054526557E4D2F2</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>	ra7 = -9.81432934416914548592e+00 <span class="comment">// 0xC023A0EFC69AC25C</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>	sa1 = 1.96512716674392571292e+01  <span class="comment">// 0x4033A6B9BD707687</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>	sa2 = 1.37657754143519042600e+02  <span class="comment">// 0x4061350C526AE721</span>
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	sa3 = 4.34565877475229228821e+02  <span class="comment">// 0x407B290DD58A1A71</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	sa4 = 6.45387271733267880336e+02  <span class="comment">// 0x40842B1921EC2868</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	sa5 = 4.29008140027567833386e+02  <span class="comment">// 0x407AD02157700314</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	sa6 = 1.08635005541779435134e+02  <span class="comment">// 0x405B28A3EE48AE2C</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	sa7 = 6.57024977031928170135e+00  <span class="comment">// 0x401A47EF8E484A93</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>	sa8 = -6.04244152148580987438e-02 <span class="comment">// 0xBFAEEFF2EE749A62</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>	<span class="comment">// Coefficients for approximation to  erfc in [1/.35, 28]</span>
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	rb0 = -9.86494292470009928597e-03 <span class="comment">// 0xBF84341239E86F4A</span>
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>	rb1 = -7.99283237680523006574e-01 <span class="comment">// 0xBFE993BA70C285DE</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	rb2 = -1.77579549177547519889e+01 <span class="comment">// 0xC031C209555F995A</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	rb3 = -1.60636384855821916062e+02 <span class="comment">// 0xC064145D43C5ED98</span>
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	rb4 = -6.37566443368389627722e+02 <span class="comment">// 0xC083EC881375F228</span>
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	rb5 = -1.02509513161107724954e+03 <span class="comment">// 0xC09004616A2E5992</span>
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	rb6 = -4.83519191608651397019e+02 <span class="comment">// 0xC07E384E9BDC383F</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	sb1 = 3.03380607434824582924e+01  <span class="comment">// 0x403E568B261D5190</span>
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>	sb2 = 3.25792512996573918826e+02  <span class="comment">// 0x40745CAE221B9F0A</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>	sb3 = 1.53672958608443695994e+03  <span class="comment">// 0x409802EB189D5118</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>	sb4 = 3.19985821950859553908e+03  <span class="comment">// 0x40A8FFB7688C246A</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	sb5 = 2.55305040643316442583e+03  <span class="comment">// 0x40A3F219CEDF3BE6</span>
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	sb6 = 4.74528541206955367215e+02  <span class="comment">// 0x407DA874E79FE763</span>
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>	sb7 = -2.24409524465858183362e+01 <span class="comment">// 0xC03670E242712D62</span>
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>)
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span><span class="comment">// Erf returns the error function of x.</span>
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span><span class="comment">// Special cases are:</span>
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span><span class="comment">//	Erf(+Inf) = 1</span>
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span><span class="comment">//	Erf(-Inf) = -1</span>
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span><span class="comment">//	Erf(NaN) = NaN</span>
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>func Erf(x float64) float64
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>func erf(x float64) float64 {
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	const (
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>		VeryTiny = 2.848094538889218e-306 <span class="comment">// 0x0080000000000000</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>		Small    = 1.0 / (1 &lt;&lt; 28)        <span class="comment">// 2**-28</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	)
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	<span class="comment">// special cases</span>
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	switch {
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	case IsNaN(x):
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>		return NaN()
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	case IsInf(x, 1):
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>		return 1
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	case IsInf(x, -1):
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>		return -1
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	}
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	sign := false
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	if x &lt; 0 {
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		x = -x
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>		sign = true
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>	}
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	if x &lt; 0.84375 { <span class="comment">// |x| &lt; 0.84375</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		var temp float64
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>		if x &lt; Small { <span class="comment">// |x| &lt; 2**-28</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>			if x &lt; VeryTiny {
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>				temp = 0.125 * (8.0*x + efx8*x) <span class="comment">// avoid underflow</span>
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>			} else {
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>				temp = x + efx*x
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>			}
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>		} else {
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>			z := x * x
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>			r := pp0 + z*(pp1+z*(pp2+z*(pp3+z*pp4)))
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>			s := 1 + z*(qq1+z*(qq2+z*(qq3+z*(qq4+z*qq5))))
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>			y := r / s
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>			temp = x + x*y
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		}
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>		if sign {
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>			return -temp
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>		}
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>		return temp
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	}
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	if x &lt; 1.25 { <span class="comment">// 0.84375 &lt;= |x| &lt; 1.25</span>
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>		s := x - 1
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>		P := pa0 + s*(pa1+s*(pa2+s*(pa3+s*(pa4+s*(pa5+s*pa6)))))
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>		Q := 1 + s*(qa1+s*(qa2+s*(qa3+s*(qa4+s*(qa5+s*qa6)))))
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>		if sign {
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>			return -erx - P/Q
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>		}
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>		return erx + P/Q
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	}
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	if x &gt;= 6 { <span class="comment">// inf &gt; |x| &gt;= 6</span>
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>		if sign {
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>			return -1
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>		}
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>		return 1
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	}
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	s := 1 / (x * x)
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	var R, S float64
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	if x &lt; 1/0.35 { <span class="comment">// |x| &lt; 1 / 0.35  ~ 2.857143</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>		R = ra0 + s*(ra1+s*(ra2+s*(ra3+s*(ra4+s*(ra5+s*(ra6+s*ra7))))))
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>		S = 1 + s*(sa1+s*(sa2+s*(sa3+s*(sa4+s*(sa5+s*(sa6+s*(sa7+s*sa8)))))))
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	} else { <span class="comment">// |x| &gt;= 1 / 0.35  ~ 2.857143</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>		R = rb0 + s*(rb1+s*(rb2+s*(rb3+s*(rb4+s*(rb5+s*rb6)))))
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>		S = 1 + s*(sb1+s*(sb2+s*(sb3+s*(sb4+s*(sb5+s*(sb6+s*sb7))))))
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	}
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	z := Float64frombits(Float64bits(x) &amp; 0xffffffff00000000) <span class="comment">// pseudo-single (20-bit) precision x</span>
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	r := Exp(-z*z-0.5625) * Exp((z-x)*(z+x)+R/S)
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	if sign {
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>		return r/x - 1
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	}
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	return 1 - r/x
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>}
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span><span class="comment">// Erfc returns the complementary error function of x.</span>
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span><span class="comment">// Special cases are:</span>
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span><span class="comment">//	Erfc(+Inf) = 0</span>
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span><span class="comment">//	Erfc(-Inf) = 2</span>
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span><span class="comment">//	Erfc(NaN) = NaN</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>func Erfc(x float64) float64
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>func erfc(x float64) float64 {
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	const Tiny = 1.0 / (1 &lt;&lt; 56) <span class="comment">// 2**-56</span>
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	<span class="comment">// special cases</span>
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	switch {
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	case IsNaN(x):
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>		return NaN()
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	case IsInf(x, 1):
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		return 0
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	case IsInf(x, -1):
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		return 2
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	}
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	sign := false
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	if x &lt; 0 {
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>		x = -x
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		sign = true
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	if x &lt; 0.84375 { <span class="comment">// |x| &lt; 0.84375</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>		var temp float64
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		if x &lt; Tiny { <span class="comment">// |x| &lt; 2**-56</span>
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>			temp = x
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>		} else {
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>			z := x * x
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>			r := pp0 + z*(pp1+z*(pp2+z*(pp3+z*pp4)))
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>			s := 1 + z*(qq1+z*(qq2+z*(qq3+z*(qq4+z*qq5))))
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>			y := r / s
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>			if x &lt; 0.25 { <span class="comment">// |x| &lt; 1/4</span>
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>				temp = x + x*y
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>			} else {
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>				temp = 0.5 + (x*y + (x - 0.5))
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>			}
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>		}
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		if sign {
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>			return 1 + temp
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>		}
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>		return 1 - temp
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	}
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>	if x &lt; 1.25 { <span class="comment">// 0.84375 &lt;= |x| &lt; 1.25</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>		s := x - 1
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>		P := pa0 + s*(pa1+s*(pa2+s*(pa3+s*(pa4+s*(pa5+s*pa6)))))
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>		Q := 1 + s*(qa1+s*(qa2+s*(qa3+s*(qa4+s*(qa5+s*qa6)))))
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>		if sign {
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>			return 1 + erx + P/Q
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>		}
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>		return 1 - erx - P/Q
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	}
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	if x &lt; 28 { <span class="comment">// |x| &lt; 28</span>
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>		s := 1 / (x * x)
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>		var R, S float64
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		if x &lt; 1/0.35 { <span class="comment">// |x| &lt; 1 / 0.35 ~ 2.857143</span>
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>			R = ra0 + s*(ra1+s*(ra2+s*(ra3+s*(ra4+s*(ra5+s*(ra6+s*ra7))))))
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>			S = 1 + s*(sa1+s*(sa2+s*(sa3+s*(sa4+s*(sa5+s*(sa6+s*(sa7+s*sa8)))))))
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>		} else { <span class="comment">// |x| &gt;= 1 / 0.35 ~ 2.857143</span>
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>			if sign &amp;&amp; x &gt; 6 {
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>				return 2 <span class="comment">// x &lt; -6</span>
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>			}
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>			R = rb0 + s*(rb1+s*(rb2+s*(rb3+s*(rb4+s*(rb5+s*rb6)))))
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>			S = 1 + s*(sb1+s*(sb2+s*(sb3+s*(sb4+s*(sb5+s*(sb6+s*sb7))))))
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>		}
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>		z := Float64frombits(Float64bits(x) &amp; 0xffffffff00000000) <span class="comment">// pseudo-single (20-bit) precision x</span>
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>		r := Exp(-z*z-0.5625) * Exp((z-x)*(z+x)+R/S)
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>		if sign {
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>			return 2 - r/x
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>		}
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>		return r / x
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>	}
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	if sign {
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>		return 2
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	}
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>	return 0
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>}
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>
+</pre><p><a href="erf.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

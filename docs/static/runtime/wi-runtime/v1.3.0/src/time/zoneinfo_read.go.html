@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/time/zoneinfo_read.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="zoneinfo_read.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/time">time</a>/<span class="text-muted">zoneinfo_read.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:6060/pkg/time">time</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// Parse &#34;zoneinfo&#34; time zone file.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// This is a fairly standard file format used on OS X, Linux, BSD, Sun, and others.</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">// See tzfile(5), http://en.wikipedia.org/wiki/Zoneinfo,</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span><span class="comment">// and ftp://munnari.oz.au/pub/oldtz/</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>package time
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>import &#34;errors&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// maxFileSize is the max permitted size of files read by readFile.</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">// As reference, the zoneinfo.zip distributed by Go is ~350 KB,</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// so 10MB is overkill.</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>const maxFileSize = 10 &lt;&lt; 20
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>type fileSizeError string
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>func (f fileSizeError) Error() string {
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	return &#34;time: file &#34; + string(f) + &#34; is too large&#34;
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>}
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span><span class="comment">// Copies of io.Seek* constants to avoid importing &#34;io&#34;:</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>const (
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	seekStart   = 0
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	seekCurrent = 1
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	seekEnd     = 2
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>)
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span><span class="comment">// Simple I/O interface to binary blob of data.</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>type data struct {
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	p     []byte
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	error bool
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>}
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>func (d *data) read(n int) []byte {
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	if len(d.p) &lt; n {
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>		d.p = nil
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		d.error = true
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>		return nil
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	}
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	p := d.p[0:n]
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	d.p = d.p[n:]
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	return p
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>}
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>func (d *data) big4() (n uint32, ok bool) {
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	p := d.read(4)
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	if len(p) &lt; 4 {
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>		d.error = true
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>		return 0, false
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	}
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	return uint32(p[0])&lt;&lt;24 | uint32(p[1])&lt;&lt;16 | uint32(p[2])&lt;&lt;8 | uint32(p[3]), true
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>}
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>func (d *data) byte() (n byte, ok bool) {
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	p := d.read(1)
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	if len(p) &lt; 1 {
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>		d.error = true
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>		return 0, false
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	}
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	return p[0], true
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>}
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span><span class="comment">// Make a string by stopping at the first NUL</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>func byteString(p []byte) string {
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(p); i++ {
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>		if p[i] == 0 {
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>			return string(p[0:i])
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>		}
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	}
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	return string(p)
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>}
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>var badData = errors.New(&#34;malformed time zone information&#34;)
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>func loadZoneData(bytes []byte) (l *Location, err error) {
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	d := data{bytes, false}
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	<span class="comment">// 4-byte magic &#34;TZif&#34;</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	if magic := d.read(4); string(magic) != &#34;TZif&#34; {
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>		return nil, badData
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	}
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	<span class="comment">// 1-byte version, then 15 bytes of padding</span>
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	var p []byte
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	if p = d.read(16); len(p) != 16 || p[0] != 0 &amp;&amp; p[0] != &#39;2&#39; &amp;&amp; p[0] != &#39;3&#39; {
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>		return nil, badData
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	}
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	<span class="comment">// six big-endian 32-bit integers:</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	<span class="comment">//	number of UTC/local indicators</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	<span class="comment">//	number of standard/wall indicators</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	<span class="comment">//	number of leap seconds</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	<span class="comment">//	number of transition times</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	<span class="comment">//	number of local time zones</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	<span class="comment">//	number of characters of time zone abbrev strings</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	const (
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>		NUTCLocal = iota
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>		NStdWall
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>		NLeap
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		NTime
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		NZone
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>		NChar
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	)
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	var n [6]int
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	for i := 0; i &lt; 6; i++ {
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		nn, ok := d.big4()
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		if !ok {
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>			return nil, badData
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>		}
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		n[i] = int(nn)
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>	}
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	<span class="comment">// Transition times.</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	txtimes := data{d.read(n[NTime] * 4), false}
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	<span class="comment">// Time zone indices for transition times.</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	txzones := d.read(n[NTime])
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	<span class="comment">// Zone info structures</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	zonedata := data{d.read(n[NZone] * 6), false}
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	<span class="comment">// Time zone abbreviations.</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	abbrev := d.read(n[NChar])
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	<span class="comment">// Leap-second time pairs</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	d.read(n[NLeap] * 8)
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	<span class="comment">// Whether tx times associated with local time types</span>
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	<span class="comment">// are specified as standard time or wall time.</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	isstd := d.read(n[NStdWall])
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	<span class="comment">// Whether tx times associated with local time types</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	<span class="comment">// are specified as UTC or local time.</span>
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	isutc := d.read(n[NUTCLocal])
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>	if d.error { <span class="comment">// ran out of data</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>		return nil, badData
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	}
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>	<span class="comment">// If version == 2 or 3, the entire file repeats, this time using</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	<span class="comment">// 8-byte ints for txtimes and leap seconds.</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	<span class="comment">// We won&#39;t need those until 2106.</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	<span class="comment">// Now we can build up a useful data structure.</span>
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	<span class="comment">// First the zone information.</span>
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	<span class="comment">//	utcoff[4] isdst[1] nameindex[1]</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>	zone := make([]zone, n[NZone])
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	for i := range zone {
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>		var ok bool
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>		var n uint32
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>		if n, ok = zonedata.big4(); !ok {
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>			return nil, badData
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>		}
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>		zone[i].offset = int(int32(n))
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		var b byte
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		if b, ok = zonedata.byte(); !ok {
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>			return nil, badData
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>		}
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		zone[i].isDST = b != 0
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>		if b, ok = zonedata.byte(); !ok || int(b) &gt;= len(abbrev) {
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>			return nil, badData
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>		}
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>		zone[i].name = byteString(abbrev[b:])
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	}
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	<span class="comment">// Now the transition time info.</span>
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	tx := make([]zoneTrans, n[NTime])
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	for i := range tx {
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>		var ok bool
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		var n uint32
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		if n, ok = txtimes.big4(); !ok {
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>			return nil, badData
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		}
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>		tx[i].when = int64(int32(n))
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		if int(txzones[i]) &gt;= len(zone) {
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>			return nil, badData
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		}
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>		tx[i].index = txzones[i]
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>		if i &lt; len(isstd) {
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>			tx[i].isstd = isstd[i] != 0
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		}
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		if i &lt; len(isutc) {
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>			tx[i].isutc = isutc[i] != 0
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>		}
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	}
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	if len(tx) == 0 {
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>		<span class="comment">// Build fake transition to cover all time.</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>		<span class="comment">// This happens in fixed locations like &#34;Etc/GMT0&#34;.</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>		tx = append(tx, zoneTrans{when: alpha, index: 0})
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	}
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	<span class="comment">// Committed to succeed.</span>
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	l = &amp;Location{zone: zone, tx: tx}
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	<span class="comment">// Fill in the cache with information about right now,</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	<span class="comment">// since that will be the most common lookup.</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	sec, _, _ := now()
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	for i := range tx {
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>		if tx[i].when &lt;= sec &amp;&amp; (i+1 == len(tx) || sec &lt; tx[i+1].when) {
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>			l.cacheStart = tx[i].when
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>			l.cacheEnd = omega
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>			if i+1 &lt; len(tx) {
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>				l.cacheEnd = tx[i+1].when
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>			}
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>			l.cacheZone = &amp;l.zone[tx[i].index]
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>		}
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	}
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	return l, nil
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>}
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>func loadZoneFile(dir, name string) (l *Location, err error) {
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	if len(dir) &gt; 4 &amp;&amp; dir[len(dir)-4:] == &#34;.zip&#34; {
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		return loadZoneZip(dir, name)
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	}
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	if dir != &#34;&#34; {
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>		name = dir + &#34;/&#34; + name
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	}
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	buf, err := readFile(name)
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>		return
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	}
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	return loadZoneData(buf)
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>}
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span><span class="comment">// There are 500+ zoneinfo files. Rather than distribute them all</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span><span class="comment">// individually, we ship them in an uncompressed zip file.</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span><span class="comment">// Used this way, the zip file format serves as a commonly readable</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span><span class="comment">// container for the individual small files. We choose zip over tar</span>
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span><span class="comment">// because zip files have a contiguous table of contents, making</span>
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span><span class="comment">// individual file lookups faster, and because the per-file overhead</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span><span class="comment">// in a zip file is considerably less than tar&#39;s 512 bytes.</span>
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span><span class="comment">// get4 returns the little-endian 32-bit value in b.</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>func get4(b []byte) int {
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	if len(b) &lt; 4 {
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>		return 0
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	}
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	return int(b[0]) | int(b[1])&lt;&lt;8 | int(b[2])&lt;&lt;16 | int(b[3])&lt;&lt;24
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>}
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span><span class="comment">// get2 returns the little-endian 16-bit value in b.</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>func get2(b []byte) int {
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	if len(b) &lt; 2 {
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>		return 0
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	}
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	return int(b[0]) | int(b[1])&lt;&lt;8
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>}
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>func loadZoneZip(zipfile, name string) (l *Location, err error) {
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	fd, err := open(zipfile)
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;open &#34; + zipfile + &#34;: &#34; + err.Error())
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	}
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>	defer closefd(fd)
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	const (
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>		zecheader = 0x06054b50
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>		zcheader  = 0x02014b50
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>		ztailsize = 22
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>		zheadersize = 30
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>		zheader     = 0x04034b50
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>	)
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	buf := make([]byte, ztailsize)
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	if err := preadn(fd, buf, -ztailsize); err != nil || get4(buf) != zecheader {
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;corrupt zip file &#34; + zipfile)
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	}
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	n := get2(buf[10:])
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	size := get4(buf[12:])
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	off := get4(buf[16:])
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	buf = make([]byte, size)
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	if err := preadn(fd, buf, off); err != nil {
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;corrupt zip file &#34; + zipfile)
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	}
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	for i := 0; i &lt; n; i++ {
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>		<span class="comment">// zip entry layout:</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>		<span class="comment">//	0	magic[4]</span>
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		<span class="comment">//	4	madevers[1]</span>
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>		<span class="comment">//	5	madeos[1]</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>		<span class="comment">//	6	extvers[1]</span>
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>		<span class="comment">//	7	extos[1]</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>		<span class="comment">//	8	flags[2]</span>
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>		<span class="comment">//	10	meth[2]</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>		<span class="comment">//	12	modtime[2]</span>
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>		<span class="comment">//	14	moddate[2]</span>
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>		<span class="comment">//	16	crc[4]</span>
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>		<span class="comment">//	20	csize[4]</span>
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		<span class="comment">//	24	uncsize[4]</span>
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>		<span class="comment">//	28	namelen[2]</span>
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>		<span class="comment">//	30	xlen[2]</span>
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		<span class="comment">//	32	fclen[2]</span>
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>		<span class="comment">//	34	disknum[2]</span>
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>		<span class="comment">//	36	iattr[2]</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>		<span class="comment">//	38	eattr[4]</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>		<span class="comment">//	42	off[4]</span>
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>		<span class="comment">//	46	name[namelen]</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>		<span class="comment">//	46+namelen+xlen+fclen - next header</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>		<span class="comment">//</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>		if get4(buf) != zcheader {
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>			break
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>		}
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>		meth := get2(buf[10:])
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>		size := get4(buf[24:])
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		namelen := get2(buf[28:])
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		xlen := get2(buf[30:])
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		fclen := get2(buf[32:])
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>		off := get4(buf[42:])
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>		zname := buf[46 : 46+namelen]
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		buf = buf[46+namelen+xlen+fclen:]
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>		if string(zname) != name {
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>			continue
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>		}
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>		if meth != 0 {
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>			return nil, errors.New(&#34;unsupported compression for &#34; + name + &#34; in &#34; + zipfile)
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>		}
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>		<span class="comment">// zip per-file header layout:</span>
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>		<span class="comment">//	0	magic[4]</span>
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>		<span class="comment">//	4	extvers[1]</span>
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>		<span class="comment">//	5	extos[1]</span>
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>		<span class="comment">//	6	flags[2]</span>
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>		<span class="comment">//	8	meth[2]</span>
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>		<span class="comment">//	10	modtime[2]</span>
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>		<span class="comment">//	12	moddate[2]</span>
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>		<span class="comment">//	14	crc[4]</span>
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>		<span class="comment">//	18	csize[4]</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>		<span class="comment">//	22	uncsize[4]</span>
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>		<span class="comment">//	26	namelen[2]</span>
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		<span class="comment">//	28	xlen[2]</span>
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		<span class="comment">//	30	name[namelen]</span>
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>		<span class="comment">//	30+namelen+xlen - file data</span>
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>		<span class="comment">//</span>
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>		buf = make([]byte, zheadersize+namelen)
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>		if err := preadn(fd, buf, off); err != nil ||
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>			get4(buf) != zheader ||
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>			get2(buf[8:]) != meth ||
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>			get2(buf[26:]) != namelen ||
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>			string(buf[30:30+namelen]) != name {
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>			return nil, errors.New(&#34;corrupt zip file &#34; + zipfile)
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>		}
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>		xlen = get2(buf[28:])
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		buf = make([]byte, size)
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>		if err := preadn(fd, buf, off+30+namelen+xlen); err != nil {
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>			return nil, errors.New(&#34;corrupt zip file &#34; + zipfile)
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>		}
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>		return loadZoneData(buf)
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	}
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	return nil, errors.New(&#34;cannot find &#34; + name + &#34; in zip file &#34; + zipfile)
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>}
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>
+</pre><p><a href="zoneinfo_read.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/rc4/rc4_arm.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="rc4_arm.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../rc4.1.html">rc4</a>/<span class="text-muted">rc4_arm.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/rc4.1.html">crypto/rc4</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2013 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	// +build !nacl
+<span id="L6" class="ln">     6</span>	
+<span id="L7" class="ln">     7</span>	#include &#34;textflag.h&#34;
+<span id="L8" class="ln">     8</span>	
+<span id="L9" class="ln">     9</span>	// Registers
+<span id="L10" class="ln">    10</span>	#define Rdst	R0
+<span id="L11" class="ln">    11</span>	#define Rsrc	R1
+<span id="L12" class="ln">    12</span>	#define Rn	R2
+<span id="L13" class="ln">    13</span>	#define Rstate	R3
+<span id="L14" class="ln">    14</span>	#define Rpi	R4
+<span id="L15" class="ln">    15</span>	#define Rpj	R5
+<span id="L16" class="ln">    16</span>	#define Ri	R6
+<span id="L17" class="ln">    17</span>	#define Rj	R7
+<span id="L18" class="ln">    18</span>	#define Rk	R8
+<span id="L19" class="ln">    19</span>	#define Rt	R11
+<span id="L20" class="ln">    20</span>	#define Rt2	R12
+<span id="L21" class="ln">    21</span>	
+<span id="L22" class="ln">    22</span>	// func xorKeyStream(dst, src *byte, n int, state *[256]byte, i, j *uint8)
+<span id="L23" class="ln">    23</span>	TEXT ·xorKeyStream(SB),NOSPLIT,$0
+<span id="L24" class="ln">    24</span>		MOVW dst+0(FP), Rdst
+<span id="L25" class="ln">    25</span>		MOVW src+4(FP), Rsrc
+<span id="L26" class="ln">    26</span>		MOVW n+8(FP), Rn
+<span id="L27" class="ln">    27</span>		MOVW state+12(FP), Rstate
+<span id="L28" class="ln">    28</span>		MOVW i+16(FP), Rpi
+<span id="L29" class="ln">    29</span>		MOVW j+20(FP), Rpj
+<span id="L30" class="ln">    30</span>		MOVBU (Rpi), Ri
+<span id="L31" class="ln">    31</span>		MOVBU (Rpj), Rj
+<span id="L32" class="ln">    32</span>		MOVW $0, Rk
+<span id="L33" class="ln">    33</span>	
+<span id="L34" class="ln">    34</span>	loop:
+<span id="L35" class="ln">    35</span>		// i += 1; j += state[i]
+<span id="L36" class="ln">    36</span>		ADD $1, Ri
+<span id="L37" class="ln">    37</span>		AND $0xff, Ri
+<span id="L38" class="ln">    38</span>		MOVBU Ri&lt;&lt;2(Rstate), Rt
+<span id="L39" class="ln">    39</span>		ADD Rt, Rj
+<span id="L40" class="ln">    40</span>		AND $0xff, Rj
+<span id="L41" class="ln">    41</span>	
+<span id="L42" class="ln">    42</span>		// swap state[i] &lt;-&gt; state[j]
+<span id="L43" class="ln">    43</span>		MOVBU Rj&lt;&lt;2(Rstate), Rt2
+<span id="L44" class="ln">    44</span>		MOVB Rt2, Ri&lt;&lt;2(Rstate)
+<span id="L45" class="ln">    45</span>		MOVB Rt, Rj&lt;&lt;2(Rstate)
+<span id="L46" class="ln">    46</span>	
+<span id="L47" class="ln">    47</span>		// dst[k] = src[k] ^ state[state[i] + state[j]]
+<span id="L48" class="ln">    48</span>		ADD Rt2, Rt
+<span id="L49" class="ln">    49</span>		AND $0xff, Rt
+<span id="L50" class="ln">    50</span>		MOVBU Rt&lt;&lt;2(Rstate), Rt
+<span id="L51" class="ln">    51</span>		MOVBU Rk&lt;&lt;0(Rsrc), Rt2
+<span id="L52" class="ln">    52</span>		EOR Rt, Rt2
+<span id="L53" class="ln">    53</span>		MOVB Rt2, Rk&lt;&lt;0(Rdst)
+<span id="L54" class="ln">    54</span>	
+<span id="L55" class="ln">    55</span>		ADD $1, Rk
+<span id="L56" class="ln">    56</span>		CMP Rk, Rn
+<span id="L57" class="ln">    57</span>		BNE loop
+<span id="L58" class="ln">    58</span>	
+<span id="L59" class="ln">    59</span>	done:
+<span id="L60" class="ln">    60</span>		MOVB Ri, (Rpi)
+<span id="L61" class="ln">    61</span>		MOVB Rj, (Rpj)
+<span id="L62" class="ln">    62</span>		RET
+</pre><p><a href="rc4_arm.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

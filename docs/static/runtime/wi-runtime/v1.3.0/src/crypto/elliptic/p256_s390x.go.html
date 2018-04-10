@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/elliptic/p256_s390x.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="p256_s390x.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../elliptic.1.html">elliptic</a>/<span class="text-muted">p256_s390x.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/elliptic.1.html">crypto/elliptic</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2016 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// +build s390x</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>package elliptic
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>import (
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;math/big&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>)
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>type p256CurveFast struct {
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	*CurveParams
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>}
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>type p256Point struct {
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	x [32]byte
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	y [32]byte
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	z [32]byte
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>}
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>var (
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	p256        Curve
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	p256PreFast *[37][64]p256Point
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>)
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span><span class="comment">// hasVectorFacility reports whether the machine has the z/Architecture</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span><span class="comment">// vector facility installed and enabled.</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>func hasVectorFacility() bool
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>var hasVX = hasVectorFacility()
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>func initP256Arch() {
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	if hasVX {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>		p256 = p256CurveFast{p256Params}
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>		initTable()
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>		return
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	}
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	<span class="comment">// No vector support, use pure Go implementation.</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	p256 = p256Curve{p256Params}
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	return
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>}
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>func (curve p256CurveFast) Params() *CurveParams {
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	return curve.CurveParams
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>}
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span><span class="comment">// Functions implemented in p256_asm_s390x.s</span>
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span><span class="comment">// Montgomery multiplication modulo P256</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>func p256MulAsm(res, in1, in2 []byte)
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span><span class="comment">// Montgomery square modulo P256</span>
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>func p256Sqr(res, in []byte) {
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	p256MulAsm(res, in, in)
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>}
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span><span class="comment">// Montgomery multiplication by 1</span>
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>func p256FromMont(res, in []byte)
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span><span class="comment">// iff cond == 1  val &lt;- -val</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>func p256NegCond(val *p256Point, cond int)
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span><span class="comment">// if cond == 0 res &lt;- b; else res &lt;- a</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>func p256MovCond(res, a, b *p256Point, cond int)
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span><span class="comment">// Constant time table access</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>func p256Select(point *p256Point, table []p256Point, idx int)
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>func p256SelectBase(point *p256Point, table []p256Point, idx int)
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span><span class="comment">// Montgomery multiplication modulo Ord(G)</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>func p256OrdMul(res, in1, in2 []byte)
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span><span class="comment">// Montgomery square modulo Ord(G), repeated n times</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>func p256OrdSqr(res, in []byte, n int) {
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	copy(res, in)
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	for i := 0; i &lt; n; i += 1 {
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		p256OrdMul(res, res, res)
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	}
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>}
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span><span class="comment">// Point add with P2 being affine point</span>
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span><span class="comment">// If sign == 1 -&gt; P2 = -P2</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span><span class="comment">// If sel == 0 -&gt; P3 = P1</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span><span class="comment">// if zero == 0 -&gt; P3 = P2</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>func p256PointAddAffineAsm(P3, P1, P2 *p256Point, sign, sel, zero int)
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span><span class="comment">// Point add</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>func p256PointAddAsm(P3, P1, P2 *p256Point)
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>func p256PointDoubleAsm(P3, P1 *p256Point)
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>func (curve p256CurveFast) Inverse(k *big.Int) *big.Int {
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	if k.Cmp(p256Params.N) &gt;= 0 {
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>		<span class="comment">// This should never happen.</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>		reducedK := new(big.Int).Mod(k, p256Params.N)
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>		k = reducedK
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	}
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	<span class="comment">// table will store precomputed powers of x. The 32 bytes at index</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	<span class="comment">// i store x^(i+1).</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	var table [15][32]byte
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	x := fromBig(k)
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	<span class="comment">// This code operates in the Montgomery domain where R = 2^256 mod n</span>
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	<span class="comment">// and n is the order of the scalar field. (See initP256 for the</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	<span class="comment">// value.) Elements in the Montgomery domain take the form a×R and</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	<span class="comment">// multiplication of x and y in the calculates (x × y × R^-1) mod n. RR</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	<span class="comment">// is R×R mod n thus the Montgomery multiplication x and RR gives x×R,</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>	<span class="comment">// i.e. converts x into the Montgomery domain. Stored in BigEndian form</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	RR := []byte{0x66, 0xe1, 0x2d, 0x94, 0xf3, 0xd9, 0x56, 0x20, 0x28, 0x45, 0xb2, 0x39, 0x2b, 0x6b, 0xec, 0x59,
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		0x46, 0x99, 0x79, 0x9c, 0x49, 0xbd, 0x6f, 0xa6, 0x83, 0x24, 0x4c, 0x95, 0xbe, 0x79, 0xee, 0xa2}
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	p256OrdMul(table[0][:], x, RR)
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	<span class="comment">// Prepare the table, no need in constant time access, because the</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	<span class="comment">// power is not a secret. (Entry 0 is never used.)</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	for i := 2; i &lt; 16; i += 2 {
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>		p256OrdSqr(table[i-1][:], table[(i/2)-1][:], 1)
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>		p256OrdMul(table[i][:], table[i-1][:], table[0][:])
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	}
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	copy(x, table[14][:]) <span class="comment">// f</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	p256OrdSqr(x[0:32], x[0:32], 4)
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	p256OrdMul(x[0:32], x[0:32], table[14][:]) <span class="comment">// ff</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	t := make([]byte, 32)
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	copy(t, x)
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	p256OrdSqr(x, x, 8)
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	p256OrdMul(x, x, t) <span class="comment">// ffff</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	copy(t, x)
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	p256OrdSqr(x, x, 16)
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	p256OrdMul(x, x, t) <span class="comment">// ffffffff</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	copy(t, x)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	p256OrdSqr(x, x, 64) <span class="comment">// ffffffff0000000000000000</span>
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	p256OrdMul(x, x, t)  <span class="comment">// ffffffff00000000ffffffff</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>	p256OrdSqr(x, x, 32) <span class="comment">// ffffffff00000000ffffffff00000000</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	p256OrdMul(x, x, t)  <span class="comment">// ffffffff00000000ffffffffffffffff</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	<span class="comment">// Remaining 32 windows</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>	expLo := [32]byte{0xb, 0xc, 0xe, 0x6, 0xf, 0xa, 0xa, 0xd, 0xa, 0x7, 0x1, 0x7, 0x9, 0xe, 0x8, 0x4,
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>		0xf, 0x3, 0xb, 0x9, 0xc, 0xa, 0xc, 0x2, 0xf, 0xc, 0x6, 0x3, 0x2, 0x5, 0x4, 0xf}
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	for i := 0; i &lt; 32; i++ {
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>		p256OrdSqr(x, x, 4)
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		p256OrdMul(x, x, table[expLo[i]-1][:])
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	}
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>	<span class="comment">// Multiplying by one in the Montgomery domain converts a Montgomery</span>
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	<span class="comment">// value out of the domain.</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>	one := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	p256OrdMul(x, x, one)
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>	return new(big.Int).SetBytes(x)
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>}
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span><span class="comment">// fromBig converts a *big.Int into a format used by this code.</span>
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>func fromBig(big *big.Int) []byte {
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	<span class="comment">// This could be done a lot more efficiently...</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	res := big.Bytes()
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>	if 32 == len(res) {
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>		return res
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	}
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>	t := make([]byte, 32)
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	offset := 32 - len(res)
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	for i := len(res) - 1; i &gt;= 0; i-- {
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>		t[i+offset] = res[i]
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	}
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	return t
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>}
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span><span class="comment">// p256GetMultiplier makes sure byte array will have 32 byte elements, If the scalar</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span><span class="comment">// is equal or greater than the order of the group, it&#39;s reduced modulo that order.</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>func p256GetMultiplier(in []byte) []byte {
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	n := new(big.Int).SetBytes(in)
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	if n.Cmp(p256Params.N) &gt;= 0 {
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		n.Mod(n, p256Params.N)
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	return fromBig(n)
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>}
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span><span class="comment">// p256MulAsm operates in a Montgomery domain with R = 2^256 mod p, where p is the</span>
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span><span class="comment">// underlying field of the curve. (See initP256 for the value.) Thus rr here is</span>
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span><span class="comment">// R×R mod p. See comment in Inverse about how this is used.</span>
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>var rr = []byte{0x00, 0x00, 0x00, 0x04, 0xff, 0xff, 0xff, 0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	0xff, 0xff, 0xff, 0xfb, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03}
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span><span class="comment">// (This is one, in the Montgomery domain.)</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>var one = []byte{0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>func maybeReduceModP(in *big.Int) *big.Int {
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	if in.Cmp(p256Params.P) &lt; 0 {
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>		return in
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	}
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	return new(big.Int).Mod(in, p256Params.P)
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>}
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>func (curve p256CurveFast) CombinedMult(bigX, bigY *big.Int, baseScalar, scalar []byte) (x, y *big.Int) {
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	var r1, r2 p256Point
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	r1.p256BaseMult(p256GetMultiplier(baseScalar))
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	copy(r2.x[:], fromBig(maybeReduceModP(bigX)))
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>	copy(r2.y[:], fromBig(maybeReduceModP(bigY)))
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	copy(r2.z[:], one)
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	p256MulAsm(r2.x[:], r2.x[:], rr[:])
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	p256MulAsm(r2.y[:], r2.y[:], rr[:])
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	r2.p256ScalarMult(p256GetMultiplier(scalar))
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;r1, &amp;r1, &amp;r2)
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>	return r1.p256PointToAffine()
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>}
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>func (curve p256CurveFast) ScalarBaseMult(scalar []byte) (x, y *big.Int) {
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	var r p256Point
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	r.p256BaseMult(p256GetMultiplier(scalar))
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	return r.p256PointToAffine()
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>}
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>func (curve p256CurveFast) ScalarMult(bigX, bigY *big.Int, scalar []byte) (x, y *big.Int) {
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	var r p256Point
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	copy(r.x[:], fromBig(maybeReduceModP(bigX)))
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	copy(r.y[:], fromBig(maybeReduceModP(bigY)))
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	copy(r.z[:], one)
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	p256MulAsm(r.x[:], r.x[:], rr[:])
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	p256MulAsm(r.y[:], r.y[:], rr[:])
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	r.p256ScalarMult(p256GetMultiplier(scalar))
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	return r.p256PointToAffine()
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>}
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>func (p *p256Point) p256PointToAffine() (x, y *big.Int) {
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	zInv := make([]byte, 32)
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	zInvSq := make([]byte, 32)
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	p256Inverse(zInv, p.z[:])
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>	p256Sqr(zInvSq, zInv)
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	p256MulAsm(zInv, zInv, zInvSq)
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	p256MulAsm(zInvSq, p.x[:], zInvSq)
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	p256MulAsm(zInv, p.y[:], zInv)
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	p256FromMont(zInvSq, zInvSq)
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	p256FromMont(zInv, zInv)
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	return new(big.Int).SetBytes(zInvSq), new(big.Int).SetBytes(zInv)
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>}
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span><span class="comment">// p256Inverse sets out to in^-1 mod p.</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>func p256Inverse(out, in []byte) {
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	var stack [6 * 32]byte
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>	p2 := stack[32*0 : 32*0+32]
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	p4 := stack[32*1 : 32*1+32]
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	p8 := stack[32*2 : 32*2+32]
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	p16 := stack[32*3 : 32*3+32]
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	p32 := stack[32*4 : 32*4+32]
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>	p256Sqr(out, in)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	p256MulAsm(p2, out, in) <span class="comment">// 3*p</span>
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	p256Sqr(out, p2)
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	p256MulAsm(p4, out, p2) <span class="comment">// f*p</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>	p256Sqr(out, p4)
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	p256MulAsm(p8, out, p4) <span class="comment">// ff*p</span>
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	p256Sqr(out, p8)
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	for i := 0; i &lt; 7; i++ {
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>		p256Sqr(out, out)
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>	}
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	p256MulAsm(p16, out, p8) <span class="comment">// ffff*p</span>
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	p256Sqr(out, p16)
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	for i := 0; i &lt; 15; i++ {
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		p256Sqr(out, out)
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	p256MulAsm(p32, out, p16) <span class="comment">// ffffffff*p</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>	p256Sqr(out, p32)
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>	for i := 0; i &lt; 31; i++ {
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>		p256Sqr(out, out)
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>	}
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>	p256MulAsm(out, out, in)
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	for i := 0; i &lt; 32*4; i++ {
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>		p256Sqr(out, out)
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	}
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	p256MulAsm(out, out, p32)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	for i := 0; i &lt; 32; i++ {
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		p256Sqr(out, out)
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>	}
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	p256MulAsm(out, out, p32)
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	for i := 0; i &lt; 16; i++ {
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>		p256Sqr(out, out)
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>	}
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>	p256MulAsm(out, out, p16)
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	for i := 0; i &lt; 8; i++ {
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>		p256Sqr(out, out)
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	}
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	p256MulAsm(out, out, p8)
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>	p256MulAsm(out, out, p4)
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>	p256MulAsm(out, out, p2)
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>	p256Sqr(out, out)
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	p256MulAsm(out, out, in)
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>}
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>func boothW5(in uint) (int, int) {
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	var s uint = ^((in &gt;&gt; 5) - 1)
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	var d uint = (1 &lt;&lt; 6) - in - 1
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	d = (d &amp; s) | (in &amp; (^s))
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>	d = (d &gt;&gt; 1) + (d &amp; 1)
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>	return int(d), int(s &amp; 1)
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>}
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>func boothW7(in uint) (int, int) {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>	var s uint = ^((in &gt;&gt; 7) - 1)
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	var d uint = (1 &lt;&lt; 8) - in - 1
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	d = (d &amp; s) | (in &amp; (^s))
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	d = (d &gt;&gt; 1) + (d &amp; 1)
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>	return int(d), int(s &amp; 1)
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>}
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>func initTable() {
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	p256PreFast = new([37][64]p256Point) <span class="comment">//z coordinate not used</span>
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	basePoint := p256Point{
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>		x: [32]byte{0x18, 0x90, 0x5f, 0x76, 0xa5, 0x37, 0x55, 0xc6, 0x79, 0xfb, 0x73, 0x2b, 0x77, 0x62, 0x25, 0x10,
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>			0x75, 0xba, 0x95, 0xfc, 0x5f, 0xed, 0xb6, 0x01, 0x79, 0xe7, 0x30, 0xd4, 0x18, 0xa9, 0x14, 0x3c}, <span class="comment">//(p256.x*2^256)%p</span>
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>		y: [32]byte{0x85, 0x71, 0xff, 0x18, 0x25, 0x88, 0x5d, 0x85, 0xd2, 0xe8, 0x86, 0x88, 0xdd, 0x21, 0xf3, 0x25,
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>			0x8b, 0x4a, 0xb8, 0xe4, 0xba, 0x19, 0xe4, 0x5c, 0xdd, 0xf2, 0x53, 0x57, 0xce, 0x95, 0x56, 0x0a}, <span class="comment">//(p256.y*2^256)%p</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		z: [32]byte{0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>			0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, <span class="comment">//(p256.z*2^256)%p</span>
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>	}
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>	t1 := new(p256Point)
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	t2 := new(p256Point)
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	*t2 = basePoint
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	zInv := make([]byte, 32)
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	zInvSq := make([]byte, 32)
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	for j := 0; j &lt; 64; j++ {
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		*t1 = *t2
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>		for i := 0; i &lt; 37; i++ {
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>			<span class="comment">// The window size is 7 so we need to double 7 times.</span>
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>			if i != 0 {
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>				for k := 0; k &lt; 7; k++ {
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>					p256PointDoubleAsm(t1, t1)
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>				}
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>			}
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>			<span class="comment">// Convert the point to affine form. (Its values are</span>
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>			<span class="comment">// still in Montgomery form however.)</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>			p256Inverse(zInv, t1.z[:])
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>			p256Sqr(zInvSq, zInv)
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>			p256MulAsm(zInv, zInv, zInvSq)
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>			p256MulAsm(t1.x[:], t1.x[:], zInvSq)
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>			p256MulAsm(t1.y[:], t1.y[:], zInv)
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>			copy(t1.z[:], basePoint.z[:])
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>			<span class="comment">// Update the table entry</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>			copy(p256PreFast[i][j].x[:], t1.x[:])
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>			copy(p256PreFast[i][j].y[:], t1.y[:])
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		}
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>		if j == 0 {
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>			p256PointDoubleAsm(t2, &amp;basePoint)
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>		} else {
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>			p256PointAddAsm(t2, t2, &amp;basePoint)
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>		}
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>	}
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>}
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>func (p *p256Point) p256BaseMult(scalar []byte) {
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>	wvalue := (uint(scalar[31]) &lt;&lt; 1) &amp; 0xff
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>	sel, sign := boothW7(uint(wvalue))
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>	p256SelectBase(p, p256PreFast[0][:], sel)
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>	p256NegCond(p, sign)
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>	copy(p.z[:], one[:])
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	var t0 p256Point
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	copy(t0.z[:], one[:])
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>	index := uint(6)
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>	zero := sel
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>	for i := 1; i &lt; 37; i++ {
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>		if index &lt; 247 {
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>			wvalue = ((uint(scalar[31-index/8]) &gt;&gt; (index % 8)) + (uint(scalar[31-index/8-1]) &lt;&lt; (8 - (index % 8)))) &amp; 0xff
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>		} else {
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>			wvalue = (uint(scalar[31-index/8]) &gt;&gt; (index % 8)) &amp; 0xff
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>		}
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>		index += 7
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		sel, sign = boothW7(uint(wvalue))
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		p256SelectBase(&amp;t0, p256PreFast[i][:], sel)
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>		p256PointAddAffineAsm(p, p, &amp;t0, sign, sel, zero)
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>		zero |= sel
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>	}
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>}
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>func (p *p256Point) p256ScalarMult(scalar []byte) {
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	<span class="comment">// precomp is a table of precomputed points that stores powers of p</span>
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>	<span class="comment">// from p^1 to p^16.</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	var precomp [16]p256Point
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>	var t0, t1, t2, t3 p256Point
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>	<span class="comment">// Prepare the table</span>
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>	*&amp;precomp[0] = *p
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	p256PointDoubleAsm(&amp;t0, p)
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>	p256PointDoubleAsm(&amp;t1, &amp;t0)
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>	p256PointDoubleAsm(&amp;t2, &amp;t1)
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	p256PointDoubleAsm(&amp;t3, &amp;t2)
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>	*&amp;precomp[1] = t0  <span class="comment">// 2</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	*&amp;precomp[3] = t1  <span class="comment">// 4</span>
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>	*&amp;precomp[7] = t2  <span class="comment">// 8</span>
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>	*&amp;precomp[15] = t3 <span class="comment">// 16</span>
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;t0, &amp;t0, p)
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;t1, &amp;t1, p)
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;t2, &amp;t2, p)
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>	*&amp;precomp[2] = t0 <span class="comment">// 3</span>
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	*&amp;precomp[4] = t1 <span class="comment">// 5</span>
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	*&amp;precomp[8] = t2 <span class="comment">// 9</span>
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>	p256PointDoubleAsm(&amp;t0, &amp;t0)
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>	p256PointDoubleAsm(&amp;t1, &amp;t1)
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>	*&amp;precomp[5] = t0 <span class="comment">// 6</span>
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>	*&amp;precomp[9] = t1 <span class="comment">// 10</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;t2, &amp;t0, p)
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;t1, &amp;t1, p)
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>	*&amp;precomp[6] = t2  <span class="comment">// 7</span>
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>	*&amp;precomp[10] = t1 <span class="comment">// 11</span>
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>	p256PointDoubleAsm(&amp;t0, &amp;t0)
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>	p256PointDoubleAsm(&amp;t2, &amp;t2)
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>	*&amp;precomp[11] = t0 <span class="comment">// 12</span>
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>	*&amp;precomp[13] = t2 <span class="comment">// 14</span>
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;t0, &amp;t0, p)
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;t2, &amp;t2, p)
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>	*&amp;precomp[12] = t0 <span class="comment">// 13</span>
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>	*&amp;precomp[14] = t2 <span class="comment">// 15</span>
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>	<span class="comment">// Start scanning the window from top bit</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>	index := uint(254)
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>	var sel, sign int
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>	wvalue := (uint(scalar[31-index/8]) &gt;&gt; (index % 8)) &amp; 0x3f
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>	sel, _ = boothW5(uint(wvalue))
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>	p256Select(p, precomp[:], sel)
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>	zero := sel
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>	for index &gt; 4 {
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>		index -= 5
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>		p256PointDoubleAsm(p, p)
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>		p256PointDoubleAsm(p, p)
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>		p256PointDoubleAsm(p, p)
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>		p256PointDoubleAsm(p, p)
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		p256PointDoubleAsm(p, p)
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>		if index &lt; 247 {
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>			wvalue = ((uint(scalar[31-index/8]) &gt;&gt; (index % 8)) + (uint(scalar[31-index/8-1]) &lt;&lt; (8 - (index % 8)))) &amp; 0x3f
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>		} else {
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>			wvalue = (uint(scalar[31-index/8]) &gt;&gt; (index % 8)) &amp; 0x3f
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>		}
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>		sel, sign = boothW5(uint(wvalue))
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>		p256Select(&amp;t0, precomp[:], sel)
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>		p256NegCond(&amp;t0, sign)
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>		p256PointAddAsm(&amp;t1, p, &amp;t0)
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>		p256MovCond(&amp;t1, &amp;t1, p, sel)
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>		p256MovCond(p, &amp;t1, &amp;t0, zero)
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>		zero |= sel
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>	}
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>	p256PointDoubleAsm(p, p)
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>	p256PointDoubleAsm(p, p)
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>	p256PointDoubleAsm(p, p)
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>	p256PointDoubleAsm(p, p)
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>	p256PointDoubleAsm(p, p)
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>	wvalue = (uint(scalar[31]) &lt;&lt; 1) &amp; 0x3f
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>	sel, sign = boothW5(uint(wvalue))
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>	p256Select(&amp;t0, precomp[:], sel)
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>	p256NegCond(&amp;t0, sign)
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>	p256PointAddAsm(&amp;t1, p, &amp;t0)
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>	p256MovCond(&amp;t1, &amp;t1, p, sel)
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>	p256MovCond(p, &amp;t1, &amp;t0, zero)
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>}
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>
+</pre><p><a href="p256_s390x.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

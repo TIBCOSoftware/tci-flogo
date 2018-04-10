@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/url/url.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./url.go%3Fs=27510:27543.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/net">net</a>/<a href="../url.1.html">url</a>/<span class="text-muted">url.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/net/url.1.html">net/url</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// Package url parses URLs and implements query escaping.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>package url
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span><span class="comment">// See RFC 3986. This package generally follows RFC 3986, except where</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span><span class="comment">// it deviates for compatibility reasons. When sending changes, first</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span><span class="comment">// search old issues for history on decisions. Unit tests should also</span>
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span><span class="comment">// contain references to issue numbers with details.</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>import (
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;sort&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;strconv&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>)
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span><span class="comment">// Error reports an error and the operation and URL that caused it.</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>type Error struct {
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	Op  string
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	URL string
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	Err error
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>}
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>func (e *Error) Error() string { return e.Op + &#34; &#34; + e.URL + &#34;: &#34; + e.Err.Error() }
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>type timeout interface {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	Timeout() bool
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>func (e *Error) Timeout() bool {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	t, ok := e.Err.(timeout)
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	return ok &amp;&amp; t.Timeout()
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>}
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>type temporary interface {
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	Temporary() bool
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>}
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>func (e *Error) Temporary() bool {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	t, ok := e.Err.(temporary)
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	return ok &amp;&amp; t.Temporary()
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>}
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>func ishex(c byte) bool {
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	switch {
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	case &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39;:
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>		return true
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	case &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;f&#39;:
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>		return true
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	case &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;F&#39;:
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>		return true
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	}
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	return false
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>}
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>func unhex(c byte) byte {
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	switch {
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	case &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39;:
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>		return c - &#39;0&#39;
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>	case &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;f&#39;:
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		return c - &#39;a&#39; + 10
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	case &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;F&#39;:
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		return c - &#39;A&#39; + 10
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	}
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>	return 0
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>}
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>type encoding int
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>const (
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	encodePath encoding = 1 + iota
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	encodePathSegment
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	encodeHost
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	encodeZone
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	encodeUserPassword
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	encodeQueryComponent
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	encodeFragment
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>)
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>type EscapeError string
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>func (e EscapeError) Error() string {
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	return &#34;invalid URL escape &#34; + strconv.Quote(string(e))
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>}
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>type InvalidHostError string
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>func (e InvalidHostError) Error() string {
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	return &#34;invalid character &#34; + strconv.Quote(string(e)) + &#34; in host name&#34;
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>}
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span><span class="comment">// Return true if the specified character should be escaped when</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span><span class="comment">// appearing in a URL string, according to RFC 3986.</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span><span class="comment">// Please be informed that for now shouldEscape does not check all</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span><span class="comment">// reserved characters correctly. See golang.org/issue/5684.</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>func shouldEscape(c byte, mode encoding) bool {
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	<span class="comment">// §2.3 Unreserved characters (alphanum)</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	if &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;Z&#39; || &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;z&#39; || &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39; {
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		return false
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	}
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	if mode == encodeHost || mode == encodeZone {
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		<span class="comment">// §3.2.2 Host allows</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		<span class="comment">//	sub-delims = &#34;!&#34; / &#34;$&#34; / &#34;&amp;&#34; / &#34;&#39;&#34; / &#34;(&#34; / &#34;)&#34; / &#34;*&#34; / &#34;+&#34; / &#34;,&#34; / &#34;;&#34; / &#34;=&#34;</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		<span class="comment">// as part of reg-name.</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		<span class="comment">// We add : because we include :port as part of host.</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>		<span class="comment">// We add [ ] because we include [ipv6]:port as part of host.</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		<span class="comment">// We add &lt; &gt; because they&#39;re the only characters left that</span>
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>		<span class="comment">// we could possibly allow, and Parse will reject them if we</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>		<span class="comment">// escape them (because hosts can&#39;t use %-encoding for</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		<span class="comment">// ASCII bytes).</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>		switch c {
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>		case &#39;!&#39;, &#39;$&#39;, &#39;&amp;&#39;, &#39;\&#39;&#39;, &#39;(&#39;, &#39;)&#39;, &#39;*&#39;, &#39;+&#39;, &#39;,&#39;, &#39;;&#39;, &#39;=&#39;, &#39;:&#39;, &#39;[&#39;, &#39;]&#39;, &#39;&lt;&#39;, &#39;&gt;&#39;, &#39;&#34;&#39;:
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>			return false
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		}
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	}
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	switch c {
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	case &#39;-&#39;, &#39;_&#39;, &#39;.&#39;, &#39;~&#39;: <span class="comment">// §2.3 Unreserved characters (mark)</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>		return false
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	case &#39;$&#39;, &#39;&amp;&#39;, &#39;+&#39;, &#39;,&#39;, &#39;/&#39;, &#39;:&#39;, &#39;;&#39;, &#39;=&#39;, &#39;?&#39;, &#39;@&#39;: <span class="comment">// §2.2 Reserved characters (reserved)</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>		<span class="comment">// Different sections of the URL allow a few of</span>
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>		<span class="comment">// the reserved characters to appear unescaped.</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>		switch mode {
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>		case encodePath: <span class="comment">// §3.3</span>
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>			<span class="comment">// The RFC allows : @ &amp; = + $ but saves / ; , for assigning</span>
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>			<span class="comment">// meaning to individual path segments. This package</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>			<span class="comment">// only manipulates the path as a whole, so we allow those</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>			<span class="comment">// last three as well. That leaves only ? to escape.</span>
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>			return c == &#39;?&#39;
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>		case encodePathSegment: <span class="comment">// §3.3</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>			<span class="comment">// The RFC allows : @ &amp; = + $ but saves / ; , for assigning</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>			<span class="comment">// meaning to individual path segments.</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>			return c == &#39;/&#39; || c == &#39;;&#39; || c == &#39;,&#39; || c == &#39;?&#39;
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		case encodeUserPassword: <span class="comment">// §3.2.1</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>			<span class="comment">// The RFC allows &#39;;&#39;, &#39;:&#39;, &#39;&amp;&#39;, &#39;=&#39;, &#39;+&#39;, &#39;$&#39;, and &#39;,&#39; in</span>
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>			<span class="comment">// userinfo, so we must escape only &#39;@&#39;, &#39;/&#39;, and &#39;?&#39;.</span>
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>			<span class="comment">// The parsing of userinfo treats &#39;:&#39; as special so we must escape</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>			<span class="comment">// that too.</span>
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>			return c == &#39;@&#39; || c == &#39;/&#39; || c == &#39;?&#39; || c == &#39;:&#39;
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		case encodeQueryComponent: <span class="comment">// §3.4</span>
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>			<span class="comment">// The RFC reserves (so we must escape) everything.</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>			return true
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>		case encodeFragment: <span class="comment">// §4.1</span>
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>			<span class="comment">// The RFC text is silent but the grammar allows</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>			<span class="comment">// everything, so escape nothing.</span>
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>			return false
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		}
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	}
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	<span class="comment">// Everything else must be escaped.</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	return true
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>}
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span><span class="comment">// QueryUnescape does the inverse transformation of QueryEscape, converting</span>
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span><span class="comment">// %AB into the byte 0xAB and &#39;+&#39; into &#39; &#39; (space). It returns an error if</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span><span class="comment">// any % is not followed by two hexadecimal digits.</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>func QueryUnescape(s string) (string, error) {
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	return unescape(s, encodeQueryComponent)
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>}
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span><span class="comment">// PathUnescape does the inverse transformation of PathEscape, converting</span>
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span><span class="comment">// %AB into the byte 0xAB. It returns an error if any % is not followed by</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span><span class="comment">// two hexadecimal digits.</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span><span class="comment">// PathUnescape is identical to QueryUnescape except that it does not unescape &#39;+&#39; to &#39; &#39; (space).</span>
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>func PathUnescape(s string) (string, error) {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>	return unescape(s, encodePathSegment)
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>}
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span><span class="comment">// unescape unescapes a string; the mode specifies</span>
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span><span class="comment">// which section of the URL string is being unescaped.</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>func unescape(s string, mode encoding) (string, error) {
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>	<span class="comment">// Count %, check that they&#39;re well-formed.</span>
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	n := 0
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	hasPlus := false
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); {
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>		switch s[i] {
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>		case &#39;%&#39;:
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>			n++
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>			if i+2 &gt;= len(s) || !ishex(s[i+1]) || !ishex(s[i+2]) {
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>				s = s[i:]
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>				if len(s) &gt; 3 {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>					s = s[:3]
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>				}
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>				return &#34;&#34;, EscapeError(s)
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>			}
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>			<span class="comment">// Per https://tools.ietf.org/html/rfc3986#page-21</span>
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>			<span class="comment">// in the host component %-encoding can only be used</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>			<span class="comment">// for non-ASCII bytes.</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>			<span class="comment">// But https://tools.ietf.org/html/rfc6874#section-2</span>
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>			<span class="comment">// introduces %25 being allowed to escape a percent sign</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>			<span class="comment">// in IPv6 scoped-address literals. Yay.</span>
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>			if mode == encodeHost &amp;&amp; unhex(s[i+1]) &lt; 8 &amp;&amp; s[i:i+3] != &#34;%25&#34; {
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>				return &#34;&#34;, EscapeError(s[i : i+3])
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>			}
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>			if mode == encodeZone {
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>				<span class="comment">// RFC 6874 says basically &#34;anything goes&#34; for zone identifiers</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>				<span class="comment">// and that even non-ASCII can be redundantly escaped,</span>
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>				<span class="comment">// but it seems prudent to restrict %-escaped bytes here to those</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>				<span class="comment">// that are valid host name bytes in their unescaped form.</span>
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>				<span class="comment">// That is, you can use escaping in the zone identifier but not</span>
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>				<span class="comment">// to introduce bytes you couldn&#39;t just write directly.</span>
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>				<span class="comment">// But Windows puts spaces here! Yay.</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>				v := unhex(s[i+1])&lt;&lt;4 | unhex(s[i+2])
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>				if s[i:i+3] != &#34;%25&#34; &amp;&amp; v != &#39; &#39; &amp;&amp; shouldEscape(v, encodeHost) {
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>					return &#34;&#34;, EscapeError(s[i : i+3])
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>				}
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>			}
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>			i += 3
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>		case &#39;+&#39;:
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>			hasPlus = mode == encodeQueryComponent
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>			i++
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>		default:
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>			if (mode == encodeHost || mode == encodeZone) &amp;&amp; s[i] &lt; 0x80 &amp;&amp; shouldEscape(s[i], mode) {
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>				return &#34;&#34;, InvalidHostError(s[i : i+1])
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>			}
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>			i++
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>		}
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	}
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	if n == 0 &amp;&amp; !hasPlus {
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>		return s, nil
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	}
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	t := make([]byte, len(s)-2*n)
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	j := 0
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); {
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>		switch s[i] {
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>		case &#39;%&#39;:
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>			t[j] = unhex(s[i+1])&lt;&lt;4 | unhex(s[i+2])
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>			j++
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>			i += 3
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>		case &#39;+&#39;:
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>			if mode == encodeQueryComponent {
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>				t[j] = &#39; &#39;
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>			} else {
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>				t[j] = &#39;+&#39;
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>			}
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>			j++
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>			i++
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>		default:
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>			t[j] = s[i]
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>			j++
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>			i++
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>		}
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	}
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	return string(t), nil
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>}
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span><span class="comment">// QueryEscape escapes the string so it can be safely placed</span>
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span><span class="comment">// inside a URL query.</span>
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>func QueryEscape(s string) string {
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	return escape(s, encodeQueryComponent)
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>}
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span><span class="comment">// PathEscape escapes the string so it can be safely placed</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span><span class="comment">// inside a URL path segment.</span>
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>func PathEscape(s string) string {
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	return escape(s, encodePathSegment)
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>}
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>func escape(s string, mode encoding) string {
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	spaceCount, hexCount := 0, 0
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>		c := s[i]
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		if shouldEscape(c, mode) {
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>			if c == &#39; &#39; &amp;&amp; mode == encodeQueryComponent {
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>				spaceCount++
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>			} else {
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>				hexCount++
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>			}
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>		}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	}
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>	if spaceCount == 0 &amp;&amp; hexCount == 0 {
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>		return s
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>	}
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>	t := make([]byte, len(s)+2*hexCount)
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>	j := 0
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>		switch c := s[i]; {
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>		case c == &#39; &#39; &amp;&amp; mode == encodeQueryComponent:
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>			t[j] = &#39;+&#39;
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>			j++
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>		case shouldEscape(c, mode):
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>			t[j] = &#39;%&#39;
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>			t[j+1] = &#34;0123456789ABCDEF&#34;[c&gt;&gt;4]
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>			t[j+2] = &#34;0123456789ABCDEF&#34;[c&amp;15]
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>			j += 3
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>		default:
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>			t[j] = s[i]
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>			j++
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>		}
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>	}
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>	return string(t)
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>}
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span><span class="comment">// A URL represents a parsed URL (technically, a URI reference).</span>
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span><span class="comment">// The general form represented is:</span>
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span><span class="comment">//	[scheme:][//[userinfo@]host][/]path[?query][#fragment]</span>
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span><span class="comment">// URLs that do not start with a slash after the scheme are interpreted as:</span>
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span><span class="comment">//	scheme:opaque[?query][#fragment]</span>
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span><span class="comment">// Note that the Path field is stored in decoded form: /%47%6f%2f becomes /Go/.</span>
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span><span class="comment">// A consequence is that it is impossible to tell which slashes in the Path were</span>
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span><span class="comment">// slashes in the raw URL and which were %2f. This distinction is rarely important,</span>
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span><span class="comment">// but when it is, code must not use Path directly.</span>
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span><span class="comment">// The Parse function sets both Path and RawPath in the URL it returns,</span>
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span><span class="comment">// and URL&#39;s String method uses RawPath if it is a valid encoding of Path,</span>
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span><span class="comment">// by calling the EscapedPath method.</span>
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>type URL struct {
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>	Scheme     string
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	Opaque     string    <span class="comment">// encoded opaque data</span>
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	User       *Userinfo <span class="comment">// username and password information</span>
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	Host       string    <span class="comment">// host or host:port</span>
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>	Path       string    <span class="comment">// path (relative paths may omit leading slash)</span>
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>	RawPath    string    <span class="comment">// encoded path hint (see EscapedPath method)</span>
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	ForceQuery bool      <span class="comment">// append a query (&#39;?&#39;) even if RawQuery is empty</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>	RawQuery   string    <span class="comment">// encoded query values, without &#39;?&#39;</span>
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	Fragment   string    <span class="comment">// fragment for references, without &#39;#&#39;</span>
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>}
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span><span class="comment">// User returns a Userinfo containing the provided username</span>
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span><span class="comment">// and no password set.</span>
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>func User(username string) *Userinfo {
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>	return &amp;Userinfo{username, &#34;&#34;, false}
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>}
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span><span class="comment">// UserPassword returns a Userinfo containing the provided username</span>
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span><span class="comment">// and password.</span>
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span><span class="comment">// This functionality should only be used with legacy web sites.</span>
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span><span class="comment">// RFC 2396 warns that interpreting Userinfo this way</span>
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span><span class="comment">// ``is NOT RECOMMENDED, because the passing of authentication</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span><span class="comment">// information in clear text (such as URI) has proven to be a</span>
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span><span class="comment">// security risk in almost every case where it has been used.&#39;&#39;</span>
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>func UserPassword(username, password string) *Userinfo {
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	return &amp;Userinfo{username, password, true}
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>}
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span><span class="comment">// The Userinfo type is an immutable encapsulation of username and</span>
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span><span class="comment">// password details for a URL. An existing Userinfo value is guaranteed</span>
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span><span class="comment">// to have a username set (potentially empty, as allowed by RFC 2396),</span>
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span><span class="comment">// and optionally a password.</span>
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>type Userinfo struct {
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	username    string
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	password    string
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	passwordSet bool
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>}
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span><span class="comment">// Username returns the username.</span>
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>func (u *Userinfo) Username() string {
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	return u.username
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>}
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span><span class="comment">// Password returns the password in case it is set, and whether it is set.</span>
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>func (u *Userinfo) Password() (string, bool) {
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	return u.password, u.passwordSet
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>}
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span><span class="comment">// String returns the encoded userinfo information in the standard form</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span><span class="comment">// of &#34;username[:password]&#34;.</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>func (u *Userinfo) String() string {
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>	s := escape(u.username, encodeUserPassword)
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	if u.passwordSet {
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>		s += &#34;:&#34; + escape(u.password, encodeUserPassword)
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>	}
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>	return s
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>}
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span><span class="comment">// Maybe rawurl is of the form scheme:path.</span>
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span><span class="comment">// (Scheme must be [a-zA-Z][a-zA-Z0-9+-.]*)</span>
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span><span class="comment">// If so, return scheme, path; else return &#34;&#34;, rawurl.</span>
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>func getscheme(rawurl string) (scheme, path string, err error) {
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(rawurl); i++ {
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>		c := rawurl[i]
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>		switch {
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>		case &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;z&#39; || &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;Z&#39;:
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>		<span class="comment">// do nothing</span>
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>		case &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39; || c == &#39;+&#39; || c == &#39;-&#39; || c == &#39;.&#39;:
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>			if i == 0 {
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>				return &#34;&#34;, rawurl, nil
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>			}
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>		case c == &#39;:&#39;:
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>			if i == 0 {
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>				return &#34;&#34;, &#34;&#34;, errors.New(&#34;missing protocol scheme&#34;)
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>			}
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>			return rawurl[:i], rawurl[i+1:], nil
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>		default:
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>			<span class="comment">// we have encountered an invalid character,</span>
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>			<span class="comment">// so there is no valid scheme</span>
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>			return &#34;&#34;, rawurl, nil
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>		}
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>	}
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	return &#34;&#34;, rawurl, nil
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>}
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span><span class="comment">// Maybe s is of the form t c u.</span>
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span><span class="comment">// If so, return t, c u (or t, u if cutc == true).</span>
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span><span class="comment">// If not, return s, &#34;&#34;.</span>
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>func split(s string, c string, cutc bool) (string, string) {
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>	i := strings.Index(s, c)
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>	if i &lt; 0 {
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>		return s, &#34;&#34;
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	}
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>	if cutc {
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>		return s[:i], s[i+len(c):]
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>	}
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>	return s[:i], s[i:]
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>}
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span><span class="comment">// Parse parses rawurl into a URL structure.</span>
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span><span class="comment">// The rawurl may be relative or absolute.</span>
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>func Parse(rawurl string) (*URL, error) {
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>	<span class="comment">// Cut off #frag</span>
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	u, frag := split(rawurl, &#34;#&#34;, true)
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>	url, err := parse(u, false)
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>		return nil, &amp;Error{&#34;parse&#34;, u, err}
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>	}
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>	if frag == &#34;&#34; {
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>		return url, nil
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>	}
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>	if url.Fragment, err = unescape(frag, encodeFragment); err != nil {
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		return nil, &amp;Error{&#34;parse&#34;, rawurl, err}
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	}
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	return url, nil
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>}
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span><span class="comment">// ParseRequestURI parses rawurl into a URL structure. It assumes that</span>
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span><span class="comment">// rawurl was received in an HTTP request, so the rawurl is interpreted</span>
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span><span class="comment">// only as an absolute URI or an absolute path.</span>
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span><span class="comment">// The string rawurl is assumed not to have a #fragment suffix.</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span><span class="comment">// (Web browsers strip #fragment before sending the URL to a web server.)</span>
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>func ParseRequestURI(rawurl string) (*URL, error) {
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>	url, err := parse(rawurl, true)
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>		return nil, &amp;Error{&#34;parse&#34;, rawurl, err}
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>	}
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>	return url, nil
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>}
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span><span class="comment">// parse parses a URL from a string in one of two contexts. If</span>
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span><span class="comment">// viaRequest is true, the URL is assumed to have arrived via an HTTP request,</span>
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span><span class="comment">// in which case only absolute URLs or path-absolute relative URLs are allowed.</span>
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span><span class="comment">// If viaRequest is false, all forms of relative URLs are allowed.</span>
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>func parse(rawurl string, viaRequest bool) (*URL, error) {
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>	var rest string
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>	var err error
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>	if rawurl == &#34;&#34; &amp;&amp; viaRequest {
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;empty url&#34;)
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>	}
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>	url := new(URL)
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>	if rawurl == &#34;*&#34; {
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>		url.Path = &#34;*&#34;
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>		return url, nil
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>	}
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>	<span class="comment">// Split off possible leading &#34;http:&#34;, &#34;mailto:&#34;, etc.</span>
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	<span class="comment">// Cannot contain escaped characters.</span>
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	if url.Scheme, rest, err = getscheme(rawurl); err != nil {
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		return nil, err
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>	}
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>	url.Scheme = strings.ToLower(url.Scheme)
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>	if strings.HasSuffix(rest, &#34;?&#34;) &amp;&amp; strings.Count(rest, &#34;?&#34;) == 1 {
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		url.ForceQuery = true
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>		rest = rest[:len(rest)-1]
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>	} else {
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>		rest, url.RawQuery = split(rest, &#34;?&#34;, true)
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>	}
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>	if !strings.HasPrefix(rest, &#34;/&#34;) {
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>		if url.Scheme != &#34;&#34; {
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>			<span class="comment">// We consider rootless paths per RFC 3986 as opaque.</span>
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>			url.Opaque = rest
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>			return url, nil
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>		}
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>		if viaRequest {
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>			return nil, errors.New(&#34;invalid URI for request&#34;)
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>		}
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>		<span class="comment">// Avoid confusion with malformed schemes, like cache_object:foo/bar.</span>
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>		<span class="comment">// See golang.org/issue/16822.</span>
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>		<span class="comment">//</span>
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>		<span class="comment">// RFC 3986, §3.3:</span>
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>		<span class="comment">// In addition, a URI reference (Section 4.1) may be a relative-path reference,</span>
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>		<span class="comment">// in which case the first path segment cannot contain a colon (&#34;:&#34;) character.</span>
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>		colon := strings.Index(rest, &#34;:&#34;)
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>		slash := strings.Index(rest, &#34;/&#34;)
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>		if colon &gt;= 0 &amp;&amp; (slash &lt; 0 || colon &lt; slash) {
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>			<span class="comment">// First path segment has colon. Not allowed in relative URL.</span>
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>			return nil, errors.New(&#34;first path segment in URL cannot contain colon&#34;)
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>		}
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>	}
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>	if (url.Scheme != &#34;&#34; || !viaRequest &amp;&amp; !strings.HasPrefix(rest, &#34;///&#34;)) &amp;&amp; strings.HasPrefix(rest, &#34;//&#34;) {
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>		var authority string
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>		authority, rest = split(rest[2:], &#34;/&#34;, false)
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>		url.User, url.Host, err = parseAuthority(authority)
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>			return nil, err
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>		}
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>	}
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>	<span class="comment">// Set Path and, optionally, RawPath.</span>
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>	<span class="comment">// RawPath is a hint of the encoding of Path. We don&#39;t want to set it if</span>
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>	<span class="comment">// the default escaping of Path is equivalent, to help make sure that people</span>
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>	<span class="comment">// don&#39;t rely on it in general.</span>
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>	if err := url.setPath(rest); err != nil {
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		return nil, err
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>	}
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>	return url, nil
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>}
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>func parseAuthority(authority string) (user *Userinfo, host string, err error) {
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>	i := strings.LastIndex(authority, &#34;@&#34;)
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>	if i &lt; 0 {
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>		host, err = parseHost(authority)
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>	} else {
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>		host, err = parseHost(authority[i+1:])
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	}
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		return nil, &#34;&#34;, err
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>	}
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>	if i &lt; 0 {
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>		return nil, host, nil
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>	}
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>	userinfo := authority[:i]
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>	if !validUserinfo(userinfo) {
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>		return nil, &#34;&#34;, errors.New(&#34;net/url: invalid userinfo&#34;)
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>	}
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>	if !strings.Contains(userinfo, &#34;:&#34;) {
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>		if userinfo, err = unescape(userinfo, encodeUserPassword); err != nil {
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>			return nil, &#34;&#34;, err
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>		}
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>		user = User(userinfo)
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>	} else {
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>		username, password := split(userinfo, &#34;:&#34;, true)
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>		if username, err = unescape(username, encodeUserPassword); err != nil {
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>			return nil, &#34;&#34;, err
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>		}
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>		if password, err = unescape(password, encodeUserPassword); err != nil {
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>			return nil, &#34;&#34;, err
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>		}
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>		user = UserPassword(username, password)
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	}
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>	return user, host, nil
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>}
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span><span class="comment">// parseHost parses host as an authority without user</span>
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span><span class="comment">// information. That is, as host[:port].</span>
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>func parseHost(host string) (string, error) {
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>	if strings.HasPrefix(host, &#34;[&#34;) {
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>		<span class="comment">// Parse an IP-Literal in RFC 3986 and RFC 6874.</span>
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		<span class="comment">// E.g., &#34;[fe80::1]&#34;, &#34;[fe80::1%25en0]&#34;, &#34;[fe80::1]:80&#34;.</span>
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>		i := strings.LastIndex(host, &#34;]&#34;)
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>		if i &lt; 0 {
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>			return &#34;&#34;, errors.New(&#34;missing &#39;]&#39; in host&#34;)
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>		}
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>		colonPort := host[i+1:]
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>		if !validOptionalPort(colonPort) {
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>			return &#34;&#34;, fmt.Errorf(&#34;invalid port %q after host&#34;, colonPort)
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>		}
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>		<span class="comment">// RFC 6874 defines that %25 (%-encoded percent) introduces</span>
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>		<span class="comment">// the zone identifier, and the zone identifier can use basically</span>
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>		<span class="comment">// any %-encoding it likes. That&#39;s different from the host, which</span>
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>		<span class="comment">// can only %-encode non-ASCII bytes.</span>
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>		<span class="comment">// We do impose some restrictions on the zone, to avoid stupidity</span>
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>		<span class="comment">// like newlines.</span>
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>		zone := strings.Index(host[:i], &#34;%25&#34;)
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>		if zone &gt;= 0 {
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>			host1, err := unescape(host[:zone], encodeHost)
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>				return &#34;&#34;, err
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>			}
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>			host2, err := unescape(host[zone:i], encodeZone)
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>				return &#34;&#34;, err
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>			}
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>			host3, err := unescape(host[i:], encodeHost)
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>				return &#34;&#34;, err
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>			}
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>			return host1 + host2 + host3, nil
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>		}
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>	}
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>	var err error
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>	if host, err = unescape(host, encodeHost); err != nil {
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>		return &#34;&#34;, err
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>	}
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>	return host, nil
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>}
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span><span class="comment">// setPath sets the Path and RawPath fields of the URL based on the provided</span>
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span><span class="comment">// escaped path p. It maintains the invariant that RawPath is only specified</span>
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span><span class="comment">// when it differs from the default encoding of the path.</span>
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span><span class="comment">// For example:</span>
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span><span class="comment">// - setPath(&#34;/foo/bar&#34;)   will set Path=&#34;/foo/bar&#34; and RawPath=&#34;&#34;</span>
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span><span class="comment">// - setPath(&#34;/foo%2fbar&#34;) will set Path=&#34;/foo/bar&#34; and RawPath=&#34;/foo%2fbar&#34;</span>
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span><span class="comment">// setPath will return an error only if the provided path contains an invalid</span>
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span><span class="comment">// escaping.</span>
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>func (u *URL) setPath(p string) error {
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>	path, err := unescape(p, encodePath)
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>		return err
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>	}
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>	u.Path = path
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>	if escp := escape(path, encodePath); p == escp {
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>		<span class="comment">// Default encoding is fine.</span>
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>		u.RawPath = &#34;&#34;
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>	} else {
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>		u.RawPath = p
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>	}
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>	return nil
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>}
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span><span class="comment">// EscapedPath returns the escaped form of u.Path.</span>
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span><span class="comment">// In general there are multiple possible escaped forms of any path.</span>
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span><span class="comment">// EscapedPath returns u.RawPath when it is a valid escaping of u.Path.</span>
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span><span class="comment">// Otherwise EscapedPath ignores u.RawPath and computes an escaped</span>
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span><span class="comment">// form on its own.</span>
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span><span class="comment">// The String and RequestURI methods use EscapedPath to construct</span>
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span><span class="comment">// their results.</span>
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span><span class="comment">// In general, code should call EscapedPath instead of</span>
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span><span class="comment">// reading u.RawPath directly.</span>
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>func (u *URL) EscapedPath() string {
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>	if u.RawPath != &#34;&#34; &amp;&amp; validEncodedPath(u.RawPath) {
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>		p, err := unescape(u.RawPath, encodePath)
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>		if err == nil &amp;&amp; p == u.Path {
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>			return u.RawPath
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>		}
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>	}
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	if u.Path == &#34;*&#34; {
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>		return &#34;*&#34; <span class="comment">// don&#39;t escape (Issue 11202)</span>
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>	}
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>	return escape(u.Path, encodePath)
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>}
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span><span class="comment">// validEncodedPath reports whether s is a valid encoded path.</span>
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span><span class="comment">// It must not contain any bytes that require escaping during path encoding.</span>
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>func validEncodedPath(s string) bool {
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); i++ {
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>		<span class="comment">// RFC 3986, Appendix A.</span>
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>		<span class="comment">// pchar = unreserved / pct-encoded / sub-delims / &#34;:&#34; / &#34;@&#34;.</span>
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>		<span class="comment">// shouldEscape is not quite compliant with the RFC,</span>
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>		<span class="comment">// so we check the sub-delims ourselves and let</span>
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>		<span class="comment">// shouldEscape handle the others.</span>
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>		switch s[i] {
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>		case &#39;!&#39;, &#39;$&#39;, &#39;&amp;&#39;, &#39;\&#39;&#39;, &#39;(&#39;, &#39;)&#39;, &#39;*&#39;, &#39;+&#39;, &#39;,&#39;, &#39;;&#39;, &#39;=&#39;, &#39;:&#39;, &#39;@&#39;:
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>			<span class="comment">// ok</span>
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>		case &#39;[&#39;, &#39;]&#39;:
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>			<span class="comment">// ok - not specified in RFC 3986 but left alone by modern browsers</span>
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>		case &#39;%&#39;:
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>			<span class="comment">// ok - percent encoded, will decode</span>
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		default:
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>			if shouldEscape(s[i], encodePath) {
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>				return false
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>			}
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>		}
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>	}
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>	return true
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>}
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span><span class="comment">// validOptionalPort reports whether port is either an empty string</span>
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span><span class="comment">// or matches /^:\d*$/</span>
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>func validOptionalPort(port string) bool {
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	if port == &#34;&#34; {
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>		return true
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>	}
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>	if port[0] != &#39;:&#39; {
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>		return false
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>	}
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>	for _, b := range port[1:] {
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>		if b &lt; &#39;0&#39; || b &gt; &#39;9&#39; {
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>			return false
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>		}
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>	}
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>	return true
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>}
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span><span class="comment">// String reassembles the URL into a valid URL string.</span>
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span><span class="comment">// The general form of the result is one of:</span>
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span><span class="comment">//	scheme:opaque?query#fragment</span>
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span><span class="comment">//	scheme://userinfo@host/path?query#fragment</span>
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span><span class="comment">// If u.Opaque is non-empty, String uses the first form;</span>
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span><span class="comment">// otherwise it uses the second form.</span>
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span><span class="comment">// To obtain the path, String uses u.EscapedPath().</span>
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span><span class="comment">// In the second form, the following rules apply:</span>
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span><span class="comment">//	- if u.Scheme is empty, scheme: is omitted.</span>
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span><span class="comment">//	- if u.User is nil, userinfo@ is omitted.</span>
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span><span class="comment">//	- if u.Host is empty, host/ is omitted.</span>
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span><span class="comment">//	- if u.Scheme and u.Host are empty and u.User is nil,</span>
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span><span class="comment">//	   the entire scheme://userinfo@host/ is omitted.</span>
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span><span class="comment">//	- if u.Host is non-empty and u.Path begins with a /,</span>
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span><span class="comment">//	   the form host/path does not add its own /.</span>
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span><span class="comment">//	- if u.RawQuery is empty, ?query is omitted.</span>
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span><span class="comment">//	- if u.Fragment is empty, #fragment is omitted.</span>
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>func (u *URL) String() string {
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>	var buf bytes.Buffer
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>	if u.Scheme != &#34;&#34; {
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>		buf.WriteString(u.Scheme)
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>		buf.WriteByte(&#39;:&#39;)
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>	}
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>	if u.Opaque != &#34;&#34; {
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>		buf.WriteString(u.Opaque)
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>	} else {
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>		if u.Scheme != &#34;&#34; || u.Host != &#34;&#34; || u.User != nil {
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>			buf.WriteString(&#34;//&#34;)
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>			if ui := u.User; ui != nil {
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>				buf.WriteString(ui.String())
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>				buf.WriteByte(&#39;@&#39;)
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>			}
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>			if h := u.Host; h != &#34;&#34; {
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>				buf.WriteString(escape(h, encodeHost))
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>			}
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>		}
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>		path := u.EscapedPath()
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>		if path != &#34;&#34; &amp;&amp; path[0] != &#39;/&#39; &amp;&amp; u.Host != &#34;&#34; {
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>			buf.WriteByte(&#39;/&#39;)
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>		}
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>		if buf.Len() == 0 {
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>			<span class="comment">// RFC 3986 §4.2</span>
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>			<span class="comment">// A path segment that contains a colon character (e.g., &#34;this:that&#34;)</span>
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>			<span class="comment">// cannot be used as the first segment of a relative-path reference, as</span>
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>			<span class="comment">// it would be mistaken for a scheme name. Such a segment must be</span>
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>			<span class="comment">// preceded by a dot-segment (e.g., &#34;./this:that&#34;) to make a relative-</span>
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>			<span class="comment">// path reference.</span>
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>			if i := strings.IndexByte(path, &#39;:&#39;); i &gt; -1 &amp;&amp; strings.IndexByte(path[:i], &#39;/&#39;) == -1 {
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>				buf.WriteString(&#34;./&#34;)
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>			}
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>		}
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>		buf.WriteString(path)
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>	}
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>	if u.ForceQuery || u.RawQuery != &#34;&#34; {
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>		buf.WriteByte(&#39;?&#39;)
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>		buf.WriteString(u.RawQuery)
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>	}
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>	if u.Fragment != &#34;&#34; {
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>		buf.WriteByte(&#39;#&#39;)
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>		buf.WriteString(escape(u.Fragment, encodeFragment))
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>	}
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>	return buf.String()
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>}
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span><span class="comment">// Values maps a string key to a list of values.</span>
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span><span class="comment">// It is typically used for query parameters and form values.</span>
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span><span class="comment">// Unlike in the http.Header map, the keys in a Values map</span>
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span><span class="comment">// are case-sensitive.</span>
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>type Values map[string][]string
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span><span class="comment">// Get gets the first value associated with the given key.</span>
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span><span class="comment">// If there are no values associated with the key, Get returns</span>
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span><span class="comment">// the empty string. To access multiple values, use the map</span>
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span><span class="comment">// directly.</span>
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>func (v Values) Get(key string) string {
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>	if v == nil {
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>		return &#34;&#34;
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>	}
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>	vs := v[key]
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>	if len(vs) == 0 {
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>		return &#34;&#34;
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>	}
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>	return vs[0]
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>}
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span><span class="comment">// Set sets the key to value. It replaces any existing</span>
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span><span class="comment">// values.</span>
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>func (v Values) Set(key, value string) {
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>	v[key] = []string{value}
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>}
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span><span class="comment">// Add adds the value to key. It appends to any existing</span>
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span><span class="comment">// values associated with key.</span>
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>func (v Values) Add(key, value string) {
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>	v[key] = append(v[key], value)
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>}
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span><span class="comment">// Del deletes the values associated with key.</span>
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>func (v Values) Del(key string) {
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>	delete(v, key)
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>}
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span><span class="comment">// ParseQuery parses the URL-encoded query string and returns</span>
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span><span class="comment">// a map listing the values specified for each key.</span>
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span><span class="comment">// ParseQuery always returns a non-nil map containing all the</span>
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span><span class="comment">// valid query parameters found; err describes the first decoding error</span>
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span><span class="comment">// encountered, if any.</span>
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span><span class="comment">// Query is expected to be a list of key=value settings separated by</span>
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span><span class="comment">// ampersands or semicolons. A setting without an equals sign is</span>
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span><span class="comment">// interpreted as a key set to an empty value.</span>
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>func ParseQuery(query string) (Values, error) {
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>	m := make(Values)
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>	err := parseQuery(m, query)
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>	return m, err
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>}
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>func parseQuery(m Values, query string) (err error) {
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>	for query != &#34;&#34; {
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>		key := query
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>		if i := strings.IndexAny(key, &#34;&amp;;&#34;); i &gt;= 0 {
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>			key, query = key[:i], key[i+1:]
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>		} else {
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>			query = &#34;&#34;
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>		}
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>		if key == &#34;&#34; {
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>			continue
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>		}
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>		value := &#34;&#34;
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>		if i := strings.Index(key, &#34;=&#34;); i &gt;= 0 {
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>			key, value = key[:i], key[i+1:]
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>		}
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>		key, err1 := QueryUnescape(key)
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>		if err1 != nil {
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>			if err == nil {
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>				err = err1
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>			}
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>			continue
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>		}
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>		value, err1 = QueryUnescape(value)
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>		if err1 != nil {
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>			if err == nil {
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>				err = err1
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>			}
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>			continue
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>		}
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>		m[key] = append(m[key], value)
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>	}
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>	return err
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>}
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span><span class="comment">// Encode encodes the values into ``URL encoded&#39;&#39; form</span>
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span><span class="comment">// (&#34;bar=baz&amp;foo=quux&#34;) sorted by key.</span>
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>func (v Values) Encode() string {
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>	if v == nil {
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>		return &#34;&#34;
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>	}
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>	var buf bytes.Buffer
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>	keys := make([]string, 0, len(v))
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>	for k := range v {
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>		keys = append(keys, k)
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>	}
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>	sort.Strings(keys)
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>	for _, k := range keys {
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>		vs := v[k]
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>		prefix := QueryEscape(k) + &#34;=&#34;
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>		for _, v := range vs {
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>			if buf.Len() &gt; 0 {
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>				buf.WriteByte(&#39;&amp;&#39;)
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>			}
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>			buf.WriteString(prefix)
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>			buf.WriteString(QueryEscape(v))
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>		}
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>	}
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>	return buf.String()
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>}
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span><span class="comment">// resolvePath applies special path segments from refs and applies</span>
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span><span class="comment">// them to base, per RFC 3986.</span>
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>func resolvePath(base, ref string) string {
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>	var full string
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>	if ref == &#34;&#34; {
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>		full = base
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>	} else if ref[0] != &#39;/&#39; {
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>		i := strings.LastIndex(base, &#34;/&#34;)
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>		full = base[:i+1] + ref
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>	} else {
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>		full = ref
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>	}
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>	if full == &#34;&#34; {
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>		return &#34;&#34;
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>	}
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>	var dst []string
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>	src := strings.Split(full, &#34;/&#34;)
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>	for _, elem := range src {
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>		switch elem {
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>		case &#34;.&#34;:
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>			<span class="comment">// drop</span>
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>		case &#34;..&#34;:
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>			if len(dst) &gt; 0 {
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>				dst = dst[:len(dst)-1]
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>			}
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>		default:
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>			dst = append(dst, elem)
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>		}
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>	}
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>	if last := src[len(src)-1]; last == &#34;.&#34; || last == &#34;..&#34; {
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>		<span class="comment">// Add final slash to the joined path.</span>
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>		dst = append(dst, &#34;&#34;)
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>	}
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>	return &#34;/&#34; + strings.TrimLeft(strings.Join(dst, &#34;/&#34;), &#34;/&#34;)
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>}
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span><span class="comment">// IsAbs reports whether the URL is absolute.</span>
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span><span class="comment">// Absolute means that it has a non-empty scheme.</span>
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>func (u *URL) IsAbs() bool {
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>	return u.Scheme != &#34;&#34;
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>}
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span><span class="comment">// Parse parses a URL in the context of the receiver. The provided URL</span>
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span><span class="comment">// may be relative or absolute. Parse returns nil, err on parse</span>
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span><span class="comment">// failure, otherwise its return value is the same as ResolveReference.</span>
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>func (u *URL) Parse(ref string) (*URL, error) {
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>	refurl, err := Parse(ref)
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>		return nil, err
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>	}
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>	return u.ResolveReference(refurl), nil
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>}
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span><span class="comment">// ResolveReference resolves a URI reference to an absolute URI from</span>
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span><span class="comment">// an absolute base URI, per RFC 3986 Section 5.2.  The URI reference</span>
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span><span class="comment">// may be relative or absolute. ResolveReference always returns a new</span>
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span><span class="comment">// URL instance, even if the returned URL is identical to either the</span>
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span><span class="comment">// base or reference. If ref is an absolute URL, then ResolveReference</span>
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span><span class="comment">// ignores base and returns a copy of ref.</span>
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>func (u *URL) ResolveReference(ref *URL) *URL {
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span>	url := *ref
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>	if ref.Scheme == &#34;&#34; {
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>		url.Scheme = u.Scheme
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>	}
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>	if ref.Scheme != &#34;&#34; || ref.Host != &#34;&#34; || ref.User != nil {
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>		<span class="comment">// The &#34;absoluteURI&#34; or &#34;net_path&#34; cases.</span>
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>		<span class="comment">// We can ignore the error from setPath since we know we provided a</span>
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>		<span class="comment">// validly-escaped path.</span>
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>		url.setPath(resolvePath(ref.EscapedPath(), &#34;&#34;))
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>		return &amp;url
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>	}
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>	if ref.Opaque != &#34;&#34; {
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>		url.User = nil
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>		url.Host = &#34;&#34;
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>		url.Path = &#34;&#34;
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>		return &amp;url
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>	}
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>	if ref.Path == &#34;&#34; {
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>		if ref.RawQuery == &#34;&#34; {
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>			url.RawQuery = u.RawQuery
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>			if ref.Fragment == &#34;&#34; {
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>				url.Fragment = u.Fragment
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>			}
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>		}
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>	}
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>	<span class="comment">// The &#34;abs_path&#34; or &#34;rel_path&#34; cases.</span>
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>	url.Host = u.Host
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>	url.User = u.User
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>	url.setPath(resolvePath(u.EscapedPath(), ref.EscapedPath()))
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>	return &amp;url
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>}
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span>
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span><span class="comment">// Query parses RawQuery and returns the corresponding values.</span>
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span><span class="comment">// It silently discards malformed value pairs.</span>
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span><span class="comment">// To check errors use ParseQuery.</span>
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span>func (u *URL) Query() Values {
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span>	v, _ := ParseQuery(u.RawQuery)
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span>	return v
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span>}
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span>
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span><span class="comment">// RequestURI returns the encoded path?query or opaque?query</span>
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span><span class="comment">// string that would be used in an HTTP request for u.</span>
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span><span class="selection">func (u *URL) RequestURI() string</span> {
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span>	result := u.Opaque
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span>	if result == &#34;&#34; {
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span>		result = u.EscapedPath()
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span>		if result == &#34;&#34; {
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span>			result = &#34;/&#34;
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span>		}
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span>	} else {
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span>		if strings.HasPrefix(result, &#34;//&#34;) {
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span>			result = u.Scheme + &#34;:&#34; + result
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span>		}
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span>	}
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span>	if u.ForceQuery || u.RawQuery != &#34;&#34; {
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span>		result += &#34;?&#34; + u.RawQuery
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span>	}
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span>	return result
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span>}
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span>
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span><span class="comment">// Hostname returns u.Host, without any port number.</span>
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span><span class="comment">// If Host is an IPv6 literal with a port number, Hostname returns the</span>
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span><span class="comment">// IPv6 literal without the square brackets. IPv6 literals may include</span>
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span><span class="comment">// a zone identifier.</span>
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span>func (u *URL) Hostname() string {
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span>	return stripPort(u.Host)
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span>}
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span>
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span><span class="comment">// Port returns the port part of u.Host, without the leading colon.</span>
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span><span class="comment">// If u.Host doesn&#39;t contain a port, Port returns an empty string.</span>
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>func (u *URL) Port() string {
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>	return portOnly(u.Host)
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span>}
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span>
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>func stripPort(hostport string) string {
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>	colon := strings.IndexByte(hostport, &#39;:&#39;)
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>	if colon == -1 {
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>		return hostport
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>	}
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>	if i := strings.IndexByte(hostport, &#39;]&#39;); i != -1 {
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span>		return strings.TrimPrefix(hostport[:i], &#34;[&#34;)
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>	}
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>	return hostport[:colon]
+<span id="L1026" class="ln" data-content="  1026">&nbsp;&nbsp;</span>}
+<span id="L1027" class="ln" data-content="  1027">&nbsp;&nbsp;</span>
+<span id="L1028" class="ln" data-content="  1028">&nbsp;&nbsp;</span>func portOnly(hostport string) string {
+<span id="L1029" class="ln" data-content="  1029">&nbsp;&nbsp;</span>	colon := strings.IndexByte(hostport, &#39;:&#39;)
+<span id="L1030" class="ln" data-content="  1030">&nbsp;&nbsp;</span>	if colon == -1 {
+<span id="L1031" class="ln" data-content="  1031">&nbsp;&nbsp;</span>		return &#34;&#34;
+<span id="L1032" class="ln" data-content="  1032">&nbsp;&nbsp;</span>	}
+<span id="L1033" class="ln" data-content="  1033">&nbsp;&nbsp;</span>	if i := strings.Index(hostport, &#34;]:&#34;); i != -1 {
+<span id="L1034" class="ln" data-content="  1034">&nbsp;&nbsp;</span>		return hostport[i+len(&#34;]:&#34;):]
+<span id="L1035" class="ln" data-content="  1035">&nbsp;&nbsp;</span>	}
+<span id="L1036" class="ln" data-content="  1036">&nbsp;&nbsp;</span>	if strings.Contains(hostport, &#34;]&#34;) {
+<span id="L1037" class="ln" data-content="  1037">&nbsp;&nbsp;</span>		return &#34;&#34;
+<span id="L1038" class="ln" data-content="  1038">&nbsp;&nbsp;</span>	}
+<span id="L1039" class="ln" data-content="  1039">&nbsp;&nbsp;</span>	return hostport[colon+len(&#34;:&#34;):]
+<span id="L1040" class="ln" data-content="  1040">&nbsp;&nbsp;</span>}
+<span id="L1041" class="ln" data-content="  1041">&nbsp;&nbsp;</span>
+<span id="L1042" class="ln" data-content="  1042">&nbsp;&nbsp;</span><span class="comment">// Marshaling interface implementations.</span>
+<span id="L1043" class="ln" data-content="  1043">&nbsp;&nbsp;</span><span class="comment">// Would like to implement MarshalText/UnmarshalText but that will change the JSON representation of URLs.</span>
+<span id="L1044" class="ln" data-content="  1044">&nbsp;&nbsp;</span>
+<span id="L1045" class="ln" data-content="  1045">&nbsp;&nbsp;</span>func (u *URL) MarshalBinary() (text []byte, err error) {
+<span id="L1046" class="ln" data-content="  1046">&nbsp;&nbsp;</span>	return []byte(u.String()), nil
+<span id="L1047" class="ln" data-content="  1047">&nbsp;&nbsp;</span>}
+<span id="L1048" class="ln" data-content="  1048">&nbsp;&nbsp;</span>
+<span id="L1049" class="ln" data-content="  1049">&nbsp;&nbsp;</span>func (u *URL) UnmarshalBinary(text []byte) error {
+<span id="L1050" class="ln" data-content="  1050">&nbsp;&nbsp;</span>	u1, err := Parse(string(text))
+<span id="L1051" class="ln" data-content="  1051">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1052" class="ln" data-content="  1052">&nbsp;&nbsp;</span>		return err
+<span id="L1053" class="ln" data-content="  1053">&nbsp;&nbsp;</span>	}
+<span id="L1054" class="ln" data-content="  1054">&nbsp;&nbsp;</span>	*u = *u1
+<span id="L1055" class="ln" data-content="  1055">&nbsp;&nbsp;</span>	return nil
+<span id="L1056" class="ln" data-content="  1056">&nbsp;&nbsp;</span>}
+<span id="L1057" class="ln" data-content="  1057">&nbsp;&nbsp;</span>
+<span id="L1058" class="ln" data-content="  1058">&nbsp;&nbsp;</span><span class="comment">// validUserinfo reports whether s is a valid userinfo string per RFC 3986</span>
+<span id="L1059" class="ln" data-content="  1059">&nbsp;&nbsp;</span><span class="comment">// Section 3.2.1:</span>
+<span id="L1060" class="ln" data-content="  1060">&nbsp;&nbsp;</span><span class="comment">//     userinfo    = *( unreserved / pct-encoded / sub-delims / &#34;:&#34; )</span>
+<span id="L1061" class="ln" data-content="  1061">&nbsp;&nbsp;</span><span class="comment">//     unreserved  = ALPHA / DIGIT / &#34;-&#34; / &#34;.&#34; / &#34;_&#34; / &#34;~&#34;</span>
+<span id="L1062" class="ln" data-content="  1062">&nbsp;&nbsp;</span><span class="comment">//     sub-delims  = &#34;!&#34; / &#34;$&#34; / &#34;&amp;&#34; / &#34;&#39;&#34; / &#34;(&#34; / &#34;)&#34;</span>
+<span id="L1063" class="ln" data-content="  1063">&nbsp;&nbsp;</span><span class="comment">//                   / &#34;*&#34; / &#34;+&#34; / &#34;,&#34; / &#34;;&#34; / &#34;=&#34;</span>
+<span id="L1064" class="ln" data-content="  1064">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L1065" class="ln" data-content="  1065">&nbsp;&nbsp;</span><span class="comment">// It doesn&#39;t validate pct-encoded. The caller does that via func unescape.</span>
+<span id="L1066" class="ln" data-content="  1066">&nbsp;&nbsp;</span>func validUserinfo(s string) bool {
+<span id="L1067" class="ln" data-content="  1067">&nbsp;&nbsp;</span>	for _, r := range s {
+<span id="L1068" class="ln" data-content="  1068">&nbsp;&nbsp;</span>		if &#39;A&#39; &lt;= r &amp;&amp; r &lt;= &#39;Z&#39; {
+<span id="L1069" class="ln" data-content="  1069">&nbsp;&nbsp;</span>			continue
+<span id="L1070" class="ln" data-content="  1070">&nbsp;&nbsp;</span>		}
+<span id="L1071" class="ln" data-content="  1071">&nbsp;&nbsp;</span>		if &#39;a&#39; &lt;= r &amp;&amp; r &lt;= &#39;z&#39; {
+<span id="L1072" class="ln" data-content="  1072">&nbsp;&nbsp;</span>			continue
+<span id="L1073" class="ln" data-content="  1073">&nbsp;&nbsp;</span>		}
+<span id="L1074" class="ln" data-content="  1074">&nbsp;&nbsp;</span>		if &#39;0&#39; &lt;= r &amp;&amp; r &lt;= &#39;9&#39; {
+<span id="L1075" class="ln" data-content="  1075">&nbsp;&nbsp;</span>			continue
+<span id="L1076" class="ln" data-content="  1076">&nbsp;&nbsp;</span>		}
+<span id="L1077" class="ln" data-content="  1077">&nbsp;&nbsp;</span>		switch r {
+<span id="L1078" class="ln" data-content="  1078">&nbsp;&nbsp;</span>		case &#39;-&#39;, &#39;.&#39;, &#39;_&#39;, &#39;:&#39;, &#39;~&#39;, &#39;!&#39;, &#39;$&#39;, &#39;&amp;&#39;, &#39;\&#39;&#39;,
+<span id="L1079" class="ln" data-content="  1079">&nbsp;&nbsp;</span>			&#39;(&#39;, &#39;)&#39;, &#39;*&#39;, &#39;+&#39;, &#39;,&#39;, &#39;;&#39;, &#39;=&#39;, &#39;%&#39;, &#39;@&#39;:
+<span id="L1080" class="ln" data-content="  1080">&nbsp;&nbsp;</span>			continue
+<span id="L1081" class="ln" data-content="  1081">&nbsp;&nbsp;</span>		default:
+<span id="L1082" class="ln" data-content="  1082">&nbsp;&nbsp;</span>			return false
+<span id="L1083" class="ln" data-content="  1083">&nbsp;&nbsp;</span>		}
+<span id="L1084" class="ln" data-content="  1084">&nbsp;&nbsp;</span>	}
+<span id="L1085" class="ln" data-content="  1085">&nbsp;&nbsp;</span>	return true
+<span id="L1086" class="ln" data-content="  1086">&nbsp;&nbsp;</span>}
+<span id="L1087" class="ln" data-content="  1087">&nbsp;&nbsp;</span>
+</pre><p><a href="url.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

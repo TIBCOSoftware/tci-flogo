@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/natconv_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="natconv_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">natconv_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2015 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package big
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;math/bits&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>)
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// log2 computes the integer binary logarithm of x.</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// The result is the integer n for which 2^n &lt;= x &lt; 2^(n+1).</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">// If x == 0, the result is -1.</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>func log2(x Word) int {
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	return bits.Len(uint(x)) - 1
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>}
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>func itoa(x nat, base int) []byte {
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	<span class="comment">// special cases</span>
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	switch {
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	case base &lt; 2:
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>		panic(&#34;illegal base&#34;)
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	case len(x) == 0:
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>		return []byte(&#34;0&#34;)
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>	}
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	<span class="comment">// allocate buffer for conversion</span>
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	i := x.bitLen()/log2(Word(base)) + 1 <span class="comment">// +1: round up</span>
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	s := make([]byte, i)
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	<span class="comment">// don&#39;t destroy x</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	q := nat(nil).set(x)
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	<span class="comment">// convert</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	for len(q) &gt; 0 {
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		i--
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>		var r Word
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		q, r = q.divW(q, Word(base))
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		s[i] = digits[r]
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	}
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	return s[i:]
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>}
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>var strTests = []struct {
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	x nat    <span class="comment">// nat value to be converted</span>
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	b int    <span class="comment">// conversion base</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	s string <span class="comment">// expected result</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>}{
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	{nil, 2, &#34;0&#34;},
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	{nat{1}, 2, &#34;1&#34;},
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	{nat{0xc5}, 2, &#34;11000101&#34;},
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	{nat{03271}, 8, &#34;3271&#34;},
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	{nat{10}, 10, &#34;10&#34;},
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	{nat{1234567890}, 10, &#34;1234567890&#34;},
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	{nat{0xdeadbeef}, 16, &#34;deadbeef&#34;},
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	{nat{0x229be7}, 17, &#34;1a2b3c&#34;},
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	{nat{0x309663e6}, 32, &#34;o9cov6&#34;},
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>}
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>func TestString(t *testing.T) {
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	<span class="comment">// test invalid base explicitly</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>	var panicStr string
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	func() {
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>		defer func() {
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>			panicStr = recover().(string)
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>		}()
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>		natOne.utoa(1)
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>	}()
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	if panicStr != &#34;invalid base&#34; {
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>		t.Errorf(&#34;expected panic for invalid base&#34;)
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	}
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	for _, a := range strTests {
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>		s := string(a.x.utoa(a.b))
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>		if s != a.s {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>			t.Errorf(&#34;string%+v\n\tgot s = %s; want %s&#34;, a, s, a.s)
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		}
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>		x, b, _, err := nat(nil).scan(strings.NewReader(a.s), a.b, false)
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>		if x.cmp(a.x) != 0 {
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>			t.Errorf(&#34;scan%+v\n\tgot z = %v; want %v&#34;, a, x, a.x)
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>		}
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>		if b != a.b {
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>			t.Errorf(&#34;scan%+v\n\tgot b = %d; want %d&#34;, a, b, a.b)
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>		}
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>			t.Errorf(&#34;scan%+v\n\tgot error = %s&#34;, a, err)
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>		}
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	}
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>}
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>var natScanTests = []struct {
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	s     string <span class="comment">// string to be scanned</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	base  int    <span class="comment">// input base</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	frac  bool   <span class="comment">// fraction ok</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	x     nat    <span class="comment">// expected nat</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	b     int    <span class="comment">// expected base</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	count int    <span class="comment">// expected digit count</span>
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	ok    bool   <span class="comment">// expected success</span>
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>	next  rune   <span class="comment">// next character (or 0, if at EOF)</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>}{
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	<span class="comment">// error: no mantissa</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	{},
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>	{s: &#34;?&#34;},
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	{base: 10},
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>	{base: 36},
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	{s: &#34;?&#34;, base: 10},
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	{s: &#34;0x&#34;},
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>	{s: &#34;345&#34;, base: 2},
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	<span class="comment">// error: incorrect use of decimal point</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	{s: &#34;.0&#34;},
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	{s: &#34;.0&#34;, base: 10},
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	{s: &#34;.&#34;, base: 0},
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	{s: &#34;0x.0&#34;},
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	<span class="comment">// no errors</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	{&#34;0&#34;, 0, false, nil, 10, 1, true, 0},
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	{&#34;0&#34;, 10, false, nil, 10, 1, true, 0},
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	{&#34;0&#34;, 36, false, nil, 36, 1, true, 0},
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	{&#34;1&#34;, 0, false, nat{1}, 10, 1, true, 0},
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	{&#34;1&#34;, 10, false, nat{1}, 10, 1, true, 0},
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	{&#34;0 &#34;, 0, false, nil, 10, 1, true, &#39; &#39;},
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	{&#34;08&#34;, 0, false, nil, 10, 1, true, &#39;8&#39;},
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	{&#34;08&#34;, 10, false, nat{8}, 10, 2, true, 0},
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	{&#34;018&#34;, 0, false, nat{1}, 8, 1, true, &#39;8&#39;},
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	{&#34;0b1&#34;, 0, false, nat{1}, 2, 1, true, 0},
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	{&#34;0b11000101&#34;, 0, false, nat{0xc5}, 2, 8, true, 0},
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	{&#34;03271&#34;, 0, false, nat{03271}, 8, 4, true, 0},
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	{&#34;10ab&#34;, 0, false, nat{10}, 10, 2, true, &#39;a&#39;},
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	{&#34;1234567890&#34;, 0, false, nat{1234567890}, 10, 10, true, 0},
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>	{&#34;xyz&#34;, 36, false, nat{(33*36+34)*36 + 35}, 36, 3, true, 0},
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>	{&#34;xyz?&#34;, 36, false, nat{(33*36+34)*36 + 35}, 36, 3, true, &#39;?&#39;},
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>	{&#34;0x&#34;, 16, false, nil, 16, 1, true, &#39;x&#39;},
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	{&#34;0xdeadbeef&#34;, 0, false, nat{0xdeadbeef}, 16, 8, true, 0},
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	{&#34;0XDEADBEEF&#34;, 0, false, nat{0xdeadbeef}, 16, 8, true, 0},
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>	<span class="comment">// no errors, decimal point</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	{&#34;0.&#34;, 0, false, nil, 10, 1, true, &#39;.&#39;},
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	{&#34;0.&#34;, 10, true, nil, 10, 0, true, 0},
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>	{&#34;0.1.2&#34;, 10, true, nat{1}, 10, -1, true, &#39;.&#39;},
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>	{&#34;.000&#34;, 10, true, nil, 10, -3, true, 0},
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	{&#34;12.3&#34;, 10, true, nat{123}, 10, -1, true, 0},
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	{&#34;012.345&#34;, 10, true, nat{12345}, 10, -3, true, 0},
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>}
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>func TestScanBase(t *testing.T) {
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	for _, a := range natScanTests {
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>		r := strings.NewReader(a.s)
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>		x, b, count, err := nat(nil).scan(r, a.base, a.frac)
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>		if err == nil &amp;&amp; !a.ok {
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>			t.Errorf(&#34;scan%+v\n\texpected error&#34;, a)
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		}
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>			if a.ok {
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>				t.Errorf(&#34;scan%+v\n\tgot error = %s&#34;, a, err)
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>			}
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>			continue
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>		}
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>		if x.cmp(a.x) != 0 {
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>			t.Errorf(&#34;scan%+v\n\tgot z = %v; want %v&#34;, a, x, a.x)
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		}
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>		if b != a.b {
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>			t.Errorf(&#34;scan%+v\n\tgot b = %d; want %d&#34;, a, b, a.base)
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		}
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		if count != a.count {
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>			t.Errorf(&#34;scan%+v\n\tgot count = %d; want %d&#34;, a, count, a.count)
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		}
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		next, _, err := r.ReadRune()
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		if err == io.EOF {
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>			next = 0
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>			err = nil
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		}
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>		if err == nil &amp;&amp; next != a.next {
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>			t.Errorf(&#34;scan%+v\n\tgot next = %q; want %q&#34;, a, next, a.next)
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>		}
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	}
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>}
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>var pi = &#34;3&#34; +
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	&#34;14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651&#34; +
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	&#34;32823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461&#34; +
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	&#34;28475648233786783165271201909145648566923460348610454326648213393607260249141273724587006606315588174881520920&#34; +
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	&#34;96282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179&#34; +
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	&#34;31051185480744623799627495673518857527248912279381830119491298336733624406566430860213949463952247371907021798&#34; +
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>	&#34;60943702770539217176293176752384674818467669405132000568127145263560827785771342757789609173637178721468440901&#34; +
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>	&#34;22495343014654958537105079227968925892354201995611212902196086403441815981362977477130996051870721134999999837&#34; +
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	&#34;29780499510597317328160963185950244594553469083026425223082533446850352619311881710100031378387528865875332083&#34; +
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	&#34;81420617177669147303598253490428755468731159562863882353787593751957781857780532171226806613001927876611195909&#34; +
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	&#34;21642019893809525720106548586327886593615338182796823030195203530185296899577362259941389124972177528347913151&#34; +
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	&#34;55748572424541506959508295331168617278558890750983817546374649393192550604009277016711390098488240128583616035&#34; +
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	&#34;63707660104710181942955596198946767837449448255379774726847104047534646208046684259069491293313677028989152104&#34; +
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	&#34;75216205696602405803815019351125338243003558764024749647326391419927260426992279678235478163600934172164121992&#34; +
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	&#34;45863150302861829745557067498385054945885869269956909272107975093029553211653449872027559602364806654991198818&#34; +
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	&#34;34797753566369807426542527862551818417574672890977772793800081647060016145249192173217214772350141441973568548&#34; +
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	&#34;16136115735255213347574184946843852332390739414333454776241686251898356948556209921922218427255025425688767179&#34; +
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	&#34;04946016534668049886272327917860857843838279679766814541009538837863609506800642251252051173929848960841284886&#34; +
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	&#34;26945604241965285022210661186306744278622039194945047123713786960956364371917287467764657573962413890865832645&#34; +
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	&#34;99581339047802759009946576407895126946839835259570982582262052248940772671947826848260147699090264013639443745&#34; +
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>	&#34;53050682034962524517493996514314298091906592509372216964615157098583874105978859597729754989301617539284681382&#34; +
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	&#34;68683868942774155991855925245953959431049972524680845987273644695848653836736222626099124608051243884390451244&#34; +
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>	&#34;13654976278079771569143599770012961608944169486855584840635342207222582848864815845602850601684273945226746767&#34; +
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	&#34;88952521385225499546667278239864565961163548862305774564980355936345681743241125150760694794510965960940252288&#34; +
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	&#34;79710893145669136867228748940560101503308617928680920874760917824938589009714909675985261365549781893129784821&#34; +
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	&#34;68299894872265880485756401427047755513237964145152374623436454285844479526586782105114135473573952311342716610&#34; +
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	&#34;21359695362314429524849371871101457654035902799344037420073105785390621983874478084784896833214457138687519435&#34; +
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	&#34;06430218453191048481005370614680674919278191197939952061419663428754440643745123718192179998391015919561814675&#34; +
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	&#34;14269123974894090718649423196156794520809514655022523160388193014209376213785595663893778708303906979207734672&#34; +
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>	&#34;21825625996615014215030680384477345492026054146659252014974428507325186660021324340881907104863317346496514539&#34; +
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>	&#34;05796268561005508106658796998163574736384052571459102897064140110971206280439039759515677157700420337869936007&#34; +
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>	&#34;23055876317635942187312514712053292819182618612586732157919841484882916447060957527069572209175671167229109816&#34; +
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	&#34;90915280173506712748583222871835209353965725121083579151369882091444210067510334671103141267111369908658516398&#34; +
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	&#34;31501970165151168517143765761835155650884909989859982387345528331635507647918535893226185489632132933089857064&#34; +
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	&#34;20467525907091548141654985946163718027098199430992448895757128289059232332609729971208443357326548938239119325&#34; +
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	&#34;97463667305836041428138830320382490375898524374417029132765618093773444030707469211201913020330380197621101100&#34; +
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>	&#34;44929321516084244485963766983895228684783123552658213144957685726243344189303968642624341077322697802807318915&#34; +
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	&#34;44110104468232527162010526522721116603966655730925471105578537634668206531098965269186205647693125705863566201&#34; +
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>	&#34;85581007293606598764861179104533488503461136576867532494416680396265797877185560845529654126654085306143444318&#34; +
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	&#34;58676975145661406800700237877659134401712749470420562230538994561314071127000407854733269939081454664645880797&#34; +
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	&#34;27082668306343285878569830523580893306575740679545716377525420211495576158140025012622859413021647155097925923&#34; +
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	&#34;09907965473761255176567513575178296664547791745011299614890304639947132962107340437518957359614589019389713111&#34; +
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	&#34;79042978285647503203198691514028708085990480109412147221317947647772622414254854540332157185306142288137585043&#34; +
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	&#34;06332175182979866223717215916077166925474873898665494945011465406284336639379003976926567214638530673609657120&#34; +
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	&#34;91807638327166416274888800786925602902284721040317211860820419000422966171196377921337575114959501566049631862&#34; +
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	&#34;94726547364252308177036751590673502350728354056704038674351362222477158915049530984448933309634087807693259939&#34; +
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	&#34;78054193414473774418426312986080998886874132604721569516239658645730216315981931951673538129741677294786724229&#34; +
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	&#34;24654366800980676928238280689964004824354037014163149658979409243237896907069779422362508221688957383798623001&#34; +
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	&#34;59377647165122893578601588161755782973523344604281512627203734314653197777416031990665541876397929334419521541&#34; +
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	&#34;34189948544473456738316249934191318148092777710386387734317720754565453220777092120190516609628049092636019759&#34; +
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	&#34;88281613323166636528619326686336062735676303544776280350450777235547105859548702790814356240145171806246436267&#34; +
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	&#34;94561275318134078330336254232783944975382437205835311477119926063813346776879695970309833913077109870408591337&#34;
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span><span class="comment">// Test case for BenchmarkScanPi.</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>func TestScanPi(t *testing.T) {
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	var x nat
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>	z, _, _, err := x.scan(strings.NewReader(pi), 10, false)
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>		t.Errorf(&#34;scanning pi: %s&#34;, err)
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	}
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	if s := string(z.utoa(10)); s != pi {
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>		t.Errorf(&#34;scanning pi: got %s&#34;, s)
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>	}
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>}
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>func TestScanPiParallel(t *testing.T) {
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	const n = 2
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	c := make(chan int)
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	for i := 0; i &lt; n; i++ {
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>		go func() {
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>			TestScanPi(t)
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>			c &lt;- 0
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>		}()
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	}
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>	for i := 0; i &lt; n; i++ {
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>		&lt;-c
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	}
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>}
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>func BenchmarkScanPi(b *testing.B) {
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	for i := 0; i &lt; b.N; i++ {
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>		var x nat
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>		x.scan(strings.NewReader(pi), 10, false)
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>	}
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>}
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>func BenchmarkStringPiParallel(b *testing.B) {
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	var x nat
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	x, _, _, _ = x.scan(strings.NewReader(pi), 0, false)
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	if string(x.utoa(10)) != pi {
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		panic(&#34;benchmark incorrect: conversion failed&#34;)
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	}
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>	b.RunParallel(func(pb *testing.PB) {
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>		for pb.Next() {
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>			x.utoa(10)
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>		}
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	})
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>}
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>func BenchmarkScan(b *testing.B) {
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	const x = 10
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>	for _, base := range []int{2, 8, 10, 16} {
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>		for _, y := range []Word{10, 100, 1000, 10000, 100000} {
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>			if isRaceBuilder &amp;&amp; y &gt; 1000 {
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>				continue
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>			}
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>			b.Run(fmt.Sprintf(&#34;%d/Base%d&#34;, y, base), func(b *testing.B) {
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>				b.StopTimer()
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>				var z nat
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>				z = z.expWW(x, y)
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>				s := z.utoa(base)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>				if t := itoa(z, base); !bytes.Equal(s, t) {
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>					b.Fatalf(&#34;scanning: got %s; want %s&#34;, s, t)
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>				}
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>				b.StartTimer()
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>				for i := 0; i &lt; b.N; i++ {
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>					z.scan(bytes.NewReader(s), base, false)
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>				}
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>			})
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>		}
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>	}
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>}
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>func BenchmarkString(b *testing.B) {
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	const x = 10
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>	for _, base := range []int{2, 8, 10, 16} {
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		for _, y := range []Word{10, 100, 1000, 10000, 100000} {
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>			if isRaceBuilder &amp;&amp; y &gt; 1000 {
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>				continue
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>			}
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>			b.Run(fmt.Sprintf(&#34;%d/Base%d&#34;, y, base), func(b *testing.B) {
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>				b.StopTimer()
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>				var z nat
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>				z = z.expWW(x, y)
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>				z.utoa(base) <span class="comment">// warm divisor cache</span>
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>				b.StartTimer()
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>				for i := 0; i &lt; b.N; i++ {
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>					_ = z.utoa(base)
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>				}
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>			})
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>		}
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	}
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>}
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>func BenchmarkLeafSize(b *testing.B) {
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>	for n := 0; n &lt;= 16; n++ {
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>		b.Run(fmt.Sprint(n), func(b *testing.B) { LeafSizeHelper(b, 10, n) })
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>	}
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	<span class="comment">// Try some large lengths</span>
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>	for _, n := range []int{32, 64} {
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		b.Run(fmt.Sprint(n), func(b *testing.B) { LeafSizeHelper(b, 10, n) })
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	}
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>}
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>func LeafSizeHelper(b *testing.B, base, size int) {
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>	b.StopTimer()
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	originalLeafSize := leafSize
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	resetTable(cacheBase10.table[:])
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	leafSize = size
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	b.StartTimer()
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	for d := 1; d &lt;= 10000; d *= 10 {
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>		b.StopTimer()
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		var z nat
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>		z = z.expWW(Word(base), Word(d)) <span class="comment">// build target number</span>
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>		_ = z.utoa(base)                 <span class="comment">// warm divisor cache</span>
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>		b.StartTimer()
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>		for i := 0; i &lt; b.N; i++ {
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>			_ = z.utoa(base)
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>		}
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	}
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	b.StopTimer()
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	resetTable(cacheBase10.table[:])
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	leafSize = originalLeafSize
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	b.StartTimer()
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>}
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>func resetTable(table []divisor) {
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	if table != nil &amp;&amp; table[0].bbb != nil {
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>		for i := 0; i &lt; len(table); i++ {
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>			table[i].bbb = nil
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>			table[i].nbits = 0
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>			table[i].ndigits = 0
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>		}
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	}
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>}
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>func TestStringPowers(t *testing.T) {
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>	var p Word
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>	for b := 2; b &lt;= 16; b++ {
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>		for p = 0; p &lt;= 512; p++ {
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>			x := nat(nil).expWW(Word(b), p)
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>			xs := x.utoa(b)
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>			xs2 := itoa(x, b)
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>			if !bytes.Equal(xs, xs2) {
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>				t.Errorf(&#34;failed at %d ** %d in base %d: %s != %s&#34;, b, p, b, xs, xs2)
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>			}
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>		}
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>		if b &gt;= 3 &amp;&amp; testing.Short() {
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>			break
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>		}
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	}
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>}
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>
+</pre><p><a href="natconv_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

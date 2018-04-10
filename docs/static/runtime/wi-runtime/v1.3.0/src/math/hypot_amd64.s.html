@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/hypot_amd64.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="hypot_amd64.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<span class="text-muted">hypot_amd64.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:6060/pkg/math">math</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2010 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	#include &#34;textflag.h&#34;
+<span id="L6" class="ln">     6</span>	
+<span id="L7" class="ln">     7</span>	#define PosInf 0x7FF0000000000000
+<span id="L8" class="ln">     8</span>	#define NaN 0x7FF8000000000001
+<span id="L9" class="ln">     9</span>	
+<span id="L10" class="ln">    10</span>	// func Hypot(p, q float64) float64
+<span id="L11" class="ln">    11</span>	TEXT ·Hypot(SB),NOSPLIT,$0
+<span id="L12" class="ln">    12</span>		// test bits for special cases
+<span id="L13" class="ln">    13</span>		MOVQ    p+0(FP), BX
+<span id="L14" class="ln">    14</span>		MOVQ    $~(1&lt;&lt;63), AX
+<span id="L15" class="ln">    15</span>		ANDQ    AX, BX // p = |p|
+<span id="L16" class="ln">    16</span>		MOVQ    q+8(FP), CX
+<span id="L17" class="ln">    17</span>		ANDQ    AX, CX // q = |q|
+<span id="L18" class="ln">    18</span>		MOVQ    $PosInf, AX
+<span id="L19" class="ln">    19</span>		CMPQ    AX, BX
+<span id="L20" class="ln">    20</span>		JLE     isInfOrNaN
+<span id="L21" class="ln">    21</span>		CMPQ    AX, CX
+<span id="L22" class="ln">    22</span>		JLE     isInfOrNaN
+<span id="L23" class="ln">    23</span>		// hypot = max * sqrt(1 + (min/max)**2)
+<span id="L24" class="ln">    24</span>		MOVQ    BX, X0
+<span id="L25" class="ln">    25</span>		MOVQ    CX, X1
+<span id="L26" class="ln">    26</span>		ORQ     CX, BX
+<span id="L27" class="ln">    27</span>		JEQ     isZero
+<span id="L28" class="ln">    28</span>		MOVAPD  X0, X2
+<span id="L29" class="ln">    29</span>		MAXSD   X1, X0
+<span id="L30" class="ln">    30</span>		MINSD   X2, X1
+<span id="L31" class="ln">    31</span>		DIVSD   X0, X1
+<span id="L32" class="ln">    32</span>		MULSD   X1, X1
+<span id="L33" class="ln">    33</span>		ADDSD   $1.0, X1
+<span id="L34" class="ln">    34</span>		SQRTSD  X1, X1
+<span id="L35" class="ln">    35</span>		MULSD   X1, X0
+<span id="L36" class="ln">    36</span>		MOVSD   X0, ret+16(FP)
+<span id="L37" class="ln">    37</span>		RET
+<span id="L38" class="ln">    38</span>	isInfOrNaN:
+<span id="L39" class="ln">    39</span>		CMPQ    AX, BX
+<span id="L40" class="ln">    40</span>		JEQ     isInf
+<span id="L41" class="ln">    41</span>		CMPQ    AX, CX
+<span id="L42" class="ln">    42</span>		JEQ     isInf
+<span id="L43" class="ln">    43</span>		MOVQ    $NaN, AX
+<span id="L44" class="ln">    44</span>		MOVQ    AX, ret+16(FP) // return NaN
+<span id="L45" class="ln">    45</span>		RET
+<span id="L46" class="ln">    46</span>	isInf:
+<span id="L47" class="ln">    47</span>		MOVQ    AX, ret+16(FP) // return +Inf
+<span id="L48" class="ln">    48</span>		RET
+<span id="L49" class="ln">    49</span>	isZero:
+<span id="L50" class="ln">    50</span>		MOVQ    $0, AX
+<span id="L51" class="ln">    51</span>		MOVQ    AX, ret+16(FP) // return 0
+<span id="L52" class="ln">    52</span>		RET
+</pre><p><a href="hypot_amd64.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

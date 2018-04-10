@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/http/fs_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="fs_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/net">net</a>/<a href="../http.1.html">http</a>/<span class="text-muted">fs_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/net/http.1.html">net/http</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package http_test
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bufio&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;io/ioutil&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;mime&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;mime/multipart&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;net&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	. &#34;net/http&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&#34;net/http/httptest&#34;
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&#34;net/url&#34;
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	&#34;os&#34;
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&#34;os/exec&#34;
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	&#34;path&#34;
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	&#34;path/filepath&#34;
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	&#34;regexp&#34;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	&#34;runtime&#34;
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	&#34;time&#34;
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>)
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>const (
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	testFile    = &#34;testdata/file&#34;
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	testFileLen = 11
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>)
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>type wantRange struct {
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	start, end int64 <span class="comment">// range [start,end)</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>}
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>var ServeFileRangeTests = []struct {
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	r      string
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	code   int
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	ranges []wantRange
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>}{
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	{r: &#34;&#34;, code: StatusOK},
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	{r: &#34;bytes=0-4&#34;, code: StatusPartialContent, ranges: []wantRange{{0, 5}}},
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	{r: &#34;bytes=2-&#34;, code: StatusPartialContent, ranges: []wantRange{{2, testFileLen}}},
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	{r: &#34;bytes=-5&#34;, code: StatusPartialContent, ranges: []wantRange{{testFileLen - 5, testFileLen}}},
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	{r: &#34;bytes=3-7&#34;, code: StatusPartialContent, ranges: []wantRange{{3, 8}}},
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	{r: &#34;bytes=0-0,-2&#34;, code: StatusPartialContent, ranges: []wantRange{{0, 1}, {testFileLen - 2, testFileLen}}},
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	{r: &#34;bytes=0-1,5-8&#34;, code: StatusPartialContent, ranges: []wantRange{{0, 2}, {5, 9}}},
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	{r: &#34;bytes=0-1,5-&#34;, code: StatusPartialContent, ranges: []wantRange{{0, 2}, {5, testFileLen}}},
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	{r: &#34;bytes=5-1000&#34;, code: StatusPartialContent, ranges: []wantRange{{5, testFileLen}}},
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	{r: &#34;bytes=0-,1-,2-,3-,4-&#34;, code: StatusOK}, <span class="comment">// ignore wasteful range request</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	{r: &#34;bytes=0-9&#34;, code: StatusPartialContent, ranges: []wantRange{{0, testFileLen - 1}}},
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	{r: &#34;bytes=0-10&#34;, code: StatusPartialContent, ranges: []wantRange{{0, testFileLen}}},
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	{r: &#34;bytes=0-11&#34;, code: StatusPartialContent, ranges: []wantRange{{0, testFileLen}}},
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	{r: &#34;bytes=10-11&#34;, code: StatusPartialContent, ranges: []wantRange{{testFileLen - 1, testFileLen}}},
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	{r: &#34;bytes=10-&#34;, code: StatusPartialContent, ranges: []wantRange{{testFileLen - 1, testFileLen}}},
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	{r: &#34;bytes=11-&#34;, code: StatusRequestedRangeNotSatisfiable},
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	{r: &#34;bytes=11-12&#34;, code: StatusRequestedRangeNotSatisfiable},
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>	{r: &#34;bytes=12-12&#34;, code: StatusRequestedRangeNotSatisfiable},
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	{r: &#34;bytes=11-100&#34;, code: StatusRequestedRangeNotSatisfiable},
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>	{r: &#34;bytes=12-100&#34;, code: StatusRequestedRangeNotSatisfiable},
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>	{r: &#34;bytes=100-&#34;, code: StatusRequestedRangeNotSatisfiable},
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	{r: &#34;bytes=100-1000&#34;, code: StatusRequestedRangeNotSatisfiable},
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>}
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>func TestServeFile(t *testing.T) {
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>	setParallel(t)
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	ts := httptest.NewServer(HandlerFunc(func(w ResponseWriter, r *Request) {
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>		ServeFile(w, r, &#34;testdata/file&#34;)
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	}))
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	c := ts.Client()
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	var err error
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	file, err := ioutil.ReadFile(testFile)
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		t.Fatal(&#34;reading file:&#34;, err)
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	}
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	<span class="comment">// set up the Request (re-used for all tests)</span>
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	var req Request
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	req.Header = make(Header)
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	if req.URL, err = url.Parse(ts.URL); err != nil {
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>		t.Fatal(&#34;ParseURL:&#34;, err)
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	}
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	req.Method = &#34;GET&#34;
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	<span class="comment">// straight GET</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	_, body := getBody(t, &#34;straight get&#34;, req, c)
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	if !bytes.Equal(body, file) {
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>		t.Fatalf(&#34;body mismatch: got %q, want %q&#34;, body, file)
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	}
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	<span class="comment">// Range tests</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>Cases:
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	for _, rt := range ServeFileRangeTests {
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>		if rt.r != &#34;&#34; {
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>			req.Header.Set(&#34;Range&#34;, rt.r)
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		}
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>		resp, body := getBody(t, fmt.Sprintf(&#34;range test %q&#34;, rt.r), req, c)
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>		if resp.StatusCode != rt.code {
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>			t.Errorf(&#34;range=%q: StatusCode=%d, want %d&#34;, rt.r, resp.StatusCode, rt.code)
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		}
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		if rt.code == StatusRequestedRangeNotSatisfiable {
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>			continue
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		}
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>		wantContentRange := &#34;&#34;
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		if len(rt.ranges) == 1 {
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>			rng := rt.ranges[0]
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>			wantContentRange = fmt.Sprintf(&#34;bytes %d-%d/%d&#34;, rng.start, rng.end-1, testFileLen)
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>		}
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>		cr := resp.Header.Get(&#34;Content-Range&#34;)
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>		if cr != wantContentRange {
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>			t.Errorf(&#34;range=%q: Content-Range = %q, want %q&#34;, rt.r, cr, wantContentRange)
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		}
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>		ct := resp.Header.Get(&#34;Content-Type&#34;)
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>		if len(rt.ranges) == 1 {
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>			rng := rt.ranges[0]
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>			wantBody := file[rng.start:rng.end]
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>			if !bytes.Equal(body, wantBody) {
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>				t.Errorf(&#34;range=%q: body = %q, want %q&#34;, rt.r, body, wantBody)
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>			}
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>			if strings.HasPrefix(ct, &#34;multipart/byteranges&#34;) {
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>				t.Errorf(&#34;range=%q content-type = %q; unexpected multipart/byteranges&#34;, rt.r, ct)
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>			}
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>		}
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>		if len(rt.ranges) &gt; 1 {
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>			typ, params, err := mime.ParseMediaType(ct)
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>				t.Errorf(&#34;range=%q content-type = %q; %v&#34;, rt.r, ct, err)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>				continue
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>			}
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>			if typ != &#34;multipart/byteranges&#34; {
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>				t.Errorf(&#34;range=%q content-type = %q; want multipart/byteranges&#34;, rt.r, typ)
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>				continue
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>			}
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>			if params[&#34;boundary&#34;] == &#34;&#34; {
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>				t.Errorf(&#34;range=%q content-type = %q; lacks boundary&#34;, rt.r, ct)
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>				continue
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>			}
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>			if g, w := resp.ContentLength, int64(len(body)); g != w {
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>				t.Errorf(&#34;range=%q Content-Length = %d; want %d&#34;, rt.r, g, w)
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>				continue
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>			}
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>			mr := multipart.NewReader(bytes.NewReader(body), params[&#34;boundary&#34;])
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>			for ri, rng := range rt.ranges {
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>				part, err := mr.NextPart()
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>				if err != nil {
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>					t.Errorf(&#34;range=%q, reading part index %d: %v&#34;, rt.r, ri, err)
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>					continue Cases
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>				}
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>				wantContentRange = fmt.Sprintf(&#34;bytes %d-%d/%d&#34;, rng.start, rng.end-1, testFileLen)
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>				if g, w := part.Header.Get(&#34;Content-Range&#34;), wantContentRange; g != w {
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>					t.Errorf(&#34;range=%q: part Content-Range = %q; want %q&#34;, rt.r, g, w)
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>				}
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>				body, err := ioutil.ReadAll(part)
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>				if err != nil {
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>					t.Errorf(&#34;range=%q, reading part index %d body: %v&#34;, rt.r, ri, err)
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>					continue Cases
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>				}
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>				wantBody := file[rng.start:rng.end]
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>				if !bytes.Equal(body, wantBody) {
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>					t.Errorf(&#34;range=%q: body = %q, want %q&#34;, rt.r, body, wantBody)
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>				}
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>			}
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>			_, err = mr.NextPart()
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>			if err != io.EOF {
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>				t.Errorf(&#34;range=%q; expected final error io.EOF; got %v&#34;, rt.r, err)
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>			}
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		}
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	}
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>}
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>func TestServeFile_DotDot(t *testing.T) {
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>		req        string
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>		wantStatus int
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>	}{
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		{&#34;/testdata/file&#34;, 200},
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		{&#34;/../file&#34;, 400},
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>		{&#34;/..&#34;, 400},
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>		{&#34;/../&#34;, 400},
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>		{&#34;/../foo&#34;, 400},
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>		{&#34;/..\\foo&#34;, 400},
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>		{&#34;/file/a&#34;, 200},
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>		{&#34;/file/a..&#34;, 200},
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>		{&#34;/file/a/..&#34;, 400},
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>		{&#34;/file/a\\..&#34;, 400},
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	}
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	for _, tt := range tests {
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		req, err := ReadRequest(bufio.NewReader(strings.NewReader(&#34;GET &#34; + tt.req + &#34; HTTP/1.1\r\nHost: foo\r\n\r\n&#34;)))
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>			t.Errorf(&#34;bad request %q: %v&#34;, tt.req, err)
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>			continue
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		}
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>		rec := httptest.NewRecorder()
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		ServeFile(rec, req, &#34;testdata/file&#34;)
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>		if rec.Code != tt.wantStatus {
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>			t.Errorf(&#34;for request %q, status = %d; want %d&#34;, tt.req, rec.Code, tt.wantStatus)
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		}
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	}
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>}
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>var fsRedirectTestData = []struct {
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	original, redirect string
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>}{
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	{&#34;/test/index.html&#34;, &#34;/test/&#34;},
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	{&#34;/test/testdata&#34;, &#34;/test/testdata/&#34;},
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>	{&#34;/test/testdata/file/&#34;, &#34;/test/testdata/file&#34;},
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>}
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>func TestFSRedirect(t *testing.T) {
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	ts := httptest.NewServer(StripPrefix(&#34;/test&#34;, FileServer(Dir(&#34;.&#34;))))
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	for _, data := range fsRedirectTestData {
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>		res, err := Get(ts.URL + data.original)
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>			t.Fatal(err)
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>		}
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>		res.Body.Close()
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>		if g, e := res.Request.URL.Path, data.redirect; g != e {
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>			t.Errorf(&#34;redirect from %s: got %s, want %s&#34;, data.original, g, e)
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>		}
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	}
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>}
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>type testFileSystem struct {
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	open func(name string) (File, error)
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>}
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>func (fs *testFileSystem) Open(name string) (File, error) {
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>	return fs.open(name)
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>}
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>func TestFileServerCleans(t *testing.T) {
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	ch := make(chan string, 1)
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	fs := FileServer(&amp;testFileSystem{func(name string) (File, error) {
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>		ch &lt;- name
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>		return nil, errors.New(&#34;file does not exist&#34;)
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>	}})
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>		reqPath, openArg string
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	}{
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>		{&#34;/foo.txt&#34;, &#34;/foo.txt&#34;},
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>		{&#34;//foo.txt&#34;, &#34;/foo.txt&#34;},
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>		{&#34;/../foo.txt&#34;, &#34;/foo.txt&#34;},
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	}
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	req, _ := NewRequest(&#34;GET&#34;, &#34;http://example.com&#34;, nil)
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	for n, test := range tests {
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>		rec := httptest.NewRecorder()
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>		req.URL.Path = test.reqPath
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>		fs.ServeHTTP(rec, req)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>		if got := &lt;-ch; got != test.openArg {
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %d: got %q, want %q&#34;, n, got, test.openArg)
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>		}
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	}
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>}
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>func TestFileServerEscapesNames(t *testing.T) {
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	const dirListPrefix = &#34;&lt;pre&gt;\n&#34;
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	const dirListSuffix = &#34;\n&lt;/pre&gt;\n&#34;
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>		name, escaped string
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	}{
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>		{`simple_name`, `&lt;a href=&#34;simple_name&#34;&gt;simple_name&lt;/a&gt;`},
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		{`&#34;&#39;&lt;&gt;&amp;`, `&lt;a href=&#34;%22%27%3C%3E&amp;&#34;&gt;&amp;#34;&amp;#39;&amp;lt;&amp;gt;&amp;amp;&lt;/a&gt;`},
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>		{`?foo=bar#baz`, `&lt;a href=&#34;%3Ffoo=bar%23baz&#34;&gt;?foo=bar#baz&lt;/a&gt;`},
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		{`&lt;combo&gt;?foo`, `&lt;a href=&#34;%3Ccombo%3E%3Ffoo&#34;&gt;&amp;lt;combo&amp;gt;?foo&lt;/a&gt;`},
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>		{`foo:bar`, `&lt;a href=&#34;./foo:bar&#34;&gt;foo:bar&lt;/a&gt;`},
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	}
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	<span class="comment">// We put each test file in its own directory in the fakeFS so we can look at it in isolation.</span>
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>	fs := make(fakeFS)
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	for i, test := range tests {
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>		testFile := &amp;fakeFileInfo{basename: test.name}
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>		fs[fmt.Sprintf(&#34;/%d&#34;, i)] = &amp;fakeFileInfo{
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>			dir:     true,
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>			modtime: time.Unix(1000000000, 0).UTC(),
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>			ents:    []*fakeFileInfo{testFile},
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>		}
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>		fs[fmt.Sprintf(&#34;/%d/%s&#34;, i, test.name)] = testFile
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>	}
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	ts := httptest.NewServer(FileServer(&amp;fs))
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	for i, test := range tests {
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		url := fmt.Sprintf(&#34;%s/%d&#34;, ts.URL, i)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>		res, err := Get(url)
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>			t.Fatalf(&#34;test %q: Get: %v&#34;, test.name, err)
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>		}
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>		b, err := ioutil.ReadAll(res.Body)
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>			t.Fatalf(&#34;test %q: read Body: %v&#34;, test.name, err)
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>		}
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>		s := string(b)
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>		if !strings.HasPrefix(s, dirListPrefix) || !strings.HasSuffix(s, dirListSuffix) {
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %q: listing dir, full output is %q, want prefix %q and suffix %q&#34;, test.name, s, dirListPrefix, dirListSuffix)
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>		}
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>		if trimmed := strings.TrimSuffix(strings.TrimPrefix(s, dirListPrefix), dirListSuffix); trimmed != test.escaped {
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %q: listing dir, filename escaped to %q, want %q&#34;, test.name, trimmed, test.escaped)
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>		}
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		res.Body.Close()
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	}
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>}
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>func TestFileServerSortsNames(t *testing.T) {
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>	const contents = &#34;I am a fake file&#34;
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>	dirMod := time.Unix(123, 0).UTC()
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	fileMod := time.Unix(1000000000, 0).UTC()
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>	fs := fakeFS{
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>		&#34;/&#34;: &amp;fakeFileInfo{
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>			dir:     true,
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>			modtime: dirMod,
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>			ents: []*fakeFileInfo{
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>				{
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>					basename: &#34;b&#34;,
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>					modtime:  fileMod,
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>					contents: contents,
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>				},
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>				{
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>					basename: &#34;a&#34;,
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>					modtime:  fileMod,
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>					contents: contents,
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>				},
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>			},
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		},
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	}
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	ts := httptest.NewServer(FileServer(&amp;fs))
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>	res, err := Get(ts.URL)
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Get: %v&#34;, err)
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	}
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	defer res.Body.Close()
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	b, err := ioutil.ReadAll(res.Body)
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		t.Fatalf(&#34;read Body: %v&#34;, err)
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	}
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>	s := string(b)
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	if !strings.Contains(s, &#34;&lt;a href=\&#34;a\&#34;&gt;a&lt;/a&gt;\n&lt;a href=\&#34;b\&#34;&gt;b&lt;/a&gt;&#34;) {
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>		t.Errorf(&#34;output appears to be unsorted:\n%s&#34;, s)
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	}
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>}
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>func mustRemoveAll(dir string) {
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	err := os.RemoveAll(dir)
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		panic(err)
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	}
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>}
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>func TestFileServerImplicitLeadingSlash(t *testing.T) {
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	tempDir, err := ioutil.TempDir(&#34;&#34;, &#34;&#34;)
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>		t.Fatalf(&#34;TempDir: %v&#34;, err)
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	}
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	defer mustRemoveAll(tempDir)
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	if err := ioutil.WriteFile(filepath.Join(tempDir, &#34;foo.txt&#34;), []byte(&#34;Hello world&#34;), 0644); err != nil {
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>		t.Fatalf(&#34;WriteFile: %v&#34;, err)
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>	}
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>	ts := httptest.NewServer(StripPrefix(&#34;/bar/&#34;, FileServer(Dir(tempDir))))
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>	get := func(suffix string) string {
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>		res, err := Get(ts.URL + suffix)
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>			t.Fatalf(&#34;Get %s: %v&#34;, suffix, err)
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>		}
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		b, err := ioutil.ReadAll(res.Body)
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>			t.Fatalf(&#34;ReadAll %s: %v&#34;, suffix, err)
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>		}
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>		res.Body.Close()
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>		return string(b)
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>	}
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>	if s := get(&#34;/bar/&#34;); !strings.Contains(s, &#34;&gt;foo.txt&lt;&#34;) {
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>		t.Logf(&#34;expected a directory listing with foo.txt, got %q&#34;, s)
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>	}
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>	if s := get(&#34;/bar/foo.txt&#34;); s != &#34;Hello world&#34; {
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>		t.Logf(&#34;expected %q, got %q&#34;, &#34;Hello world&#34;, s)
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>	}
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>}
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>func TestDirJoin(t *testing.T) {
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	if runtime.GOOS == &#34;windows&#34; {
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>		t.Skip(&#34;skipping test on windows&#34;)
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	}
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>	wfi, err := os.Stat(&#34;/etc/hosts&#34;)
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>		t.Skip(&#34;skipping test; no /etc/hosts file&#34;)
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>	}
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>	test := func(d Dir, name string) {
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>		f, err := d.Open(name)
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>			t.Fatalf(&#34;open of %s: %v&#34;, name, err)
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>		}
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>		defer f.Close()
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>		gfi, err := f.Stat()
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>			t.Fatalf(&#34;stat of %s: %v&#34;, name, err)
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>		}
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>		if !os.SameFile(gfi, wfi) {
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s got different file&#34;, name)
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>		}
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>	}
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc/&#34;), &#34;/hosts&#34;)
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc/&#34;), &#34;hosts&#34;)
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc/&#34;), &#34;../../../../hosts&#34;)
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc&#34;), &#34;/hosts&#34;)
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc&#34;), &#34;hosts&#34;)
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc&#34;), &#34;../../../../hosts&#34;)
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>	<span class="comment">// Not really directories, but since we use this trick in</span>
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>	<span class="comment">// ServeFile, test it:</span>
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc/hosts&#34;), &#34;&#34;)
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc/hosts&#34;), &#34;/&#34;)
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>	test(Dir(&#34;/etc/hosts&#34;), &#34;../&#34;)
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>}
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>func TestEmptyDirOpenCWD(t *testing.T) {
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>	test := func(d Dir) {
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>		name := &#34;fs_test.go&#34;
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>		f, err := d.Open(name)
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>			t.Fatalf(&#34;open of %s: %v&#34;, name, err)
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>		}
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		defer f.Close()
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	}
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	test(Dir(&#34;&#34;))
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	test(Dir(&#34;.&#34;))
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>	test(Dir(&#34;./&#34;))
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>}
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>func TestServeFileContentType(t *testing.T) {
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>	const ctype = &#34;icecream/chocolate&#34;
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>	ts := httptest.NewServer(HandlerFunc(func(w ResponseWriter, r *Request) {
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>		switch r.FormValue(&#34;override&#34;) {
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>		case &#34;1&#34;:
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>			w.Header().Set(&#34;Content-Type&#34;, ctype)
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>		case &#34;2&#34;:
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>			<span class="comment">// Explicitly inhibit sniffing.</span>
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>			w.Header()[&#34;Content-Type&#34;] = []string{}
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>		}
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>		ServeFile(w, r, &#34;testdata/file&#34;)
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>	}))
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>	get := func(override string, want []string) {
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>		resp, err := Get(ts.URL + &#34;?override=&#34; + override)
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>			t.Fatal(err)
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>		}
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>		if h := resp.Header[&#34;Content-Type&#34;]; !reflect.DeepEqual(h, want) {
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>			t.Errorf(&#34;Content-Type mismatch: got %v, want %v&#34;, h, want)
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>		}
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>		resp.Body.Close()
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>	}
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>	get(&#34;0&#34;, []string{&#34;text/plain; charset=utf-8&#34;})
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	get(&#34;1&#34;, []string{ctype})
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>	get(&#34;2&#34;, nil)
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>}
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>func TestServeFileMimeType(t *testing.T) {
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>	ts := httptest.NewServer(HandlerFunc(func(w ResponseWriter, r *Request) {
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		ServeFile(w, r, &#34;testdata/style.css&#34;)
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>	}))
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>	resp, err := Get(ts.URL)
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>	}
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>	resp.Body.Close()
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>	want := &#34;text/css; charset=utf-8&#34;
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>	if h := resp.Header.Get(&#34;Content-Type&#34;); h != want {
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>		t.Errorf(&#34;Content-Type mismatch: got %q, want %q&#34;, h, want)
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>	}
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>}
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>func TestServeFileFromCWD(t *testing.T) {
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>	ts := httptest.NewServer(HandlerFunc(func(w ResponseWriter, r *Request) {
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>		ServeFile(w, r, &#34;fs_test.go&#34;)
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>	}))
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>	r, err := Get(ts.URL)
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>	}
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>	r.Body.Close()
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>	if r.StatusCode != 200 {
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>		t.Fatalf(&#34;expected 200 OK, got %s&#34;, r.Status)
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>	}
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>}
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span><span class="comment">// Issue 13996</span>
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>func TestServeDirWithoutTrailingSlash(t *testing.T) {
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>	e := &#34;/testdata/&#34;
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>	ts := httptest.NewServer(HandlerFunc(func(w ResponseWriter, r *Request) {
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>		ServeFile(w, r, &#34;.&#34;)
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>	}))
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>	r, err := Get(ts.URL + &#34;/testdata&#34;)
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>	}
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>	r.Body.Close()
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>	if g := r.Request.URL.Path; g != e {
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>		t.Errorf(&#34;got %s, want %s&#34;, g, e)
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>	}
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>}
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span><span class="comment">// Tests that ServeFile doesn&#39;t add a Content-Length if a Content-Encoding is</span>
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span><span class="comment">// specified.</span>
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>func TestServeFileWithContentEncoding_h1(t *testing.T) { testServeFileWithContentEncoding(t, h1Mode) }
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>func TestServeFileWithContentEncoding_h2(t *testing.T) { testServeFileWithContentEncoding(t, h2Mode) }
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>func testServeFileWithContentEncoding(t *testing.T, h2 bool) {
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>	cst := newClientServerTest(t, h2, HandlerFunc(func(w ResponseWriter, r *Request) {
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>		w.Header().Set(&#34;Content-Encoding&#34;, &#34;foo&#34;)
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>		ServeFile(w, r, &#34;testdata/file&#34;)
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>		<span class="comment">// Because the testdata is so small, it would fit in</span>
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>		<span class="comment">// both the h1 and h2 Server&#39;s write buffers. For h1,</span>
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>		<span class="comment">// sendfile is used, though, forcing a header flush at</span>
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		<span class="comment">// the io.Copy. http2 doesn&#39;t do a header flush so</span>
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>		<span class="comment">// buffers all 11 bytes and then adds its own</span>
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>		<span class="comment">// Content-Length. To prevent the Server&#39;s</span>
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>		<span class="comment">// Content-Length and test ServeFile only, flush here.</span>
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>		w.(Flusher).Flush()
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>	}))
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>	defer cst.close()
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>	resp, err := cst.c.Get(cst.ts.URL)
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>	}
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>	resp.Body.Close()
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>	if g, e := resp.ContentLength, int64(-1); g != e {
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>		t.Errorf(&#34;Content-Length mismatch: got %d, want %d&#34;, g, e)
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>	}
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>}
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>func TestServeIndexHtml(t *testing.T) {
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>	const want = &#34;index.html says hello\n&#34;
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>	ts := httptest.NewServer(FileServer(Dir(&#34;.&#34;)))
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>	for _, path := range []string{&#34;/testdata/&#34;, &#34;/testdata/index.html&#34;} {
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>		res, err := Get(ts.URL + path)
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>			t.Fatal(err)
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>		}
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>		b, err := ioutil.ReadAll(res.Body)
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>			t.Fatal(&#34;reading Body:&#34;, err)
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>		}
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		if s := string(b); s != want {
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>			t.Errorf(&#34;for path %q got %q, want %q&#34;, path, s, want)
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>		}
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>		res.Body.Close()
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>	}
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>}
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>func TestFileServerZeroByte(t *testing.T) {
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>	ts := httptest.NewServer(FileServer(Dir(&#34;.&#34;)))
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>	res, err := Get(ts.URL + &#34;/..\x00&#34;)
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>	}
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>	b, err := ioutil.ReadAll(res.Body)
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>		t.Fatal(&#34;reading Body:&#34;, err)
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>	}
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>	if res.StatusCode == 200 {
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>		t.Errorf(&#34;got status 200; want an error. Body is:\n%s&#34;, string(b))
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>	}
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>}
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>type fakeFileInfo struct {
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>	dir      bool
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>	basename string
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>	modtime  time.Time
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>	ents     []*fakeFileInfo
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>	contents string
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>	err      error
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>}
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>func (f *fakeFileInfo) Name() string       { return f.basename }
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>func (f *fakeFileInfo) Sys() interface{}   { return nil }
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>func (f *fakeFileInfo) ModTime() time.Time { return f.modtime }
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>func (f *fakeFileInfo) IsDir() bool        { return f.dir }
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>func (f *fakeFileInfo) Size() int64        { return int64(len(f.contents)) }
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>func (f *fakeFileInfo) Mode() os.FileMode {
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>	if f.dir {
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>		return 0755 | os.ModeDir
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>	}
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>	return 0644
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>}
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>type fakeFile struct {
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>	io.ReadSeeker
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>	fi     *fakeFileInfo
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>	path   string <span class="comment">// as opened</span>
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>	entpos int
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>}
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>func (f *fakeFile) Close() error               { return nil }
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>func (f *fakeFile) Stat() (os.FileInfo, error) { return f.fi, nil }
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>func (f *fakeFile) Readdir(count int) ([]os.FileInfo, error) {
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>	if !f.fi.dir {
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>		return nil, os.ErrInvalid
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>	}
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>	var fis []os.FileInfo
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>	limit := f.entpos + count
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>	if count &lt;= 0 || limit &gt; len(f.fi.ents) {
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>		limit = len(f.fi.ents)
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>	}
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>	for ; f.entpos &lt; limit; f.entpos++ {
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>		fis = append(fis, f.fi.ents[f.entpos])
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>	}
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>	if len(fis) == 0 &amp;&amp; count &gt; 0 {
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>		return fis, io.EOF
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>	} else {
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>		return fis, nil
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>	}
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>}
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>type fakeFS map[string]*fakeFileInfo
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>func (fs fakeFS) Open(name string) (File, error) {
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>	name = path.Clean(name)
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	f, ok := fs[name]
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>	if !ok {
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>		return nil, os.ErrNotExist
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>	}
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>	if f.err != nil {
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>		return nil, f.err
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>	}
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>	return &amp;fakeFile{ReadSeeker: strings.NewReader(f.contents), fi: f, path: name}, nil
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>}
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>func TestDirectoryIfNotModified(t *testing.T) {
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>	const indexContents = &#34;I am a fake index.html file&#34;
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>	fileMod := time.Unix(1000000000, 0).UTC()
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>	fileModStr := fileMod.Format(TimeFormat)
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>	dirMod := time.Unix(123, 0).UTC()
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>	indexFile := &amp;fakeFileInfo{
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>		basename: &#34;index.html&#34;,
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>		modtime:  fileMod,
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>		contents: indexContents,
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	}
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>	fs := fakeFS{
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		&#34;/&#34;: &amp;fakeFileInfo{
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>			dir:     true,
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>			modtime: dirMod,
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>			ents:    []*fakeFileInfo{indexFile},
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>		},
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>		&#34;/index.html&#34;: indexFile,
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>	}
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>	ts := httptest.NewServer(FileServer(fs))
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>	res, err := Get(ts.URL)
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>	}
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>	b, err := ioutil.ReadAll(res.Body)
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>	}
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>	if string(b) != indexContents {
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Got body %q; want %q&#34;, b, indexContents)
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>	}
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>	res.Body.Close()
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>	lastMod := res.Header.Get(&#34;Last-Modified&#34;)
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>	if lastMod != fileModStr {
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>		t.Fatalf(&#34;initial Last-Modified = %q; want %q&#34;, lastMod, fileModStr)
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>	}
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>	req, _ := NewRequest(&#34;GET&#34;, ts.URL, nil)
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>	req.Header.Set(&#34;If-Modified-Since&#34;, lastMod)
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>	c := ts.Client()
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>	res, err = c.Do(req)
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>	}
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>	if res.StatusCode != 304 {
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Code after If-Modified-Since request = %v; want 304&#34;, res.StatusCode)
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>	}
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>	res.Body.Close()
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>	<span class="comment">// Advance the index.html file&#39;s modtime, but not the directory&#39;s.</span>
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>	indexFile.modtime = indexFile.modtime.Add(1 * time.Hour)
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>	res, err = c.Do(req)
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>	}
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>	if res.StatusCode != 200 {
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Code after second If-Modified-Since request = %v; want 200; res is %#v&#34;, res.StatusCode, res)
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>	}
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>	res.Body.Close()
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>}
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>func mustStat(t *testing.T, fileName string) os.FileInfo {
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>	fi, err := os.Stat(fileName)
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>	}
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>	return fi
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>}
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>func TestServeContent(t *testing.T) {
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>	type serveParam struct {
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>		name        string
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>		modtime     time.Time
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>		content     io.ReadSeeker
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>		contentType string
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>		etag        string
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>	}
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>	servec := make(chan serveParam, 1)
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>	ts := httptest.NewServer(HandlerFunc(func(w ResponseWriter, r *Request) {
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>		p := &lt;-servec
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>		if p.etag != &#34;&#34; {
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>			w.Header().Set(&#34;ETag&#34;, p.etag)
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>		}
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>		if p.contentType != &#34;&#34; {
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>			w.Header().Set(&#34;Content-Type&#34;, p.contentType)
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>		}
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>		ServeContent(w, r, p.name, p.modtime, p.content)
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>	}))
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>	type testCase struct {
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>		<span class="comment">// One of file or content must be set:</span>
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>		file    string
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>		content io.ReadSeeker
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>		modtime          time.Time
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>		serveETag        string <span class="comment">// optional</span>
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>		serveContentType string <span class="comment">// optional</span>
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>		reqHeader        map[string]string
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>		wantLastMod      string
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>		wantContentType  string
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>		wantContentRange string
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>		wantStatus       int
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>	}
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>	htmlModTime := mustStat(t, &#34;testdata/index.html&#34;).ModTime()
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>	tests := map[string]testCase{
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>		&#34;no_last_modified&#34;: {
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>			file:            &#34;testdata/style.css&#34;,
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>			wantContentType: &#34;text/css; charset=utf-8&#34;,
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>			wantStatus:      200,
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>		},
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>		&#34;with_last_modified&#34;: {
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>			file:            &#34;testdata/index.html&#34;,
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>			wantContentType: &#34;text/html; charset=utf-8&#34;,
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>			modtime:         htmlModTime,
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>			wantLastMod:     htmlModTime.UTC().Format(TimeFormat),
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>			wantStatus:      200,
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>		},
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>		&#34;not_modified_modtime&#34;: {
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>			serveETag: `&#34;foo&#34;`, <span class="comment">// Last-Modified sent only when no ETag</span>
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>			modtime:   htmlModTime,
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>				&#34;If-Modified-Since&#34;: htmlModTime.UTC().Format(TimeFormat),
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>			},
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>			wantStatus: 304,
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>		},
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>		&#34;not_modified_modtime_with_contenttype&#34;: {
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>			file:             &#34;testdata/style.css&#34;,
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>			serveContentType: &#34;text/css&#34;, <span class="comment">// explicit content type</span>
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>			serveETag:        `&#34;foo&#34;`,    <span class="comment">// Last-Modified sent only when no ETag</span>
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>			modtime:          htmlModTime,
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>				&#34;If-Modified-Since&#34;: htmlModTime.UTC().Format(TimeFormat),
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>			},
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>			wantStatus: 304,
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>		},
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>		&#34;not_modified_etag&#34;: {
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>			serveETag: `&#34;foo&#34;`,
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>				&#34;If-None-Match&#34;: `&#34;foo&#34;`,
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>			},
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>			wantStatus: 304,
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>		},
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>		&#34;not_modified_etag_no_seek&#34;: {
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>			content:   panicOnSeek{nil}, <span class="comment">// should never be called</span>
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>			serveETag: `W/&#34;foo&#34;`,        <span class="comment">// If-None-Match uses weak ETag comparison</span>
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>				&#34;If-None-Match&#34;: `&#34;baz&#34;, W/&#34;foo&#34;`,
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>			},
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>			wantStatus: 304,
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>		},
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>		&#34;if_none_match_mismatch&#34;: {
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>			serveETag: `&#34;foo&#34;`,
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>				&#34;If-None-Match&#34;: `&#34;Foo&#34;`,
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>			},
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>			wantStatus:      200,
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>			wantContentType: &#34;text/css; charset=utf-8&#34;,
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>		},
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>		&#34;range_good&#34;: {
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>			serveETag: `&#34;A&#34;`,
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>				&#34;Range&#34;: &#34;bytes=0-4&#34;,
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>			},
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>			wantStatus:       StatusPartialContent,
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>			wantContentType:  &#34;text/css; charset=utf-8&#34;,
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>			wantContentRange: &#34;bytes 0-4/8&#34;,
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>		},
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>		&#34;range_match&#34;: {
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>			serveETag: `&#34;A&#34;`,
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>				&#34;Range&#34;:    &#34;bytes=0-4&#34;,
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>				&#34;If-Range&#34;: `&#34;A&#34;`,
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>			},
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>			wantStatus:       StatusPartialContent,
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>			wantContentType:  &#34;text/css; charset=utf-8&#34;,
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>			wantContentRange: &#34;bytes 0-4/8&#34;,
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>		},
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>		&#34;range_match_weak_etag&#34;: {
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>			serveETag: `W/&#34;A&#34;`,
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>				&#34;Range&#34;:    &#34;bytes=0-4&#34;,
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>				&#34;If-Range&#34;: `W/&#34;A&#34;`,
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>			},
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>			wantStatus:      200,
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>			wantContentType: &#34;text/css; charset=utf-8&#34;,
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>		},
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>		&#34;range_no_overlap&#34;: {
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>			serveETag: `&#34;A&#34;`,
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>				&#34;Range&#34;: &#34;bytes=10-20&#34;,
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>			},
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>			wantStatus:       StatusRequestedRangeNotSatisfiable,
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>			wantContentType:  &#34;text/plain; charset=utf-8&#34;,
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>			wantContentRange: &#34;bytes */8&#34;,
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>		},
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>		<span class="comment">// An If-Range resource for entity &#34;A&#34;, but entity &#34;B&#34; is now current.</span>
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>		<span class="comment">// The Range request should be ignored.</span>
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>		&#34;range_no_match&#34;: {
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>			serveETag: `&#34;A&#34;`,
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>				&#34;Range&#34;:    &#34;bytes=0-4&#34;,
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>				&#34;If-Range&#34;: `&#34;B&#34;`,
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span>			},
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>			wantStatus:      200,
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>			wantContentType: &#34;text/css; charset=utf-8&#34;,
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>		},
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>		&#34;range_with_modtime&#34;: {
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>			file:    &#34;testdata/style.css&#34;,
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>			modtime: time.Date(2014, 6, 25, 17, 12, 18, 0 <span class="comment">/* nanos */</span>, time.UTC),
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>				&#34;Range&#34;:    &#34;bytes=0-4&#34;,
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>				&#34;If-Range&#34;: &#34;Wed, 25 Jun 2014 17:12:18 GMT&#34;,
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>			},
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>			wantStatus:       StatusPartialContent,
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>			wantContentType:  &#34;text/css; charset=utf-8&#34;,
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>			wantContentRange: &#34;bytes 0-4/8&#34;,
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>			wantLastMod:      &#34;Wed, 25 Jun 2014 17:12:18 GMT&#34;,
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>		},
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>		&#34;range_with_modtime_nanos&#34;: {
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>			file:    &#34;testdata/style.css&#34;,
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>			modtime: time.Date(2014, 6, 25, 17, 12, 18, 123 <span class="comment">/* nanos */</span>, time.UTC),
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>				&#34;Range&#34;:    &#34;bytes=0-4&#34;,
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>				&#34;If-Range&#34;: &#34;Wed, 25 Jun 2014 17:12:18 GMT&#34;,
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>			},
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>			wantStatus:       StatusPartialContent,
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>			wantContentType:  &#34;text/css; charset=utf-8&#34;,
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>			wantContentRange: &#34;bytes 0-4/8&#34;,
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>			wantLastMod:      &#34;Wed, 25 Jun 2014 17:12:18 GMT&#34;,
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>		},
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>		&#34;unix_zero_modtime&#34;: {
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>			content:         strings.NewReader(&#34;&lt;html&gt;foo&#34;),
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>			modtime:         time.Unix(0, 0),
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>			wantStatus:      StatusOK,
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>			wantContentType: &#34;text/html; charset=utf-8&#34;,
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>		},
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>		&#34;ifmatch_matches&#34;: {
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>			serveETag: `&#34;A&#34;`,
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>				&#34;If-Match&#34;: `&#34;Z&#34;, &#34;A&#34;`,
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>			},
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>			wantStatus:      200,
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>			wantContentType: &#34;text/css; charset=utf-8&#34;,
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>		},
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>		&#34;ifmatch_star&#34;: {
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>			serveETag: `&#34;A&#34;`,
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>				&#34;If-Match&#34;: `*`,
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>			},
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>			wantStatus:      200,
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>			wantContentType: &#34;text/css; charset=utf-8&#34;,
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>		},
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>		&#34;ifmatch_failed&#34;: {
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>			serveETag: `&#34;A&#34;`,
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>				&#34;If-Match&#34;: `&#34;B&#34;`,
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>			},
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>			wantStatus:      412,
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>			wantContentType: &#34;text/plain; charset=utf-8&#34;,
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span>		},
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>		&#34;ifmatch_fails_on_weak_etag&#34;: {
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>			file:      &#34;testdata/style.css&#34;,
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>			serveETag: `W/&#34;A&#34;`,
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>				&#34;If-Match&#34;: `W/&#34;A&#34;`,
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>			},
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>			wantStatus:      412,
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>			wantContentType: &#34;text/plain; charset=utf-8&#34;,
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>		},
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>		&#34;if_unmodified_since_true&#34;: {
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>			file:    &#34;testdata/style.css&#34;,
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>			modtime: htmlModTime,
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>				&#34;If-Unmodified-Since&#34;: htmlModTime.UTC().Format(TimeFormat),
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>			},
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>			wantStatus:      200,
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>			wantContentType: &#34;text/css; charset=utf-8&#34;,
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>			wantLastMod:     htmlModTime.UTC().Format(TimeFormat),
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>		},
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>		&#34;if_unmodified_since_false&#34;: {
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>			file:    &#34;testdata/style.css&#34;,
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>			modtime: htmlModTime,
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>			reqHeader: map[string]string{
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>				&#34;If-Unmodified-Since&#34;: htmlModTime.Add(-2 * time.Second).UTC().Format(TimeFormat),
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>			},
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>			wantStatus:      412,
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>			wantContentType: &#34;text/plain; charset=utf-8&#34;,
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>			wantLastMod:     htmlModTime.UTC().Format(TimeFormat),
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>		},
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>	}
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span>	for testName, tt := range tests {
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span>		var content io.ReadSeeker
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span>		if tt.file != &#34;&#34; {
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span>			f, err := os.Open(tt.file)
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span>			if err != nil {
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span>				t.Fatalf(&#34;test %q: %v&#34;, testName, err)
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span>			}
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span>			defer f.Close()
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span>			content = f
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span>		} else {
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span>			content = tt.content
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span>		}
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span>
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span>		servec &lt;- serveParam{
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span>			name:        filepath.Base(tt.file),
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span>			content:     content,
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span>			modtime:     tt.modtime,
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span>			etag:        tt.serveETag,
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span>			contentType: tt.serveContentType,
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span>		}
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span>		req, err := NewRequest(&#34;GET&#34;, ts.URL, nil)
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span>			t.Fatal(err)
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span>		}
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span>		for k, v := range tt.reqHeader {
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span>			req.Header.Set(k, v)
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span>		}
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span>
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span>		c := ts.Client()
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span>		res, err := c.Do(req)
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span>			t.Fatal(err)
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span>		}
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span>		io.Copy(ioutil.Discard, res.Body)
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span>		res.Body.Close()
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span>		if res.StatusCode != tt.wantStatus {
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %q: status = %d; want %d&#34;, testName, res.StatusCode, tt.wantStatus)
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span>		}
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span>		if g, e := res.Header.Get(&#34;Content-Type&#34;), tt.wantContentType; g != e {
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %q: content-type = %q, want %q&#34;, testName, g, e)
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>		}
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>		if g, e := res.Header.Get(&#34;Content-Range&#34;), tt.wantContentRange; g != e {
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %q: content-range = %q, want %q&#34;, testName, g, e)
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span>		}
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>		if g, e := res.Header.Get(&#34;Last-Modified&#34;), tt.wantLastMod; g != e {
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %q: last-modified = %q, want %q&#34;, testName, g, e)
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>		}
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>	}
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>}
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span><span class="comment">// Issue 12991</span>
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>func TestServerFileStatError(t *testing.T) {
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>	rec := httptest.NewRecorder()
+<span id="L1026" class="ln" data-content="  1026">&nbsp;&nbsp;</span>	r, _ := NewRequest(&#34;GET&#34;, &#34;http://foo/&#34;, nil)
+<span id="L1027" class="ln" data-content="  1027">&nbsp;&nbsp;</span>	redirect := false
+<span id="L1028" class="ln" data-content="  1028">&nbsp;&nbsp;</span>	name := &#34;file.txt&#34;
+<span id="L1029" class="ln" data-content="  1029">&nbsp;&nbsp;</span>	fs := issue12991FS{}
+<span id="L1030" class="ln" data-content="  1030">&nbsp;&nbsp;</span>	ExportServeFile(rec, r, fs, name, redirect)
+<span id="L1031" class="ln" data-content="  1031">&nbsp;&nbsp;</span>	if body := rec.Body.String(); !strings.Contains(body, &#34;403&#34;) || !strings.Contains(body, &#34;Forbidden&#34;) {
+<span id="L1032" class="ln" data-content="  1032">&nbsp;&nbsp;</span>		t.Errorf(&#34;wanted 403 forbidden message; got: %s&#34;, body)
+<span id="L1033" class="ln" data-content="  1033">&nbsp;&nbsp;</span>	}
+<span id="L1034" class="ln" data-content="  1034">&nbsp;&nbsp;</span>}
+<span id="L1035" class="ln" data-content="  1035">&nbsp;&nbsp;</span>
+<span id="L1036" class="ln" data-content="  1036">&nbsp;&nbsp;</span>type issue12991FS struct{}
+<span id="L1037" class="ln" data-content="  1037">&nbsp;&nbsp;</span>
+<span id="L1038" class="ln" data-content="  1038">&nbsp;&nbsp;</span>func (issue12991FS) Open(string) (File, error) { return issue12991File{}, nil }
+<span id="L1039" class="ln" data-content="  1039">&nbsp;&nbsp;</span>
+<span id="L1040" class="ln" data-content="  1040">&nbsp;&nbsp;</span>type issue12991File struct{ File }
+<span id="L1041" class="ln" data-content="  1041">&nbsp;&nbsp;</span>
+<span id="L1042" class="ln" data-content="  1042">&nbsp;&nbsp;</span>func (issue12991File) Stat() (os.FileInfo, error) { return nil, os.ErrPermission }
+<span id="L1043" class="ln" data-content="  1043">&nbsp;&nbsp;</span>func (issue12991File) Close() error               { return nil }
+<span id="L1044" class="ln" data-content="  1044">&nbsp;&nbsp;</span>
+<span id="L1045" class="ln" data-content="  1045">&nbsp;&nbsp;</span>func TestServeContentErrorMessages(t *testing.T) {
+<span id="L1046" class="ln" data-content="  1046">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L1047" class="ln" data-content="  1047">&nbsp;&nbsp;</span>	fs := fakeFS{
+<span id="L1048" class="ln" data-content="  1048">&nbsp;&nbsp;</span>		&#34;/500&#34;: &amp;fakeFileInfo{
+<span id="L1049" class="ln" data-content="  1049">&nbsp;&nbsp;</span>			err: errors.New(&#34;random error&#34;),
+<span id="L1050" class="ln" data-content="  1050">&nbsp;&nbsp;</span>		},
+<span id="L1051" class="ln" data-content="  1051">&nbsp;&nbsp;</span>		&#34;/403&#34;: &amp;fakeFileInfo{
+<span id="L1052" class="ln" data-content="  1052">&nbsp;&nbsp;</span>			err: &amp;os.PathError{Err: os.ErrPermission},
+<span id="L1053" class="ln" data-content="  1053">&nbsp;&nbsp;</span>		},
+<span id="L1054" class="ln" data-content="  1054">&nbsp;&nbsp;</span>	}
+<span id="L1055" class="ln" data-content="  1055">&nbsp;&nbsp;</span>	ts := httptest.NewServer(FileServer(fs))
+<span id="L1056" class="ln" data-content="  1056">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L1057" class="ln" data-content="  1057">&nbsp;&nbsp;</span>	c := ts.Client()
+<span id="L1058" class="ln" data-content="  1058">&nbsp;&nbsp;</span>	for _, code := range []int{403, 404, 500} {
+<span id="L1059" class="ln" data-content="  1059">&nbsp;&nbsp;</span>		res, err := c.Get(fmt.Sprintf(&#34;%s/%d&#34;, ts.URL, code))
+<span id="L1060" class="ln" data-content="  1060">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L1061" class="ln" data-content="  1061">&nbsp;&nbsp;</span>			t.Errorf(&#34;Error fetching /%d: %v&#34;, code, err)
+<span id="L1062" class="ln" data-content="  1062">&nbsp;&nbsp;</span>			continue
+<span id="L1063" class="ln" data-content="  1063">&nbsp;&nbsp;</span>		}
+<span id="L1064" class="ln" data-content="  1064">&nbsp;&nbsp;</span>		if res.StatusCode != code {
+<span id="L1065" class="ln" data-content="  1065">&nbsp;&nbsp;</span>			t.Errorf(&#34;For /%d, status code = %d; want %d&#34;, code, res.StatusCode, code)
+<span id="L1066" class="ln" data-content="  1066">&nbsp;&nbsp;</span>		}
+<span id="L1067" class="ln" data-content="  1067">&nbsp;&nbsp;</span>		res.Body.Close()
+<span id="L1068" class="ln" data-content="  1068">&nbsp;&nbsp;</span>	}
+<span id="L1069" class="ln" data-content="  1069">&nbsp;&nbsp;</span>}
+<span id="L1070" class="ln" data-content="  1070">&nbsp;&nbsp;</span>
+<span id="L1071" class="ln" data-content="  1071">&nbsp;&nbsp;</span><span class="comment">// verifies that sendfile is being used on Linux</span>
+<span id="L1072" class="ln" data-content="  1072">&nbsp;&nbsp;</span>func TestLinuxSendfile(t *testing.T) {
+<span id="L1073" class="ln" data-content="  1073">&nbsp;&nbsp;</span>	setParallel(t)
+<span id="L1074" class="ln" data-content="  1074">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L1075" class="ln" data-content="  1075">&nbsp;&nbsp;</span>	if runtime.GOOS != &#34;linux&#34; {
+<span id="L1076" class="ln" data-content="  1076">&nbsp;&nbsp;</span>		t.Skip(&#34;skipping; linux-only test&#34;)
+<span id="L1077" class="ln" data-content="  1077">&nbsp;&nbsp;</span>	}
+<span id="L1078" class="ln" data-content="  1078">&nbsp;&nbsp;</span>	if _, err := exec.LookPath(&#34;strace&#34;); err != nil {
+<span id="L1079" class="ln" data-content="  1079">&nbsp;&nbsp;</span>		t.Skip(&#34;skipping; strace not found in path&#34;)
+<span id="L1080" class="ln" data-content="  1080">&nbsp;&nbsp;</span>	}
+<span id="L1081" class="ln" data-content="  1081">&nbsp;&nbsp;</span>
+<span id="L1082" class="ln" data-content="  1082">&nbsp;&nbsp;</span>	ln, err := net.Listen(&#34;tcp&#34;, &#34;127.0.0.1:0&#34;)
+<span id="L1083" class="ln" data-content="  1083">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1084" class="ln" data-content="  1084">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1085" class="ln" data-content="  1085">&nbsp;&nbsp;</span>	}
+<span id="L1086" class="ln" data-content="  1086">&nbsp;&nbsp;</span>	lnf, err := ln.(*net.TCPListener).File()
+<span id="L1087" class="ln" data-content="  1087">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1088" class="ln" data-content="  1088">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1089" class="ln" data-content="  1089">&nbsp;&nbsp;</span>	}
+<span id="L1090" class="ln" data-content="  1090">&nbsp;&nbsp;</span>	defer ln.Close()
+<span id="L1091" class="ln" data-content="  1091">&nbsp;&nbsp;</span>
+<span id="L1092" class="ln" data-content="  1092">&nbsp;&nbsp;</span>	syscalls := &#34;sendfile,sendfile64&#34;
+<span id="L1093" class="ln" data-content="  1093">&nbsp;&nbsp;</span>	switch runtime.GOARCH {
+<span id="L1094" class="ln" data-content="  1094">&nbsp;&nbsp;</span>	case &#34;mips64&#34;, &#34;mips64le&#34;, &#34;s390x&#34;:
+<span id="L1095" class="ln" data-content="  1095">&nbsp;&nbsp;</span>		<span class="comment">// strace on the above platforms doesn&#39;t support sendfile64</span>
+<span id="L1096" class="ln" data-content="  1096">&nbsp;&nbsp;</span>		<span class="comment">// and will error out if we specify that with `-e trace=&#39;.</span>
+<span id="L1097" class="ln" data-content="  1097">&nbsp;&nbsp;</span>		syscalls = &#34;sendfile&#34;
+<span id="L1098" class="ln" data-content="  1098">&nbsp;&nbsp;</span>	}
+<span id="L1099" class="ln" data-content="  1099">&nbsp;&nbsp;</span>
+<span id="L1100" class="ln" data-content="  1100">&nbsp;&nbsp;</span>	<span class="comment">// Attempt to run strace, and skip on failure - this test requires SYS_PTRACE.</span>
+<span id="L1101" class="ln" data-content="  1101">&nbsp;&nbsp;</span>	if err := exec.Command(&#34;strace&#34;, &#34;-f&#34;, &#34;-q&#34;, &#34;-e&#34;, &#34;trace=&#34;+syscalls, os.Args[0], &#34;-test.run=^$&#34;).Run(); err != nil {
+<span id="L1102" class="ln" data-content="  1102">&nbsp;&nbsp;</span>		t.Skipf(&#34;skipping; failed to run strace: %v&#34;, err)
+<span id="L1103" class="ln" data-content="  1103">&nbsp;&nbsp;</span>	}
+<span id="L1104" class="ln" data-content="  1104">&nbsp;&nbsp;</span>
+<span id="L1105" class="ln" data-content="  1105">&nbsp;&nbsp;</span>	var buf bytes.Buffer
+<span id="L1106" class="ln" data-content="  1106">&nbsp;&nbsp;</span>	child := exec.Command(&#34;strace&#34;, &#34;-f&#34;, &#34;-q&#34;, &#34;-e&#34;, &#34;trace=&#34;+syscalls, os.Args[0], &#34;-test.run=TestLinuxSendfileChild&#34;)
+<span id="L1107" class="ln" data-content="  1107">&nbsp;&nbsp;</span>	child.ExtraFiles = append(child.ExtraFiles, lnf)
+<span id="L1108" class="ln" data-content="  1108">&nbsp;&nbsp;</span>	child.Env = append([]string{&#34;GO_WANT_HELPER_PROCESS=1&#34;}, os.Environ()...)
+<span id="L1109" class="ln" data-content="  1109">&nbsp;&nbsp;</span>	child.Stdout = &amp;buf
+<span id="L1110" class="ln" data-content="  1110">&nbsp;&nbsp;</span>	child.Stderr = &amp;buf
+<span id="L1111" class="ln" data-content="  1111">&nbsp;&nbsp;</span>	if err := child.Start(); err != nil {
+<span id="L1112" class="ln" data-content="  1112">&nbsp;&nbsp;</span>		t.Skipf(&#34;skipping; failed to start straced child: %v&#34;, err)
+<span id="L1113" class="ln" data-content="  1113">&nbsp;&nbsp;</span>	}
+<span id="L1114" class="ln" data-content="  1114">&nbsp;&nbsp;</span>
+<span id="L1115" class="ln" data-content="  1115">&nbsp;&nbsp;</span>	res, err := Get(fmt.Sprintf(&#34;http://%s/&#34;, ln.Addr()))
+<span id="L1116" class="ln" data-content="  1116">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1117" class="ln" data-content="  1117">&nbsp;&nbsp;</span>		t.Fatalf(&#34;http client error: %v&#34;, err)
+<span id="L1118" class="ln" data-content="  1118">&nbsp;&nbsp;</span>	}
+<span id="L1119" class="ln" data-content="  1119">&nbsp;&nbsp;</span>	_, err = io.Copy(ioutil.Discard, res.Body)
+<span id="L1120" class="ln" data-content="  1120">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1121" class="ln" data-content="  1121">&nbsp;&nbsp;</span>		t.Fatalf(&#34;client body read error: %v&#34;, err)
+<span id="L1122" class="ln" data-content="  1122">&nbsp;&nbsp;</span>	}
+<span id="L1123" class="ln" data-content="  1123">&nbsp;&nbsp;</span>	res.Body.Close()
+<span id="L1124" class="ln" data-content="  1124">&nbsp;&nbsp;</span>
+<span id="L1125" class="ln" data-content="  1125">&nbsp;&nbsp;</span>	<span class="comment">// Force child to exit cleanly.</span>
+<span id="L1126" class="ln" data-content="  1126">&nbsp;&nbsp;</span>	Post(fmt.Sprintf(&#34;http://%s/quit&#34;, ln.Addr()), &#34;&#34;, nil)
+<span id="L1127" class="ln" data-content="  1127">&nbsp;&nbsp;</span>	child.Wait()
+<span id="L1128" class="ln" data-content="  1128">&nbsp;&nbsp;</span>
+<span id="L1129" class="ln" data-content="  1129">&nbsp;&nbsp;</span>	rx := regexp.MustCompile(`sendfile(64)?\(\d+,\s*\d+,\s*NULL,\s*\d+`)
+<span id="L1130" class="ln" data-content="  1130">&nbsp;&nbsp;</span>	out := buf.String()
+<span id="L1131" class="ln" data-content="  1131">&nbsp;&nbsp;</span>	if !rx.MatchString(out) {
+<span id="L1132" class="ln" data-content="  1132">&nbsp;&nbsp;</span>		t.Errorf(&#34;no sendfile system call found in:\n%s&#34;, out)
+<span id="L1133" class="ln" data-content="  1133">&nbsp;&nbsp;</span>	}
+<span id="L1134" class="ln" data-content="  1134">&nbsp;&nbsp;</span>}
+<span id="L1135" class="ln" data-content="  1135">&nbsp;&nbsp;</span>
+<span id="L1136" class="ln" data-content="  1136">&nbsp;&nbsp;</span>func getBody(t *testing.T, testName string, req Request, client *Client) (*Response, []byte) {
+<span id="L1137" class="ln" data-content="  1137">&nbsp;&nbsp;</span>	r, err := client.Do(&amp;req)
+<span id="L1138" class="ln" data-content="  1138">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1139" class="ln" data-content="  1139">&nbsp;&nbsp;</span>		t.Fatalf(&#34;%s: for URL %q, send error: %v&#34;, testName, req.URL.String(), err)
+<span id="L1140" class="ln" data-content="  1140">&nbsp;&nbsp;</span>	}
+<span id="L1141" class="ln" data-content="  1141">&nbsp;&nbsp;</span>	b, err := ioutil.ReadAll(r.Body)
+<span id="L1142" class="ln" data-content="  1142">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1143" class="ln" data-content="  1143">&nbsp;&nbsp;</span>		t.Fatalf(&#34;%s: for URL %q, reading body: %v&#34;, testName, req.URL.String(), err)
+<span id="L1144" class="ln" data-content="  1144">&nbsp;&nbsp;</span>	}
+<span id="L1145" class="ln" data-content="  1145">&nbsp;&nbsp;</span>	return r, b
+<span id="L1146" class="ln" data-content="  1146">&nbsp;&nbsp;</span>}
+<span id="L1147" class="ln" data-content="  1147">&nbsp;&nbsp;</span>
+<span id="L1148" class="ln" data-content="  1148">&nbsp;&nbsp;</span><span class="comment">// TestLinuxSendfileChild isn&#39;t a real test. It&#39;s used as a helper process</span>
+<span id="L1149" class="ln" data-content="  1149">&nbsp;&nbsp;</span><span class="comment">// for TestLinuxSendfile.</span>
+<span id="L1150" class="ln" data-content="  1150">&nbsp;&nbsp;</span>func TestLinuxSendfileChild(*testing.T) {
+<span id="L1151" class="ln" data-content="  1151">&nbsp;&nbsp;</span>	if os.Getenv(&#34;GO_WANT_HELPER_PROCESS&#34;) != &#34;1&#34; {
+<span id="L1152" class="ln" data-content="  1152">&nbsp;&nbsp;</span>		return
+<span id="L1153" class="ln" data-content="  1153">&nbsp;&nbsp;</span>	}
+<span id="L1154" class="ln" data-content="  1154">&nbsp;&nbsp;</span>	defer os.Exit(0)
+<span id="L1155" class="ln" data-content="  1155">&nbsp;&nbsp;</span>	fd3 := os.NewFile(3, &#34;ephemeral-port-listener&#34;)
+<span id="L1156" class="ln" data-content="  1156">&nbsp;&nbsp;</span>	ln, err := net.FileListener(fd3)
+<span id="L1157" class="ln" data-content="  1157">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1158" class="ln" data-content="  1158">&nbsp;&nbsp;</span>		panic(err)
+<span id="L1159" class="ln" data-content="  1159">&nbsp;&nbsp;</span>	}
+<span id="L1160" class="ln" data-content="  1160">&nbsp;&nbsp;</span>	mux := NewServeMux()
+<span id="L1161" class="ln" data-content="  1161">&nbsp;&nbsp;</span>	mux.Handle(&#34;/&#34;, FileServer(Dir(&#34;testdata&#34;)))
+<span id="L1162" class="ln" data-content="  1162">&nbsp;&nbsp;</span>	mux.HandleFunc(&#34;/quit&#34;, func(ResponseWriter, *Request) {
+<span id="L1163" class="ln" data-content="  1163">&nbsp;&nbsp;</span>		os.Exit(0)
+<span id="L1164" class="ln" data-content="  1164">&nbsp;&nbsp;</span>	})
+<span id="L1165" class="ln" data-content="  1165">&nbsp;&nbsp;</span>	s := &amp;Server{Handler: mux}
+<span id="L1166" class="ln" data-content="  1166">&nbsp;&nbsp;</span>	err = s.Serve(ln)
+<span id="L1167" class="ln" data-content="  1167">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1168" class="ln" data-content="  1168">&nbsp;&nbsp;</span>		panic(err)
+<span id="L1169" class="ln" data-content="  1169">&nbsp;&nbsp;</span>	}
+<span id="L1170" class="ln" data-content="  1170">&nbsp;&nbsp;</span>}
+<span id="L1171" class="ln" data-content="  1171">&nbsp;&nbsp;</span>
+<span id="L1172" class="ln" data-content="  1172">&nbsp;&nbsp;</span><span class="comment">// Issue 18984: tests that requests for paths beyond files return not-found errors</span>
+<span id="L1173" class="ln" data-content="  1173">&nbsp;&nbsp;</span>func TestFileServerNotDirError(t *testing.T) {
+<span id="L1174" class="ln" data-content="  1174">&nbsp;&nbsp;</span>	defer afterTest(t)
+<span id="L1175" class="ln" data-content="  1175">&nbsp;&nbsp;</span>	ts := httptest.NewServer(FileServer(Dir(&#34;testdata&#34;)))
+<span id="L1176" class="ln" data-content="  1176">&nbsp;&nbsp;</span>	defer ts.Close()
+<span id="L1177" class="ln" data-content="  1177">&nbsp;&nbsp;</span>
+<span id="L1178" class="ln" data-content="  1178">&nbsp;&nbsp;</span>	res, err := Get(ts.URL + &#34;/index.html/not-a-file&#34;)
+<span id="L1179" class="ln" data-content="  1179">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1180" class="ln" data-content="  1180">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1181" class="ln" data-content="  1181">&nbsp;&nbsp;</span>	}
+<span id="L1182" class="ln" data-content="  1182">&nbsp;&nbsp;</span>	res.Body.Close()
+<span id="L1183" class="ln" data-content="  1183">&nbsp;&nbsp;</span>	if res.StatusCode != 404 {
+<span id="L1184" class="ln" data-content="  1184">&nbsp;&nbsp;</span>		t.Errorf(&#34;StatusCode = %v; want 404&#34;, res.StatusCode)
+<span id="L1185" class="ln" data-content="  1185">&nbsp;&nbsp;</span>	}
+<span id="L1186" class="ln" data-content="  1186">&nbsp;&nbsp;</span>
+<span id="L1187" class="ln" data-content="  1187">&nbsp;&nbsp;</span>	test := func(name string, dir Dir) {
+<span id="L1188" class="ln" data-content="  1188">&nbsp;&nbsp;</span>		t.Run(name, func(t *testing.T) {
+<span id="L1189" class="ln" data-content="  1189">&nbsp;&nbsp;</span>			_, err = dir.Open(&#34;/index.html/not-a-file&#34;)
+<span id="L1190" class="ln" data-content="  1190">&nbsp;&nbsp;</span>			if err == nil {
+<span id="L1191" class="ln" data-content="  1191">&nbsp;&nbsp;</span>				t.Fatal(&#34;err == nil; want != nil&#34;)
+<span id="L1192" class="ln" data-content="  1192">&nbsp;&nbsp;</span>			}
+<span id="L1193" class="ln" data-content="  1193">&nbsp;&nbsp;</span>			if !os.IsNotExist(err) {
+<span id="L1194" class="ln" data-content="  1194">&nbsp;&nbsp;</span>				t.Errorf(&#34;err = %v; os.IsNotExist(err) = %v; want true&#34;, err, os.IsNotExist(err))
+<span id="L1195" class="ln" data-content="  1195">&nbsp;&nbsp;</span>			}
+<span id="L1196" class="ln" data-content="  1196">&nbsp;&nbsp;</span>
+<span id="L1197" class="ln" data-content="  1197">&nbsp;&nbsp;</span>			_, err = dir.Open(&#34;/index.html/not-a-dir/not-a-file&#34;)
+<span id="L1198" class="ln" data-content="  1198">&nbsp;&nbsp;</span>			if err == nil {
+<span id="L1199" class="ln" data-content="  1199">&nbsp;&nbsp;</span>				t.Fatal(&#34;err == nil; want != nil&#34;)
+<span id="L1200" class="ln" data-content="  1200">&nbsp;&nbsp;</span>			}
+<span id="L1201" class="ln" data-content="  1201">&nbsp;&nbsp;</span>			if !os.IsNotExist(err) {
+<span id="L1202" class="ln" data-content="  1202">&nbsp;&nbsp;</span>				t.Errorf(&#34;err = %v; os.IsNotExist(err) = %v; want true&#34;, err, os.IsNotExist(err))
+<span id="L1203" class="ln" data-content="  1203">&nbsp;&nbsp;</span>			}
+<span id="L1204" class="ln" data-content="  1204">&nbsp;&nbsp;</span>		})
+<span id="L1205" class="ln" data-content="  1205">&nbsp;&nbsp;</span>	}
+<span id="L1206" class="ln" data-content="  1206">&nbsp;&nbsp;</span>
+<span id="L1207" class="ln" data-content="  1207">&nbsp;&nbsp;</span>	absPath, err := filepath.Abs(&#34;testdata&#34;)
+<span id="L1208" class="ln" data-content="  1208">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1209" class="ln" data-content="  1209">&nbsp;&nbsp;</span>		t.Fatal(&#34;get abs path:&#34;, err)
+<span id="L1210" class="ln" data-content="  1210">&nbsp;&nbsp;</span>	}
+<span id="L1211" class="ln" data-content="  1211">&nbsp;&nbsp;</span>
+<span id="L1212" class="ln" data-content="  1212">&nbsp;&nbsp;</span>	test(&#34;RelativePath&#34;, Dir(&#34;testdata&#34;))
+<span id="L1213" class="ln" data-content="  1213">&nbsp;&nbsp;</span>	test(&#34;AbsolutePath&#34;, Dir(absPath))
+<span id="L1214" class="ln" data-content="  1214">&nbsp;&nbsp;</span>}
+<span id="L1215" class="ln" data-content="  1215">&nbsp;&nbsp;</span>
+<span id="L1216" class="ln" data-content="  1216">&nbsp;&nbsp;</span>func TestFileServerCleanPath(t *testing.T) {
+<span id="L1217" class="ln" data-content="  1217">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L1218" class="ln" data-content="  1218">&nbsp;&nbsp;</span>		path     string
+<span id="L1219" class="ln" data-content="  1219">&nbsp;&nbsp;</span>		wantCode int
+<span id="L1220" class="ln" data-content="  1220">&nbsp;&nbsp;</span>		wantOpen []string
+<span id="L1221" class="ln" data-content="  1221">&nbsp;&nbsp;</span>	}{
+<span id="L1222" class="ln" data-content="  1222">&nbsp;&nbsp;</span>		{&#34;/&#34;, 200, []string{&#34;/&#34;, &#34;/index.html&#34;}},
+<span id="L1223" class="ln" data-content="  1223">&nbsp;&nbsp;</span>		{&#34;/dir&#34;, 301, []string{&#34;/dir&#34;}},
+<span id="L1224" class="ln" data-content="  1224">&nbsp;&nbsp;</span>		{&#34;/dir/&#34;, 200, []string{&#34;/dir&#34;, &#34;/dir/index.html&#34;}},
+<span id="L1225" class="ln" data-content="  1225">&nbsp;&nbsp;</span>	}
+<span id="L1226" class="ln" data-content="  1226">&nbsp;&nbsp;</span>	for _, tt := range tests {
+<span id="L1227" class="ln" data-content="  1227">&nbsp;&nbsp;</span>		var log []string
+<span id="L1228" class="ln" data-content="  1228">&nbsp;&nbsp;</span>		rr := httptest.NewRecorder()
+<span id="L1229" class="ln" data-content="  1229">&nbsp;&nbsp;</span>		req, _ := NewRequest(&#34;GET&#34;, &#34;http://foo.localhost&#34;+tt.path, nil)
+<span id="L1230" class="ln" data-content="  1230">&nbsp;&nbsp;</span>		FileServer(fileServerCleanPathDir{&amp;log}).ServeHTTP(rr, req)
+<span id="L1231" class="ln" data-content="  1231">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(log, tt.wantOpen) {
+<span id="L1232" class="ln" data-content="  1232">&nbsp;&nbsp;</span>			t.Logf(&#34;For %s: Opens = %q; want %q&#34;, tt.path, log, tt.wantOpen)
+<span id="L1233" class="ln" data-content="  1233">&nbsp;&nbsp;</span>		}
+<span id="L1234" class="ln" data-content="  1234">&nbsp;&nbsp;</span>		if rr.Code != tt.wantCode {
+<span id="L1235" class="ln" data-content="  1235">&nbsp;&nbsp;</span>			t.Logf(&#34;For %s: Response code = %d; want %d&#34;, tt.path, rr.Code, tt.wantCode)
+<span id="L1236" class="ln" data-content="  1236">&nbsp;&nbsp;</span>		}
+<span id="L1237" class="ln" data-content="  1237">&nbsp;&nbsp;</span>	}
+<span id="L1238" class="ln" data-content="  1238">&nbsp;&nbsp;</span>}
+<span id="L1239" class="ln" data-content="  1239">&nbsp;&nbsp;</span>
+<span id="L1240" class="ln" data-content="  1240">&nbsp;&nbsp;</span>type fileServerCleanPathDir struct {
+<span id="L1241" class="ln" data-content="  1241">&nbsp;&nbsp;</span>	log *[]string
+<span id="L1242" class="ln" data-content="  1242">&nbsp;&nbsp;</span>}
+<span id="L1243" class="ln" data-content="  1243">&nbsp;&nbsp;</span>
+<span id="L1244" class="ln" data-content="  1244">&nbsp;&nbsp;</span>func (d fileServerCleanPathDir) Open(path string) (File, error) {
+<span id="L1245" class="ln" data-content="  1245">&nbsp;&nbsp;</span>	*(d.log) = append(*(d.log), path)
+<span id="L1246" class="ln" data-content="  1246">&nbsp;&nbsp;</span>	if path == &#34;/&#34; || path == &#34;/dir&#34; || path == &#34;/dir/&#34; {
+<span id="L1247" class="ln" data-content="  1247">&nbsp;&nbsp;</span>		<span class="comment">// Just return back something that&#39;s a directory.</span>
+<span id="L1248" class="ln" data-content="  1248">&nbsp;&nbsp;</span>		return Dir(&#34;.&#34;).Open(&#34;.&#34;)
+<span id="L1249" class="ln" data-content="  1249">&nbsp;&nbsp;</span>	}
+<span id="L1250" class="ln" data-content="  1250">&nbsp;&nbsp;</span>	return nil, os.ErrNotExist
+<span id="L1251" class="ln" data-content="  1251">&nbsp;&nbsp;</span>}
+<span id="L1252" class="ln" data-content="  1252">&nbsp;&nbsp;</span>
+<span id="L1253" class="ln" data-content="  1253">&nbsp;&nbsp;</span>type panicOnSeek struct{ io.ReadSeeker }
+<span id="L1254" class="ln" data-content="  1254">&nbsp;&nbsp;</span>
+<span id="L1255" class="ln" data-content="  1255">&nbsp;&nbsp;</span>func Test_scanETag(t *testing.T) {
+<span id="L1256" class="ln" data-content="  1256">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L1257" class="ln" data-content="  1257">&nbsp;&nbsp;</span>		in         string
+<span id="L1258" class="ln" data-content="  1258">&nbsp;&nbsp;</span>		wantETag   string
+<span id="L1259" class="ln" data-content="  1259">&nbsp;&nbsp;</span>		wantRemain string
+<span id="L1260" class="ln" data-content="  1260">&nbsp;&nbsp;</span>	}{
+<span id="L1261" class="ln" data-content="  1261">&nbsp;&nbsp;</span>		{`W/&#34;etag-1&#34;`, `W/&#34;etag-1&#34;`, &#34;&#34;},
+<span id="L1262" class="ln" data-content="  1262">&nbsp;&nbsp;</span>		{`&#34;etag-2&#34;`, `&#34;etag-2&#34;`, &#34;&#34;},
+<span id="L1263" class="ln" data-content="  1263">&nbsp;&nbsp;</span>		{`&#34;etag-1&#34;, &#34;etag-2&#34;`, `&#34;etag-1&#34;`, `, &#34;etag-2&#34;`},
+<span id="L1264" class="ln" data-content="  1264">&nbsp;&nbsp;</span>		{&#34;&#34;, &#34;&#34;, &#34;&#34;},
+<span id="L1265" class="ln" data-content="  1265">&nbsp;&nbsp;</span>		{&#34;W/&#34;, &#34;&#34;, &#34;&#34;},
+<span id="L1266" class="ln" data-content="  1266">&nbsp;&nbsp;</span>		{`W/&#34;truc`, &#34;&#34;, &#34;&#34;},
+<span id="L1267" class="ln" data-content="  1267">&nbsp;&nbsp;</span>		{`w/&#34;case-sensitive&#34;`, &#34;&#34;, &#34;&#34;},
+<span id="L1268" class="ln" data-content="  1268">&nbsp;&nbsp;</span>		{`&#34;spaced etag&#34;`, &#34;&#34;, &#34;&#34;},
+<span id="L1269" class="ln" data-content="  1269">&nbsp;&nbsp;</span>	}
+<span id="L1270" class="ln" data-content="  1270">&nbsp;&nbsp;</span>	for _, test := range tests {
+<span id="L1271" class="ln" data-content="  1271">&nbsp;&nbsp;</span>		etag, remain := ExportScanETag(test.in)
+<span id="L1272" class="ln" data-content="  1272">&nbsp;&nbsp;</span>		if etag != test.wantETag || remain != test.wantRemain {
+<span id="L1273" class="ln" data-content="  1273">&nbsp;&nbsp;</span>			t.Errorf(&#34;scanETag(%q)=%q %q, want %q %q&#34;, test.in, etag, remain, test.wantETag, test.wantRemain)
+<span id="L1274" class="ln" data-content="  1274">&nbsp;&nbsp;</span>		}
+<span id="L1275" class="ln" data-content="  1275">&nbsp;&nbsp;</span>	}
+<span id="L1276" class="ln" data-content="  1276">&nbsp;&nbsp;</span>}
+<span id="L1277" class="ln" data-content="  1277">&nbsp;&nbsp;</span>
+</pre><p><a href="fs_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

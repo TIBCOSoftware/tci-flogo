@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/rat.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./rat.go%3Fs=12264:12297.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">rat.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// This file implements multi-precision rational numbers.</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>package big
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>import (
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;math&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>)
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// A Rat represents a quotient a/b of arbitrary precision.</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span><span class="comment">// The zero value for a Rat represents the value 0.</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>type Rat struct {
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	<span class="comment">// To make zero values for Rat work w/o initialization,</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	<span class="comment">// a zero value of b (len(b) == 0) acts like b == 1.</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	<span class="comment">// a.neg determines the sign of the Rat, b.neg is ignored.</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	a, b Int
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>}
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span><span class="comment">// NewRat creates a new Rat with numerator a and denominator b.</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>func NewRat(a, b int64) *Rat {
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	return new(Rat).SetFrac64(a, b)
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>}
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span><span class="comment">// SetFloat64 sets z to exactly f and returns z.</span>
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span><span class="comment">// If f is not finite, SetFloat returns nil.</span>
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>func (z *Rat) SetFloat64(f float64) *Rat {
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	const expMask = 1&lt;&lt;11 - 1
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	bits := math.Float64bits(f)
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	mantissa := bits &amp; (1&lt;&lt;52 - 1)
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	exp := int((bits &gt;&gt; 52) &amp; expMask)
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	switch exp {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	case expMask: <span class="comment">// non-finite</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>		return nil
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	case 0: <span class="comment">// denormal</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>		exp -= 1022
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	default: <span class="comment">// normal</span>
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		mantissa |= 1 &lt;&lt; 52
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>		exp -= 1023
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	}
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	shift := 52 - exp
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	<span class="comment">// Optimization (?): partially pre-normalise.</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	for mantissa&amp;1 == 0 &amp;&amp; shift &gt; 0 {
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>		mantissa &gt;&gt;= 1
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>		shift--
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	}
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	z.a.SetUint64(mantissa)
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>	z.a.neg = f &lt; 0
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	z.b.Set(intOne)
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	if shift &gt; 0 {
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>		z.b.Lsh(&amp;z.b, uint(shift))
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	} else {
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		z.a.Lsh(&amp;z.a, uint(-shift))
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	}
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	return z.norm()
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>}
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span><span class="comment">// quotToFloat32 returns the non-negative float32 value</span>
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span><span class="comment">// nearest to the quotient a/b, using round-to-even in</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span><span class="comment">// halfway cases. It does not mutate its arguments.</span>
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span><span class="comment">// Preconditions: b is non-zero; a and b have no common factors.</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>func quotToFloat32(a, b nat) (f float32, exact bool) {
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	const (
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>		<span class="comment">// float size in bits</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>		Fsize = 32
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>		<span class="comment">// mantissa</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>		Msize  = 23
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>		Msize1 = Msize + 1 <span class="comment">// incl. implicit 1</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>		Msize2 = Msize1 + 1
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>		<span class="comment">// exponent</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		Esize = Fsize - Msize1
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>		Ebias = 1&lt;&lt;(Esize-1) - 1
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>		Emin  = 1 - Ebias
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		Emax  = Ebias
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	)
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>	<span class="comment">// TODO(adonovan): specialize common degenerate cases: 1.0, integers.</span>
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	alen := a.bitLen()
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	if alen == 0 {
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>		return 0, true
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	}
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>	blen := b.bitLen()
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	if blen == 0 {
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>		panic(&#34;division by zero&#34;)
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	}
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>	<span class="comment">// 1. Left-shift A or B such that quotient A/B is in [1&lt;&lt;Msize1, 1&lt;&lt;(Msize2+1)</span>
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	<span class="comment">// (Msize2 bits if A &lt; B when they are left-aligned, Msize2+1 bits if A &gt;= B).</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	<span class="comment">// This is 2 or 3 more than the float32 mantissa field width of Msize:</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>	<span class="comment">// - the optional extra bit is shifted away in step 3 below.</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	<span class="comment">// - the high-order 1 is omitted in &#34;normal&#34; representation;</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	<span class="comment">// - the low-order 1 will be used during rounding then discarded.</span>
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	exp := alen - blen
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	var a2, b2 nat
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	a2 = a2.set(a)
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	b2 = b2.set(b)
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>	if shift := Msize2 - exp; shift &gt; 0 {
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>		a2 = a2.shl(a2, uint(shift))
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>	} else if shift &lt; 0 {
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>		b2 = b2.shl(b2, uint(-shift))
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	}
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	<span class="comment">// 2. Compute quotient and remainder (q, r).  NB: due to the</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>	<span class="comment">// extra shift, the low-order bit of q is logically the</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	<span class="comment">// high-order bit of r.</span>
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	var q nat
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>	q, r := q.div(a2, a2, b2) <span class="comment">// (recycle a2)</span>
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	mantissa := low32(q)
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	haveRem := len(r) &gt; 0 <span class="comment">// mantissa&amp;1 &amp;&amp; !haveRem =&gt; remainder is exactly half</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	<span class="comment">// 3. If quotient didn&#39;t fit in Msize2 bits, redo division by b2&lt;&lt;1</span>
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	<span class="comment">// (in effect---we accomplish this incrementally).</span>
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	if mantissa&gt;&gt;Msize2 == 1 {
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>		if mantissa&amp;1 == 1 {
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>			haveRem = true
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>		}
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>		mantissa &gt;&gt;= 1
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>		exp++
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	}
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	if mantissa&gt;&gt;Msize1 != 1 {
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>		panic(fmt.Sprintf(&#34;expected exactly %d bits of result&#34;, Msize2))
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	}
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	<span class="comment">// 4. Rounding.</span>
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	if Emin-Msize &lt;= exp &amp;&amp; exp &lt;= Emin {
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>		<span class="comment">// Denormal case; lose &#39;shift&#39; bits of precision.</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>		shift := uint(Emin - (exp - 1)) <span class="comment">// [1..Esize1)</span>
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>		lostbits := mantissa &amp; (1&lt;&lt;shift - 1)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>		haveRem = haveRem || lostbits != 0
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>		mantissa &gt;&gt;= shift
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>		exp = 2 - Ebias <span class="comment">// == exp + shift</span>
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>	}
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	<span class="comment">// Round q using round-half-to-even.</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	exact = !haveRem
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	if mantissa&amp;1 != 0 {
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		exact = false
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>		if haveRem || mantissa&amp;2 != 0 {
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>			if mantissa++; mantissa &gt;= 1&lt;&lt;Msize2 {
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>				<span class="comment">// Complete rollover 11...1 =&gt; 100...0, so shift is safe</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>				mantissa &gt;&gt;= 1
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>				exp++
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>			}
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		}
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	}
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>	mantissa &gt;&gt;= 1 <span class="comment">// discard rounding bit.  Mantissa now scaled by 1&lt;&lt;Msize1.</span>
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	f = float32(math.Ldexp(float64(mantissa), exp-Msize1))
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>	if math.IsInf(float64(f), 0) {
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>		exact = false
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>	}
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	return
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>}
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span><span class="comment">// quotToFloat64 returns the non-negative float64 value</span>
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span><span class="comment">// nearest to the quotient a/b, using round-to-even in</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span><span class="comment">// halfway cases. It does not mutate its arguments.</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span><span class="comment">// Preconditions: b is non-zero; a and b have no common factors.</span>
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>func quotToFloat64(a, b nat) (f float64, exact bool) {
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>	const (
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		<span class="comment">// float size in bits</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>		Fsize = 64
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		<span class="comment">// mantissa</span>
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		Msize  = 52
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>		Msize1 = Msize + 1 <span class="comment">// incl. implicit 1</span>
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		Msize2 = Msize1 + 1
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		<span class="comment">// exponent</span>
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		Esize = Fsize - Msize1
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>		Ebias = 1&lt;&lt;(Esize-1) - 1
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		Emin  = 1 - Ebias
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>		Emax  = Ebias
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	)
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	<span class="comment">// TODO(adonovan): specialize common degenerate cases: 1.0, integers.</span>
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>	alen := a.bitLen()
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>	if alen == 0 {
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		return 0, true
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>	}
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	blen := b.bitLen()
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	if blen == 0 {
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>		panic(&#34;division by zero&#34;)
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	}
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>	<span class="comment">// 1. Left-shift A or B such that quotient A/B is in [1&lt;&lt;Msize1, 1&lt;&lt;(Msize2+1)</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>	<span class="comment">// (Msize2 bits if A &lt; B when they are left-aligned, Msize2+1 bits if A &gt;= B).</span>
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	<span class="comment">// This is 2 or 3 more than the float64 mantissa field width of Msize:</span>
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	<span class="comment">// - the optional extra bit is shifted away in step 3 below.</span>
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	<span class="comment">// - the high-order 1 is omitted in &#34;normal&#34; representation;</span>
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	<span class="comment">// - the low-order 1 will be used during rounding then discarded.</span>
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	exp := alen - blen
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	var a2, b2 nat
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	a2 = a2.set(a)
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	b2 = b2.set(b)
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	if shift := Msize2 - exp; shift &gt; 0 {
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>		a2 = a2.shl(a2, uint(shift))
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	} else if shift &lt; 0 {
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		b2 = b2.shl(b2, uint(-shift))
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	}
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	<span class="comment">// 2. Compute quotient and remainder (q, r).  NB: due to the</span>
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	<span class="comment">// extra shift, the low-order bit of q is logically the</span>
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	<span class="comment">// high-order bit of r.</span>
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	var q nat
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	q, r := q.div(a2, a2, b2) <span class="comment">// (recycle a2)</span>
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	mantissa := low64(q)
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>	haveRem := len(r) &gt; 0 <span class="comment">// mantissa&amp;1 &amp;&amp; !haveRem =&gt; remainder is exactly half</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>	<span class="comment">// 3. If quotient didn&#39;t fit in Msize2 bits, redo division by b2&lt;&lt;1</span>
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	<span class="comment">// (in effect---we accomplish this incrementally).</span>
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>	if mantissa&gt;&gt;Msize2 == 1 {
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>		if mantissa&amp;1 == 1 {
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>			haveRem = true
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>		}
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		mantissa &gt;&gt;= 1
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>		exp++
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>	}
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	if mantissa&gt;&gt;Msize1 != 1 {
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>		panic(fmt.Sprintf(&#34;expected exactly %d bits of result&#34;, Msize2))
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	}
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	<span class="comment">// 4. Rounding.</span>
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	if Emin-Msize &lt;= exp &amp;&amp; exp &lt;= Emin {
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>		<span class="comment">// Denormal case; lose &#39;shift&#39; bits of precision.</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>		shift := uint(Emin - (exp - 1)) <span class="comment">// [1..Esize1)</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>		lostbits := mantissa &amp; (1&lt;&lt;shift - 1)
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>		haveRem = haveRem || lostbits != 0
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>		mantissa &gt;&gt;= shift
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>		exp = 2 - Ebias <span class="comment">// == exp + shift</span>
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	}
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	<span class="comment">// Round q using round-half-to-even.</span>
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>	exact = !haveRem
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	if mantissa&amp;1 != 0 {
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>		exact = false
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>		if haveRem || mantissa&amp;2 != 0 {
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>			if mantissa++; mantissa &gt;= 1&lt;&lt;Msize2 {
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>				<span class="comment">// Complete rollover 11...1 =&gt; 100...0, so shift is safe</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>				mantissa &gt;&gt;= 1
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>				exp++
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>			}
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		}
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>	}
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	mantissa &gt;&gt;= 1 <span class="comment">// discard rounding bit.  Mantissa now scaled by 1&lt;&lt;Msize1.</span>
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	f = math.Ldexp(float64(mantissa), exp-Msize1)
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	if math.IsInf(f, 0) {
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>		exact = false
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	}
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	return
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>}
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span><span class="comment">// Float32 returns the nearest float32 value for x and a bool indicating</span>
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span><span class="comment">// whether f represents x exactly. If the magnitude of x is too large to</span>
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span><span class="comment">// be represented by a float32, f is an infinity and exact is false.</span>
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span><span class="comment">// The sign of f always matches the sign of x, even if f == 0.</span>
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>func (x *Rat) Float32() (f float32, exact bool) {
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	b := x.b.abs
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	if len(b) == 0 {
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>		b = b.set(natOne) <span class="comment">// materialize denominator</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>	}
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>	f, exact = quotToFloat32(x.a.abs, b)
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	if x.a.neg {
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		f = -f
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>	}
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	return
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>}
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span><span class="comment">// Float64 returns the nearest float64 value for x and a bool indicating</span>
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span><span class="comment">// whether f represents x exactly. If the magnitude of x is too large to</span>
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span><span class="comment">// be represented by a float64, f is an infinity and exact is false.</span>
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span><span class="comment">// The sign of f always matches the sign of x, even if f == 0.</span>
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>func (x *Rat) Float64() (f float64, exact bool) {
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	b := x.b.abs
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	if len(b) == 0 {
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		b = b.set(natOne) <span class="comment">// materialize denominator</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	f, exact = quotToFloat64(x.a.abs, b)
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	if x.a.neg {
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		f = -f
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>	}
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>	return
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>}
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span><span class="comment">// SetFrac sets z to a/b and returns z.</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>func (z *Rat) SetFrac(a, b *Int) *Rat {
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	z.a.neg = a.neg != b.neg
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	babs := b.abs
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	if len(babs) == 0 {
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		panic(&#34;division by zero&#34;)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	}
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	if &amp;z.a == b || alias(z.a.abs, babs) {
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		babs = nat(nil).set(babs) <span class="comment">// make a copy</span>
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>	}
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	z.a.abs = z.a.abs.set(a.abs)
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	z.b.abs = z.b.abs.set(babs)
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	return z.norm()
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>}
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span><span class="comment">// SetFrac64 sets z to a/b and returns z.</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>func (z *Rat) SetFrac64(a, b int64) *Rat {
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	z.a.SetInt64(a)
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	if b == 0 {
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>		panic(&#34;division by zero&#34;)
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	}
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>	if b &lt; 0 {
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		b = -b
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		z.a.neg = !z.a.neg
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>	}
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	z.b.abs = z.b.abs.setUint64(uint64(b))
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>	return z.norm()
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>}
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span><span class="comment">// SetInt sets z to x (by making a copy of x) and returns z.</span>
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>func (z *Rat) SetInt(x *Int) *Rat {
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	z.a.Set(x)
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>	z.b.abs = z.b.abs[:0]
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>	return z
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>}
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span><span class="comment">// SetInt64 sets z to x and returns z.</span>
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>func (z *Rat) SetInt64(x int64) *Rat {
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	z.a.SetInt64(x)
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	z.b.abs = z.b.abs[:0]
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	return z
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>}
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span><span class="comment">// Set sets z to x (by making a copy of x) and returns z.</span>
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>func (z *Rat) Set(x *Rat) *Rat {
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	if z != x {
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		z.a.Set(&amp;x.a)
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		z.b.Set(&amp;x.b)
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	}
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	return z
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>}
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span><span class="comment">// Abs sets z to |x| (the absolute value of x) and returns z.</span>
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>func (z *Rat) Abs(x *Rat) *Rat {
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	z.Set(x)
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	z.a.neg = false
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>	return z
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>}
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span><span class="comment">// Neg sets z to -x and returns z.</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>func (z *Rat) Neg(x *Rat) *Rat {
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	z.Set(x)
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>	z.a.neg = len(z.a.abs) &gt; 0 &amp;&amp; !z.a.neg <span class="comment">// 0 has no sign</span>
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	return z
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>}
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span><span class="comment">// Inv sets z to 1/x and returns z.</span>
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>func (z *Rat) Inv(x *Rat) *Rat {
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	if len(x.a.abs) == 0 {
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>		panic(&#34;division by zero&#34;)
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	}
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	z.Set(x)
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	a := z.b.abs
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	if len(a) == 0 {
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>		a = a.set(natOne) <span class="comment">// materialize numerator</span>
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	}
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	b := z.a.abs
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	if b.cmp(natOne) == 0 {
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>		b = b[:0] <span class="comment">// normalize denominator</span>
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>	}
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	z.a.abs, z.b.abs = a, b <span class="comment">// sign doesn&#39;t change</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	return z
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>}
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span><span class="comment">// Sign returns:</span>
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span><span class="comment">//	-1 if x &lt;  0</span>
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span><span class="comment">//	 0 if x == 0</span>
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span><span class="comment">//	+1 if x &gt;  0</span>
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>func (x *Rat) Sign() int {
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>	return x.a.Sign()
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>}
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span><span class="comment">// IsInt reports whether the denominator of x is 1.</span>
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>func (x *Rat) IsInt() bool {
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	return len(x.b.abs) == 0 || x.b.abs.cmp(natOne) == 0
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>}
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span><span class="comment">// Num returns the numerator of x; it may be &lt;= 0.</span>
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span><span class="comment">// The result is a reference to x&#39;s numerator; it</span>
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span><span class="comment">// may change if a new value is assigned to x, and vice versa.</span>
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span><span class="comment">// The sign of the numerator corresponds to the sign of x.</span>
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>func (x *Rat) Num() *Int {
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>	return &amp;x.a
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>}
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span><span class="comment">// Denom returns the denominator of x; it is always &gt; 0.</span>
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span><span class="comment">// The result is a reference to x&#39;s denominator; it</span>
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span><span class="comment">// may change if a new value is assigned to x, and vice versa.</span>
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>func (x *Rat) Denom() *Int {
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>	x.b.neg = false <span class="comment">// the result is always &gt;= 0</span>
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>	if len(x.b.abs) == 0 {
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>		x.b.abs = x.b.abs.set(natOne) <span class="comment">// materialize denominator</span>
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>	}
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>	return &amp;x.b
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>}
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>func (z *Rat) norm() *Rat {
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>	switch {
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	case len(z.a.abs) == 0:
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>		<span class="comment">// z == 0 - normalize sign and denominator</span>
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>		z.a.neg = false
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		z.b.abs = z.b.abs[:0]
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>	case len(z.b.abs) == 0:
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>		<span class="comment">// z is normalized int - nothing to do</span>
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>	case z.b.abs.cmp(natOne) == 0:
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>		<span class="comment">// z is int - normalize denominator</span>
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>		z.b.abs = z.b.abs[:0]
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>	default:
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>		neg := z.a.neg
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>		z.a.neg = false
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>		z.b.neg = false
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>		if f := NewInt(0).binaryGCD(&amp;z.a, &amp;z.b); f.Cmp(intOne) != 0 {
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>			z.a.abs, _ = z.a.abs.div(nil, z.a.abs, f.abs)
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>			z.b.abs, _ = z.b.abs.div(nil, z.b.abs, f.abs)
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>			if z.b.abs.cmp(natOne) == 0 {
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>				<span class="comment">// z is int - normalize denominator</span>
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>				z.b.abs = z.b.abs[:0]
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>			}
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>		}
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>		z.a.neg = neg
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>	}
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>	return z
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>}
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span><span class="comment">// mulDenom sets z to the denominator product x*y (by taking into</span>
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span><span class="comment">// account that 0 values for x or y must be interpreted as 1) and</span>
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span><span class="comment">// returns z.</span>
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>func mulDenom(z, x, y nat) nat {
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>	switch {
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	case len(x) == 0:
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>		return z.set(y)
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	case len(y) == 0:
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>		return z.set(x)
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>	}
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>	return z.mul(x, y)
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>}
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span><span class="comment">// scaleDenom computes x*f.</span>
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span><span class="comment">// If f == 0 (zero value of denominator), the result is (a copy of) x.</span>
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>func scaleDenom(x *Int, f nat) *Int {
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>	var z Int
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>	if len(f) == 0 {
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>		return z.Set(x)
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>	}
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>	z.abs = z.abs.mul(x.abs, f)
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>	z.neg = x.neg
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>	return &amp;z
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>}
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span><span class="comment">// Cmp compares x and y and returns:</span>
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span><span class="comment">//   -1 if x &lt;  y</span>
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span><span class="comment">//    0 if x == y</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span><span class="comment">//   +1 if x &gt;  y</span>
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span><span class="comment">//</span>
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>func (x *Rat) Cmp(y *Rat) int {
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>	return scaleDenom(&amp;x.a, y.b.abs).Cmp(scaleDenom(&amp;y.a, x.b.abs))
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>}
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span><span class="comment">// Add sets z to the sum x+y and returns z.</span>
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>func (z *Rat) Add(x, y *Rat) *Rat {
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>	a1 := scaleDenom(&amp;x.a, y.b.abs)
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>	a2 := scaleDenom(&amp;y.a, x.b.abs)
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>	z.a.Add(a1, a2)
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>	z.b.abs = mulDenom(z.b.abs, x.b.abs, y.b.abs)
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>	return z.norm()
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>}
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span><span class="comment">// Sub sets z to the difference x-y and returns z.</span>
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>func (z *Rat) Sub(x, y *Rat) *Rat {
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>	a1 := scaleDenom(&amp;x.a, y.b.abs)
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>	a2 := scaleDenom(&amp;y.a, x.b.abs)
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>	z.a.Sub(a1, a2)
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>	z.b.abs = mulDenom(z.b.abs, x.b.abs, y.b.abs)
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>	return z.norm()
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>}
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span><span class="comment">// Mul sets z to the product x*y and returns z.</span>
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span><span class="selection">func (z *Rat) Mul(x, y *Rat) *Rat</span> {
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>	z.a.Mul(&amp;x.a, &amp;y.a)
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>	z.b.abs = mulDenom(z.b.abs, x.b.abs, y.b.abs)
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>	return z.norm()
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>}
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span><span class="comment">// Quo sets z to the quotient x/y and returns z.</span>
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span><span class="comment">// If y == 0, a division-by-zero run-time panic occurs.</span>
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>func (z *Rat) Quo(x, y *Rat) *Rat {
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>	if len(y.a.abs) == 0 {
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>		panic(&#34;division by zero&#34;)
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>	}
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>	a := scaleDenom(&amp;x.a, y.b.abs)
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>	b := scaleDenom(&amp;y.a, x.b.abs)
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>	z.a.abs = a.abs
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>	z.b.abs = b.abs
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>	z.a.neg = a.neg != b.neg
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>	return z.norm()
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>}
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>
+</pre><p><a href="rat.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

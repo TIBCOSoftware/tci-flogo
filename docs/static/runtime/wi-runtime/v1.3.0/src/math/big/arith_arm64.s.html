@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/arith_arm64.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="arith_arm64.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">arith_arm64.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2013 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	// +build !math_big_pure_go
+<span id="L6" class="ln">     6</span>	
+<span id="L7" class="ln">     7</span>	#include &#34;textflag.h&#34;
+<span id="L8" class="ln">     8</span>	
+<span id="L9" class="ln">     9</span>	// This file provides fast assembly versions for the elementary
+<span id="L10" class="ln">    10</span>	// arithmetic operations on vectors implemented in arith.go.
+<span id="L11" class="ln">    11</span>	
+<span id="L12" class="ln">    12</span>	// TODO: Consider re-implementing using Advanced SIMD
+<span id="L13" class="ln">    13</span>	// once the assembler supports those instructions.
+<span id="L14" class="ln">    14</span>	
+<span id="L15" class="ln">    15</span>	// func mulWW(x, y Word) (z1, z0 Word)
+<span id="L16" class="ln">    16</span>	TEXT ·mulWW(SB),NOSPLIT,$0
+<span id="L17" class="ln">    17</span>		MOVD	x+0(FP), R0
+<span id="L18" class="ln">    18</span>		MOVD	y+8(FP), R1
+<span id="L19" class="ln">    19</span>		MUL	R0, R1, R2
+<span id="L20" class="ln">    20</span>		UMULH	R0, R1, R3
+<span id="L21" class="ln">    21</span>		MOVD	R3, z1+16(FP)
+<span id="L22" class="ln">    22</span>		MOVD	R2, z0+24(FP)
+<span id="L23" class="ln">    23</span>		RET
+<span id="L24" class="ln">    24</span>	
+<span id="L25" class="ln">    25</span>	
+<span id="L26" class="ln">    26</span>	// func divWW(x1, x0, y Word) (q, r Word)
+<span id="L27" class="ln">    27</span>	TEXT ·divWW(SB),NOSPLIT,$0
+<span id="L28" class="ln">    28</span>		B	·divWW_g(SB) // ARM64 has no multiword division
+<span id="L29" class="ln">    29</span>	
+<span id="L30" class="ln">    30</span>	
+<span id="L31" class="ln">    31</span>	// func addVV(z, x, y []Word) (c Word)
+<span id="L32" class="ln">    32</span>	TEXT ·addVV(SB),NOSPLIT,$0
+<span id="L33" class="ln">    33</span>		MOVD	z+0(FP), R3
+<span id="L34" class="ln">    34</span>		MOVD	z_len+8(FP), R0
+<span id="L35" class="ln">    35</span>		MOVD	x+24(FP), R1
+<span id="L36" class="ln">    36</span>		MOVD	y+48(FP), R2
+<span id="L37" class="ln">    37</span>		ADDS	$0, R0 // clear carry flag
+<span id="L38" class="ln">    38</span>	loop:
+<span id="L39" class="ln">    39</span>		CBZ	R0, done // careful not to touch the carry flag
+<span id="L40" class="ln">    40</span>		MOVD.P	8(R1), R4
+<span id="L41" class="ln">    41</span>		MOVD.P	8(R2), R5
+<span id="L42" class="ln">    42</span>		ADCS	R4, R5
+<span id="L43" class="ln">    43</span>		MOVD.P	R5, 8(R3)
+<span id="L44" class="ln">    44</span>		SUB	$1, R0
+<span id="L45" class="ln">    45</span>		B	loop
+<span id="L46" class="ln">    46</span>	done:
+<span id="L47" class="ln">    47</span>		CSET	HS, R0 // extract carry flag
+<span id="L48" class="ln">    48</span>		MOVD	R0, c+72(FP)
+<span id="L49" class="ln">    49</span>		RET
+<span id="L50" class="ln">    50</span>	
+<span id="L51" class="ln">    51</span>	
+<span id="L52" class="ln">    52</span>	// func subVV(z, x, y []Word) (c Word)
+<span id="L53" class="ln">    53</span>	TEXT ·subVV(SB),NOSPLIT,$0
+<span id="L54" class="ln">    54</span>		MOVD	z+0(FP), R3
+<span id="L55" class="ln">    55</span>		MOVD	z_len+8(FP), R0
+<span id="L56" class="ln">    56</span>		MOVD	x+24(FP), R1
+<span id="L57" class="ln">    57</span>		MOVD	y+48(FP), R2
+<span id="L58" class="ln">    58</span>		CMP	R0, R0 // set carry flag
+<span id="L59" class="ln">    59</span>	loop:
+<span id="L60" class="ln">    60</span>		CBZ	R0, done // careful not to touch the carry flag
+<span id="L61" class="ln">    61</span>		MOVD.P	8(R1), R4
+<span id="L62" class="ln">    62</span>		MOVD.P	8(R2), R5
+<span id="L63" class="ln">    63</span>		SBCS	R5, R4
+<span id="L64" class="ln">    64</span>		MOVD.P	R4, 8(R3)
+<span id="L65" class="ln">    65</span>		SUB	$1, R0
+<span id="L66" class="ln">    66</span>		B	loop
+<span id="L67" class="ln">    67</span>	done:
+<span id="L68" class="ln">    68</span>		CSET	LO, R0 // extract carry flag
+<span id="L69" class="ln">    69</span>		MOVD	R0, c+72(FP)
+<span id="L70" class="ln">    70</span>		RET
+<span id="L71" class="ln">    71</span>	
+<span id="L72" class="ln">    72</span>	
+<span id="L73" class="ln">    73</span>	// func addVW(z, x []Word, y Word) (c Word)
+<span id="L74" class="ln">    74</span>	TEXT ·addVW(SB),NOSPLIT,$0
+<span id="L75" class="ln">    75</span>		MOVD	z+0(FP), R3
+<span id="L76" class="ln">    76</span>		MOVD	z_len+8(FP), R0
+<span id="L77" class="ln">    77</span>		MOVD	x+24(FP), R1
+<span id="L78" class="ln">    78</span>		MOVD	y+48(FP), R2
+<span id="L79" class="ln">    79</span>		CBZ	R0, return_y
+<span id="L80" class="ln">    80</span>		MOVD.P	8(R1), R4
+<span id="L81" class="ln">    81</span>		ADDS	R2, R4
+<span id="L82" class="ln">    82</span>		MOVD.P	R4, 8(R3)
+<span id="L83" class="ln">    83</span>		SUB	$1, R0
+<span id="L84" class="ln">    84</span>	loop:
+<span id="L85" class="ln">    85</span>		CBZ	R0, done // careful not to touch the carry flag
+<span id="L86" class="ln">    86</span>		MOVD.P	8(R1), R4
+<span id="L87" class="ln">    87</span>		ADCS	$0, R4
+<span id="L88" class="ln">    88</span>		MOVD.P	R4, 8(R3)
+<span id="L89" class="ln">    89</span>		SUB	$1, R0
+<span id="L90" class="ln">    90</span>		B	loop
+<span id="L91" class="ln">    91</span>	done:
+<span id="L92" class="ln">    92</span>		CSET	HS, R0 // extract carry flag
+<span id="L93" class="ln">    93</span>		MOVD	R0, c+56(FP)
+<span id="L94" class="ln">    94</span>		RET
+<span id="L95" class="ln">    95</span>	return_y: // z is empty; copy y to c
+<span id="L96" class="ln">    96</span>		MOVD	R2, c+56(FP)
+<span id="L97" class="ln">    97</span>		RET
+<span id="L98" class="ln">    98</span>	
+<span id="L99" class="ln">    99</span>	
+<span id="L100" class="ln">   100</span>	// func subVW(z, x []Word, y Word) (c Word)
+<span id="L101" class="ln">   101</span>	TEXT ·subVW(SB),NOSPLIT,$0
+<span id="L102" class="ln">   102</span>		MOVD	z+0(FP), R3
+<span id="L103" class="ln">   103</span>		MOVD	z_len+8(FP), R0
+<span id="L104" class="ln">   104</span>		MOVD	x+24(FP), R1
+<span id="L105" class="ln">   105</span>		MOVD	y+48(FP), R2
+<span id="L106" class="ln">   106</span>		CBZ	R0, rety
+<span id="L107" class="ln">   107</span>		MOVD.P	8(R1), R4
+<span id="L108" class="ln">   108</span>		SUBS	R2, R4
+<span id="L109" class="ln">   109</span>		MOVD.P	R4, 8(R3)
+<span id="L110" class="ln">   110</span>		SUB	$1, R0
+<span id="L111" class="ln">   111</span>	loop:
+<span id="L112" class="ln">   112</span>		CBZ	R0, done // careful not to touch the carry flag
+<span id="L113" class="ln">   113</span>		MOVD.P	8(R1), R4
+<span id="L114" class="ln">   114</span>		SBCS	$0, R4
+<span id="L115" class="ln">   115</span>		MOVD.P	R4, 8(R3)
+<span id="L116" class="ln">   116</span>		SUB	$1, R0
+<span id="L117" class="ln">   117</span>		B	loop
+<span id="L118" class="ln">   118</span>	done:
+<span id="L119" class="ln">   119</span>		CSET	LO, R0 // extract carry flag
+<span id="L120" class="ln">   120</span>		MOVD	R0, c+56(FP)
+<span id="L121" class="ln">   121</span>		RET
+<span id="L122" class="ln">   122</span>	rety: // z is empty; copy y to c
+<span id="L123" class="ln">   123</span>		MOVD	R2, c+56(FP)
+<span id="L124" class="ln">   124</span>		RET
+<span id="L125" class="ln">   125</span>	
+<span id="L126" class="ln">   126</span>	
+<span id="L127" class="ln">   127</span>	// func shlVU(z, x []Word, s uint) (c Word)
+<span id="L128" class="ln">   128</span>	TEXT ·shlVU(SB),NOSPLIT,$0
+<span id="L129" class="ln">   129</span>		B ·shlVU_g(SB)
+<span id="L130" class="ln">   130</span>	
+<span id="L131" class="ln">   131</span>	
+<span id="L132" class="ln">   132</span>	// func shrVU(z, x []Word, s uint) (c Word)
+<span id="L133" class="ln">   133</span>	TEXT ·shrVU(SB),NOSPLIT,$0
+<span id="L134" class="ln">   134</span>		B ·shrVU_g(SB)
+<span id="L135" class="ln">   135</span>	
+<span id="L136" class="ln">   136</span>	
+<span id="L137" class="ln">   137</span>	// func mulAddVWW(z, x []Word, y, r Word) (c Word)
+<span id="L138" class="ln">   138</span>	TEXT ·mulAddVWW(SB),NOSPLIT,$0
+<span id="L139" class="ln">   139</span>		MOVD	z+0(FP), R1
+<span id="L140" class="ln">   140</span>		MOVD	z_len+8(FP), R0
+<span id="L141" class="ln">   141</span>		MOVD	x+24(FP), R2
+<span id="L142" class="ln">   142</span>		MOVD	y+48(FP), R3
+<span id="L143" class="ln">   143</span>		MOVD	r+56(FP), R4
+<span id="L144" class="ln">   144</span>	loop:
+<span id="L145" class="ln">   145</span>		CBZ	R0, done
+<span id="L146" class="ln">   146</span>		MOVD.P	8(R2), R5
+<span id="L147" class="ln">   147</span>		UMULH	R5, R3, R7
+<span id="L148" class="ln">   148</span>		MUL	R5, R3, R6
+<span id="L149" class="ln">   149</span>		ADDS	R4, R6
+<span id="L150" class="ln">   150</span>		ADC	$0, R7
+<span id="L151" class="ln">   151</span>		MOVD.P	R6, 8(R1)
+<span id="L152" class="ln">   152</span>		MOVD	R7, R4
+<span id="L153" class="ln">   153</span>		SUB	$1, R0
+<span id="L154" class="ln">   154</span>		B	loop
+<span id="L155" class="ln">   155</span>	done:
+<span id="L156" class="ln">   156</span>		MOVD	R4, c+64(FP)
+<span id="L157" class="ln">   157</span>		RET
+<span id="L158" class="ln">   158</span>	
+<span id="L159" class="ln">   159</span>	
+<span id="L160" class="ln">   160</span>	// func addMulVVW(z, x []Word, y Word) (c Word)
+<span id="L161" class="ln">   161</span>	TEXT ·addMulVVW(SB),NOSPLIT,$0
+<span id="L162" class="ln">   162</span>		B ·addMulVVW_g(SB)
+<span id="L163" class="ln">   163</span>	
+<span id="L164" class="ln">   164</span>	
+<span id="L165" class="ln">   165</span>	// func divWVW(z []Word, xn Word, x []Word, y Word) (r Word)
+<span id="L166" class="ln">   166</span>	TEXT ·divWVW(SB),NOSPLIT,$0
+<span id="L167" class="ln">   167</span>		B ·divWVW_g(SB)
+</pre><p><a href="arith_arm64.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/sha1/sha1block_amd64p32.s - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="sha1block_amd64p32.s.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Text file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../sha1.1.html">sha1</a>/<span class="text-muted">sha1block_amd64p32.s</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/sha1.1.html">crypto/sha1</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<pre><span id="L1" class="ln">     1</span>	// Copyright 2013 The Go Authors. All rights reserved.
+<span id="L2" class="ln">     2</span>	// Use of this source code is governed by a BSD-style
+<span id="L3" class="ln">     3</span>	// license that can be found in the LICENSE file.
+<span id="L4" class="ln">     4</span>	
+<span id="L5" class="ln">     5</span>	#include &#34;textflag.h&#34;
+<span id="L6" class="ln">     6</span>	
+<span id="L7" class="ln">     7</span>	// SHA-1 block routine. See sha1block.go for Go equivalent.
+<span id="L8" class="ln">     8</span>	//
+<span id="L9" class="ln">     9</span>	// There are 80 rounds of 4 types:
+<span id="L10" class="ln">    10</span>	//   - rounds 0-15 are type 1 and load data (ROUND1 macro).
+<span id="L11" class="ln">    11</span>	//   - rounds 16-19 are type 1 and do not load data (ROUND1x macro).
+<span id="L12" class="ln">    12</span>	//   - rounds 20-39 are type 2 and do not load data (ROUND2 macro).
+<span id="L13" class="ln">    13</span>	//   - rounds 40-59 are type 3 and do not load data (ROUND3 macro).
+<span id="L14" class="ln">    14</span>	//   - rounds 60-79 are type 4 and do not load data (ROUND4 macro).
+<span id="L15" class="ln">    15</span>	//
+<span id="L16" class="ln">    16</span>	// Each round loads or shuffles the data, then computes a per-round
+<span id="L17" class="ln">    17</span>	// function of b, c, d, and then mixes the result into and rotates the
+<span id="L18" class="ln">    18</span>	// five registers a, b, c, d, e holding the intermediate results.
+<span id="L19" class="ln">    19</span>	//
+<span id="L20" class="ln">    20</span>	// The register rotation is implemented by rotating the arguments to
+<span id="L21" class="ln">    21</span>	// the round macros instead of by explicit move instructions.
+<span id="L22" class="ln">    22</span>	//
+<span id="L23" class="ln">    23</span>	// amd64p32 version.
+<span id="L24" class="ln">    24</span>	// To ensure safety for Native Client, avoids use of BP and R15
+<span id="L25" class="ln">    25</span>	// as well as two-register addressing modes.
+<span id="L26" class="ln">    26</span>	
+<span id="L27" class="ln">    27</span>	#define LOAD(index) \
+<span id="L28" class="ln">    28</span>		MOVL	(index*4)(SI), R10; \
+<span id="L29" class="ln">    29</span>		BSWAPL	R10; \
+<span id="L30" class="ln">    30</span>		MOVL	R10, (index*4)(SP)
+<span id="L31" class="ln">    31</span>	
+<span id="L32" class="ln">    32</span>	#define SHUFFLE(index) \
+<span id="L33" class="ln">    33</span>		MOVL	(((index)&amp;0xf)*4)(SP), R10; \
+<span id="L34" class="ln">    34</span>		XORL	(((index-3)&amp;0xf)*4)(SP), R10; \
+<span id="L35" class="ln">    35</span>		XORL	(((index-8)&amp;0xf)*4)(SP), R10; \
+<span id="L36" class="ln">    36</span>		XORL	(((index-14)&amp;0xf)*4)(SP), R10; \
+<span id="L37" class="ln">    37</span>		ROLL	$1, R10; \
+<span id="L38" class="ln">    38</span>		MOVL	R10, (((index)&amp;0xf)*4)(SP)
+<span id="L39" class="ln">    39</span>	
+<span id="L40" class="ln">    40</span>	#define FUNC1(a, b, c, d, e) \
+<span id="L41" class="ln">    41</span>		MOVL	d, R9; \
+<span id="L42" class="ln">    42</span>		XORL	c, R9; \
+<span id="L43" class="ln">    43</span>		ANDL	b, R9; \
+<span id="L44" class="ln">    44</span>		XORL	d, R9
+<span id="L45" class="ln">    45</span>	
+<span id="L46" class="ln">    46</span>	#define FUNC2(a, b, c, d, e) \
+<span id="L47" class="ln">    47</span>		MOVL	b, R9; \
+<span id="L48" class="ln">    48</span>		XORL	c, R9; \
+<span id="L49" class="ln">    49</span>		XORL	d, R9
+<span id="L50" class="ln">    50</span>	
+<span id="L51" class="ln">    51</span>	#define FUNC3(a, b, c, d, e) \
+<span id="L52" class="ln">    52</span>		MOVL	b, R8; \
+<span id="L53" class="ln">    53</span>		ORL	c, R8; \
+<span id="L54" class="ln">    54</span>		ANDL	d, R8; \
+<span id="L55" class="ln">    55</span>		MOVL	b, R9; \
+<span id="L56" class="ln">    56</span>		ANDL	c, R9; \
+<span id="L57" class="ln">    57</span>		ORL	R8, R9
+<span id="L58" class="ln">    58</span>		
+<span id="L59" class="ln">    59</span>	#define FUNC4 FUNC2
+<span id="L60" class="ln">    60</span>	
+<span id="L61" class="ln">    61</span>	#define MIX(a, b, c, d, e, const) \
+<span id="L62" class="ln">    62</span>		ROLL	$30, b; \
+<span id="L63" class="ln">    63</span>		ADDL	R9, e; \
+<span id="L64" class="ln">    64</span>		MOVL	a, R8; \
+<span id="L65" class="ln">    65</span>		ROLL	$5, R8; \
+<span id="L66" class="ln">    66</span>		LEAL	const(e)(R10*1), e; \
+<span id="L67" class="ln">    67</span>		ADDL	R8, e
+<span id="L68" class="ln">    68</span>	
+<span id="L69" class="ln">    69</span>	#define ROUND1(a, b, c, d, e, index) \
+<span id="L70" class="ln">    70</span>		LOAD(index); \
+<span id="L71" class="ln">    71</span>		FUNC1(a, b, c, d, e); \
+<span id="L72" class="ln">    72</span>		MIX(a, b, c, d, e, 0x5A827999)
+<span id="L73" class="ln">    73</span>	
+<span id="L74" class="ln">    74</span>	#define ROUND1x(a, b, c, d, e, index) \
+<span id="L75" class="ln">    75</span>		SHUFFLE(index); \
+<span id="L76" class="ln">    76</span>		FUNC1(a, b, c, d, e); \
+<span id="L77" class="ln">    77</span>		MIX(a, b, c, d, e, 0x5A827999)
+<span id="L78" class="ln">    78</span>	
+<span id="L79" class="ln">    79</span>	#define ROUND2(a, b, c, d, e, index) \
+<span id="L80" class="ln">    80</span>		SHUFFLE(index); \
+<span id="L81" class="ln">    81</span>		FUNC2(a, b, c, d, e); \
+<span id="L82" class="ln">    82</span>		MIX(a, b, c, d, e, 0x6ED9EBA1)
+<span id="L83" class="ln">    83</span>	
+<span id="L84" class="ln">    84</span>	#define ROUND3(a, b, c, d, e, index) \
+<span id="L85" class="ln">    85</span>		SHUFFLE(index); \
+<span id="L86" class="ln">    86</span>		FUNC3(a, b, c, d, e); \
+<span id="L87" class="ln">    87</span>		MIX(a, b, c, d, e, 0x8F1BBCDC)
+<span id="L88" class="ln">    88</span>	
+<span id="L89" class="ln">    89</span>	#define ROUND4(a, b, c, d, e, index) \
+<span id="L90" class="ln">    90</span>		SHUFFLE(index); \
+<span id="L91" class="ln">    91</span>		FUNC4(a, b, c, d, e); \
+<span id="L92" class="ln">    92</span>		MIX(a, b, c, d, e, 0xCA62C1D6)
+<span id="L93" class="ln">    93</span>	
+<span id="L94" class="ln">    94</span>	TEXT ·block(SB),NOSPLIT,$64-16
+<span id="L95" class="ln">    95</span>		MOVL	dig+0(FP),	R14
+<span id="L96" class="ln">    96</span>		MOVL	p_base+4(FP),	SI
+<span id="L97" class="ln">    97</span>		MOVL	p_len+8(FP),	DX
+<span id="L98" class="ln">    98</span>		SHRQ	$6,		DX
+<span id="L99" class="ln">    99</span>		SHLQ	$6,		DX
+<span id="L100" class="ln">   100</span>		
+<span id="L101" class="ln">   101</span>		LEAQ	(SI)(DX*1),	DI
+<span id="L102" class="ln">   102</span>		MOVL	(0*4)(R14),	AX
+<span id="L103" class="ln">   103</span>		MOVL	(1*4)(R14),	BX
+<span id="L104" class="ln">   104</span>		MOVL	(2*4)(R14),	CX
+<span id="L105" class="ln">   105</span>		MOVL	(3*4)(R14),	DX
+<span id="L106" class="ln">   106</span>		MOVL	(4*4)(R14),	R13
+<span id="L107" class="ln">   107</span>	
+<span id="L108" class="ln">   108</span>		CMPQ	SI,		DI
+<span id="L109" class="ln">   109</span>		JEQ	end
+<span id="L110" class="ln">   110</span>	
+<span id="L111" class="ln">   111</span>	loop:
+<span id="L112" class="ln">   112</span>	#define BP R13 /* keep diff from sha1block_amd64.s small */
+<span id="L113" class="ln">   113</span>		ROUND1(AX, BX, CX, DX, BP, 0)
+<span id="L114" class="ln">   114</span>		ROUND1(BP, AX, BX, CX, DX, 1)
+<span id="L115" class="ln">   115</span>		ROUND1(DX, BP, AX, BX, CX, 2)
+<span id="L116" class="ln">   116</span>		ROUND1(CX, DX, BP, AX, BX, 3)
+<span id="L117" class="ln">   117</span>		ROUND1(BX, CX, DX, BP, AX, 4)
+<span id="L118" class="ln">   118</span>		ROUND1(AX, BX, CX, DX, BP, 5)
+<span id="L119" class="ln">   119</span>		ROUND1(BP, AX, BX, CX, DX, 6)
+<span id="L120" class="ln">   120</span>		ROUND1(DX, BP, AX, BX, CX, 7)
+<span id="L121" class="ln">   121</span>		ROUND1(CX, DX, BP, AX, BX, 8)
+<span id="L122" class="ln">   122</span>		ROUND1(BX, CX, DX, BP, AX, 9)
+<span id="L123" class="ln">   123</span>		ROUND1(AX, BX, CX, DX, BP, 10)
+<span id="L124" class="ln">   124</span>		ROUND1(BP, AX, BX, CX, DX, 11)
+<span id="L125" class="ln">   125</span>		ROUND1(DX, BP, AX, BX, CX, 12)
+<span id="L126" class="ln">   126</span>		ROUND1(CX, DX, BP, AX, BX, 13)
+<span id="L127" class="ln">   127</span>		ROUND1(BX, CX, DX, BP, AX, 14)
+<span id="L128" class="ln">   128</span>		ROUND1(AX, BX, CX, DX, BP, 15)
+<span id="L129" class="ln">   129</span>	
+<span id="L130" class="ln">   130</span>		ROUND1x(BP, AX, BX, CX, DX, 16)
+<span id="L131" class="ln">   131</span>		ROUND1x(DX, BP, AX, BX, CX, 17)
+<span id="L132" class="ln">   132</span>		ROUND1x(CX, DX, BP, AX, BX, 18)
+<span id="L133" class="ln">   133</span>		ROUND1x(BX, CX, DX, BP, AX, 19)
+<span id="L134" class="ln">   134</span>		
+<span id="L135" class="ln">   135</span>		ROUND2(AX, BX, CX, DX, BP, 20)
+<span id="L136" class="ln">   136</span>		ROUND2(BP, AX, BX, CX, DX, 21)
+<span id="L137" class="ln">   137</span>		ROUND2(DX, BP, AX, BX, CX, 22)
+<span id="L138" class="ln">   138</span>		ROUND2(CX, DX, BP, AX, BX, 23)
+<span id="L139" class="ln">   139</span>		ROUND2(BX, CX, DX, BP, AX, 24)
+<span id="L140" class="ln">   140</span>		ROUND2(AX, BX, CX, DX, BP, 25)
+<span id="L141" class="ln">   141</span>		ROUND2(BP, AX, BX, CX, DX, 26)
+<span id="L142" class="ln">   142</span>		ROUND2(DX, BP, AX, BX, CX, 27)
+<span id="L143" class="ln">   143</span>		ROUND2(CX, DX, BP, AX, BX, 28)
+<span id="L144" class="ln">   144</span>		ROUND2(BX, CX, DX, BP, AX, 29)
+<span id="L145" class="ln">   145</span>		ROUND2(AX, BX, CX, DX, BP, 30)
+<span id="L146" class="ln">   146</span>		ROUND2(BP, AX, BX, CX, DX, 31)
+<span id="L147" class="ln">   147</span>		ROUND2(DX, BP, AX, BX, CX, 32)
+<span id="L148" class="ln">   148</span>		ROUND2(CX, DX, BP, AX, BX, 33)
+<span id="L149" class="ln">   149</span>		ROUND2(BX, CX, DX, BP, AX, 34)
+<span id="L150" class="ln">   150</span>		ROUND2(AX, BX, CX, DX, BP, 35)
+<span id="L151" class="ln">   151</span>		ROUND2(BP, AX, BX, CX, DX, 36)
+<span id="L152" class="ln">   152</span>		ROUND2(DX, BP, AX, BX, CX, 37)
+<span id="L153" class="ln">   153</span>		ROUND2(CX, DX, BP, AX, BX, 38)
+<span id="L154" class="ln">   154</span>		ROUND2(BX, CX, DX, BP, AX, 39)
+<span id="L155" class="ln">   155</span>		
+<span id="L156" class="ln">   156</span>		ROUND3(AX, BX, CX, DX, BP, 40)
+<span id="L157" class="ln">   157</span>		ROUND3(BP, AX, BX, CX, DX, 41)
+<span id="L158" class="ln">   158</span>		ROUND3(DX, BP, AX, BX, CX, 42)
+<span id="L159" class="ln">   159</span>		ROUND3(CX, DX, BP, AX, BX, 43)
+<span id="L160" class="ln">   160</span>		ROUND3(BX, CX, DX, BP, AX, 44)
+<span id="L161" class="ln">   161</span>		ROUND3(AX, BX, CX, DX, BP, 45)
+<span id="L162" class="ln">   162</span>		ROUND3(BP, AX, BX, CX, DX, 46)
+<span id="L163" class="ln">   163</span>		ROUND3(DX, BP, AX, BX, CX, 47)
+<span id="L164" class="ln">   164</span>		ROUND3(CX, DX, BP, AX, BX, 48)
+<span id="L165" class="ln">   165</span>		ROUND3(BX, CX, DX, BP, AX, 49)
+<span id="L166" class="ln">   166</span>		ROUND3(AX, BX, CX, DX, BP, 50)
+<span id="L167" class="ln">   167</span>		ROUND3(BP, AX, BX, CX, DX, 51)
+<span id="L168" class="ln">   168</span>		ROUND3(DX, BP, AX, BX, CX, 52)
+<span id="L169" class="ln">   169</span>		ROUND3(CX, DX, BP, AX, BX, 53)
+<span id="L170" class="ln">   170</span>		ROUND3(BX, CX, DX, BP, AX, 54)
+<span id="L171" class="ln">   171</span>		ROUND3(AX, BX, CX, DX, BP, 55)
+<span id="L172" class="ln">   172</span>		ROUND3(BP, AX, BX, CX, DX, 56)
+<span id="L173" class="ln">   173</span>		ROUND3(DX, BP, AX, BX, CX, 57)
+<span id="L174" class="ln">   174</span>		ROUND3(CX, DX, BP, AX, BX, 58)
+<span id="L175" class="ln">   175</span>		ROUND3(BX, CX, DX, BP, AX, 59)
+<span id="L176" class="ln">   176</span>		
+<span id="L177" class="ln">   177</span>		ROUND4(AX, BX, CX, DX, BP, 60)
+<span id="L178" class="ln">   178</span>		ROUND4(BP, AX, BX, CX, DX, 61)
+<span id="L179" class="ln">   179</span>		ROUND4(DX, BP, AX, BX, CX, 62)
+<span id="L180" class="ln">   180</span>		ROUND4(CX, DX, BP, AX, BX, 63)
+<span id="L181" class="ln">   181</span>		ROUND4(BX, CX, DX, BP, AX, 64)
+<span id="L182" class="ln">   182</span>		ROUND4(AX, BX, CX, DX, BP, 65)
+<span id="L183" class="ln">   183</span>		ROUND4(BP, AX, BX, CX, DX, 66)
+<span id="L184" class="ln">   184</span>		ROUND4(DX, BP, AX, BX, CX, 67)
+<span id="L185" class="ln">   185</span>		ROUND4(CX, DX, BP, AX, BX, 68)
+<span id="L186" class="ln">   186</span>		ROUND4(BX, CX, DX, BP, AX, 69)
+<span id="L187" class="ln">   187</span>		ROUND4(AX, BX, CX, DX, BP, 70)
+<span id="L188" class="ln">   188</span>		ROUND4(BP, AX, BX, CX, DX, 71)
+<span id="L189" class="ln">   189</span>		ROUND4(DX, BP, AX, BX, CX, 72)
+<span id="L190" class="ln">   190</span>		ROUND4(CX, DX, BP, AX, BX, 73)
+<span id="L191" class="ln">   191</span>		ROUND4(BX, CX, DX, BP, AX, 74)
+<span id="L192" class="ln">   192</span>		ROUND4(AX, BX, CX, DX, BP, 75)
+<span id="L193" class="ln">   193</span>		ROUND4(BP, AX, BX, CX, DX, 76)
+<span id="L194" class="ln">   194</span>		ROUND4(DX, BP, AX, BX, CX, 77)
+<span id="L195" class="ln">   195</span>		ROUND4(CX, DX, BP, AX, BX, 78)
+<span id="L196" class="ln">   196</span>		ROUND4(BX, CX, DX, BP, AX, 79)
+<span id="L197" class="ln">   197</span>	#undef BP
+<span id="L198" class="ln">   198</span>	
+<span id="L199" class="ln">   199</span>		ADDL	(0*4)(R14), AX
+<span id="L200" class="ln">   200</span>		ADDL	(1*4)(R14), BX
+<span id="L201" class="ln">   201</span>		ADDL	(2*4)(R14), CX
+<span id="L202" class="ln">   202</span>		ADDL	(3*4)(R14), DX
+<span id="L203" class="ln">   203</span>		ADDL	(4*4)(R14), R13
+<span id="L204" class="ln">   204</span>	
+<span id="L205" class="ln">   205</span>		MOVL	AX, (0*4)(R14)
+<span id="L206" class="ln">   206</span>		MOVL	BX, (1*4)(R14)
+<span id="L207" class="ln">   207</span>		MOVL	CX, (2*4)(R14)
+<span id="L208" class="ln">   208</span>		MOVL	DX, (3*4)(R14)
+<span id="L209" class="ln">   209</span>		MOVL	R13, (4*4)(R14)
+<span id="L210" class="ln">   210</span>	
+<span id="L211" class="ln">   211</span>		ADDQ	$64, SI
+<span id="L212" class="ln">   212</span>		CMPQ	SI, DI
+<span id="L213" class="ln">   213</span>		JB	loop
+<span id="L214" class="ln">   214</span>	
+<span id="L215" class="ln">   215</span>	end:
+<span id="L216" class="ln">   216</span>		RET
+</pre><p><a href="sha1block_amd64p32.s%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

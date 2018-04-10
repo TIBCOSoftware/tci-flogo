@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/crypto/tls/handshake_messages_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="handshake_messages_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/crypto">crypto</a>/<a href="../tls.1.html">tls</a>/<span class="text-muted">handshake_messages_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/crypto/tls.1.html">crypto/tls</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package tls
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;math/rand&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;testing/quick&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>)
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>var tests = []interface{}{
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&amp;clientHelloMsg{},
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	&amp;serverHelloMsg{},
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	&amp;finishedMsg{},
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	&amp;certificateMsg{},
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	&amp;certificateRequestMsg{},
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	&amp;certificateVerifyMsg{},
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	&amp;certificateStatusMsg{},
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>	&amp;clientKeyExchangeMsg{},
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>	&amp;nextProtoMsg{},
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	&amp;newSessionTicketMsg{},
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	&amp;sessionState{},
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>}
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>type testMessage interface {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	marshal() []byte
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>	unmarshal([]byte) bool
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>	equal(interface{}) bool
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>}
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>func TestMarshalUnmarshal(t *testing.T) {
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	rand := rand.New(rand.NewSource(0))
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	for i, iface := range tests {
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>		ty := reflect.ValueOf(iface).Type()
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		n := 100
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		if testing.Short() {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>			n = 5
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>		}
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>		for j := 0; j &lt; n; j++ {
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>			v, ok := quick.Value(ty, rand)
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>			if !ok {
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>				t.Errorf(&#34;#%d: failed to create value&#34;, i)
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>				break
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>			}
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>			m1 := v.Interface().(testMessage)
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>			marshaled := m1.marshal()
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>			m2 := iface.(testMessage)
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>			if !m2.unmarshal(marshaled) {
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>				t.Errorf(&#34;#%d failed to unmarshal %#v %x&#34;, i, m1, marshaled)
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>				break
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>			}
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>			m2.marshal() <span class="comment">// to fill any marshal cache in the message</span>
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>			if !m1.equal(m2) {
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>				t.Errorf(&#34;#%d got:%#v want:%#v %x&#34;, i, m2, m1, marshaled)
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>				break
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>			}
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>			if i &gt;= 3 {
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>				<span class="comment">// The first three message types (ClientHello,</span>
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>				<span class="comment">// ServerHello and Finished) are allowed to</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>				<span class="comment">// have parsable prefixes because the extension</span>
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>				<span class="comment">// data is optional and the length of the</span>
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>				<span class="comment">// Finished varies across versions.</span>
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>				for j := 0; j &lt; len(marshaled); j++ {
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>					if m2.unmarshal(marshaled[0:j]) {
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>						t.Errorf(&#34;#%d unmarshaled a prefix of length %d of %#v&#34;, i, j, m1)
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>						break
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>					}
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>				}
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>			}
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>		}
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>	}
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>}
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>func TestFuzz(t *testing.T) {
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	rand := rand.New(rand.NewSource(0))
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	for _, iface := range tests {
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>		m := iface.(testMessage)
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>		for j := 0; j &lt; 1000; j++ {
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>			len := rand.Intn(100)
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>			bytes := randomBytes(len, rand)
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>			<span class="comment">// This just looks for crashes due to bounds errors etc.</span>
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>			m.unmarshal(bytes)
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>		}
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	}
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>}
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>func randomBytes(n int, rand *rand.Rand) []byte {
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	r := make([]byte, n)
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	for i := 0; i &lt; n; i++ {
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>		r[i] = byte(rand.Int31())
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>	}
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	return r
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>}
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>func randomString(n int, rand *rand.Rand) string {
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>	b := randomBytes(n, rand)
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	return string(b)
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>}
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>func (*clientHelloMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	m := &amp;clientHelloMsg{}
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	m.vers = uint16(rand.Intn(65536))
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>	m.random = randomBytes(32, rand)
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	m.sessionId = randomBytes(rand.Intn(32), rand)
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	m.cipherSuites = make([]uint16, rand.Intn(63)+1)
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(m.cipherSuites); i++ {
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>		m.cipherSuites[i] = uint16(rand.Int31())
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	}
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>	m.compressionMethods = randomBytes(rand.Intn(63)+1, rand)
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>		m.nextProtoNeg = true
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	}
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>		m.serverName = randomString(rand.Intn(255), rand)
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>		for strings.HasSuffix(m.serverName, &#34;.&#34;) {
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>			m.serverName = m.serverName[:len(m.serverName)-1]
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>		}
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>	}
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	m.ocspStapling = rand.Intn(10) &gt; 5
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	m.supportedPoints = randomBytes(rand.Intn(5)+1, rand)
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	m.supportedCurves = make([]CurveID, rand.Intn(5)+1)
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	for i := range m.supportedCurves {
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>		m.supportedCurves[i] = CurveID(rand.Intn(30000))
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>	}
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>		m.ticketSupported = true
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>		if rand.Intn(10) &gt; 5 {
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>			m.sessionTicket = randomBytes(rand.Intn(300), rand)
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>		}
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>	}
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>		m.signatureAndHashes = supportedSignatureAlgorithms
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	}
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	m.alpnProtocols = make([]string, rand.Intn(5))
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>	for i := range m.alpnProtocols {
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		m.alpnProtocols[i] = randomString(rand.Intn(20)+1, rand)
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	}
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		m.scts = true
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>	}
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>}
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>func (*serverHelloMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>	m := &amp;serverHelloMsg{}
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>	m.vers = uint16(rand.Intn(65536))
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>	m.random = randomBytes(32, rand)
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	m.sessionId = randomBytes(rand.Intn(32), rand)
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	m.cipherSuite = uint16(rand.Int31())
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	m.compressionMethod = uint8(rand.Intn(256))
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>		m.nextProtoNeg = true
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>		n := rand.Intn(10)
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>		m.nextProtos = make([]string, n)
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>		for i := 0; i &lt; n; i++ {
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>			m.nextProtos[i] = randomString(20, rand)
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		}
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	}
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		m.ocspStapling = true
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>	}
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		m.ticketSupported = true
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	}
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	m.alpnProtocol = randomString(rand.Intn(32)+1, rand)
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>		numSCTs := rand.Intn(4)
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		m.scts = make([][]byte, numSCTs)
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		for i := range m.scts {
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>			m.scts[i] = randomBytes(rand.Intn(500), rand)
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>		}
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	}
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>}
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>func (*certificateMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	m := &amp;certificateMsg{}
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	numCerts := rand.Intn(20)
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>	m.certificates = make([][]byte, numCerts)
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>	for i := 0; i &lt; numCerts; i++ {
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>		m.certificates[i] = randomBytes(rand.Intn(10)+1, rand)
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	}
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>}
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>func (*certificateRequestMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	m := &amp;certificateRequestMsg{}
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>	m.certificateTypes = randomBytes(rand.Intn(5)+1, rand)
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	numCAs := rand.Intn(100)
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>	m.certificateAuthorities = make([][]byte, numCAs)
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>	for i := 0; i &lt; numCAs; i++ {
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		m.certificateAuthorities[i] = randomBytes(rand.Intn(15)+1, rand)
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	}
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>}
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>func (*certificateVerifyMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>	m := &amp;certificateVerifyMsg{}
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>	m.signature = randomBytes(rand.Intn(15)+1, rand)
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>}
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>func (*certificateStatusMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>	m := &amp;certificateStatusMsg{}
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	if rand.Intn(10) &gt; 5 {
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>		m.statusType = statusTypeOCSP
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>		m.response = randomBytes(rand.Intn(10)+1, rand)
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>	} else {
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>		m.statusType = 42
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>	}
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>}
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>func (*clientKeyExchangeMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	m := &amp;clientKeyExchangeMsg{}
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	m.ciphertext = randomBytes(rand.Intn(1000)+1, rand)
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>}
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>func (*finishedMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	m := &amp;finishedMsg{}
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>	m.verifyData = randomBytes(12, rand)
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>}
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>func (*nextProtoMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>	m := &amp;nextProtoMsg{}
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>	m.proto = randomString(rand.Intn(255), rand)
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>}
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>func (*newSessionTicketMsg) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	m := &amp;newSessionTicketMsg{}
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	m.ticket = randomBytes(rand.Intn(4), rand)
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	return reflect.ValueOf(m)
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>}
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>func (*sessionState) Generate(rand *rand.Rand, size int) reflect.Value {
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>	s := &amp;sessionState{}
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	s.vers = uint16(rand.Intn(10000))
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	s.cipherSuite = uint16(rand.Intn(10000))
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>	s.masterSecret = randomBytes(rand.Intn(100), rand)
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>	numCerts := rand.Intn(20)
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	s.certificates = make([][]byte, numCerts)
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>	for i := 0; i &lt; numCerts; i++ {
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>		s.certificates[i] = randomBytes(rand.Intn(10)+1, rand)
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>	}
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>	return reflect.ValueOf(s)
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>}
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>func TestRejectEmptySCTList(t *testing.T) {
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>	<span class="comment">// https://tools.ietf.org/html/rfc6962#section-3.3.1 specifies that</span>
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>	<span class="comment">// empty SCT lists are invalid.</span>
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	var random [32]byte
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	sct := []byte{0x42, 0x42, 0x42, 0x42}
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>	serverHello := serverHelloMsg{
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		vers:   VersionTLS12,
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>		random: random[:],
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>		scts:   [][]byte{sct},
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>	}
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>	serverHelloBytes := serverHello.marshal()
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	var serverHelloCopy serverHelloMsg
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>	if !serverHelloCopy.unmarshal(serverHelloBytes) {
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>		t.Fatal(&#34;Failed to unmarshal initial message&#34;)
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	}
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>	<span class="comment">// Change serverHelloBytes so that the SCT list is empty</span>
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>	i := bytes.Index(serverHelloBytes, sct)
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>	if i &lt; 0 {
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>		t.Fatal(&#34;Cannot find SCT in ServerHello&#34;)
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>	}
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	var serverHelloEmptySCT []byte
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	serverHelloEmptySCT = append(serverHelloEmptySCT, serverHelloBytes[:i-6]...)
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	<span class="comment">// Append the extension length and SCT list length for an empty list.</span>
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	serverHelloEmptySCT = append(serverHelloEmptySCT, []byte{0, 2, 0, 0}...)
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	serverHelloEmptySCT = append(serverHelloEmptySCT, serverHelloBytes[i+4:]...)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	<span class="comment">// Update the handshake message length.</span>
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>	serverHelloEmptySCT[1] = byte((len(serverHelloEmptySCT) - 4) &gt;&gt; 16)
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>	serverHelloEmptySCT[2] = byte((len(serverHelloEmptySCT) - 4) &gt;&gt; 8)
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	serverHelloEmptySCT[3] = byte(len(serverHelloEmptySCT) - 4)
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	<span class="comment">// Update the extensions length</span>
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>	serverHelloEmptySCT[42] = byte((len(serverHelloEmptySCT) - 44) &gt;&gt; 8)
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>	serverHelloEmptySCT[43] = byte((len(serverHelloEmptySCT) - 44))
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>	if serverHelloCopy.unmarshal(serverHelloEmptySCT) {
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>		t.Fatal(&#34;Unmarshaled ServerHello with empty SCT list&#34;)
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	}
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>}
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>func TestRejectEmptySCT(t *testing.T) {
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	<span class="comment">// Not only must the SCT list be non-empty, but the SCT elements must</span>
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>	<span class="comment">// not be zero length.</span>
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>	var random [32]byte
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>	serverHello := serverHelloMsg{
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>		vers:   VersionTLS12,
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>		random: random[:],
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>		scts:   [][]byte{nil},
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>	}
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>	serverHelloBytes := serverHello.marshal()
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>	var serverHelloCopy serverHelloMsg
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>	if serverHelloCopy.unmarshal(serverHelloBytes) {
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>		t.Fatal(&#34;Unmarshaled ServerHello with zero-length SCT&#34;)
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>	}
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>}
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>
+</pre><p><a href="handshake_messages_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

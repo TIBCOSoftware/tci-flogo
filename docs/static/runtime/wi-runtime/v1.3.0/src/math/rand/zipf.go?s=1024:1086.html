@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/rand/zipf.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="./zipf.go%3Fs=1024:1086.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../rand.1.html">rand</a>/<span class="text-muted">zipf.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/rand.1.html">math/rand</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span><span class="comment">// W.Hormann, G.Derflinger:</span>
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span><span class="comment">// &#34;Rejection-Inversion to Generate Variates</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span><span class="comment">// from Monotone Discrete Distributions&#34;</span>
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span><span class="comment">// http://eeyore.wu-wien.ac.at/papers/96-04-04.wh-der.ps.gz</span>
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>package rand
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>import &#34;math&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span><span class="comment">// A Zipf generates Zipf distributed variates.</span>
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>type Zipf struct {
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	r            *Rand
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	imax         float64
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>	v            float64
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>	q            float64
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	s            float64
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	oneminusQ    float64
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	oneminusQinv float64
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	hxm          float64
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	hx0minusHxm  float64
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>}
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>func (z *Zipf) h(x float64) float64 {
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	return math.Exp(z.oneminusQ*math.Log(z.v+x)) * z.oneminusQinv
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>}
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>func (z *Zipf) hinv(x float64) float64 {
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	return math.Exp(z.oneminusQinv*math.Log(z.oneminusQ*x)) - z.v
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span><span class="comment">// NewZipf returns a Zipf variate generator.</span>
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span><span class="comment">// The generator generates values k ∈ [0, imax]</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span><span class="comment">// such that P(k) is proportional to (v + k) ** (-s).</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span><span class="comment">// Requirements: s &gt; 1 and v &gt;= 1.</span>
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span><span class="selection">func NewZipf(r *Rand, s float64, v float64, imax uint64) *Zipf</span> {
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	z := new(Zipf)
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	if s &lt;= 1.0 || v &lt; 1 {
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>		return nil
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	}
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	z.r = r
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	z.imax = float64(imax)
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	z.v = v
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	z.q = s
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	z.oneminusQ = 1.0 - z.q
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>	z.oneminusQinv = 1.0 / z.oneminusQ
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>	z.hxm = z.h(z.imax + 0.5)
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>	z.hx0minusHxm = z.h(0.5) - math.Exp(math.Log(z.v)*(-z.q)) - z.hxm
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>	z.s = 1 - z.hinv(z.h(1.5)-math.Exp(-z.q*math.Log(z.v+1.0)))
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>	return z
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>}
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span><span class="comment">// Uint64 returns a value drawn from the Zipf distribution described</span>
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span><span class="comment">// by the Zipf object.</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>func (z *Zipf) Uint64() uint64 {
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>	if z == nil {
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>		panic(&#34;rand: nil Zipf&#34;)
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>	}
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>	k := 0.0
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>	for {
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>		r := z.r.Float64() <span class="comment">// r on [0,1]</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		ur := z.hxm + r*z.hx0minusHxm
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>		x := z.hinv(ur)
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		k = math.Floor(x + 0.5)
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>		if k-x &lt;= z.s {
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>			break
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>		}
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>		if ur &gt;= z.h(k+0.5)-math.Exp(-math.Log(k+z.v)*z.q) {
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>			break
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>		}
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>	}
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>	return uint64(k)
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>}
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>
+</pre><p><a href="zipf.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

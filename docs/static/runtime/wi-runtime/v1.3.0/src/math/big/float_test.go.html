@@ -1,0 +1,1924 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/math/big/float_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="float_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/math">math</a>/<a href="../big.1.html">big</a>/<span class="text-muted">float_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/math/big.1.html">math/big</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2014 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package big
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;flag&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;math&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;strconv&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>)
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// Verify that ErrNaN implements the error interface.</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>var _ error = ErrNaN{}
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>func (x *Float) uint64() uint64 {
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>	u, acc := x.Uint64()
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	if acc != Exact {
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>		panic(fmt.Sprintf(&#34;%s is not a uint64&#34;, x.Text(&#39;g&#39;, 10)))
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	}
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>	return u
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>}
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>func (x *Float) int64() int64 {
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	i, acc := x.Int64()
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>	if acc != Exact {
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>		panic(fmt.Sprintf(&#34;%s is not an int64&#34;, x.Text(&#39;g&#39;, 10)))
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>	}
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>	return i
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>}
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>func TestFloatZeroValue(t *testing.T) {
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	<span class="comment">// zero (uninitialized) value is a ready-to-use 0.0</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	var x Float
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	if s := x.Text(&#39;f&#39;, 1); s != &#34;0.0&#34; {
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>		t.Errorf(&#34;zero value = %s; want 0.0&#34;, s)
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>	}
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	<span class="comment">// zero value has precision 0</span>
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>	if prec := x.Prec(); prec != 0 {
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		t.Errorf(&#34;prec = %d; want 0&#34;, prec)
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	}
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	<span class="comment">// zero value can be used in any and all positions of binary operations</span>
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>	make := func(x int) *Float {
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>		var f Float
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>		if x != 0 {
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>			f.SetInt64(int64(x))
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>		}
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>		<span class="comment">// x == 0 translates into the zero value</span>
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>		return &amp;f
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>	}
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>		z, x, y, want int
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>		opname        rune
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		op            func(z, x, y *Float) *Float
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>	}{
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>		{0, 0, 0, 0, &#39;+&#39;, (*Float).Add},
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>		{0, 1, 2, 3, &#39;+&#39;, (*Float).Add},
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>		{1, 2, 0, 2, &#39;+&#39;, (*Float).Add},
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>		{2, 0, 1, 1, &#39;+&#39;, (*Float).Add},
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		{0, 0, 0, 0, &#39;-&#39;, (*Float).Sub},
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>		{0, 1, 2, -1, &#39;-&#39;, (*Float).Sub},
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>		{1, 2, 0, 2, &#39;-&#39;, (*Float).Sub},
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>		{2, 0, 1, -1, &#39;-&#39;, (*Float).Sub},
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>		{0, 0, 0, 0, &#39;*&#39;, (*Float).Mul},
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>		{0, 1, 2, 2, &#39;*&#39;, (*Float).Mul},
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>		{1, 2, 0, 0, &#39;*&#39;, (*Float).Mul},
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>		{2, 0, 1, 0, &#39;*&#39;, (*Float).Mul},
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>		<span class="comment">// {0, 0, 0, 0, &#39;/&#39;, (*Float).Quo}, // panics</span>
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>		{0, 2, 1, 2, &#39;/&#39;, (*Float).Quo},
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>		{1, 2, 0, 0, &#39;/&#39;, (*Float).Quo}, <span class="comment">// = +Inf</span>
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		{2, 0, 1, 0, &#39;/&#39;, (*Float).Quo},
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	} {
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>		z := make(test.z)
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		test.op(z, make(test.x), make(test.y))
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>		got := 0
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>		if !z.IsInf() {
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>			got = int(z.int64())
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>		}
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>		if got != test.want {
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d %c %d = %d; want %d&#34;, test.x, test.opname, test.y, got, test.want)
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>		}
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>	}
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri) test how precision is set for zero value results</span>
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>}
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>func makeFloat(s string) *Float {
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>	x, _, err := ParseFloat(s, 0, 1000, ToNearestEven)
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>		panic(err)
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>	}
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	return x
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>}
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>func TestFloatSetPrec(t *testing.T) {
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>		x    string
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>		prec uint
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>		want string
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>		acc  Accuracy
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>	}{
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		<span class="comment">// prec 0</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>		{&#34;0&#34;, 0, &#34;0&#34;, Exact},
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>		{&#34;-0&#34;, 0, &#34;-0&#34;, Exact},
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, 0, &#34;-Inf&#34;, Exact},
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, 0, &#34;+Inf&#34;, Exact},
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>		{&#34;123&#34;, 0, &#34;0&#34;, Below},
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>		{&#34;-123&#34;, 0, &#34;-0&#34;, Above},
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>		<span class="comment">// prec at upper limit</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>		{&#34;0&#34;, MaxPrec, &#34;0&#34;, Exact},
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>		{&#34;-0&#34;, MaxPrec, &#34;-0&#34;, Exact},
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, MaxPrec, &#34;-Inf&#34;, Exact},
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, MaxPrec, &#34;+Inf&#34;, Exact},
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>		<span class="comment">// just a few regular cases - general rounding is tested elsewhere</span>
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>		{&#34;1.5&#34;, 1, &#34;2&#34;, Above},
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>		{&#34;-1.5&#34;, 1, &#34;-2&#34;, Below},
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>		{&#34;123&#34;, 1e6, &#34;123&#34;, Exact},
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>		{&#34;-123&#34;, 1e6, &#34;-123&#34;, Exact},
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	} {
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>		x := makeFloat(test.x).SetPrec(test.prec)
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>		prec := test.prec
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>		if prec &gt; MaxPrec {
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>			prec = MaxPrec
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>		}
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>		if got := x.Prec(); got != prec {
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s.SetPrec(%d).Prec() == %d; want %d&#34;, test.x, test.prec, got, prec)
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>		}
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>		if got, acc := x.String(), x.Acc(); got != test.want || acc != test.acc {
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s.SetPrec(%d) = %s (%s); want %s (%s)&#34;, test.x, test.prec, got, acc, test.want, test.acc)
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>		}
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>	}
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>}
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>func TestFloatMinPrec(t *testing.T) {
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	const max = 100
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>		x    string
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		want uint
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>	}{
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>		{&#34;0&#34;, 0},
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		{&#34;-0&#34;, 0},
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, 0},
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, 0},
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>		{&#34;1&#34;, 1},
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>		{&#34;2&#34;, 1},
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>		{&#34;3&#34;, 2},
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>		{&#34;0x8001&#34;, 16},
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>		{&#34;0x8001p-1000&#34;, 16},
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		{&#34;0x8001p+1000&#34;, 16},
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		{&#34;0.1&#34;, max},
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>	} {
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>		x := makeFloat(test.x).SetPrec(max)
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		if got := x.MinPrec(); got != test.want {
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s.MinPrec() = %d; want %d&#34;, test.x, got, test.want)
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>		}
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	}
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>}
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>func TestFloatSign(t *testing.T) {
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>		x string
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		s int
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	}{
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, -1},
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		{&#34;-1&#34;, -1},
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>		{&#34;-0&#34;, 0},
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		{&#34;+0&#34;, 0},
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>		{&#34;+1&#34;, +1},
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, +1},
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	} {
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		x := makeFloat(test.x)
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>		s := x.Sign()
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>		if s != test.s {
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s.Sign() = %d; want %d&#34;, test.x, s, test.s)
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>		}
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>	}
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>}
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span><span class="comment">// alike(x, y) is like x.Cmp(y) == 0 but also considers the sign of 0 (0 != -0).</span>
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>func alike(x, y *Float) bool {
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>	return x.Cmp(y) == 0 &amp;&amp; x.Signbit() == y.Signbit()
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>}
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>func alike32(x, y float32) bool {
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>	<span class="comment">// we can ignore NaNs</span>
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>	return x == y &amp;&amp; math.Signbit(float64(x)) == math.Signbit(float64(y))
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>}
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>func alike64(x, y float64) bool {
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	<span class="comment">// we can ignore NaNs</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	return x == y &amp;&amp; math.Signbit(x) == math.Signbit(y)
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>}
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>func TestFloatMantExp(t *testing.T) {
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>		x    string
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>		mant string
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		exp  int
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	}{
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>		{&#34;0&#34;, &#34;0&#34;, 0},
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>		{&#34;+0&#34;, &#34;0&#34;, 0},
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>		{&#34;-0&#34;, &#34;-0&#34;, 0},
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>		{&#34;Inf&#34;, &#34;+Inf&#34;, 0},
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, &#34;+Inf&#34;, 0},
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, &#34;-Inf&#34;, 0},
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>		{&#34;1.5&#34;, &#34;0.75&#34;, 1},
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		{&#34;1.024e3&#34;, &#34;0.5&#34;, 11},
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>		{&#34;-0.125&#34;, &#34;-0.5&#34;, -2},
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	} {
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>		x := makeFloat(test.x)
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		mant := makeFloat(test.mant)
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>		m := new(Float)
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>		e := x.MantExp(m)
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>		if !alike(m, mant) || e != test.exp {
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s.MantExp() = %s, %d; want %s, %d&#34;, test.x, m.Text(&#39;g&#39;, 10), e, test.mant, test.exp)
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>		}
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>	}
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>}
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>func TestFloatMantExpAliasing(t *testing.T) {
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>	x := makeFloat(&#34;0.5p10&#34;)
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>	if e := x.MantExp(x); e != 10 {
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Float.MantExp aliasing error: got %d; want 10&#34;, e)
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	}
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>	if want := makeFloat(&#34;0.5&#34;); !alike(x, want) {
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Float.MantExp aliasing error: got %s; want %s&#34;, x.Text(&#39;g&#39;, 10), want.Text(&#39;g&#39;, 10))
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	}
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>}
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>func TestFloatSetMantExp(t *testing.T) {
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>		frac string
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>		exp  int
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>		z    string
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>	}{
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>		{&#34;0&#34;, 0, &#34;0&#34;},
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		{&#34;+0&#34;, 0, &#34;0&#34;},
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>		{&#34;-0&#34;, 0, &#34;-0&#34;},
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>		{&#34;Inf&#34;, 1234, &#34;+Inf&#34;},
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, -1234, &#34;+Inf&#34;},
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, -1234, &#34;-Inf&#34;},
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>		{&#34;0&#34;, MinExp, &#34;0&#34;},
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>		{&#34;0.25&#34;, MinExp, &#34;+0&#34;},    <span class="comment">// exponent underflow</span>
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>		{&#34;-0.25&#34;, MinExp, &#34;-0&#34;},   <span class="comment">// exponent underflow</span>
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>		{&#34;1&#34;, MaxExp, &#34;+Inf&#34;},     <span class="comment">// exponent overflow</span>
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>		{&#34;2&#34;, MaxExp - 1, &#34;+Inf&#34;}, <span class="comment">// exponent overflow</span>
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>		{&#34;0.75&#34;, 1, &#34;1.5&#34;},
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>		{&#34;0.5&#34;, 11, &#34;1024&#34;},
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>		{&#34;-0.5&#34;, -2, &#34;-0.125&#34;},
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>		{&#34;32&#34;, 5, &#34;1024&#34;},
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>		{&#34;1024&#34;, -10, &#34;1&#34;},
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>	} {
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>		frac := makeFloat(test.frac)
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>		want := makeFloat(test.z)
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>		var z Float
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>		z.SetMantExp(frac, test.exp)
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>		if !alike(&amp;z, want) {
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>			t.Errorf(&#34;SetMantExp(%s, %d) = %s; want %s&#34;, test.frac, test.exp, z.Text(&#39;g&#39;, 10), test.z)
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		}
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>		<span class="comment">// test inverse property</span>
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>		mant := new(Float)
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>		if z.SetMantExp(mant, want.MantExp(mant)).Cmp(want) != 0 {
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>			t.Errorf(&#34;Inverse property not satisfied: got %s; want %s&#34;, z.Text(&#39;g&#39;, 10), test.z)
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		}
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>	}
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>}
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>func TestFloatPredicates(t *testing.T) {
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>		x            string
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		sign         int
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>		signbit, inf bool
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	}{
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>		{x: &#34;-Inf&#34;, sign: -1, signbit: true, inf: true},
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		{x: &#34;-1&#34;, sign: -1, signbit: true},
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>		{x: &#34;-0&#34;, signbit: true},
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>		{x: &#34;0&#34;},
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>		{x: &#34;1&#34;, sign: 1},
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>		{x: &#34;+Inf&#34;, sign: 1, inf: true},
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>	} {
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>		x := makeFloat(test.x)
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>		if got := x.Signbit(); got != test.signbit {
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>			t.Errorf(&#34;(%s).Signbit() = %v; want %v&#34;, test.x, got, test.signbit)
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>		}
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		if got := x.Sign(); got != test.sign {
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>			t.Errorf(&#34;(%s).Sign() = %d; want %d&#34;, test.x, got, test.sign)
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>		}
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		if got := x.IsInf(); got != test.inf {
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>			t.Errorf(&#34;(%s).IsInf() = %v; want %v&#34;, test.x, got, test.inf)
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>		}
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	}
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>}
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>func TestFloatIsInt(t *testing.T) {
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>	for _, test := range []string{
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>		&#34;0 int&#34;,
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>		&#34;-0 int&#34;,
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>		&#34;1 int&#34;,
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>		&#34;-1 int&#34;,
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>		&#34;0.5&#34;,
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		&#34;1.23&#34;,
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		&#34;1.23e1&#34;,
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>		&#34;1.23e2 int&#34;,
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>		&#34;0.000000001e+8&#34;,
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>		&#34;0.000000001e+9 int&#34;,
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		&#34;1.2345e200 int&#34;,
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>		&#34;Inf&#34;,
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>		&#34;+Inf&#34;,
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>		&#34;-Inf&#34;,
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>	} {
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>		s := strings.TrimSuffix(test, &#34; int&#34;)
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>		want := s != test
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>		if got := makeFloat(s).IsInt(); got != want {
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s.IsInt() == %t&#34;, s, got)
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>		}
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>	}
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>}
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>func fromBinary(s string) int64 {
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	x, err := strconv.ParseInt(s, 2, 64)
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>		panic(err)
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	}
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>	return x
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>}
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>func toBinary(x int64) string {
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	return strconv.FormatInt(x, 2)
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>}
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>func testFloatRound(t *testing.T, x, r int64, prec uint, mode RoundingMode) {
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>	<span class="comment">// verify test data</span>
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>	var ok bool
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>	switch mode {
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>	case ToNearestEven, ToNearestAway:
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>		ok = true <span class="comment">// nothing to do for now</span>
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>	case ToZero:
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>		if x &lt; 0 {
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>			ok = r &gt;= x
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>		} else {
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>			ok = r &lt;= x
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>		}
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>	case AwayFromZero:
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>		if x &lt; 0 {
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>			ok = r &lt;= x
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>		} else {
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>			ok = r &gt;= x
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>		}
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	case ToNegativeInf:
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>		ok = r &lt;= x
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>	case ToPositiveInf:
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>		ok = r &gt;= x
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	default:
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>		panic(&#34;unreachable&#34;)
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>	}
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>	if !ok {
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>		t.Fatalf(&#34;incorrect test data for prec = %d, %s: x = %s, r = %s&#34;, prec, mode, toBinary(x), toBinary(r))
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	}
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	<span class="comment">// compute expected accuracy</span>
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>	a := Exact
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	switch {
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>	case r &lt; x:
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>		a = Below
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>	case r &gt; x:
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>		a = Above
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>	}
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>	<span class="comment">// round</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	f := new(Float).SetMode(mode).SetInt64(x).SetPrec(prec)
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>	<span class="comment">// check result</span>
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>	r1 := f.int64()
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>	p1 := f.Prec()
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>	a1 := f.Acc()
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>	if r1 != r || p1 != prec || a1 != a {
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>		t.Errorf(&#34;round %s (%d bits, %s) incorrect: got %s (%d bits, %s); want %s (%d bits, %s)&#34;,
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>			toBinary(x), prec, mode,
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>			toBinary(r1), p1, a1,
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>			toBinary(r), prec, a)
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>		return
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>	}
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>	<span class="comment">// g and f should be the same</span>
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>	<span class="comment">// (rounding by SetPrec after SetInt64 using default precision</span>
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>	<span class="comment">// should be the same as rounding by SetInt64 after setting the</span>
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>	<span class="comment">// precision)</span>
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	g := new(Float).SetMode(mode).SetPrec(prec).SetInt64(x)
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>	if !alike(g, f) {
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>		t.Errorf(&#34;round %s (%d bits, %s) not symmetric: got %s and %s; want %s&#34;,
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>			toBinary(x), prec, mode,
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>			toBinary(g.int64()),
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>			toBinary(r1),
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>			toBinary(r),
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>		)
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>		return
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>	}
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>	<span class="comment">// h and f should be the same</span>
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	<span class="comment">// (repeated rounding should be idempotent)</span>
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>	h := new(Float).SetMode(mode).SetPrec(prec).Set(f)
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>	if !alike(h, f) {
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		t.Errorf(&#34;round %s (%d bits, %s) not idempotent: got %s and %s; want %s&#34;,
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>			toBinary(x), prec, mode,
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>			toBinary(h.int64()),
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>			toBinary(r1),
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>			toBinary(r),
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>		)
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>		return
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	}
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>}
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span><span class="comment">// TestFloatRound tests basic rounding.</span>
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>func TestFloatRound(t *testing.T) {
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>		prec                        uint
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>		x, zero, neven, naway, away string <span class="comment">// input, results rounded to prec bits</span>
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>	}{
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>		{5, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;},
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>		{5, &#34;1001&#34;, &#34;1001&#34;, &#34;1001&#34;, &#34;1001&#34;, &#34;1001&#34;},
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>		{5, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;},
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>		{5, &#34;1011&#34;, &#34;1011&#34;, &#34;1011&#34;, &#34;1011&#34;, &#34;1011&#34;},
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>		{5, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;},
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>		{5, &#34;1101&#34;, &#34;1101&#34;, &#34;1101&#34;, &#34;1101&#34;, &#34;1101&#34;},
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>		{5, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;},
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>		{5, &#34;1111&#34;, &#34;1111&#34;, &#34;1111&#34;, &#34;1111&#34;, &#34;1111&#34;},
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>		{4, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;},
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>		{4, &#34;1001&#34;, &#34;1001&#34;, &#34;1001&#34;, &#34;1001&#34;, &#34;1001&#34;},
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		{4, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;},
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>		{4, &#34;1011&#34;, &#34;1011&#34;, &#34;1011&#34;, &#34;1011&#34;, &#34;1011&#34;},
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>		{4, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;},
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>		{4, &#34;1101&#34;, &#34;1101&#34;, &#34;1101&#34;, &#34;1101&#34;, &#34;1101&#34;},
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>		{4, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;},
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>		{4, &#34;1111&#34;, &#34;1111&#34;, &#34;1111&#34;, &#34;1111&#34;, &#34;1111&#34;},
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>		{3, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;},
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>		{3, &#34;1001&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1010&#34;, &#34;1010&#34;},
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>		{3, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;, &#34;1010&#34;},
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>		{3, &#34;1011&#34;, &#34;1010&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;},
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>		{3, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;},
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>		{3, &#34;1101&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1110&#34;, &#34;1110&#34;},
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>		{3, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;, &#34;1110&#34;},
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>		{3, &#34;1111&#34;, &#34;1110&#34;, &#34;10000&#34;, &#34;10000&#34;, &#34;10000&#34;},
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>		{3, &#34;1000001&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1010000&#34;},
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>		{3, &#34;1001001&#34;, &#34;1000000&#34;, &#34;1010000&#34;, &#34;1010000&#34;, &#34;1010000&#34;},
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>		{3, &#34;1010001&#34;, &#34;1010000&#34;, &#34;1010000&#34;, &#34;1010000&#34;, &#34;1100000&#34;},
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>		{3, &#34;1011001&#34;, &#34;1010000&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;1100000&#34;},
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>		{3, &#34;1100001&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;1110000&#34;},
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>		{3, &#34;1101001&#34;, &#34;1100000&#34;, &#34;1110000&#34;, &#34;1110000&#34;, &#34;1110000&#34;},
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>		{3, &#34;1110001&#34;, &#34;1110000&#34;, &#34;1110000&#34;, &#34;1110000&#34;, &#34;10000000&#34;},
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>		{3, &#34;1111001&#34;, &#34;1110000&#34;, &#34;10000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;},
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>		{2, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;},
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>		{2, &#34;1001&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1100&#34;},
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>		{2, &#34;1010&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1100&#34;, &#34;1100&#34;},
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>		{2, &#34;1011&#34;, &#34;1000&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;},
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>		{2, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;},
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>		{2, &#34;1101&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;1100&#34;, &#34;10000&#34;},
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>		{2, &#34;1110&#34;, &#34;1100&#34;, &#34;10000&#34;, &#34;10000&#34;, &#34;10000&#34;},
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>		{2, &#34;1111&#34;, &#34;1100&#34;, &#34;10000&#34;, &#34;10000&#34;, &#34;10000&#34;},
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>		{2, &#34;1000001&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1100000&#34;},
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>		{2, &#34;1001001&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1100000&#34;},
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>		{2, &#34;1010001&#34;, &#34;1000000&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;1100000&#34;},
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>		{2, &#34;1011001&#34;, &#34;1000000&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;1100000&#34;},
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>		{2, &#34;1100001&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;10000000&#34;},
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		{2, &#34;1101001&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;1100000&#34;, &#34;10000000&#34;},
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>		{2, &#34;1110001&#34;, &#34;1100000&#34;, &#34;10000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;},
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>		{2, &#34;1111001&#34;, &#34;1100000&#34;, &#34;10000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;},
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>		{1, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;},
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		{1, &#34;1001&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;10000&#34;},
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>		{1, &#34;1010&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;10000&#34;},
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>		{1, &#34;1011&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;1000&#34;, &#34;10000&#34;},
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>		{1, &#34;1100&#34;, &#34;1000&#34;, &#34;10000&#34;, &#34;10000&#34;, &#34;10000&#34;},
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>		{1, &#34;1101&#34;, &#34;1000&#34;, &#34;10000&#34;, &#34;10000&#34;, &#34;10000&#34;},
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>		{1, &#34;1110&#34;, &#34;1000&#34;, &#34;10000&#34;, &#34;10000&#34;, &#34;10000&#34;},
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>		{1, &#34;1111&#34;, &#34;1000&#34;, &#34;10000&#34;, &#34;10000&#34;, &#34;10000&#34;},
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>		{1, &#34;1000001&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;10000000&#34;},
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>		{1, &#34;1001001&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;10000000&#34;},
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>		{1, &#34;1010001&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;10000000&#34;},
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>		{1, &#34;1011001&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;1000000&#34;, &#34;10000000&#34;},
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>		{1, &#34;1100001&#34;, &#34;1000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;},
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>		{1, &#34;1101001&#34;, &#34;1000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;},
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>		{1, &#34;1110001&#34;, &#34;1000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;},
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>		{1, &#34;1111001&#34;, &#34;1000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;, &#34;10000000&#34;},
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>	} {
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>		x := fromBinary(test.x)
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>		z := fromBinary(test.zero)
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>		e := fromBinary(test.neven)
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>		n := fromBinary(test.naway)
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>		a := fromBinary(test.away)
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>		prec := test.prec
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>		testFloatRound(t, x, z, prec, ToZero)
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>		testFloatRound(t, x, e, prec, ToNearestEven)
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>		testFloatRound(t, x, n, prec, ToNearestAway)
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>		testFloatRound(t, x, a, prec, AwayFromZero)
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>		testFloatRound(t, x, z, prec, ToNegativeInf)
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>		testFloatRound(t, x, a, prec, ToPositiveInf)
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>		testFloatRound(t, -x, -a, prec, ToNegativeInf)
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>		testFloatRound(t, -x, -z, prec, ToPositiveInf)
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>	}
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>}
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span><span class="comment">// TestFloatRound24 tests that rounding a float64 to 24 bits</span>
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span><span class="comment">// matches IEEE-754 rounding to nearest when converting a</span>
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span><span class="comment">// float64 to a float32 (excluding denormal numbers).</span>
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>func TestFloatRound24(t *testing.T) {
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>	const x0 = 1&lt;&lt;26 - 0x10 <span class="comment">// 11...110000 (26 bits)</span>
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>	for d := 0; d &lt;= 0x10; d++ {
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		x := float64(x0 + d)
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>		f := new(Float).SetPrec(24).SetFloat64(x)
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>		got, _ := f.Float32()
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>		want := float32(x)
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>		if got != want {
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>			t.Errorf(&#34;Round(%g, 24) = %g; want %g&#34;, x, got, want)
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>		}
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>	}
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>}
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>func TestFloatSetUint64(t *testing.T) {
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	for _, want := range []uint64{
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>		0,
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		1,
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>		2,
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>		10,
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>		100,
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>		1&lt;&lt;32 - 1,
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>		1 &lt;&lt; 32,
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>		1&lt;&lt;64 - 1,
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>	} {
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>		var f Float
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>		f.SetUint64(want)
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>		if got := f.uint64(); got != want {
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %#x (%s); want %#x&#34;, got, f.Text(&#39;p&#39;, 0), want)
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>		}
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>	}
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>	<span class="comment">// test basic rounding behavior (exhaustive rounding testing is done elsewhere)</span>
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>	const x uint64 = 0x8765432187654321 <span class="comment">// 64 bits needed</span>
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>	for prec := uint(1); prec &lt;= 64; prec++ {
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>		f := new(Float).SetPrec(prec).SetMode(ToZero).SetUint64(x)
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>		got := f.uint64()
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>		want := x &amp;^ (1&lt;&lt;(64-prec) - 1) <span class="comment">// cut off (round to zero) low 64-prec bits</span>
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>		if got != want {
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %#x (%s); want %#x&#34;, got, f.Text(&#39;p&#39;, 0), want)
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>		}
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>	}
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>}
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>func TestFloatSetInt64(t *testing.T) {
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>	for _, want := range []int64{
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>		0,
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>		1,
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span>		2,
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>		10,
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>		100,
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>		1&lt;&lt;32 - 1,
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>		1 &lt;&lt; 32,
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>		1&lt;&lt;63 - 1,
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>	} {
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>		for i := range [2]int{} {
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>			if i&amp;1 != 0 {
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>				want = -want
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>			}
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>			var f Float
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>			f.SetInt64(want)
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>			if got := f.int64(); got != want {
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>				t.Errorf(&#34;got %#x (%s); want %#x&#34;, got, f.Text(&#39;p&#39;, 0), want)
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>			}
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>		}
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>	}
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>	<span class="comment">// test basic rounding behavior (exhaustive rounding testing is done elsewhere)</span>
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>	const x int64 = 0x7654321076543210 <span class="comment">// 63 bits needed</span>
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>	for prec := uint(1); prec &lt;= 63; prec++ {
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>		f := new(Float).SetPrec(prec).SetMode(ToZero).SetInt64(x)
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>		got := f.int64()
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>		want := x &amp;^ (1&lt;&lt;(63-prec) - 1) <span class="comment">// cut off (round to zero) low 63-prec bits</span>
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>		if got != want {
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %#x (%s); want %#x&#34;, got, f.Text(&#39;p&#39;, 0), want)
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>		}
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>	}
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>}
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>func TestFloatSetFloat64(t *testing.T) {
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>	for _, want := range []float64{
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>		0,
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>		1,
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>		2,
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>		12345,
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>		1e10,
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>		1e100,
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>		3.14159265e10,
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>		2.718281828e-123,
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>		1.0 / 3,
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>		math.MaxFloat32,
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>		math.MaxFloat64,
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>		math.SmallestNonzeroFloat32,
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>		math.SmallestNonzeroFloat64,
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>		math.Inf(-1),
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>		math.Inf(0),
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>		-math.Inf(1),
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>	} {
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>		for i := range [2]int{} {
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>			if i&amp;1 != 0 {
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>				want = -want
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>			}
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>			var f Float
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>			f.SetFloat64(want)
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>			if got, acc := f.Float64(); got != want || acc != Exact {
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>				t.Errorf(&#34;got %g (%s, %s); want %g (Exact)&#34;, got, f.Text(&#39;p&#39;, 0), acc, want)
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>			}
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>		}
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>	}
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>	<span class="comment">// test basic rounding behavior (exhaustive rounding testing is done elsewhere)</span>
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>	const x uint64 = 0x8765432143218 <span class="comment">// 53 bits needed</span>
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>	for prec := uint(1); prec &lt;= 52; prec++ {
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>		f := new(Float).SetPrec(prec).SetMode(ToZero).SetFloat64(float64(x))
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>		got, _ := f.Float64()
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>		want := float64(x &amp;^ (1&lt;&lt;(52-prec) - 1)) <span class="comment">// cut off (round to zero) low 53-prec bits</span>
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>		if got != want {
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %g (%s); want %g&#34;, got, f.Text(&#39;p&#39;, 0), want)
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>		}
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>	}
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>	<span class="comment">// test NaN</span>
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>	defer func() {
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>		if p, ok := recover().(ErrNaN); !ok {
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %v; want ErrNaN panic&#34;, p)
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>		}
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>	}()
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>	var f Float
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>	f.SetFloat64(math.NaN())
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	<span class="comment">// should not reach here</span>
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>	t.Errorf(&#34;got %s; want ErrNaN panic&#34;, f.Text(&#39;p&#39;, 0))
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>}
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>func TestFloatSetInt(t *testing.T) {
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>	for _, want := range []string{
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>		&#34;0&#34;,
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>		&#34;1&#34;,
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>		&#34;-1&#34;,
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>		&#34;1234567890&#34;,
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>		&#34;123456789012345678901234567890&#34;,
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>		&#34;123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890&#34;,
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>	} {
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>		var x Int
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>		_, ok := x.SetString(want, 0)
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>		if !ok {
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>			t.Errorf(&#34;invalid integer %s&#34;, want)
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>			continue
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>		}
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>		n := x.BitLen()
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>		var f Float
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		f.SetInt(&amp;x)
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>		<span class="comment">// check precision</span>
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>		if n &lt; 64 {
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>			n = 64
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>		}
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>		if prec := f.Prec(); prec != uint(n) {
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>			t.Errorf(&#34;got prec = %d; want %d&#34;, prec, n)
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>		}
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>		<span class="comment">// check value</span>
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>		got := f.Text(&#39;g&#39;, 100)
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>		if got != want {
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %s (%s); want %s&#34;, got, f.Text(&#39;p&#39;, 0), want)
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>		}
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>	}
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri) test basic rounding behavior</span>
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>}
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>func TestFloatSetRat(t *testing.T) {
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>	for _, want := range []string{
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>		&#34;0&#34;,
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>		&#34;1&#34;,
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>		&#34;-1&#34;,
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>		&#34;1234567890&#34;,
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>		&#34;123456789012345678901234567890&#34;,
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>		&#34;123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890&#34;,
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>		&#34;1.2&#34;,
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>		&#34;3.14159265&#34;,
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>		<span class="comment">// TODO(gri) expand</span>
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>	} {
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>		var x Rat
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>		_, ok := x.SetString(want)
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>		if !ok {
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>			t.Errorf(&#34;invalid fraction %s&#34;, want)
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>			continue
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>		}
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>		n := max(x.Num().BitLen(), x.Denom().BitLen())
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>		var f1, f2 Float
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>		f2.SetPrec(1000)
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>		f1.SetRat(&amp;x)
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>		f2.SetRat(&amp;x)
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>		<span class="comment">// check precision when set automatically</span>
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>		if n &lt; 64 {
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>			n = 64
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>		}
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>		if prec := f1.Prec(); prec != uint(n) {
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>			t.Errorf(&#34;got prec = %d; want %d&#34;, prec, n)
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>		}
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>		got := f2.Text(&#39;g&#39;, 100)
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>		if got != want {
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %s (%s); want %s&#34;, got, f2.Text(&#39;p&#39;, 0), want)
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>		}
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>	}
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>}
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>func TestFloatSetInf(t *testing.T) {
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>	var f Float
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>		signbit bool
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>		prec    uint
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>		want    string
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>	}{
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>		{false, 0, &#34;+Inf&#34;},
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>		{true, 0, &#34;-Inf&#34;},
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>		{false, 10, &#34;+Inf&#34;},
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>		{true, 30, &#34;-Inf&#34;},
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>	} {
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>		x := f.SetPrec(test.prec).SetInf(test.signbit)
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>		if got := x.String(); got != test.want || x.Prec() != test.prec {
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>			t.Errorf(&#34;SetInf(%v) = %s (prec = %d); want %s (prec = %d)&#34;, test.signbit, got, x.Prec(), test.want, test.prec)
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>		}
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>	}
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>}
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>func TestFloatUint64(t *testing.T) {
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>		x   string
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>		out uint64
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>		acc Accuracy
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>	}{
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, 0, Above},
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>		{&#34;-1&#34;, 0, Above},
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>		{&#34;-1e-1000&#34;, 0, Above},
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>		{&#34;-0&#34;, 0, Exact},
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>		{&#34;0&#34;, 0, Exact},
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>		{&#34;1e-1000&#34;, 0, Below},
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>		{&#34;1&#34;, 1, Exact},
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>		{&#34;1.000000000000000000001&#34;, 1, Below},
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>		{&#34;12345.0&#34;, 12345, Exact},
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>		{&#34;12345.000000000000000000001&#34;, 12345, Below},
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>		{&#34;18446744073709551615&#34;, 18446744073709551615, Exact},
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>		{&#34;18446744073709551615.000000000000000000001&#34;, math.MaxUint64, Below},
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>		{&#34;18446744073709551616&#34;, math.MaxUint64, Below},
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>		{&#34;1e10000&#34;, math.MaxUint64, Below},
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, math.MaxUint64, Below},
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>	} {
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>		x := makeFloat(test.x)
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>		out, acc := x.Uint64()
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>		if out != test.out || acc != test.acc {
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: got %d (%s); want %d (%s)&#34;, test.x, out, acc, test.out, test.acc)
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>		}
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>	}
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>}
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>func TestFloatInt64(t *testing.T) {
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>		x   string
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>		out int64
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>		acc Accuracy
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>	}{
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, math.MinInt64, Above},
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>		{&#34;-1e10000&#34;, math.MinInt64, Above},
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>		{&#34;-9223372036854775809&#34;, math.MinInt64, Above},
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>		{&#34;-9223372036854775808.000000000000000000001&#34;, math.MinInt64, Above},
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>		{&#34;-9223372036854775808&#34;, -9223372036854775808, Exact},
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>		{&#34;-9223372036854775807.000000000000000000001&#34;, -9223372036854775807, Above},
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>		{&#34;-9223372036854775807&#34;, -9223372036854775807, Exact},
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>		{&#34;-12345.000000000000000000001&#34;, -12345, Above},
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>		{&#34;-12345.0&#34;, -12345, Exact},
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>		{&#34;-1.000000000000000000001&#34;, -1, Above},
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>		{&#34;-1.5&#34;, -1, Above},
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>		{&#34;-1&#34;, -1, Exact},
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>		{&#34;-1e-1000&#34;, 0, Above},
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>		{&#34;0&#34;, 0, Exact},
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>		{&#34;1e-1000&#34;, 0, Below},
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>		{&#34;1&#34;, 1, Exact},
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>		{&#34;1.000000000000000000001&#34;, 1, Below},
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>		{&#34;1.5&#34;, 1, Below},
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>		{&#34;12345.0&#34;, 12345, Exact},
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>		{&#34;12345.000000000000000000001&#34;, 12345, Below},
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>		{&#34;9223372036854775807&#34;, 9223372036854775807, Exact},
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>		{&#34;9223372036854775807.000000000000000000001&#34;, math.MaxInt64, Below},
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>		{&#34;9223372036854775808&#34;, math.MaxInt64, Below},
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>		{&#34;1e10000&#34;, math.MaxInt64, Below},
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, math.MaxInt64, Below},
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>	} {
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>		x := makeFloat(test.x)
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>		out, acc := x.Int64()
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>		if out != test.out || acc != test.acc {
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: got %d (%s); want %d (%s)&#34;, test.x, out, acc, test.out, test.acc)
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>		}
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>	}
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>}
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>func TestFloatFloat32(t *testing.T) {
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>		x   string
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>		out float32
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>		acc Accuracy
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>	}{
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>		{&#34;0&#34;, 0, Exact},
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>		<span class="comment">// underflow to zero</span>
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>		{&#34;1e-1000&#34;, 0, Below},
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>		{&#34;0x0.000002p-127&#34;, 0, Below},
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>		{&#34;0x.0000010p-126&#34;, 0, Below},
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>		<span class="comment">// denormals</span>
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>		{&#34;1.401298464e-45&#34;, math.SmallestNonzeroFloat32, Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>		{&#34;0x.ffffff8p-149&#34;, math.SmallestNonzeroFloat32, Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>		{&#34;0x.0000018p-126&#34;, math.SmallestNonzeroFloat32, Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>		{&#34;0x.0000020p-126&#34;, math.SmallestNonzeroFloat32, Exact},
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>		{&#34;0x.8p-148&#34;, math.SmallestNonzeroFloat32, Exact},
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>		{&#34;1p-149&#34;, math.SmallestNonzeroFloat32, Exact},
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>		{&#34;0x.fffffep-126&#34;, math.Float32frombits(0x7fffff), Exact}, <span class="comment">// largest denormal</span>
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>		<span class="comment">// special denormal cases (see issues 14553, 14651)</span>
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>		{&#34;0x0.0000001p-126&#34;, math.Float32frombits(0x00000000), Below}, <span class="comment">// underflow to zero</span>
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>		{&#34;0x0.0000008p-126&#34;, math.Float32frombits(0x00000000), Below}, <span class="comment">// underflow to zero</span>
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>		{&#34;0x0.0000010p-126&#34;, math.Float32frombits(0x00000000), Below}, <span class="comment">// rounded down to even</span>
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>		{&#34;0x0.0000011p-126&#34;, math.Float32frombits(0x00000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>		{&#34;0x0.0000018p-126&#34;, math.Float32frombits(0x00000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>		{&#34;0x1.0000000p-149&#34;, math.Float32frombits(0x00000001), Exact}, <span class="comment">// smallest denormal</span>
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>		{&#34;0x0.0000020p-126&#34;, math.Float32frombits(0x00000001), Exact}, <span class="comment">// smallest denormal</span>
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>		{&#34;0x0.fffffe0p-126&#34;, math.Float32frombits(0x007fffff), Exact}, <span class="comment">// largest denormal</span>
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>		{&#34;0x1.0000000p-126&#34;, math.Float32frombits(0x00800000), Exact}, <span class="comment">// smallest normal</span>
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>		{&#34;0x0.8p-149&#34;, math.Float32frombits(0x000000000), Below}, <span class="comment">// rounded down to even</span>
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>		{&#34;0x0.9p-149&#34;, math.Float32frombits(0x000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>		{&#34;0x0.ap-149&#34;, math.Float32frombits(0x000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>		{&#34;0x0.bp-149&#34;, math.Float32frombits(0x000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>		{&#34;0x0.cp-149&#34;, math.Float32frombits(0x000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>		{&#34;0x1.0p-149&#34;, math.Float32frombits(0x000000001), Exact}, <span class="comment">// smallest denormal</span>
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>		{&#34;0x1.7p-149&#34;, math.Float32frombits(0x000000001), Below},
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>		{&#34;0x1.8p-149&#34;, math.Float32frombits(0x000000002), Above},
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>		{&#34;0x1.9p-149&#34;, math.Float32frombits(0x000000002), Above},
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>		{&#34;0x2.0p-149&#34;, math.Float32frombits(0x000000002), Exact},
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>		{&#34;0x2.8p-149&#34;, math.Float32frombits(0x000000002), Below}, <span class="comment">// rounded down to even</span>
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>		{&#34;0x2.9p-149&#34;, math.Float32frombits(0x000000003), Above},
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>		{&#34;0x3.0p-149&#34;, math.Float32frombits(0x000000003), Exact},
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>		{&#34;0x3.7p-149&#34;, math.Float32frombits(0x000000003), Below},
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>		{&#34;0x3.8p-149&#34;, math.Float32frombits(0x000000004), Above}, <span class="comment">// rounded up to even</span>
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>		{&#34;0x4.0p-149&#34;, math.Float32frombits(0x000000004), Exact},
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>		{&#34;0x4.8p-149&#34;, math.Float32frombits(0x000000004), Below}, <span class="comment">// rounded down to even</span>
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>		{&#34;0x4.9p-149&#34;, math.Float32frombits(0x000000005), Above},
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span>		<span class="comment">// specific case from issue 14553</span>
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>		{&#34;0x7.7p-149&#34;, math.Float32frombits(0x000000007), Below},
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>		{&#34;0x7.8p-149&#34;, math.Float32frombits(0x000000008), Above},
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>		{&#34;0x7.9p-149&#34;, math.Float32frombits(0x000000008), Above},
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>		<span class="comment">// normals</span>
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>		{&#34;0x.ffffffp-126&#34;, math.Float32frombits(0x00800000), Above}, <span class="comment">// rounded up to smallest normal</span>
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>		{&#34;1p-126&#34;, math.Float32frombits(0x00800000), Exact},         <span class="comment">// smallest normal</span>
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>		{&#34;0x1.fffffep-126&#34;, math.Float32frombits(0x00ffffff), Exact},
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>		{&#34;0x1.ffffffp-126&#34;, math.Float32frombits(0x01000000), Above}, <span class="comment">// rounded up</span>
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>		{&#34;1&#34;, 1, Exact},
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>		{&#34;1.000000000000000000001&#34;, 1, Below},
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>		{&#34;12345.0&#34;, 12345, Exact},
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>		{&#34;12345.000000000000000000001&#34;, 12345, Below},
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>		{&#34;0x1.fffffe0p127&#34;, math.MaxFloat32, Exact},
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>		{&#34;0x1.fffffe8p127&#34;, math.MaxFloat32, Below},
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>		<span class="comment">// overflow</span>
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>		{&#34;0x1.ffffff0p127&#34;, float32(math.Inf(+1)), Above},
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>		{&#34;0x1p128&#34;, float32(math.Inf(+1)), Above},
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>		{&#34;1e10000&#34;, float32(math.Inf(+1)), Above},
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>		{&#34;0x1.ffffff0p2147483646&#34;, float32(math.Inf(+1)), Above}, <span class="comment">// overflow in rounding</span>
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>		<span class="comment">// inf</span>
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>		{&#34;Inf&#34;, float32(math.Inf(+1)), Exact},
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>	} {
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>		for i := 0; i &lt; 2; i++ {
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>			<span class="comment">// test both signs</span>
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>			tx, tout, tacc := test.x, test.out, test.acc
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>			if i != 0 {
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>				tx = &#34;-&#34; + tx
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>				tout = -tout
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>				tacc = -tacc
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>			}
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>			<span class="comment">// conversion should match strconv where syntax is agreeable</span>
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>			if f, err := strconv.ParseFloat(tx, 32); err == nil &amp;&amp; !alike32(float32(f), tout) {
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>				t.Errorf(&#34;%s: got %g; want %g (incorrect test data)&#34;, tx, f, tout)
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>			}
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>			x := makeFloat(tx)
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>			out, acc := x.Float32()
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>			if !alike32(out, tout) || acc != tacc {
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>				t.Errorf(&#34;%s: got %g (%#08x, %s); want %g (%#08x, %s)&#34;, tx, out, math.Float32bits(out), acc, test.out, math.Float32bits(test.out), tacc)
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>			}
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>			<span class="comment">// test that x.SetFloat64(float64(f)).Float32() == f</span>
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>			var x2 Float
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>			out2, acc2 := x2.SetFloat64(float64(out)).Float32()
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>			if !alike32(out2, out) || acc2 != Exact {
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>				t.Errorf(&#34;idempotency test: got %g (%s); want %g (Exact)&#34;, out2, acc2, out)
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>			}
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>		}
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>	}
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>}
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>func TestFloatFloat64(t *testing.T) {
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>	const smallestNormalFloat64 = 2.2250738585072014e-308 <span class="comment">// 1p-1022</span>
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>		x   string
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span>		out float64
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span>		acc Accuracy
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span>	}{
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span>		{&#34;0&#34;, 0, Exact},
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span>
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>		<span class="comment">// underflow to zero</span>
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>		{&#34;1e-1000&#34;, 0, Below},
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>		{&#34;0x0.0000000000001p-1023&#34;, 0, Below},
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>		{&#34;0x0.00000000000008p-1022&#34;, 0, Below},
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>		<span class="comment">// denormals</span>
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>		{&#34;0x0.0000000000000cp-1022&#34;, math.SmallestNonzeroFloat64, Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>		{&#34;0x0.00000000000010p-1022&#34;, math.SmallestNonzeroFloat64, Exact}, <span class="comment">// smallest denormal</span>
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>		{&#34;0x.8p-1073&#34;, math.SmallestNonzeroFloat64, Exact},
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>		{&#34;1p-1074&#34;, math.SmallestNonzeroFloat64, Exact},
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>		{&#34;0x.fffffffffffffp-1022&#34;, math.Float64frombits(0x000fffffffffffff), Exact}, <span class="comment">// largest denormal</span>
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>		<span class="comment">// special denormal cases (see issues 14553, 14651)</span>
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>		{&#34;0x0.00000000000001p-1022&#34;, math.Float64frombits(0x00000000000000000), Below}, <span class="comment">// underflow to zero</span>
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>		{&#34;0x0.00000000000004p-1022&#34;, math.Float64frombits(0x00000000000000000), Below}, <span class="comment">// underflow to zero</span>
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>		{&#34;0x0.00000000000008p-1022&#34;, math.Float64frombits(0x00000000000000000), Below}, <span class="comment">// rounded down to even</span>
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>		{&#34;0x0.00000000000009p-1022&#34;, math.Float64frombits(0x00000000000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>		{&#34;0x0.0000000000000ap-1022&#34;, math.Float64frombits(0x00000000000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>		{&#34;0x0.8p-1074&#34;, math.Float64frombits(0x00000000000000000), Below}, <span class="comment">// rounded down to even</span>
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>		{&#34;0x0.9p-1074&#34;, math.Float64frombits(0x00000000000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>		{&#34;0x0.ap-1074&#34;, math.Float64frombits(0x00000000000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>		{&#34;0x0.bp-1074&#34;, math.Float64frombits(0x00000000000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>		{&#34;0x0.cp-1074&#34;, math.Float64frombits(0x00000000000000001), Above}, <span class="comment">// rounded up to smallest denormal</span>
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>		{&#34;0x1.0p-1074&#34;, math.Float64frombits(0x00000000000000001), Exact},
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span>		{&#34;0x1.7p-1074&#34;, math.Float64frombits(0x00000000000000001), Below},
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span>		{&#34;0x1.8p-1074&#34;, math.Float64frombits(0x00000000000000002), Above},
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span>		{&#34;0x1.9p-1074&#34;, math.Float64frombits(0x00000000000000002), Above},
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span>
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span>		{&#34;0x2.0p-1074&#34;, math.Float64frombits(0x00000000000000002), Exact},
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span>		{&#34;0x2.8p-1074&#34;, math.Float64frombits(0x00000000000000002), Below}, <span class="comment">// rounded down to even</span>
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span>		{&#34;0x2.9p-1074&#34;, math.Float64frombits(0x00000000000000003), Above},
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span>
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span>		{&#34;0x3.0p-1074&#34;, math.Float64frombits(0x00000000000000003), Exact},
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span>		{&#34;0x3.7p-1074&#34;, math.Float64frombits(0x00000000000000003), Below},
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span>		{&#34;0x3.8p-1074&#34;, math.Float64frombits(0x00000000000000004), Above}, <span class="comment">// rounded up to even</span>
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span>
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span>		{&#34;0x4.0p-1074&#34;, math.Float64frombits(0x00000000000000004), Exact},
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span>		{&#34;0x4.8p-1074&#34;, math.Float64frombits(0x00000000000000004), Below}, <span class="comment">// rounded down to even</span>
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span>		{&#34;0x4.9p-1074&#34;, math.Float64frombits(0x00000000000000005), Above},
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span>
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span>		<span class="comment">// normals</span>
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span>		{&#34;0x.fffffffffffff8p-1022&#34;, math.Float64frombits(0x0010000000000000), Above}, <span class="comment">// rounded up to smallest normal</span>
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span>		{&#34;1p-1022&#34;, math.Float64frombits(0x0010000000000000), Exact},                 <span class="comment">// smallest normal</span>
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span>		{&#34;1&#34;, 1, Exact},
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span>		{&#34;1.000000000000000000001&#34;, 1, Below},
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span>		{&#34;12345.0&#34;, 12345, Exact},
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span>		{&#34;12345.000000000000000000001&#34;, 12345, Below},
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span>		{&#34;0x1.fffffffffffff0p1023&#34;, math.MaxFloat64, Exact},
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span>		{&#34;0x1.fffffffffffff4p1023&#34;, math.MaxFloat64, Below},
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span>
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span>		<span class="comment">// overflow</span>
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span>		{&#34;0x1.fffffffffffff8p1023&#34;, math.Inf(+1), Above},
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span>		{&#34;0x1p1024&#34;, math.Inf(+1), Above},
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span>		{&#34;1e10000&#34;, math.Inf(+1), Above},
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span>		{&#34;0x1.fffffffffffff8p2147483646&#34;, math.Inf(+1), Above}, <span class="comment">// overflow in rounding</span>
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span>		{&#34;Inf&#34;, math.Inf(+1), Exact},
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span>
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span>		<span class="comment">// selected denormalized values that were handled incorrectly in the past</span>
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span>		{&#34;0x.fffffffffffffp-1022&#34;, smallestNormalFloat64 - math.SmallestNonzeroFloat64, Exact},
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span>		{&#34;4503599627370495p-1074&#34;, smallestNormalFloat64 - math.SmallestNonzeroFloat64, Exact},
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span>
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span>		<span class="comment">// http://www.exploringbinary.com/php-hangs-on-numeric-value-2-2250738585072011e-308/</span>
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span>		{&#34;2.2250738585072011e-308&#34;, 2.225073858507201e-308, Below},
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span>		<span class="comment">// http://www.exploringbinary.com/java-hangs-when-converting-2-2250738585072012e-308/</span>
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>		{&#34;2.2250738585072012e-308&#34;, 2.2250738585072014e-308, Above},
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>	} {
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span>		for i := 0; i &lt; 2; i++ {
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span>			<span class="comment">// test both signs</span>
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>			tx, tout, tacc := test.x, test.out, test.acc
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>			if i != 0 {
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>				tx = &#34;-&#34; + tx
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>				tout = -tout
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>				tacc = -tacc
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>			}
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span>
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>			<span class="comment">// conversion should match strconv where syntax is agreeable</span>
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>			if f, err := strconv.ParseFloat(tx, 64); err == nil &amp;&amp; !alike64(f, tout) {
+<span id="L1026" class="ln" data-content="  1026">&nbsp;&nbsp;</span>				t.Errorf(&#34;%s: got %g; want %g (incorrect test data)&#34;, tx, f, tout)
+<span id="L1027" class="ln" data-content="  1027">&nbsp;&nbsp;</span>			}
+<span id="L1028" class="ln" data-content="  1028">&nbsp;&nbsp;</span>
+<span id="L1029" class="ln" data-content="  1029">&nbsp;&nbsp;</span>			x := makeFloat(tx)
+<span id="L1030" class="ln" data-content="  1030">&nbsp;&nbsp;</span>			out, acc := x.Float64()
+<span id="L1031" class="ln" data-content="  1031">&nbsp;&nbsp;</span>			if !alike64(out, tout) || acc != tacc {
+<span id="L1032" class="ln" data-content="  1032">&nbsp;&nbsp;</span>				t.Errorf(&#34;%s: got %g (%#016x, %s); want %g (%#016x, %s)&#34;, tx, out, math.Float64bits(out), acc, test.out, math.Float64bits(test.out), tacc)
+<span id="L1033" class="ln" data-content="  1033">&nbsp;&nbsp;</span>			}
+<span id="L1034" class="ln" data-content="  1034">&nbsp;&nbsp;</span>
+<span id="L1035" class="ln" data-content="  1035">&nbsp;&nbsp;</span>			<span class="comment">// test that x.SetFloat64(f).Float64() == f</span>
+<span id="L1036" class="ln" data-content="  1036">&nbsp;&nbsp;</span>			var x2 Float
+<span id="L1037" class="ln" data-content="  1037">&nbsp;&nbsp;</span>			out2, acc2 := x2.SetFloat64(out).Float64()
+<span id="L1038" class="ln" data-content="  1038">&nbsp;&nbsp;</span>			if !alike64(out2, out) || acc2 != Exact {
+<span id="L1039" class="ln" data-content="  1039">&nbsp;&nbsp;</span>				t.Errorf(&#34;idempotency test: got %g (%s); want %g (Exact)&#34;, out2, acc2, out)
+<span id="L1040" class="ln" data-content="  1040">&nbsp;&nbsp;</span>			}
+<span id="L1041" class="ln" data-content="  1041">&nbsp;&nbsp;</span>		}
+<span id="L1042" class="ln" data-content="  1042">&nbsp;&nbsp;</span>	}
+<span id="L1043" class="ln" data-content="  1043">&nbsp;&nbsp;</span>}
+<span id="L1044" class="ln" data-content="  1044">&nbsp;&nbsp;</span>
+<span id="L1045" class="ln" data-content="  1045">&nbsp;&nbsp;</span>func TestFloatInt(t *testing.T) {
+<span id="L1046" class="ln" data-content="  1046">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L1047" class="ln" data-content="  1047">&nbsp;&nbsp;</span>		x    string
+<span id="L1048" class="ln" data-content="  1048">&nbsp;&nbsp;</span>		want string
+<span id="L1049" class="ln" data-content="  1049">&nbsp;&nbsp;</span>		acc  Accuracy
+<span id="L1050" class="ln" data-content="  1050">&nbsp;&nbsp;</span>	}{
+<span id="L1051" class="ln" data-content="  1051">&nbsp;&nbsp;</span>		{&#34;0&#34;, &#34;0&#34;, Exact},
+<span id="L1052" class="ln" data-content="  1052">&nbsp;&nbsp;</span>		{&#34;+0&#34;, &#34;0&#34;, Exact},
+<span id="L1053" class="ln" data-content="  1053">&nbsp;&nbsp;</span>		{&#34;-0&#34;, &#34;0&#34;, Exact},
+<span id="L1054" class="ln" data-content="  1054">&nbsp;&nbsp;</span>		{&#34;Inf&#34;, &#34;nil&#34;, Below},
+<span id="L1055" class="ln" data-content="  1055">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, &#34;nil&#34;, Below},
+<span id="L1056" class="ln" data-content="  1056">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, &#34;nil&#34;, Above},
+<span id="L1057" class="ln" data-content="  1057">&nbsp;&nbsp;</span>		{&#34;1&#34;, &#34;1&#34;, Exact},
+<span id="L1058" class="ln" data-content="  1058">&nbsp;&nbsp;</span>		{&#34;-1&#34;, &#34;-1&#34;, Exact},
+<span id="L1059" class="ln" data-content="  1059">&nbsp;&nbsp;</span>		{&#34;1.23&#34;, &#34;1&#34;, Below},
+<span id="L1060" class="ln" data-content="  1060">&nbsp;&nbsp;</span>		{&#34;-1.23&#34;, &#34;-1&#34;, Above},
+<span id="L1061" class="ln" data-content="  1061">&nbsp;&nbsp;</span>		{&#34;123e-2&#34;, &#34;1&#34;, Below},
+<span id="L1062" class="ln" data-content="  1062">&nbsp;&nbsp;</span>		{&#34;123e-3&#34;, &#34;0&#34;, Below},
+<span id="L1063" class="ln" data-content="  1063">&nbsp;&nbsp;</span>		{&#34;123e-4&#34;, &#34;0&#34;, Below},
+<span id="L1064" class="ln" data-content="  1064">&nbsp;&nbsp;</span>		{&#34;1e-1000&#34;, &#34;0&#34;, Below},
+<span id="L1065" class="ln" data-content="  1065">&nbsp;&nbsp;</span>		{&#34;-1e-1000&#34;, &#34;0&#34;, Above},
+<span id="L1066" class="ln" data-content="  1066">&nbsp;&nbsp;</span>		{&#34;1e+10&#34;, &#34;10000000000&#34;, Exact},
+<span id="L1067" class="ln" data-content="  1067">&nbsp;&nbsp;</span>		{&#34;1e+100&#34;, &#34;10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000&#34;, Exact},
+<span id="L1068" class="ln" data-content="  1068">&nbsp;&nbsp;</span>	} {
+<span id="L1069" class="ln" data-content="  1069">&nbsp;&nbsp;</span>		x := makeFloat(test.x)
+<span id="L1070" class="ln" data-content="  1070">&nbsp;&nbsp;</span>		res, acc := x.Int(nil)
+<span id="L1071" class="ln" data-content="  1071">&nbsp;&nbsp;</span>		got := &#34;nil&#34;
+<span id="L1072" class="ln" data-content="  1072">&nbsp;&nbsp;</span>		if res != nil {
+<span id="L1073" class="ln" data-content="  1073">&nbsp;&nbsp;</span>			got = res.String()
+<span id="L1074" class="ln" data-content="  1074">&nbsp;&nbsp;</span>		}
+<span id="L1075" class="ln" data-content="  1075">&nbsp;&nbsp;</span>		if got != test.want || acc != test.acc {
+<span id="L1076" class="ln" data-content="  1076">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: got %s (%s); want %s (%s)&#34;, test.x, got, acc, test.want, test.acc)
+<span id="L1077" class="ln" data-content="  1077">&nbsp;&nbsp;</span>		}
+<span id="L1078" class="ln" data-content="  1078">&nbsp;&nbsp;</span>	}
+<span id="L1079" class="ln" data-content="  1079">&nbsp;&nbsp;</span>
+<span id="L1080" class="ln" data-content="  1080">&nbsp;&nbsp;</span>	<span class="comment">// check that supplied *Int is used</span>
+<span id="L1081" class="ln" data-content="  1081">&nbsp;&nbsp;</span>	for _, f := range []string{&#34;0&#34;, &#34;1&#34;, &#34;-1&#34;, &#34;1234&#34;} {
+<span id="L1082" class="ln" data-content="  1082">&nbsp;&nbsp;</span>		x := makeFloat(f)
+<span id="L1083" class="ln" data-content="  1083">&nbsp;&nbsp;</span>		i := new(Int)
+<span id="L1084" class="ln" data-content="  1084">&nbsp;&nbsp;</span>		if res, _ := x.Int(i); res != i {
+<span id="L1085" class="ln" data-content="  1085">&nbsp;&nbsp;</span>			t.Errorf(&#34;(%s).Int is not using supplied *Int&#34;, f)
+<span id="L1086" class="ln" data-content="  1086">&nbsp;&nbsp;</span>		}
+<span id="L1087" class="ln" data-content="  1087">&nbsp;&nbsp;</span>	}
+<span id="L1088" class="ln" data-content="  1088">&nbsp;&nbsp;</span>}
+<span id="L1089" class="ln" data-content="  1089">&nbsp;&nbsp;</span>
+<span id="L1090" class="ln" data-content="  1090">&nbsp;&nbsp;</span>func TestFloatRat(t *testing.T) {
+<span id="L1091" class="ln" data-content="  1091">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L1092" class="ln" data-content="  1092">&nbsp;&nbsp;</span>		x, want string
+<span id="L1093" class="ln" data-content="  1093">&nbsp;&nbsp;</span>		acc     Accuracy
+<span id="L1094" class="ln" data-content="  1094">&nbsp;&nbsp;</span>	}{
+<span id="L1095" class="ln" data-content="  1095">&nbsp;&nbsp;</span>		{&#34;0&#34;, &#34;0/1&#34;, Exact},
+<span id="L1096" class="ln" data-content="  1096">&nbsp;&nbsp;</span>		{&#34;+0&#34;, &#34;0/1&#34;, Exact},
+<span id="L1097" class="ln" data-content="  1097">&nbsp;&nbsp;</span>		{&#34;-0&#34;, &#34;0/1&#34;, Exact},
+<span id="L1098" class="ln" data-content="  1098">&nbsp;&nbsp;</span>		{&#34;Inf&#34;, &#34;nil&#34;, Below},
+<span id="L1099" class="ln" data-content="  1099">&nbsp;&nbsp;</span>		{&#34;+Inf&#34;, &#34;nil&#34;, Below},
+<span id="L1100" class="ln" data-content="  1100">&nbsp;&nbsp;</span>		{&#34;-Inf&#34;, &#34;nil&#34;, Above},
+<span id="L1101" class="ln" data-content="  1101">&nbsp;&nbsp;</span>		{&#34;1&#34;, &#34;1/1&#34;, Exact},
+<span id="L1102" class="ln" data-content="  1102">&nbsp;&nbsp;</span>		{&#34;-1&#34;, &#34;-1/1&#34;, Exact},
+<span id="L1103" class="ln" data-content="  1103">&nbsp;&nbsp;</span>		{&#34;1.25&#34;, &#34;5/4&#34;, Exact},
+<span id="L1104" class="ln" data-content="  1104">&nbsp;&nbsp;</span>		{&#34;-1.25&#34;, &#34;-5/4&#34;, Exact},
+<span id="L1105" class="ln" data-content="  1105">&nbsp;&nbsp;</span>		{&#34;1e10&#34;, &#34;10000000000/1&#34;, Exact},
+<span id="L1106" class="ln" data-content="  1106">&nbsp;&nbsp;</span>		{&#34;1p10&#34;, &#34;1024/1&#34;, Exact},
+<span id="L1107" class="ln" data-content="  1107">&nbsp;&nbsp;</span>		{&#34;-1p-10&#34;, &#34;-1/1024&#34;, Exact},
+<span id="L1108" class="ln" data-content="  1108">&nbsp;&nbsp;</span>		{&#34;3.14159265&#34;, &#34;7244019449799623199/2305843009213693952&#34;, Exact},
+<span id="L1109" class="ln" data-content="  1109">&nbsp;&nbsp;</span>	} {
+<span id="L1110" class="ln" data-content="  1110">&nbsp;&nbsp;</span>		x := makeFloat(test.x).SetPrec(64)
+<span id="L1111" class="ln" data-content="  1111">&nbsp;&nbsp;</span>		res, acc := x.Rat(nil)
+<span id="L1112" class="ln" data-content="  1112">&nbsp;&nbsp;</span>		got := &#34;nil&#34;
+<span id="L1113" class="ln" data-content="  1113">&nbsp;&nbsp;</span>		if res != nil {
+<span id="L1114" class="ln" data-content="  1114">&nbsp;&nbsp;</span>			got = res.String()
+<span id="L1115" class="ln" data-content="  1115">&nbsp;&nbsp;</span>		}
+<span id="L1116" class="ln" data-content="  1116">&nbsp;&nbsp;</span>		if got != test.want {
+<span id="L1117" class="ln" data-content="  1117">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: got %s; want %s&#34;, test.x, got, test.want)
+<span id="L1118" class="ln" data-content="  1118">&nbsp;&nbsp;</span>			continue
+<span id="L1119" class="ln" data-content="  1119">&nbsp;&nbsp;</span>		}
+<span id="L1120" class="ln" data-content="  1120">&nbsp;&nbsp;</span>		if acc != test.acc {
+<span id="L1121" class="ln" data-content="  1121">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: got %s; want %s&#34;, test.x, acc, test.acc)
+<span id="L1122" class="ln" data-content="  1122">&nbsp;&nbsp;</span>			continue
+<span id="L1123" class="ln" data-content="  1123">&nbsp;&nbsp;</span>		}
+<span id="L1124" class="ln" data-content="  1124">&nbsp;&nbsp;</span>
+<span id="L1125" class="ln" data-content="  1125">&nbsp;&nbsp;</span>		<span class="comment">// inverse conversion</span>
+<span id="L1126" class="ln" data-content="  1126">&nbsp;&nbsp;</span>		if res != nil {
+<span id="L1127" class="ln" data-content="  1127">&nbsp;&nbsp;</span>			got := new(Float).SetPrec(64).SetRat(res)
+<span id="L1128" class="ln" data-content="  1128">&nbsp;&nbsp;</span>			if got.Cmp(x) != 0 {
+<span id="L1129" class="ln" data-content="  1129">&nbsp;&nbsp;</span>				t.Errorf(&#34;%s: got %s; want %s&#34;, test.x, got, x)
+<span id="L1130" class="ln" data-content="  1130">&nbsp;&nbsp;</span>			}
+<span id="L1131" class="ln" data-content="  1131">&nbsp;&nbsp;</span>		}
+<span id="L1132" class="ln" data-content="  1132">&nbsp;&nbsp;</span>	}
+<span id="L1133" class="ln" data-content="  1133">&nbsp;&nbsp;</span>
+<span id="L1134" class="ln" data-content="  1134">&nbsp;&nbsp;</span>	<span class="comment">// check that supplied *Rat is used</span>
+<span id="L1135" class="ln" data-content="  1135">&nbsp;&nbsp;</span>	for _, f := range []string{&#34;0&#34;, &#34;1&#34;, &#34;-1&#34;, &#34;1234&#34;} {
+<span id="L1136" class="ln" data-content="  1136">&nbsp;&nbsp;</span>		x := makeFloat(f)
+<span id="L1137" class="ln" data-content="  1137">&nbsp;&nbsp;</span>		r := new(Rat)
+<span id="L1138" class="ln" data-content="  1138">&nbsp;&nbsp;</span>		if res, _ := x.Rat(r); res != r {
+<span id="L1139" class="ln" data-content="  1139">&nbsp;&nbsp;</span>			t.Errorf(&#34;(%s).Rat is not using supplied *Rat&#34;, f)
+<span id="L1140" class="ln" data-content="  1140">&nbsp;&nbsp;</span>		}
+<span id="L1141" class="ln" data-content="  1141">&nbsp;&nbsp;</span>	}
+<span id="L1142" class="ln" data-content="  1142">&nbsp;&nbsp;</span>}
+<span id="L1143" class="ln" data-content="  1143">&nbsp;&nbsp;</span>
+<span id="L1144" class="ln" data-content="  1144">&nbsp;&nbsp;</span>func TestFloatAbs(t *testing.T) {
+<span id="L1145" class="ln" data-content="  1145">&nbsp;&nbsp;</span>	for _, test := range []string{
+<span id="L1146" class="ln" data-content="  1146">&nbsp;&nbsp;</span>		&#34;0&#34;,
+<span id="L1147" class="ln" data-content="  1147">&nbsp;&nbsp;</span>		&#34;1&#34;,
+<span id="L1148" class="ln" data-content="  1148">&nbsp;&nbsp;</span>		&#34;1234&#34;,
+<span id="L1149" class="ln" data-content="  1149">&nbsp;&nbsp;</span>		&#34;1.23e-2&#34;,
+<span id="L1150" class="ln" data-content="  1150">&nbsp;&nbsp;</span>		&#34;1e-1000&#34;,
+<span id="L1151" class="ln" data-content="  1151">&nbsp;&nbsp;</span>		&#34;1e1000&#34;,
+<span id="L1152" class="ln" data-content="  1152">&nbsp;&nbsp;</span>		&#34;Inf&#34;,
+<span id="L1153" class="ln" data-content="  1153">&nbsp;&nbsp;</span>	} {
+<span id="L1154" class="ln" data-content="  1154">&nbsp;&nbsp;</span>		p := makeFloat(test)
+<span id="L1155" class="ln" data-content="  1155">&nbsp;&nbsp;</span>		a := new(Float).Abs(p)
+<span id="L1156" class="ln" data-content="  1156">&nbsp;&nbsp;</span>		if !alike(a, p) {
+<span id="L1157" class="ln" data-content="  1157">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: got %s; want %s&#34;, test, a.Text(&#39;g&#39;, 10), test)
+<span id="L1158" class="ln" data-content="  1158">&nbsp;&nbsp;</span>		}
+<span id="L1159" class="ln" data-content="  1159">&nbsp;&nbsp;</span>
+<span id="L1160" class="ln" data-content="  1160">&nbsp;&nbsp;</span>		n := makeFloat(&#34;-&#34; + test)
+<span id="L1161" class="ln" data-content="  1161">&nbsp;&nbsp;</span>		a.Abs(n)
+<span id="L1162" class="ln" data-content="  1162">&nbsp;&nbsp;</span>		if !alike(a, p) {
+<span id="L1163" class="ln" data-content="  1163">&nbsp;&nbsp;</span>			t.Errorf(&#34;-%s: got %s; want %s&#34;, test, a.Text(&#39;g&#39;, 10), test)
+<span id="L1164" class="ln" data-content="  1164">&nbsp;&nbsp;</span>		}
+<span id="L1165" class="ln" data-content="  1165">&nbsp;&nbsp;</span>	}
+<span id="L1166" class="ln" data-content="  1166">&nbsp;&nbsp;</span>}
+<span id="L1167" class="ln" data-content="  1167">&nbsp;&nbsp;</span>
+<span id="L1168" class="ln" data-content="  1168">&nbsp;&nbsp;</span>func TestFloatNeg(t *testing.T) {
+<span id="L1169" class="ln" data-content="  1169">&nbsp;&nbsp;</span>	for _, test := range []string{
+<span id="L1170" class="ln" data-content="  1170">&nbsp;&nbsp;</span>		&#34;0&#34;,
+<span id="L1171" class="ln" data-content="  1171">&nbsp;&nbsp;</span>		&#34;1&#34;,
+<span id="L1172" class="ln" data-content="  1172">&nbsp;&nbsp;</span>		&#34;1234&#34;,
+<span id="L1173" class="ln" data-content="  1173">&nbsp;&nbsp;</span>		&#34;1.23e-2&#34;,
+<span id="L1174" class="ln" data-content="  1174">&nbsp;&nbsp;</span>		&#34;1e-1000&#34;,
+<span id="L1175" class="ln" data-content="  1175">&nbsp;&nbsp;</span>		&#34;1e1000&#34;,
+<span id="L1176" class="ln" data-content="  1176">&nbsp;&nbsp;</span>		&#34;Inf&#34;,
+<span id="L1177" class="ln" data-content="  1177">&nbsp;&nbsp;</span>	} {
+<span id="L1178" class="ln" data-content="  1178">&nbsp;&nbsp;</span>		p1 := makeFloat(test)
+<span id="L1179" class="ln" data-content="  1179">&nbsp;&nbsp;</span>		n1 := makeFloat(&#34;-&#34; + test)
+<span id="L1180" class="ln" data-content="  1180">&nbsp;&nbsp;</span>		n2 := new(Float).Neg(p1)
+<span id="L1181" class="ln" data-content="  1181">&nbsp;&nbsp;</span>		p2 := new(Float).Neg(n2)
+<span id="L1182" class="ln" data-content="  1182">&nbsp;&nbsp;</span>		if !alike(n2, n1) {
+<span id="L1183" class="ln" data-content="  1183">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: got %s; want %s&#34;, test, n2.Text(&#39;g&#39;, 10), n1.Text(&#39;g&#39;, 10))
+<span id="L1184" class="ln" data-content="  1184">&nbsp;&nbsp;</span>		}
+<span id="L1185" class="ln" data-content="  1185">&nbsp;&nbsp;</span>		if !alike(p2, p1) {
+<span id="L1186" class="ln" data-content="  1186">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s: got %s; want %s&#34;, test, p2.Text(&#39;g&#39;, 10), p1.Text(&#39;g&#39;, 10))
+<span id="L1187" class="ln" data-content="  1187">&nbsp;&nbsp;</span>		}
+<span id="L1188" class="ln" data-content="  1188">&nbsp;&nbsp;</span>	}
+<span id="L1189" class="ln" data-content="  1189">&nbsp;&nbsp;</span>}
+<span id="L1190" class="ln" data-content="  1190">&nbsp;&nbsp;</span>
+<span id="L1191" class="ln" data-content="  1191">&nbsp;&nbsp;</span>func TestFloatInc(t *testing.T) {
+<span id="L1192" class="ln" data-content="  1192">&nbsp;&nbsp;</span>	const n = 10
+<span id="L1193" class="ln" data-content="  1193">&nbsp;&nbsp;</span>	for _, prec := range precList {
+<span id="L1194" class="ln" data-content="  1194">&nbsp;&nbsp;</span>		if 1&lt;&lt;prec &lt; n {
+<span id="L1195" class="ln" data-content="  1195">&nbsp;&nbsp;</span>			continue <span class="comment">// prec must be large enough to hold all numbers from 0 to n</span>
+<span id="L1196" class="ln" data-content="  1196">&nbsp;&nbsp;</span>		}
+<span id="L1197" class="ln" data-content="  1197">&nbsp;&nbsp;</span>		var x, one Float
+<span id="L1198" class="ln" data-content="  1198">&nbsp;&nbsp;</span>		x.SetPrec(prec)
+<span id="L1199" class="ln" data-content="  1199">&nbsp;&nbsp;</span>		one.SetInt64(1)
+<span id="L1200" class="ln" data-content="  1200">&nbsp;&nbsp;</span>		for i := 0; i &lt; n; i++ {
+<span id="L1201" class="ln" data-content="  1201">&nbsp;&nbsp;</span>			x.Add(&amp;x, &amp;one)
+<span id="L1202" class="ln" data-content="  1202">&nbsp;&nbsp;</span>		}
+<span id="L1203" class="ln" data-content="  1203">&nbsp;&nbsp;</span>		if x.Cmp(new(Float).SetInt64(n)) != 0 {
+<span id="L1204" class="ln" data-content="  1204">&nbsp;&nbsp;</span>			t.Errorf(&#34;prec = %d: got %s; want %d&#34;, prec, &amp;x, n)
+<span id="L1205" class="ln" data-content="  1205">&nbsp;&nbsp;</span>		}
+<span id="L1206" class="ln" data-content="  1206">&nbsp;&nbsp;</span>	}
+<span id="L1207" class="ln" data-content="  1207">&nbsp;&nbsp;</span>}
+<span id="L1208" class="ln" data-content="  1208">&nbsp;&nbsp;</span>
+<span id="L1209" class="ln" data-content="  1209">&nbsp;&nbsp;</span><span class="comment">// Selected precisions with which to run various tests.</span>
+<span id="L1210" class="ln" data-content="  1210">&nbsp;&nbsp;</span>var precList = [...]uint{1, 2, 5, 8, 10, 16, 23, 24, 32, 50, 53, 64, 100, 128, 500, 511, 512, 513, 1000, 10000}
+<span id="L1211" class="ln" data-content="  1211">&nbsp;&nbsp;</span>
+<span id="L1212" class="ln" data-content="  1212">&nbsp;&nbsp;</span><span class="comment">// Selected bits with which to run various tests.</span>
+<span id="L1213" class="ln" data-content="  1213">&nbsp;&nbsp;</span><span class="comment">// Each entry is a list of bits representing a floating-point number (see fromBits).</span>
+<span id="L1214" class="ln" data-content="  1214">&nbsp;&nbsp;</span>var bitsList = [...]Bits{
+<span id="L1215" class="ln" data-content="  1215">&nbsp;&nbsp;</span>	{},           <span class="comment">// = 0</span>
+<span id="L1216" class="ln" data-content="  1216">&nbsp;&nbsp;</span>	{0},          <span class="comment">// = 1</span>
+<span id="L1217" class="ln" data-content="  1217">&nbsp;&nbsp;</span>	{1},          <span class="comment">// = 2</span>
+<span id="L1218" class="ln" data-content="  1218">&nbsp;&nbsp;</span>	{-1},         <span class="comment">// = 1/2</span>
+<span id="L1219" class="ln" data-content="  1219">&nbsp;&nbsp;</span>	{10},         <span class="comment">// = 2**10 == 1024</span>
+<span id="L1220" class="ln" data-content="  1220">&nbsp;&nbsp;</span>	{-10},        <span class="comment">// = 2**-10 == 1/1024</span>
+<span id="L1221" class="ln" data-content="  1221">&nbsp;&nbsp;</span>	{100, 10, 1}, <span class="comment">// = 2**100 + 2**10 + 2**1</span>
+<span id="L1222" class="ln" data-content="  1222">&nbsp;&nbsp;</span>	{0, -1, -2, -10},
+<span id="L1223" class="ln" data-content="  1223">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri) add more test cases</span>
+<span id="L1224" class="ln" data-content="  1224">&nbsp;&nbsp;</span>}
+<span id="L1225" class="ln" data-content="  1225">&nbsp;&nbsp;</span>
+<span id="L1226" class="ln" data-content="  1226">&nbsp;&nbsp;</span><span class="comment">// TestFloatAdd tests Float.Add/Sub by comparing the result of a &#34;manual&#34;</span>
+<span id="L1227" class="ln" data-content="  1227">&nbsp;&nbsp;</span><span class="comment">// addition/subtraction of arguments represented by Bits values with the</span>
+<span id="L1228" class="ln" data-content="  1228">&nbsp;&nbsp;</span><span class="comment">// respective Float addition/subtraction for a variety of precisions</span>
+<span id="L1229" class="ln" data-content="  1229">&nbsp;&nbsp;</span><span class="comment">// and rounding modes.</span>
+<span id="L1230" class="ln" data-content="  1230">&nbsp;&nbsp;</span>func TestFloatAdd(t *testing.T) {
+<span id="L1231" class="ln" data-content="  1231">&nbsp;&nbsp;</span>	for _, xbits := range bitsList {
+<span id="L1232" class="ln" data-content="  1232">&nbsp;&nbsp;</span>		for _, ybits := range bitsList {
+<span id="L1233" class="ln" data-content="  1233">&nbsp;&nbsp;</span>			<span class="comment">// exact values</span>
+<span id="L1234" class="ln" data-content="  1234">&nbsp;&nbsp;</span>			x := xbits.Float()
+<span id="L1235" class="ln" data-content="  1235">&nbsp;&nbsp;</span>			y := ybits.Float()
+<span id="L1236" class="ln" data-content="  1236">&nbsp;&nbsp;</span>			zbits := xbits.add(ybits)
+<span id="L1237" class="ln" data-content="  1237">&nbsp;&nbsp;</span>			z := zbits.Float()
+<span id="L1238" class="ln" data-content="  1238">&nbsp;&nbsp;</span>
+<span id="L1239" class="ln" data-content="  1239">&nbsp;&nbsp;</span>			for i, mode := range [...]RoundingMode{ToZero, ToNearestEven, AwayFromZero} {
+<span id="L1240" class="ln" data-content="  1240">&nbsp;&nbsp;</span>				for _, prec := range precList {
+<span id="L1241" class="ln" data-content="  1241">&nbsp;&nbsp;</span>					got := new(Float).SetPrec(prec).SetMode(mode)
+<span id="L1242" class="ln" data-content="  1242">&nbsp;&nbsp;</span>					got.Add(x, y)
+<span id="L1243" class="ln" data-content="  1243">&nbsp;&nbsp;</span>					want := zbits.round(prec, mode)
+<span id="L1244" class="ln" data-content="  1244">&nbsp;&nbsp;</span>					if got.Cmp(want) != 0 {
+<span id="L1245" class="ln" data-content="  1245">&nbsp;&nbsp;</span>						t.Errorf(&#34;i = %d, prec = %d, %s:\n\t     %s %v\n\t+    %s %v\n\t=    %s\n\twant %s&#34;,
+<span id="L1246" class="ln" data-content="  1246">&nbsp;&nbsp;</span>							i, prec, mode, x, xbits, y, ybits, got, want)
+<span id="L1247" class="ln" data-content="  1247">&nbsp;&nbsp;</span>					}
+<span id="L1248" class="ln" data-content="  1248">&nbsp;&nbsp;</span>
+<span id="L1249" class="ln" data-content="  1249">&nbsp;&nbsp;</span>					got.Sub(z, x)
+<span id="L1250" class="ln" data-content="  1250">&nbsp;&nbsp;</span>					want = ybits.round(prec, mode)
+<span id="L1251" class="ln" data-content="  1251">&nbsp;&nbsp;</span>					if got.Cmp(want) != 0 {
+<span id="L1252" class="ln" data-content="  1252">&nbsp;&nbsp;</span>						t.Errorf(&#34;i = %d, prec = %d, %s:\n\t     %s %v\n\t-    %s %v\n\t=    %s\n\twant %s&#34;,
+<span id="L1253" class="ln" data-content="  1253">&nbsp;&nbsp;</span>							i, prec, mode, z, zbits, x, xbits, got, want)
+<span id="L1254" class="ln" data-content="  1254">&nbsp;&nbsp;</span>					}
+<span id="L1255" class="ln" data-content="  1255">&nbsp;&nbsp;</span>				}
+<span id="L1256" class="ln" data-content="  1256">&nbsp;&nbsp;</span>			}
+<span id="L1257" class="ln" data-content="  1257">&nbsp;&nbsp;</span>		}
+<span id="L1258" class="ln" data-content="  1258">&nbsp;&nbsp;</span>	}
+<span id="L1259" class="ln" data-content="  1259">&nbsp;&nbsp;</span>}
+<span id="L1260" class="ln" data-content="  1260">&nbsp;&nbsp;</span>
+<span id="L1261" class="ln" data-content="  1261">&nbsp;&nbsp;</span><span class="comment">// TestFloatAdd32 tests that Float.Add/Sub of numbers with</span>
+<span id="L1262" class="ln" data-content="  1262">&nbsp;&nbsp;</span><span class="comment">// 24bit mantissa behaves like float32 addition/subtraction</span>
+<span id="L1263" class="ln" data-content="  1263">&nbsp;&nbsp;</span><span class="comment">// (excluding denormal numbers).</span>
+<span id="L1264" class="ln" data-content="  1264">&nbsp;&nbsp;</span>func TestFloatAdd32(t *testing.T) {
+<span id="L1265" class="ln" data-content="  1265">&nbsp;&nbsp;</span>	<span class="comment">// chose base such that we cross the mantissa precision limit</span>
+<span id="L1266" class="ln" data-content="  1266">&nbsp;&nbsp;</span>	const base = 1&lt;&lt;26 - 0x10 <span class="comment">// 11...110000 (26 bits)</span>
+<span id="L1267" class="ln" data-content="  1267">&nbsp;&nbsp;</span>	for d := 0; d &lt;= 0x10; d++ {
+<span id="L1268" class="ln" data-content="  1268">&nbsp;&nbsp;</span>		for i := range [2]int{} {
+<span id="L1269" class="ln" data-content="  1269">&nbsp;&nbsp;</span>			x0, y0 := float64(base), float64(d)
+<span id="L1270" class="ln" data-content="  1270">&nbsp;&nbsp;</span>			if i&amp;1 != 0 {
+<span id="L1271" class="ln" data-content="  1271">&nbsp;&nbsp;</span>				x0, y0 = y0, x0
+<span id="L1272" class="ln" data-content="  1272">&nbsp;&nbsp;</span>			}
+<span id="L1273" class="ln" data-content="  1273">&nbsp;&nbsp;</span>
+<span id="L1274" class="ln" data-content="  1274">&nbsp;&nbsp;</span>			x := NewFloat(x0)
+<span id="L1275" class="ln" data-content="  1275">&nbsp;&nbsp;</span>			y := NewFloat(y0)
+<span id="L1276" class="ln" data-content="  1276">&nbsp;&nbsp;</span>			z := new(Float).SetPrec(24)
+<span id="L1277" class="ln" data-content="  1277">&nbsp;&nbsp;</span>
+<span id="L1278" class="ln" data-content="  1278">&nbsp;&nbsp;</span>			z.Add(x, y)
+<span id="L1279" class="ln" data-content="  1279">&nbsp;&nbsp;</span>			got, acc := z.Float32()
+<span id="L1280" class="ln" data-content="  1280">&nbsp;&nbsp;</span>			want := float32(y0) + float32(x0)
+<span id="L1281" class="ln" data-content="  1281">&nbsp;&nbsp;</span>			if got != want || acc != Exact {
+<span id="L1282" class="ln" data-content="  1282">&nbsp;&nbsp;</span>				t.Errorf(&#34;d = %d: %g + %g = %g (%s); want %g (Exact)&#34;, d, x0, y0, got, acc, want)
+<span id="L1283" class="ln" data-content="  1283">&nbsp;&nbsp;</span>			}
+<span id="L1284" class="ln" data-content="  1284">&nbsp;&nbsp;</span>
+<span id="L1285" class="ln" data-content="  1285">&nbsp;&nbsp;</span>			z.Sub(z, y)
+<span id="L1286" class="ln" data-content="  1286">&nbsp;&nbsp;</span>			got, acc = z.Float32()
+<span id="L1287" class="ln" data-content="  1287">&nbsp;&nbsp;</span>			want = float32(want) - float32(y0)
+<span id="L1288" class="ln" data-content="  1288">&nbsp;&nbsp;</span>			if got != want || acc != Exact {
+<span id="L1289" class="ln" data-content="  1289">&nbsp;&nbsp;</span>				t.Errorf(&#34;d = %d: %g - %g = %g (%s); want %g (Exact)&#34;, d, x0+y0, y0, got, acc, want)
+<span id="L1290" class="ln" data-content="  1290">&nbsp;&nbsp;</span>			}
+<span id="L1291" class="ln" data-content="  1291">&nbsp;&nbsp;</span>		}
+<span id="L1292" class="ln" data-content="  1292">&nbsp;&nbsp;</span>	}
+<span id="L1293" class="ln" data-content="  1293">&nbsp;&nbsp;</span>}
+<span id="L1294" class="ln" data-content="  1294">&nbsp;&nbsp;</span>
+<span id="L1295" class="ln" data-content="  1295">&nbsp;&nbsp;</span><span class="comment">// TestFloatAdd64 tests that Float.Add/Sub of numbers with</span>
+<span id="L1296" class="ln" data-content="  1296">&nbsp;&nbsp;</span><span class="comment">// 53bit mantissa behaves like float64 addition/subtraction.</span>
+<span id="L1297" class="ln" data-content="  1297">&nbsp;&nbsp;</span>func TestFloatAdd64(t *testing.T) {
+<span id="L1298" class="ln" data-content="  1298">&nbsp;&nbsp;</span>	<span class="comment">// chose base such that we cross the mantissa precision limit</span>
+<span id="L1299" class="ln" data-content="  1299">&nbsp;&nbsp;</span>	const base = 1&lt;&lt;55 - 0x10 <span class="comment">// 11...110000 (55 bits)</span>
+<span id="L1300" class="ln" data-content="  1300">&nbsp;&nbsp;</span>	for d := 0; d &lt;= 0x10; d++ {
+<span id="L1301" class="ln" data-content="  1301">&nbsp;&nbsp;</span>		for i := range [2]int{} {
+<span id="L1302" class="ln" data-content="  1302">&nbsp;&nbsp;</span>			x0, y0 := float64(base), float64(d)
+<span id="L1303" class="ln" data-content="  1303">&nbsp;&nbsp;</span>			if i&amp;1 != 0 {
+<span id="L1304" class="ln" data-content="  1304">&nbsp;&nbsp;</span>				x0, y0 = y0, x0
+<span id="L1305" class="ln" data-content="  1305">&nbsp;&nbsp;</span>			}
+<span id="L1306" class="ln" data-content="  1306">&nbsp;&nbsp;</span>
+<span id="L1307" class="ln" data-content="  1307">&nbsp;&nbsp;</span>			x := NewFloat(x0)
+<span id="L1308" class="ln" data-content="  1308">&nbsp;&nbsp;</span>			y := NewFloat(y0)
+<span id="L1309" class="ln" data-content="  1309">&nbsp;&nbsp;</span>			z := new(Float).SetPrec(53)
+<span id="L1310" class="ln" data-content="  1310">&nbsp;&nbsp;</span>
+<span id="L1311" class="ln" data-content="  1311">&nbsp;&nbsp;</span>			z.Add(x, y)
+<span id="L1312" class="ln" data-content="  1312">&nbsp;&nbsp;</span>			got, acc := z.Float64()
+<span id="L1313" class="ln" data-content="  1313">&nbsp;&nbsp;</span>			want := x0 + y0
+<span id="L1314" class="ln" data-content="  1314">&nbsp;&nbsp;</span>			if got != want || acc != Exact {
+<span id="L1315" class="ln" data-content="  1315">&nbsp;&nbsp;</span>				t.Errorf(&#34;d = %d: %g + %g = %g (%s); want %g (Exact)&#34;, d, x0, y0, got, acc, want)
+<span id="L1316" class="ln" data-content="  1316">&nbsp;&nbsp;</span>			}
+<span id="L1317" class="ln" data-content="  1317">&nbsp;&nbsp;</span>
+<span id="L1318" class="ln" data-content="  1318">&nbsp;&nbsp;</span>			z.Sub(z, y)
+<span id="L1319" class="ln" data-content="  1319">&nbsp;&nbsp;</span>			got, acc = z.Float64()
+<span id="L1320" class="ln" data-content="  1320">&nbsp;&nbsp;</span>			want -= y0
+<span id="L1321" class="ln" data-content="  1321">&nbsp;&nbsp;</span>			if got != want || acc != Exact {
+<span id="L1322" class="ln" data-content="  1322">&nbsp;&nbsp;</span>				t.Errorf(&#34;d = %d: %g - %g = %g (%s); want %g (Exact)&#34;, d, x0+y0, y0, got, acc, want)
+<span id="L1323" class="ln" data-content="  1323">&nbsp;&nbsp;</span>			}
+<span id="L1324" class="ln" data-content="  1324">&nbsp;&nbsp;</span>		}
+<span id="L1325" class="ln" data-content="  1325">&nbsp;&nbsp;</span>	}
+<span id="L1326" class="ln" data-content="  1326">&nbsp;&nbsp;</span>}
+<span id="L1327" class="ln" data-content="  1327">&nbsp;&nbsp;</span>
+<span id="L1328" class="ln" data-content="  1328">&nbsp;&nbsp;</span>func TestIssue20490(t *testing.T) {
+<span id="L1329" class="ln" data-content="  1329">&nbsp;&nbsp;</span>	var tests = []struct {
+<span id="L1330" class="ln" data-content="  1330">&nbsp;&nbsp;</span>		a, b float64
+<span id="L1331" class="ln" data-content="  1331">&nbsp;&nbsp;</span>	}{
+<span id="L1332" class="ln" data-content="  1332">&nbsp;&nbsp;</span>		{4, 1},
+<span id="L1333" class="ln" data-content="  1333">&nbsp;&nbsp;</span>		{-4, 1},
+<span id="L1334" class="ln" data-content="  1334">&nbsp;&nbsp;</span>		{4, -1},
+<span id="L1335" class="ln" data-content="  1335">&nbsp;&nbsp;</span>		{-4, -1},
+<span id="L1336" class="ln" data-content="  1336">&nbsp;&nbsp;</span>	}
+<span id="L1337" class="ln" data-content="  1337">&nbsp;&nbsp;</span>
+<span id="L1338" class="ln" data-content="  1338">&nbsp;&nbsp;</span>	for _, test := range tests {
+<span id="L1339" class="ln" data-content="  1339">&nbsp;&nbsp;</span>		a, b := NewFloat(test.a), NewFloat(test.b)
+<span id="L1340" class="ln" data-content="  1340">&nbsp;&nbsp;</span>		diff := new(Float).Sub(a, b)
+<span id="L1341" class="ln" data-content="  1341">&nbsp;&nbsp;</span>		b.Sub(a, b)
+<span id="L1342" class="ln" data-content="  1342">&nbsp;&nbsp;</span>		if b.Cmp(diff) != 0 {
+<span id="L1343" class="ln" data-content="  1343">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %g - %g = %g; want %g\n&#34;, a, NewFloat(test.b), b, diff)
+<span id="L1344" class="ln" data-content="  1344">&nbsp;&nbsp;</span>		}
+<span id="L1345" class="ln" data-content="  1345">&nbsp;&nbsp;</span>
+<span id="L1346" class="ln" data-content="  1346">&nbsp;&nbsp;</span>		b = NewFloat(test.b)
+<span id="L1347" class="ln" data-content="  1347">&nbsp;&nbsp;</span>		sum := new(Float).Add(a, b)
+<span id="L1348" class="ln" data-content="  1348">&nbsp;&nbsp;</span>		b.Add(a, b)
+<span id="L1349" class="ln" data-content="  1349">&nbsp;&nbsp;</span>		if b.Cmp(sum) != 0 {
+<span id="L1350" class="ln" data-content="  1350">&nbsp;&nbsp;</span>			t.Errorf(&#34;got %g + %g = %g; want %g\n&#34;, a, NewFloat(test.b), b, sum)
+<span id="L1351" class="ln" data-content="  1351">&nbsp;&nbsp;</span>		}
+<span id="L1352" class="ln" data-content="  1352">&nbsp;&nbsp;</span>
+<span id="L1353" class="ln" data-content="  1353">&nbsp;&nbsp;</span>	}
+<span id="L1354" class="ln" data-content="  1354">&nbsp;&nbsp;</span>}
+<span id="L1355" class="ln" data-content="  1355">&nbsp;&nbsp;</span>
+<span id="L1356" class="ln" data-content="  1356">&nbsp;&nbsp;</span><span class="comment">// TestFloatMul tests Float.Mul/Quo by comparing the result of a &#34;manual&#34;</span>
+<span id="L1357" class="ln" data-content="  1357">&nbsp;&nbsp;</span><span class="comment">// multiplication/division of arguments represented by Bits values with the</span>
+<span id="L1358" class="ln" data-content="  1358">&nbsp;&nbsp;</span><span class="comment">// respective Float multiplication/division for a variety of precisions</span>
+<span id="L1359" class="ln" data-content="  1359">&nbsp;&nbsp;</span><span class="comment">// and rounding modes.</span>
+<span id="L1360" class="ln" data-content="  1360">&nbsp;&nbsp;</span>func TestFloatMul(t *testing.T) {
+<span id="L1361" class="ln" data-content="  1361">&nbsp;&nbsp;</span>	for _, xbits := range bitsList {
+<span id="L1362" class="ln" data-content="  1362">&nbsp;&nbsp;</span>		for _, ybits := range bitsList {
+<span id="L1363" class="ln" data-content="  1363">&nbsp;&nbsp;</span>			<span class="comment">// exact values</span>
+<span id="L1364" class="ln" data-content="  1364">&nbsp;&nbsp;</span>			x := xbits.Float()
+<span id="L1365" class="ln" data-content="  1365">&nbsp;&nbsp;</span>			y := ybits.Float()
+<span id="L1366" class="ln" data-content="  1366">&nbsp;&nbsp;</span>			zbits := xbits.mul(ybits)
+<span id="L1367" class="ln" data-content="  1367">&nbsp;&nbsp;</span>			z := zbits.Float()
+<span id="L1368" class="ln" data-content="  1368">&nbsp;&nbsp;</span>
+<span id="L1369" class="ln" data-content="  1369">&nbsp;&nbsp;</span>			for i, mode := range [...]RoundingMode{ToZero, ToNearestEven, AwayFromZero} {
+<span id="L1370" class="ln" data-content="  1370">&nbsp;&nbsp;</span>				for _, prec := range precList {
+<span id="L1371" class="ln" data-content="  1371">&nbsp;&nbsp;</span>					got := new(Float).SetPrec(prec).SetMode(mode)
+<span id="L1372" class="ln" data-content="  1372">&nbsp;&nbsp;</span>					got.Mul(x, y)
+<span id="L1373" class="ln" data-content="  1373">&nbsp;&nbsp;</span>					want := zbits.round(prec, mode)
+<span id="L1374" class="ln" data-content="  1374">&nbsp;&nbsp;</span>					if got.Cmp(want) != 0 {
+<span id="L1375" class="ln" data-content="  1375">&nbsp;&nbsp;</span>						t.Errorf(&#34;i = %d, prec = %d, %s:\n\t     %s %v\n\t*    %s %v\n\t=    %s\n\twant %s&#34;,
+<span id="L1376" class="ln" data-content="  1376">&nbsp;&nbsp;</span>							i, prec, mode, x, xbits, y, ybits, got, want)
+<span id="L1377" class="ln" data-content="  1377">&nbsp;&nbsp;</span>					}
+<span id="L1378" class="ln" data-content="  1378">&nbsp;&nbsp;</span>
+<span id="L1379" class="ln" data-content="  1379">&nbsp;&nbsp;</span>					if x.Sign() == 0 {
+<span id="L1380" class="ln" data-content="  1380">&nbsp;&nbsp;</span>						continue <span class="comment">// ignore div-0 case (not invertable)</span>
+<span id="L1381" class="ln" data-content="  1381">&nbsp;&nbsp;</span>					}
+<span id="L1382" class="ln" data-content="  1382">&nbsp;&nbsp;</span>					got.Quo(z, x)
+<span id="L1383" class="ln" data-content="  1383">&nbsp;&nbsp;</span>					want = ybits.round(prec, mode)
+<span id="L1384" class="ln" data-content="  1384">&nbsp;&nbsp;</span>					if got.Cmp(want) != 0 {
+<span id="L1385" class="ln" data-content="  1385">&nbsp;&nbsp;</span>						t.Errorf(&#34;i = %d, prec = %d, %s:\n\t     %s %v\n\t/    %s %v\n\t=    %s\n\twant %s&#34;,
+<span id="L1386" class="ln" data-content="  1386">&nbsp;&nbsp;</span>							i, prec, mode, z, zbits, x, xbits, got, want)
+<span id="L1387" class="ln" data-content="  1387">&nbsp;&nbsp;</span>					}
+<span id="L1388" class="ln" data-content="  1388">&nbsp;&nbsp;</span>				}
+<span id="L1389" class="ln" data-content="  1389">&nbsp;&nbsp;</span>			}
+<span id="L1390" class="ln" data-content="  1390">&nbsp;&nbsp;</span>		}
+<span id="L1391" class="ln" data-content="  1391">&nbsp;&nbsp;</span>	}
+<span id="L1392" class="ln" data-content="  1392">&nbsp;&nbsp;</span>}
+<span id="L1393" class="ln" data-content="  1393">&nbsp;&nbsp;</span>
+<span id="L1394" class="ln" data-content="  1394">&nbsp;&nbsp;</span><span class="comment">// TestFloatMul64 tests that Float.Mul/Quo of numbers with</span>
+<span id="L1395" class="ln" data-content="  1395">&nbsp;&nbsp;</span><span class="comment">// 53bit mantissa behaves like float64 multiplication/division.</span>
+<span id="L1396" class="ln" data-content="  1396">&nbsp;&nbsp;</span>func TestFloatMul64(t *testing.T) {
+<span id="L1397" class="ln" data-content="  1397">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L1398" class="ln" data-content="  1398">&nbsp;&nbsp;</span>		x, y float64
+<span id="L1399" class="ln" data-content="  1399">&nbsp;&nbsp;</span>	}{
+<span id="L1400" class="ln" data-content="  1400">&nbsp;&nbsp;</span>		{0, 0},
+<span id="L1401" class="ln" data-content="  1401">&nbsp;&nbsp;</span>		{0, 1},
+<span id="L1402" class="ln" data-content="  1402">&nbsp;&nbsp;</span>		{1, 1},
+<span id="L1403" class="ln" data-content="  1403">&nbsp;&nbsp;</span>		{1, 1.5},
+<span id="L1404" class="ln" data-content="  1404">&nbsp;&nbsp;</span>		{1.234, 0.5678},
+<span id="L1405" class="ln" data-content="  1405">&nbsp;&nbsp;</span>		{2.718281828, 3.14159265358979},
+<span id="L1406" class="ln" data-content="  1406">&nbsp;&nbsp;</span>		{2.718281828e10, 3.14159265358979e-32},
+<span id="L1407" class="ln" data-content="  1407">&nbsp;&nbsp;</span>		{1.0 / 3, 1e200},
+<span id="L1408" class="ln" data-content="  1408">&nbsp;&nbsp;</span>	} {
+<span id="L1409" class="ln" data-content="  1409">&nbsp;&nbsp;</span>		for i := range [8]int{} {
+<span id="L1410" class="ln" data-content="  1410">&nbsp;&nbsp;</span>			x0, y0 := test.x, test.y
+<span id="L1411" class="ln" data-content="  1411">&nbsp;&nbsp;</span>			if i&amp;1 != 0 {
+<span id="L1412" class="ln" data-content="  1412">&nbsp;&nbsp;</span>				x0 = -x0
+<span id="L1413" class="ln" data-content="  1413">&nbsp;&nbsp;</span>			}
+<span id="L1414" class="ln" data-content="  1414">&nbsp;&nbsp;</span>			if i&amp;2 != 0 {
+<span id="L1415" class="ln" data-content="  1415">&nbsp;&nbsp;</span>				y0 = -y0
+<span id="L1416" class="ln" data-content="  1416">&nbsp;&nbsp;</span>			}
+<span id="L1417" class="ln" data-content="  1417">&nbsp;&nbsp;</span>			if i&amp;4 != 0 {
+<span id="L1418" class="ln" data-content="  1418">&nbsp;&nbsp;</span>				x0, y0 = y0, x0
+<span id="L1419" class="ln" data-content="  1419">&nbsp;&nbsp;</span>			}
+<span id="L1420" class="ln" data-content="  1420">&nbsp;&nbsp;</span>
+<span id="L1421" class="ln" data-content="  1421">&nbsp;&nbsp;</span>			x := NewFloat(x0)
+<span id="L1422" class="ln" data-content="  1422">&nbsp;&nbsp;</span>			y := NewFloat(y0)
+<span id="L1423" class="ln" data-content="  1423">&nbsp;&nbsp;</span>			z := new(Float).SetPrec(53)
+<span id="L1424" class="ln" data-content="  1424">&nbsp;&nbsp;</span>
+<span id="L1425" class="ln" data-content="  1425">&nbsp;&nbsp;</span>			z.Mul(x, y)
+<span id="L1426" class="ln" data-content="  1426">&nbsp;&nbsp;</span>			got, _ := z.Float64()
+<span id="L1427" class="ln" data-content="  1427">&nbsp;&nbsp;</span>			want := x0 * y0
+<span id="L1428" class="ln" data-content="  1428">&nbsp;&nbsp;</span>			if got != want {
+<span id="L1429" class="ln" data-content="  1429">&nbsp;&nbsp;</span>				t.Errorf(&#34;%g * %g = %g; want %g&#34;, x0, y0, got, want)
+<span id="L1430" class="ln" data-content="  1430">&nbsp;&nbsp;</span>			}
+<span id="L1431" class="ln" data-content="  1431">&nbsp;&nbsp;</span>
+<span id="L1432" class="ln" data-content="  1432">&nbsp;&nbsp;</span>			if y0 == 0 {
+<span id="L1433" class="ln" data-content="  1433">&nbsp;&nbsp;</span>				continue <span class="comment">// avoid division-by-zero</span>
+<span id="L1434" class="ln" data-content="  1434">&nbsp;&nbsp;</span>			}
+<span id="L1435" class="ln" data-content="  1435">&nbsp;&nbsp;</span>			z.Quo(z, y)
+<span id="L1436" class="ln" data-content="  1436">&nbsp;&nbsp;</span>			got, _ = z.Float64()
+<span id="L1437" class="ln" data-content="  1437">&nbsp;&nbsp;</span>			want /= y0
+<span id="L1438" class="ln" data-content="  1438">&nbsp;&nbsp;</span>			if got != want {
+<span id="L1439" class="ln" data-content="  1439">&nbsp;&nbsp;</span>				t.Errorf(&#34;%g / %g = %g; want %g&#34;, x0*y0, y0, got, want)
+<span id="L1440" class="ln" data-content="  1440">&nbsp;&nbsp;</span>			}
+<span id="L1441" class="ln" data-content="  1441">&nbsp;&nbsp;</span>		}
+<span id="L1442" class="ln" data-content="  1442">&nbsp;&nbsp;</span>	}
+<span id="L1443" class="ln" data-content="  1443">&nbsp;&nbsp;</span>}
+<span id="L1444" class="ln" data-content="  1444">&nbsp;&nbsp;</span>
+<span id="L1445" class="ln" data-content="  1445">&nbsp;&nbsp;</span>func TestIssue6866(t *testing.T) {
+<span id="L1446" class="ln" data-content="  1446">&nbsp;&nbsp;</span>	for _, prec := range precList {
+<span id="L1447" class="ln" data-content="  1447">&nbsp;&nbsp;</span>		two := new(Float).SetPrec(prec).SetInt64(2)
+<span id="L1448" class="ln" data-content="  1448">&nbsp;&nbsp;</span>		one := new(Float).SetPrec(prec).SetInt64(1)
+<span id="L1449" class="ln" data-content="  1449">&nbsp;&nbsp;</span>		three := new(Float).SetPrec(prec).SetInt64(3)
+<span id="L1450" class="ln" data-content="  1450">&nbsp;&nbsp;</span>		msix := new(Float).SetPrec(prec).SetInt64(-6)
+<span id="L1451" class="ln" data-content="  1451">&nbsp;&nbsp;</span>		psix := new(Float).SetPrec(prec).SetInt64(+6)
+<span id="L1452" class="ln" data-content="  1452">&nbsp;&nbsp;</span>
+<span id="L1453" class="ln" data-content="  1453">&nbsp;&nbsp;</span>		p := new(Float).SetPrec(prec)
+<span id="L1454" class="ln" data-content="  1454">&nbsp;&nbsp;</span>		z1 := new(Float).SetPrec(prec)
+<span id="L1455" class="ln" data-content="  1455">&nbsp;&nbsp;</span>		z2 := new(Float).SetPrec(prec)
+<span id="L1456" class="ln" data-content="  1456">&nbsp;&nbsp;</span>
+<span id="L1457" class="ln" data-content="  1457">&nbsp;&nbsp;</span>		<span class="comment">// z1 = 2 + 1.0/3*-6</span>
+<span id="L1458" class="ln" data-content="  1458">&nbsp;&nbsp;</span>		p.Quo(one, three)
+<span id="L1459" class="ln" data-content="  1459">&nbsp;&nbsp;</span>		p.Mul(p, msix)
+<span id="L1460" class="ln" data-content="  1460">&nbsp;&nbsp;</span>		z1.Add(two, p)
+<span id="L1461" class="ln" data-content="  1461">&nbsp;&nbsp;</span>
+<span id="L1462" class="ln" data-content="  1462">&nbsp;&nbsp;</span>		<span class="comment">// z2 = 2 - 1.0/3*+6</span>
+<span id="L1463" class="ln" data-content="  1463">&nbsp;&nbsp;</span>		p.Quo(one, three)
+<span id="L1464" class="ln" data-content="  1464">&nbsp;&nbsp;</span>		p.Mul(p, psix)
+<span id="L1465" class="ln" data-content="  1465">&nbsp;&nbsp;</span>		z2.Sub(two, p)
+<span id="L1466" class="ln" data-content="  1466">&nbsp;&nbsp;</span>
+<span id="L1467" class="ln" data-content="  1467">&nbsp;&nbsp;</span>		if z1.Cmp(z2) != 0 {
+<span id="L1468" class="ln" data-content="  1468">&nbsp;&nbsp;</span>			t.Fatalf(&#34;prec %d: got z1 = %s != z2 = %s; want z1 == z2\n&#34;, prec, z1, z2)
+<span id="L1469" class="ln" data-content="  1469">&nbsp;&nbsp;</span>		}
+<span id="L1470" class="ln" data-content="  1470">&nbsp;&nbsp;</span>		if z1.Sign() != 0 {
+<span id="L1471" class="ln" data-content="  1471">&nbsp;&nbsp;</span>			t.Errorf(&#34;prec %d: got z1 = %s; want 0&#34;, prec, z1)
+<span id="L1472" class="ln" data-content="  1472">&nbsp;&nbsp;</span>		}
+<span id="L1473" class="ln" data-content="  1473">&nbsp;&nbsp;</span>		if z2.Sign() != 0 {
+<span id="L1474" class="ln" data-content="  1474">&nbsp;&nbsp;</span>			t.Errorf(&#34;prec %d: got z2 = %s; want 0&#34;, prec, z2)
+<span id="L1475" class="ln" data-content="  1475">&nbsp;&nbsp;</span>		}
+<span id="L1476" class="ln" data-content="  1476">&nbsp;&nbsp;</span>	}
+<span id="L1477" class="ln" data-content="  1477">&nbsp;&nbsp;</span>}
+<span id="L1478" class="ln" data-content="  1478">&nbsp;&nbsp;</span>
+<span id="L1479" class="ln" data-content="  1479">&nbsp;&nbsp;</span>func TestFloatQuo(t *testing.T) {
+<span id="L1480" class="ln" data-content="  1480">&nbsp;&nbsp;</span>	<span class="comment">// TODO(gri) make the test vary these precisions</span>
+<span id="L1481" class="ln" data-content="  1481">&nbsp;&nbsp;</span>	preci := 200 <span class="comment">// precision of integer part</span>
+<span id="L1482" class="ln" data-content="  1482">&nbsp;&nbsp;</span>	precf := 20  <span class="comment">// precision of fractional part</span>
+<span id="L1483" class="ln" data-content="  1483">&nbsp;&nbsp;</span>
+<span id="L1484" class="ln" data-content="  1484">&nbsp;&nbsp;</span>	for i := 0; i &lt; 8; i++ {
+<span id="L1485" class="ln" data-content="  1485">&nbsp;&nbsp;</span>		<span class="comment">// compute accurate (not rounded) result z</span>
+<span id="L1486" class="ln" data-content="  1486">&nbsp;&nbsp;</span>		bits := Bits{preci - 1}
+<span id="L1487" class="ln" data-content="  1487">&nbsp;&nbsp;</span>		if i&amp;3 != 0 {
+<span id="L1488" class="ln" data-content="  1488">&nbsp;&nbsp;</span>			bits = append(bits, 0)
+<span id="L1489" class="ln" data-content="  1489">&nbsp;&nbsp;</span>		}
+<span id="L1490" class="ln" data-content="  1490">&nbsp;&nbsp;</span>		if i&amp;2 != 0 {
+<span id="L1491" class="ln" data-content="  1491">&nbsp;&nbsp;</span>			bits = append(bits, -1)
+<span id="L1492" class="ln" data-content="  1492">&nbsp;&nbsp;</span>		}
+<span id="L1493" class="ln" data-content="  1493">&nbsp;&nbsp;</span>		if i&amp;1 != 0 {
+<span id="L1494" class="ln" data-content="  1494">&nbsp;&nbsp;</span>			bits = append(bits, -precf)
+<span id="L1495" class="ln" data-content="  1495">&nbsp;&nbsp;</span>		}
+<span id="L1496" class="ln" data-content="  1496">&nbsp;&nbsp;</span>		z := bits.Float()
+<span id="L1497" class="ln" data-content="  1497">&nbsp;&nbsp;</span>
+<span id="L1498" class="ln" data-content="  1498">&nbsp;&nbsp;</span>		<span class="comment">// compute accurate x as z*y</span>
+<span id="L1499" class="ln" data-content="  1499">&nbsp;&nbsp;</span>		y := NewFloat(3.14159265358979323e123)
+<span id="L1500" class="ln" data-content="  1500">&nbsp;&nbsp;</span>
+<span id="L1501" class="ln" data-content="  1501">&nbsp;&nbsp;</span>		x := new(Float).SetPrec(z.Prec() + y.Prec()).SetMode(ToZero)
+<span id="L1502" class="ln" data-content="  1502">&nbsp;&nbsp;</span>		x.Mul(z, y)
+<span id="L1503" class="ln" data-content="  1503">&nbsp;&nbsp;</span>
+<span id="L1504" class="ln" data-content="  1504">&nbsp;&nbsp;</span>		<span class="comment">// leave for debugging</span>
+<span id="L1505" class="ln" data-content="  1505">&nbsp;&nbsp;</span>		<span class="comment">// fmt.Printf(&#34;x = %s\ny = %s\nz = %s\n&#34;, x, y, z)</span>
+<span id="L1506" class="ln" data-content="  1506">&nbsp;&nbsp;</span>
+<span id="L1507" class="ln" data-content="  1507">&nbsp;&nbsp;</span>		if got := x.Acc(); got != Exact {
+<span id="L1508" class="ln" data-content="  1508">&nbsp;&nbsp;</span>			t.Errorf(&#34;got acc = %s; want exact&#34;, got)
+<span id="L1509" class="ln" data-content="  1509">&nbsp;&nbsp;</span>		}
+<span id="L1510" class="ln" data-content="  1510">&nbsp;&nbsp;</span>
+<span id="L1511" class="ln" data-content="  1511">&nbsp;&nbsp;</span>		<span class="comment">// round accurate z for a variety of precisions and</span>
+<span id="L1512" class="ln" data-content="  1512">&nbsp;&nbsp;</span>		<span class="comment">// modes and compare against result of x / y.</span>
+<span id="L1513" class="ln" data-content="  1513">&nbsp;&nbsp;</span>		for _, mode := range [...]RoundingMode{ToZero, ToNearestEven, AwayFromZero} {
+<span id="L1514" class="ln" data-content="  1514">&nbsp;&nbsp;</span>			for d := -5; d &lt; 5; d++ {
+<span id="L1515" class="ln" data-content="  1515">&nbsp;&nbsp;</span>				prec := uint(preci + d)
+<span id="L1516" class="ln" data-content="  1516">&nbsp;&nbsp;</span>				got := new(Float).SetPrec(prec).SetMode(mode).Quo(x, y)
+<span id="L1517" class="ln" data-content="  1517">&nbsp;&nbsp;</span>				want := bits.round(prec, mode)
+<span id="L1518" class="ln" data-content="  1518">&nbsp;&nbsp;</span>				if got.Cmp(want) != 0 {
+<span id="L1519" class="ln" data-content="  1519">&nbsp;&nbsp;</span>					t.Errorf(&#34;i = %d, prec = %d, %s:\n\t     %s\n\t/    %s\n\t=    %s\n\twant %s&#34;,
+<span id="L1520" class="ln" data-content="  1520">&nbsp;&nbsp;</span>						i, prec, mode, x, y, got, want)
+<span id="L1521" class="ln" data-content="  1521">&nbsp;&nbsp;</span>				}
+<span id="L1522" class="ln" data-content="  1522">&nbsp;&nbsp;</span>			}
+<span id="L1523" class="ln" data-content="  1523">&nbsp;&nbsp;</span>		}
+<span id="L1524" class="ln" data-content="  1524">&nbsp;&nbsp;</span>	}
+<span id="L1525" class="ln" data-content="  1525">&nbsp;&nbsp;</span>}
+<span id="L1526" class="ln" data-content="  1526">&nbsp;&nbsp;</span>
+<span id="L1527" class="ln" data-content="  1527">&nbsp;&nbsp;</span>var long = flag.Bool(&#34;long&#34;, false, &#34;run very long tests&#34;)
+<span id="L1528" class="ln" data-content="  1528">&nbsp;&nbsp;</span>
+<span id="L1529" class="ln" data-content="  1529">&nbsp;&nbsp;</span><span class="comment">// TestFloatQuoSmoke tests all divisions x/y for values x, y in the range [-n, +n];</span>
+<span id="L1530" class="ln" data-content="  1530">&nbsp;&nbsp;</span><span class="comment">// it serves as a smoke test for basic correctness of division.</span>
+<span id="L1531" class="ln" data-content="  1531">&nbsp;&nbsp;</span>func TestFloatQuoSmoke(t *testing.T) {
+<span id="L1532" class="ln" data-content="  1532">&nbsp;&nbsp;</span>	n := 10
+<span id="L1533" class="ln" data-content="  1533">&nbsp;&nbsp;</span>	if *long {
+<span id="L1534" class="ln" data-content="  1534">&nbsp;&nbsp;</span>		n = 1000
+<span id="L1535" class="ln" data-content="  1535">&nbsp;&nbsp;</span>	}
+<span id="L1536" class="ln" data-content="  1536">&nbsp;&nbsp;</span>
+<span id="L1537" class="ln" data-content="  1537">&nbsp;&nbsp;</span>	const dprec = 3         <span class="comment">// max. precision variation</span>
+<span id="L1538" class="ln" data-content="  1538">&nbsp;&nbsp;</span>	const prec = 10 + dprec <span class="comment">// enough bits to hold n precisely</span>
+<span id="L1539" class="ln" data-content="  1539">&nbsp;&nbsp;</span>	for x := -n; x &lt;= n; x++ {
+<span id="L1540" class="ln" data-content="  1540">&nbsp;&nbsp;</span>		for y := -n; y &lt; n; y++ {
+<span id="L1541" class="ln" data-content="  1541">&nbsp;&nbsp;</span>			if y == 0 {
+<span id="L1542" class="ln" data-content="  1542">&nbsp;&nbsp;</span>				continue
+<span id="L1543" class="ln" data-content="  1543">&nbsp;&nbsp;</span>			}
+<span id="L1544" class="ln" data-content="  1544">&nbsp;&nbsp;</span>
+<span id="L1545" class="ln" data-content="  1545">&nbsp;&nbsp;</span>			a := float64(x)
+<span id="L1546" class="ln" data-content="  1546">&nbsp;&nbsp;</span>			b := float64(y)
+<span id="L1547" class="ln" data-content="  1547">&nbsp;&nbsp;</span>			c := a / b
+<span id="L1548" class="ln" data-content="  1548">&nbsp;&nbsp;</span>
+<span id="L1549" class="ln" data-content="  1549">&nbsp;&nbsp;</span>			<span class="comment">// vary operand precision (only ok as long as a, b can be represented correctly)</span>
+<span id="L1550" class="ln" data-content="  1550">&nbsp;&nbsp;</span>			for ad := -dprec; ad &lt;= dprec; ad++ {
+<span id="L1551" class="ln" data-content="  1551">&nbsp;&nbsp;</span>				for bd := -dprec; bd &lt;= dprec; bd++ {
+<span id="L1552" class="ln" data-content="  1552">&nbsp;&nbsp;</span>					A := new(Float).SetPrec(uint(prec + ad)).SetFloat64(a)
+<span id="L1553" class="ln" data-content="  1553">&nbsp;&nbsp;</span>					B := new(Float).SetPrec(uint(prec + bd)).SetFloat64(b)
+<span id="L1554" class="ln" data-content="  1554">&nbsp;&nbsp;</span>					C := new(Float).SetPrec(53).Quo(A, B) <span class="comment">// C has float64 mantissa width</span>
+<span id="L1555" class="ln" data-content="  1555">&nbsp;&nbsp;</span>
+<span id="L1556" class="ln" data-content="  1556">&nbsp;&nbsp;</span>					cc, acc := C.Float64()
+<span id="L1557" class="ln" data-content="  1557">&nbsp;&nbsp;</span>					if cc != c {
+<span id="L1558" class="ln" data-content="  1558">&nbsp;&nbsp;</span>						t.Errorf(&#34;%g/%g = %s; want %.5g\n&#34;, a, b, C.Text(&#39;g&#39;, 5), c)
+<span id="L1559" class="ln" data-content="  1559">&nbsp;&nbsp;</span>						continue
+<span id="L1560" class="ln" data-content="  1560">&nbsp;&nbsp;</span>					}
+<span id="L1561" class="ln" data-content="  1561">&nbsp;&nbsp;</span>					if acc != Exact {
+<span id="L1562" class="ln" data-content="  1562">&nbsp;&nbsp;</span>						t.Errorf(&#34;%g/%g got %s result; want exact result&#34;, a, b, acc)
+<span id="L1563" class="ln" data-content="  1563">&nbsp;&nbsp;</span>					}
+<span id="L1564" class="ln" data-content="  1564">&nbsp;&nbsp;</span>				}
+<span id="L1565" class="ln" data-content="  1565">&nbsp;&nbsp;</span>			}
+<span id="L1566" class="ln" data-content="  1566">&nbsp;&nbsp;</span>		}
+<span id="L1567" class="ln" data-content="  1567">&nbsp;&nbsp;</span>	}
+<span id="L1568" class="ln" data-content="  1568">&nbsp;&nbsp;</span>}
+<span id="L1569" class="ln" data-content="  1569">&nbsp;&nbsp;</span>
+<span id="L1570" class="ln" data-content="  1570">&nbsp;&nbsp;</span><span class="comment">// TestFloatArithmeticSpecialValues tests that Float operations produce the</span>
+<span id="L1571" class="ln" data-content="  1571">&nbsp;&nbsp;</span><span class="comment">// correct results for combinations of zero (±0), finite (±1 and ±2.71828),</span>
+<span id="L1572" class="ln" data-content="  1572">&nbsp;&nbsp;</span><span class="comment">// and infinite (±Inf) operands.</span>
+<span id="L1573" class="ln" data-content="  1573">&nbsp;&nbsp;</span>func TestFloatArithmeticSpecialValues(t *testing.T) {
+<span id="L1574" class="ln" data-content="  1574">&nbsp;&nbsp;</span>	zero := 0.0
+<span id="L1575" class="ln" data-content="  1575">&nbsp;&nbsp;</span>	args := []float64{math.Inf(-1), -2.71828, -1, -zero, zero, 1, 2.71828, math.Inf(1)}
+<span id="L1576" class="ln" data-content="  1576">&nbsp;&nbsp;</span>	xx := new(Float)
+<span id="L1577" class="ln" data-content="  1577">&nbsp;&nbsp;</span>	yy := new(Float)
+<span id="L1578" class="ln" data-content="  1578">&nbsp;&nbsp;</span>	got := new(Float)
+<span id="L1579" class="ln" data-content="  1579">&nbsp;&nbsp;</span>	want := new(Float)
+<span id="L1580" class="ln" data-content="  1580">&nbsp;&nbsp;</span>	for i := 0; i &lt; 4; i++ {
+<span id="L1581" class="ln" data-content="  1581">&nbsp;&nbsp;</span>		for _, x := range args {
+<span id="L1582" class="ln" data-content="  1582">&nbsp;&nbsp;</span>			xx.SetFloat64(x)
+<span id="L1583" class="ln" data-content="  1583">&nbsp;&nbsp;</span>			<span class="comment">// check conversion is correct</span>
+<span id="L1584" class="ln" data-content="  1584">&nbsp;&nbsp;</span>			<span class="comment">// (no need to do this for y, since we see exactly the</span>
+<span id="L1585" class="ln" data-content="  1585">&nbsp;&nbsp;</span>			<span class="comment">// same values there)</span>
+<span id="L1586" class="ln" data-content="  1586">&nbsp;&nbsp;</span>			if got, acc := xx.Float64(); got != x || acc != Exact {
+<span id="L1587" class="ln" data-content="  1587">&nbsp;&nbsp;</span>				t.Errorf(&#34;Float(%g) == %g (%s)&#34;, x, got, acc)
+<span id="L1588" class="ln" data-content="  1588">&nbsp;&nbsp;</span>			}
+<span id="L1589" class="ln" data-content="  1589">&nbsp;&nbsp;</span>			for _, y := range args {
+<span id="L1590" class="ln" data-content="  1590">&nbsp;&nbsp;</span>				yy.SetFloat64(y)
+<span id="L1591" class="ln" data-content="  1591">&nbsp;&nbsp;</span>				var (
+<span id="L1592" class="ln" data-content="  1592">&nbsp;&nbsp;</span>					op string
+<span id="L1593" class="ln" data-content="  1593">&nbsp;&nbsp;</span>					z  float64
+<span id="L1594" class="ln" data-content="  1594">&nbsp;&nbsp;</span>					f  func(z, x, y *Float) *Float
+<span id="L1595" class="ln" data-content="  1595">&nbsp;&nbsp;</span>				)
+<span id="L1596" class="ln" data-content="  1596">&nbsp;&nbsp;</span>				switch i {
+<span id="L1597" class="ln" data-content="  1597">&nbsp;&nbsp;</span>				case 0:
+<span id="L1598" class="ln" data-content="  1598">&nbsp;&nbsp;</span>					op = &#34;+&#34;
+<span id="L1599" class="ln" data-content="  1599">&nbsp;&nbsp;</span>					z = x + y
+<span id="L1600" class="ln" data-content="  1600">&nbsp;&nbsp;</span>					f = (*Float).Add
+<span id="L1601" class="ln" data-content="  1601">&nbsp;&nbsp;</span>				case 1:
+<span id="L1602" class="ln" data-content="  1602">&nbsp;&nbsp;</span>					op = &#34;-&#34;
+<span id="L1603" class="ln" data-content="  1603">&nbsp;&nbsp;</span>					z = x - y
+<span id="L1604" class="ln" data-content="  1604">&nbsp;&nbsp;</span>					f = (*Float).Sub
+<span id="L1605" class="ln" data-content="  1605">&nbsp;&nbsp;</span>				case 2:
+<span id="L1606" class="ln" data-content="  1606">&nbsp;&nbsp;</span>					op = &#34;*&#34;
+<span id="L1607" class="ln" data-content="  1607">&nbsp;&nbsp;</span>					z = x * y
+<span id="L1608" class="ln" data-content="  1608">&nbsp;&nbsp;</span>					f = (*Float).Mul
+<span id="L1609" class="ln" data-content="  1609">&nbsp;&nbsp;</span>				case 3:
+<span id="L1610" class="ln" data-content="  1610">&nbsp;&nbsp;</span>					op = &#34;/&#34;
+<span id="L1611" class="ln" data-content="  1611">&nbsp;&nbsp;</span>					z = x / y
+<span id="L1612" class="ln" data-content="  1612">&nbsp;&nbsp;</span>					f = (*Float).Quo
+<span id="L1613" class="ln" data-content="  1613">&nbsp;&nbsp;</span>				default:
+<span id="L1614" class="ln" data-content="  1614">&nbsp;&nbsp;</span>					panic(&#34;unreachable&#34;)
+<span id="L1615" class="ln" data-content="  1615">&nbsp;&nbsp;</span>				}
+<span id="L1616" class="ln" data-content="  1616">&nbsp;&nbsp;</span>				var errnan bool <span class="comment">// set if execution of f panicked with ErrNaN</span>
+<span id="L1617" class="ln" data-content="  1617">&nbsp;&nbsp;</span>				<span class="comment">// protect execution of f</span>
+<span id="L1618" class="ln" data-content="  1618">&nbsp;&nbsp;</span>				func() {
+<span id="L1619" class="ln" data-content="  1619">&nbsp;&nbsp;</span>					defer func() {
+<span id="L1620" class="ln" data-content="  1620">&nbsp;&nbsp;</span>						if p := recover(); p != nil {
+<span id="L1621" class="ln" data-content="  1621">&nbsp;&nbsp;</span>							_ = p.(ErrNaN) <span class="comment">// re-panic if not ErrNaN</span>
+<span id="L1622" class="ln" data-content="  1622">&nbsp;&nbsp;</span>							errnan = true
+<span id="L1623" class="ln" data-content="  1623">&nbsp;&nbsp;</span>						}
+<span id="L1624" class="ln" data-content="  1624">&nbsp;&nbsp;</span>					}()
+<span id="L1625" class="ln" data-content="  1625">&nbsp;&nbsp;</span>					f(got, xx, yy)
+<span id="L1626" class="ln" data-content="  1626">&nbsp;&nbsp;</span>				}()
+<span id="L1627" class="ln" data-content="  1627">&nbsp;&nbsp;</span>				if math.IsNaN(z) {
+<span id="L1628" class="ln" data-content="  1628">&nbsp;&nbsp;</span>					if !errnan {
+<span id="L1629" class="ln" data-content="  1629">&nbsp;&nbsp;</span>						t.Errorf(&#34;%5g %s %5g = %5s; want ErrNaN panic&#34;, x, op, y, got)
+<span id="L1630" class="ln" data-content="  1630">&nbsp;&nbsp;</span>					}
+<span id="L1631" class="ln" data-content="  1631">&nbsp;&nbsp;</span>					continue
+<span id="L1632" class="ln" data-content="  1632">&nbsp;&nbsp;</span>				}
+<span id="L1633" class="ln" data-content="  1633">&nbsp;&nbsp;</span>				if errnan {
+<span id="L1634" class="ln" data-content="  1634">&nbsp;&nbsp;</span>					t.Errorf(&#34;%5g %s %5g panicked with ErrNan; want %5s&#34;, x, op, y, want)
+<span id="L1635" class="ln" data-content="  1635">&nbsp;&nbsp;</span>					continue
+<span id="L1636" class="ln" data-content="  1636">&nbsp;&nbsp;</span>				}
+<span id="L1637" class="ln" data-content="  1637">&nbsp;&nbsp;</span>				want.SetFloat64(z)
+<span id="L1638" class="ln" data-content="  1638">&nbsp;&nbsp;</span>				if !alike(got, want) {
+<span id="L1639" class="ln" data-content="  1639">&nbsp;&nbsp;</span>					t.Errorf(&#34;%5g %s %5g = %5s; want %5s&#34;, x, op, y, got, want)
+<span id="L1640" class="ln" data-content="  1640">&nbsp;&nbsp;</span>				}
+<span id="L1641" class="ln" data-content="  1641">&nbsp;&nbsp;</span>			}
+<span id="L1642" class="ln" data-content="  1642">&nbsp;&nbsp;</span>		}
+<span id="L1643" class="ln" data-content="  1643">&nbsp;&nbsp;</span>	}
+<span id="L1644" class="ln" data-content="  1644">&nbsp;&nbsp;</span>}
+<span id="L1645" class="ln" data-content="  1645">&nbsp;&nbsp;</span>
+<span id="L1646" class="ln" data-content="  1646">&nbsp;&nbsp;</span>func TestFloatArithmeticOverflow(t *testing.T) {
+<span id="L1647" class="ln" data-content="  1647">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L1648" class="ln" data-content="  1648">&nbsp;&nbsp;</span>		prec       uint
+<span id="L1649" class="ln" data-content="  1649">&nbsp;&nbsp;</span>		mode       RoundingMode
+<span id="L1650" class="ln" data-content="  1650">&nbsp;&nbsp;</span>		op         byte
+<span id="L1651" class="ln" data-content="  1651">&nbsp;&nbsp;</span>		x, y, want string
+<span id="L1652" class="ln" data-content="  1652">&nbsp;&nbsp;</span>		acc        Accuracy
+<span id="L1653" class="ln" data-content="  1653">&nbsp;&nbsp;</span>	}{
+<span id="L1654" class="ln" data-content="  1654">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;0&#34;, &#34;0&#34;, &#34;0&#34;, Exact},                   <span class="comment">// smoke test</span>
+<span id="L1655" class="ln" data-content="  1655">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;0x.8p+0&#34;, &#34;0x.8p+0&#34;, &#34;0x.8p+1&#34;, Exact}, <span class="comment">// smoke test</span>
+<span id="L1656" class="ln" data-content="  1656">&nbsp;&nbsp;</span>
+<span id="L1657" class="ln" data-content="  1657">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;0&#34;, &#34;0x.8p2147483647&#34;, &#34;0x.8p+2147483647&#34;, Exact},
+<span id="L1658" class="ln" data-content="  1658">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;0x.8p2147483500&#34;, &#34;0x.8p2147483647&#34;, &#34;0x.8p+2147483647&#34;, Below}, <span class="comment">// rounded to zero</span>
+<span id="L1659" class="ln" data-content="  1659">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;0x.8p2147483647&#34;, &#34;0x.8p2147483647&#34;, &#34;+Inf&#34;, Above},             <span class="comment">// exponent overflow in +</span>
+<span id="L1660" class="ln" data-content="  1660">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;-0x.8p2147483647&#34;, &#34;-0x.8p2147483647&#34;, &#34;-Inf&#34;, Below},           <span class="comment">// exponent overflow in +</span>
+<span id="L1661" class="ln" data-content="  1661">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;-&#39;, &#34;-0x.8p2147483647&#34;, &#34;0x.8p2147483647&#34;, &#34;-Inf&#34;, Below},            <span class="comment">// exponent overflow in -</span>
+<span id="L1662" class="ln" data-content="  1662">&nbsp;&nbsp;</span>
+<span id="L1663" class="ln" data-content="  1663">&nbsp;&nbsp;</span>		{4, ToZero, &#39;+&#39;, &#34;0x.fp2147483647&#34;, &#34;0x.8p2147483643&#34;, &#34;0x.fp+2147483647&#34;, Below}, <span class="comment">// rounded to zero</span>
+<span id="L1664" class="ln" data-content="  1664">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;0x.fp2147483647&#34;, &#34;0x.8p2147483643&#34;, &#34;+Inf&#34;, Above},      <span class="comment">// exponent overflow in rounding</span>
+<span id="L1665" class="ln" data-content="  1665">&nbsp;&nbsp;</span>		{4, AwayFromZero, &#39;+&#39;, &#34;0x.fp2147483647&#34;, &#34;0x.8p2147483643&#34;, &#34;+Inf&#34;, Above},       <span class="comment">// exponent overflow in rounding</span>
+<span id="L1666" class="ln" data-content="  1666">&nbsp;&nbsp;</span>
+<span id="L1667" class="ln" data-content="  1667">&nbsp;&nbsp;</span>		{4, AwayFromZero, &#39;-&#39;, &#34;-0x.fp2147483647&#34;, &#34;0x.8p2147483644&#34;, &#34;-Inf&#34;, Below},        <span class="comment">// exponent overflow in rounding</span>
+<span id="L1668" class="ln" data-content="  1668">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;-&#39;, &#34;-0x.fp2147483647&#34;, &#34;0x.8p2147483643&#34;, &#34;-Inf&#34;, Below},       <span class="comment">// exponent overflow in rounding</span>
+<span id="L1669" class="ln" data-content="  1669">&nbsp;&nbsp;</span>		{4, ToZero, &#39;-&#39;, &#34;-0x.fp2147483647&#34;, &#34;0x.8p2147483643&#34;, &#34;-0x.fp+2147483647&#34;, Above}, <span class="comment">// rounded to zero</span>
+<span id="L1670" class="ln" data-content="  1670">&nbsp;&nbsp;</span>
+<span id="L1671" class="ln" data-content="  1671">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;0&#34;, &#34;0x.8p-2147483648&#34;, &#34;0x.8p-2147483648&#34;, Exact},
+<span id="L1672" class="ln" data-content="  1672">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;+&#39;, &#34;0x.8p-2147483648&#34;, &#34;0x.8p-2147483648&#34;, &#34;0x.8p-2147483647&#34;, Exact},
+<span id="L1673" class="ln" data-content="  1673">&nbsp;&nbsp;</span>
+<span id="L1674" class="ln" data-content="  1674">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;*&#39;, &#34;1&#34;, &#34;0x.8p2147483647&#34;, &#34;0x.8p+2147483647&#34;, Exact},
+<span id="L1675" class="ln" data-content="  1675">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;*&#39;, &#34;2&#34;, &#34;0x.8p2147483647&#34;, &#34;+Inf&#34;, Above},  <span class="comment">// exponent overflow in *</span>
+<span id="L1676" class="ln" data-content="  1676">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;*&#39;, &#34;-2&#34;, &#34;0x.8p2147483647&#34;, &#34;-Inf&#34;, Below}, <span class="comment">// exponent overflow in *</span>
+<span id="L1677" class="ln" data-content="  1677">&nbsp;&nbsp;</span>
+<span id="L1678" class="ln" data-content="  1678">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;/&#39;, &#34;0.5&#34;, &#34;0x.8p2147483647&#34;, &#34;0x.8p-2147483646&#34;, Exact},
+<span id="L1679" class="ln" data-content="  1679">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;/&#39;, &#34;0x.8p+0&#34;, &#34;0x.8p2147483647&#34;, &#34;0x.8p-2147483646&#34;, Exact},
+<span id="L1680" class="ln" data-content="  1680">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;/&#39;, &#34;0x.8p-1&#34;, &#34;0x.8p2147483647&#34;, &#34;0x.8p-2147483647&#34;, Exact},
+<span id="L1681" class="ln" data-content="  1681">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;/&#39;, &#34;0x.8p-2&#34;, &#34;0x.8p2147483647&#34;, &#34;0x.8p-2147483648&#34;, Exact},
+<span id="L1682" class="ln" data-content="  1682">&nbsp;&nbsp;</span>		{4, ToNearestEven, &#39;/&#39;, &#34;0x.8p-3&#34;, &#34;0x.8p2147483647&#34;, &#34;0&#34;, Below}, <span class="comment">// exponent underflow in /</span>
+<span id="L1683" class="ln" data-content="  1683">&nbsp;&nbsp;</span>	} {
+<span id="L1684" class="ln" data-content="  1684">&nbsp;&nbsp;</span>		x := makeFloat(test.x)
+<span id="L1685" class="ln" data-content="  1685">&nbsp;&nbsp;</span>		y := makeFloat(test.y)
+<span id="L1686" class="ln" data-content="  1686">&nbsp;&nbsp;</span>		z := new(Float).SetPrec(test.prec).SetMode(test.mode)
+<span id="L1687" class="ln" data-content="  1687">&nbsp;&nbsp;</span>		switch test.op {
+<span id="L1688" class="ln" data-content="  1688">&nbsp;&nbsp;</span>		case &#39;+&#39;:
+<span id="L1689" class="ln" data-content="  1689">&nbsp;&nbsp;</span>			z.Add(x, y)
+<span id="L1690" class="ln" data-content="  1690">&nbsp;&nbsp;</span>		case &#39;-&#39;:
+<span id="L1691" class="ln" data-content="  1691">&nbsp;&nbsp;</span>			z.Sub(x, y)
+<span id="L1692" class="ln" data-content="  1692">&nbsp;&nbsp;</span>		case &#39;*&#39;:
+<span id="L1693" class="ln" data-content="  1693">&nbsp;&nbsp;</span>			z.Mul(x, y)
+<span id="L1694" class="ln" data-content="  1694">&nbsp;&nbsp;</span>		case &#39;/&#39;:
+<span id="L1695" class="ln" data-content="  1695">&nbsp;&nbsp;</span>			z.Quo(x, y)
+<span id="L1696" class="ln" data-content="  1696">&nbsp;&nbsp;</span>		default:
+<span id="L1697" class="ln" data-content="  1697">&nbsp;&nbsp;</span>			panic(&#34;unreachable&#34;)
+<span id="L1698" class="ln" data-content="  1698">&nbsp;&nbsp;</span>		}
+<span id="L1699" class="ln" data-content="  1699">&nbsp;&nbsp;</span>		if got := z.Text(&#39;p&#39;, 0); got != test.want || z.Acc() != test.acc {
+<span id="L1700" class="ln" data-content="  1700">&nbsp;&nbsp;</span>			t.Errorf(
+<span id="L1701" class="ln" data-content="  1701">&nbsp;&nbsp;</span>				&#34;prec = %d (%s): %s %c %s = %s (%s); want %s (%s)&#34;,
+<span id="L1702" class="ln" data-content="  1702">&nbsp;&nbsp;</span>				test.prec, test.mode, x.Text(&#39;p&#39;, 0), test.op, y.Text(&#39;p&#39;, 0), got, z.Acc(), test.want, test.acc,
+<span id="L1703" class="ln" data-content="  1703">&nbsp;&nbsp;</span>			)
+<span id="L1704" class="ln" data-content="  1704">&nbsp;&nbsp;</span>		}
+<span id="L1705" class="ln" data-content="  1705">&nbsp;&nbsp;</span>	}
+<span id="L1706" class="ln" data-content="  1706">&nbsp;&nbsp;</span>}
+<span id="L1707" class="ln" data-content="  1707">&nbsp;&nbsp;</span>
+<span id="L1708" class="ln" data-content="  1708">&nbsp;&nbsp;</span><span class="comment">// TODO(gri) Add tests that check correctness in the presence of aliasing.</span>
+<span id="L1709" class="ln" data-content="  1709">&nbsp;&nbsp;</span>
+<span id="L1710" class="ln" data-content="  1710">&nbsp;&nbsp;</span><span class="comment">// For rounding modes ToNegativeInf and ToPositiveInf, rounding is affected</span>
+<span id="L1711" class="ln" data-content="  1711">&nbsp;&nbsp;</span><span class="comment">// by the sign of the value to be rounded. Test that rounding happens after</span>
+<span id="L1712" class="ln" data-content="  1712">&nbsp;&nbsp;</span><span class="comment">// the sign of a result has been set.</span>
+<span id="L1713" class="ln" data-content="  1713">&nbsp;&nbsp;</span><span class="comment">// This test uses specific values that are known to fail if rounding is</span>
+<span id="L1714" class="ln" data-content="  1714">&nbsp;&nbsp;</span><span class="comment">// &#34;factored&#34; out before setting the result sign.</span>
+<span id="L1715" class="ln" data-content="  1715">&nbsp;&nbsp;</span>func TestFloatArithmeticRounding(t *testing.T) {
+<span id="L1716" class="ln" data-content="  1716">&nbsp;&nbsp;</span>	for _, test := range []struct {
+<span id="L1717" class="ln" data-content="  1717">&nbsp;&nbsp;</span>		mode       RoundingMode
+<span id="L1718" class="ln" data-content="  1718">&nbsp;&nbsp;</span>		prec       uint
+<span id="L1719" class="ln" data-content="  1719">&nbsp;&nbsp;</span>		x, y, want int64
+<span id="L1720" class="ln" data-content="  1720">&nbsp;&nbsp;</span>		op         byte
+<span id="L1721" class="ln" data-content="  1721">&nbsp;&nbsp;</span>	}{
+<span id="L1722" class="ln" data-content="  1722">&nbsp;&nbsp;</span>		{ToZero, 3, -0x8, -0x1, -0x8, &#39;+&#39;},
+<span id="L1723" class="ln" data-content="  1723">&nbsp;&nbsp;</span>		{AwayFromZero, 3, -0x8, -0x1, -0xa, &#39;+&#39;},
+<span id="L1724" class="ln" data-content="  1724">&nbsp;&nbsp;</span>		{ToNegativeInf, 3, -0x8, -0x1, -0xa, &#39;+&#39;},
+<span id="L1725" class="ln" data-content="  1725">&nbsp;&nbsp;</span>
+<span id="L1726" class="ln" data-content="  1726">&nbsp;&nbsp;</span>		{ToZero, 3, -0x8, 0x1, -0x8, &#39;-&#39;},
+<span id="L1727" class="ln" data-content="  1727">&nbsp;&nbsp;</span>		{AwayFromZero, 3, -0x8, 0x1, -0xa, &#39;-&#39;},
+<span id="L1728" class="ln" data-content="  1728">&nbsp;&nbsp;</span>		{ToNegativeInf, 3, -0x8, 0x1, -0xa, &#39;-&#39;},
+<span id="L1729" class="ln" data-content="  1729">&nbsp;&nbsp;</span>
+<span id="L1730" class="ln" data-content="  1730">&nbsp;&nbsp;</span>		{ToZero, 3, -0x9, 0x1, -0x8, &#39;*&#39;},
+<span id="L1731" class="ln" data-content="  1731">&nbsp;&nbsp;</span>		{AwayFromZero, 3, -0x9, 0x1, -0xa, &#39;*&#39;},
+<span id="L1732" class="ln" data-content="  1732">&nbsp;&nbsp;</span>		{ToNegativeInf, 3, -0x9, 0x1, -0xa, &#39;*&#39;},
+<span id="L1733" class="ln" data-content="  1733">&nbsp;&nbsp;</span>
+<span id="L1734" class="ln" data-content="  1734">&nbsp;&nbsp;</span>		{ToZero, 3, -0x9, 0x1, -0x8, &#39;/&#39;},
+<span id="L1735" class="ln" data-content="  1735">&nbsp;&nbsp;</span>		{AwayFromZero, 3, -0x9, 0x1, -0xa, &#39;/&#39;},
+<span id="L1736" class="ln" data-content="  1736">&nbsp;&nbsp;</span>		{ToNegativeInf, 3, -0x9, 0x1, -0xa, &#39;/&#39;},
+<span id="L1737" class="ln" data-content="  1737">&nbsp;&nbsp;</span>	} {
+<span id="L1738" class="ln" data-content="  1738">&nbsp;&nbsp;</span>		var x, y, z Float
+<span id="L1739" class="ln" data-content="  1739">&nbsp;&nbsp;</span>		x.SetInt64(test.x)
+<span id="L1740" class="ln" data-content="  1740">&nbsp;&nbsp;</span>		y.SetInt64(test.y)
+<span id="L1741" class="ln" data-content="  1741">&nbsp;&nbsp;</span>		z.SetPrec(test.prec).SetMode(test.mode)
+<span id="L1742" class="ln" data-content="  1742">&nbsp;&nbsp;</span>		switch test.op {
+<span id="L1743" class="ln" data-content="  1743">&nbsp;&nbsp;</span>		case &#39;+&#39;:
+<span id="L1744" class="ln" data-content="  1744">&nbsp;&nbsp;</span>			z.Add(&amp;x, &amp;y)
+<span id="L1745" class="ln" data-content="  1745">&nbsp;&nbsp;</span>		case &#39;-&#39;:
+<span id="L1746" class="ln" data-content="  1746">&nbsp;&nbsp;</span>			z.Sub(&amp;x, &amp;y)
+<span id="L1747" class="ln" data-content="  1747">&nbsp;&nbsp;</span>		case &#39;*&#39;:
+<span id="L1748" class="ln" data-content="  1748">&nbsp;&nbsp;</span>			z.Mul(&amp;x, &amp;y)
+<span id="L1749" class="ln" data-content="  1749">&nbsp;&nbsp;</span>		case &#39;/&#39;:
+<span id="L1750" class="ln" data-content="  1750">&nbsp;&nbsp;</span>			z.Quo(&amp;x, &amp;y)
+<span id="L1751" class="ln" data-content="  1751">&nbsp;&nbsp;</span>		default:
+<span id="L1752" class="ln" data-content="  1752">&nbsp;&nbsp;</span>			panic(&#34;unreachable&#34;)
+<span id="L1753" class="ln" data-content="  1753">&nbsp;&nbsp;</span>		}
+<span id="L1754" class="ln" data-content="  1754">&nbsp;&nbsp;</span>		if got, acc := z.Int64(); got != test.want || acc != Exact {
+<span id="L1755" class="ln" data-content="  1755">&nbsp;&nbsp;</span>			t.Errorf(&#34;%s, %d bits: %d %c %d = %d (%s); want %d (Exact)&#34;,
+<span id="L1756" class="ln" data-content="  1756">&nbsp;&nbsp;</span>				test.mode, test.prec, test.x, test.op, test.y, got, acc, test.want,
+<span id="L1757" class="ln" data-content="  1757">&nbsp;&nbsp;</span>			)
+<span id="L1758" class="ln" data-content="  1758">&nbsp;&nbsp;</span>		}
+<span id="L1759" class="ln" data-content="  1759">&nbsp;&nbsp;</span>	}
+<span id="L1760" class="ln" data-content="  1760">&nbsp;&nbsp;</span>}
+<span id="L1761" class="ln" data-content="  1761">&nbsp;&nbsp;</span>
+<span id="L1762" class="ln" data-content="  1762">&nbsp;&nbsp;</span><span class="comment">// TestFloatCmpSpecialValues tests that Cmp produces the correct results for</span>
+<span id="L1763" class="ln" data-content="  1763">&nbsp;&nbsp;</span><span class="comment">// combinations of zero (±0), finite (±1 and ±2.71828), and infinite (±Inf)</span>
+<span id="L1764" class="ln" data-content="  1764">&nbsp;&nbsp;</span><span class="comment">// operands.</span>
+<span id="L1765" class="ln" data-content="  1765">&nbsp;&nbsp;</span>func TestFloatCmpSpecialValues(t *testing.T) {
+<span id="L1766" class="ln" data-content="  1766">&nbsp;&nbsp;</span>	zero := 0.0
+<span id="L1767" class="ln" data-content="  1767">&nbsp;&nbsp;</span>	args := []float64{math.Inf(-1), -2.71828, -1, -zero, zero, 1, 2.71828, math.Inf(1)}
+<span id="L1768" class="ln" data-content="  1768">&nbsp;&nbsp;</span>	xx := new(Float)
+<span id="L1769" class="ln" data-content="  1769">&nbsp;&nbsp;</span>	yy := new(Float)
+<span id="L1770" class="ln" data-content="  1770">&nbsp;&nbsp;</span>	for i := 0; i &lt; 4; i++ {
+<span id="L1771" class="ln" data-content="  1771">&nbsp;&nbsp;</span>		for _, x := range args {
+<span id="L1772" class="ln" data-content="  1772">&nbsp;&nbsp;</span>			xx.SetFloat64(x)
+<span id="L1773" class="ln" data-content="  1773">&nbsp;&nbsp;</span>			<span class="comment">// check conversion is correct</span>
+<span id="L1774" class="ln" data-content="  1774">&nbsp;&nbsp;</span>			<span class="comment">// (no need to do this for y, since we see exactly the</span>
+<span id="L1775" class="ln" data-content="  1775">&nbsp;&nbsp;</span>			<span class="comment">// same values there)</span>
+<span id="L1776" class="ln" data-content="  1776">&nbsp;&nbsp;</span>			if got, acc := xx.Float64(); got != x || acc != Exact {
+<span id="L1777" class="ln" data-content="  1777">&nbsp;&nbsp;</span>				t.Errorf(&#34;Float(%g) == %g (%s)&#34;, x, got, acc)
+<span id="L1778" class="ln" data-content="  1778">&nbsp;&nbsp;</span>			}
+<span id="L1779" class="ln" data-content="  1779">&nbsp;&nbsp;</span>			for _, y := range args {
+<span id="L1780" class="ln" data-content="  1780">&nbsp;&nbsp;</span>				yy.SetFloat64(y)
+<span id="L1781" class="ln" data-content="  1781">&nbsp;&nbsp;</span>				got := xx.Cmp(yy)
+<span id="L1782" class="ln" data-content="  1782">&nbsp;&nbsp;</span>				want := 0
+<span id="L1783" class="ln" data-content="  1783">&nbsp;&nbsp;</span>				switch {
+<span id="L1784" class="ln" data-content="  1784">&nbsp;&nbsp;</span>				case x &lt; y:
+<span id="L1785" class="ln" data-content="  1785">&nbsp;&nbsp;</span>					want = -1
+<span id="L1786" class="ln" data-content="  1786">&nbsp;&nbsp;</span>				case x &gt; y:
+<span id="L1787" class="ln" data-content="  1787">&nbsp;&nbsp;</span>					want = +1
+<span id="L1788" class="ln" data-content="  1788">&nbsp;&nbsp;</span>				}
+<span id="L1789" class="ln" data-content="  1789">&nbsp;&nbsp;</span>				if got != want {
+<span id="L1790" class="ln" data-content="  1790">&nbsp;&nbsp;</span>					t.Errorf(&#34;(%g).Cmp(%g) = %v; want %v&#34;, x, y, got, want)
+<span id="L1791" class="ln" data-content="  1791">&nbsp;&nbsp;</span>				}
+<span id="L1792" class="ln" data-content="  1792">&nbsp;&nbsp;</span>			}
+<span id="L1793" class="ln" data-content="  1793">&nbsp;&nbsp;</span>		}
+<span id="L1794" class="ln" data-content="  1794">&nbsp;&nbsp;</span>	}
+<span id="L1795" class="ln" data-content="  1795">&nbsp;&nbsp;</span>}
+<span id="L1796" class="ln" data-content="  1796">&nbsp;&nbsp;</span>
+<span id="L1797" class="ln" data-content="  1797">&nbsp;&nbsp;</span>func BenchmarkFloatAdd(b *testing.B) {
+<span id="L1798" class="ln" data-content="  1798">&nbsp;&nbsp;</span>	x := new(Float)
+<span id="L1799" class="ln" data-content="  1799">&nbsp;&nbsp;</span>	y := new(Float)
+<span id="L1800" class="ln" data-content="  1800">&nbsp;&nbsp;</span>	z := new(Float)
+<span id="L1801" class="ln" data-content="  1801">&nbsp;&nbsp;</span>
+<span id="L1802" class="ln" data-content="  1802">&nbsp;&nbsp;</span>	for _, prec := range []uint{10, 1e2, 1e3, 1e4, 1e5} {
+<span id="L1803" class="ln" data-content="  1803">&nbsp;&nbsp;</span>		x.SetPrec(prec).SetRat(NewRat(1, 3))
+<span id="L1804" class="ln" data-content="  1804">&nbsp;&nbsp;</span>		y.SetPrec(prec).SetRat(NewRat(1, 6))
+<span id="L1805" class="ln" data-content="  1805">&nbsp;&nbsp;</span>		z.SetPrec(prec)
+<span id="L1806" class="ln" data-content="  1806">&nbsp;&nbsp;</span>
+<span id="L1807" class="ln" data-content="  1807">&nbsp;&nbsp;</span>		b.Run(fmt.Sprintf(&#34;%v&#34;, prec), func(b *testing.B) {
+<span id="L1808" class="ln" data-content="  1808">&nbsp;&nbsp;</span>			b.ReportAllocs()
+<span id="L1809" class="ln" data-content="  1809">&nbsp;&nbsp;</span>			for i := 0; i &lt; b.N; i++ {
+<span id="L1810" class="ln" data-content="  1810">&nbsp;&nbsp;</span>				z.Add(x, y)
+<span id="L1811" class="ln" data-content="  1811">&nbsp;&nbsp;</span>			}
+<span id="L1812" class="ln" data-content="  1812">&nbsp;&nbsp;</span>		})
+<span id="L1813" class="ln" data-content="  1813">&nbsp;&nbsp;</span>	}
+<span id="L1814" class="ln" data-content="  1814">&nbsp;&nbsp;</span>}
+<span id="L1815" class="ln" data-content="  1815">&nbsp;&nbsp;</span>
+<span id="L1816" class="ln" data-content="  1816">&nbsp;&nbsp;</span>func BenchmarkFloatSub(b *testing.B) {
+<span id="L1817" class="ln" data-content="  1817">&nbsp;&nbsp;</span>	x := new(Float)
+<span id="L1818" class="ln" data-content="  1818">&nbsp;&nbsp;</span>	y := new(Float)
+<span id="L1819" class="ln" data-content="  1819">&nbsp;&nbsp;</span>	z := new(Float)
+<span id="L1820" class="ln" data-content="  1820">&nbsp;&nbsp;</span>
+<span id="L1821" class="ln" data-content="  1821">&nbsp;&nbsp;</span>	for _, prec := range []uint{10, 1e2, 1e3, 1e4, 1e5} {
+<span id="L1822" class="ln" data-content="  1822">&nbsp;&nbsp;</span>		x.SetPrec(prec).SetRat(NewRat(1, 3))
+<span id="L1823" class="ln" data-content="  1823">&nbsp;&nbsp;</span>		y.SetPrec(prec).SetRat(NewRat(1, 6))
+<span id="L1824" class="ln" data-content="  1824">&nbsp;&nbsp;</span>		z.SetPrec(prec)
+<span id="L1825" class="ln" data-content="  1825">&nbsp;&nbsp;</span>
+<span id="L1826" class="ln" data-content="  1826">&nbsp;&nbsp;</span>		b.Run(fmt.Sprintf(&#34;%v&#34;, prec), func(b *testing.B) {
+<span id="L1827" class="ln" data-content="  1827">&nbsp;&nbsp;</span>			b.ReportAllocs()
+<span id="L1828" class="ln" data-content="  1828">&nbsp;&nbsp;</span>			for i := 0; i &lt; b.N; i++ {
+<span id="L1829" class="ln" data-content="  1829">&nbsp;&nbsp;</span>				z.Sub(x, y)
+<span id="L1830" class="ln" data-content="  1830">&nbsp;&nbsp;</span>			}
+<span id="L1831" class="ln" data-content="  1831">&nbsp;&nbsp;</span>		})
+<span id="L1832" class="ln" data-content="  1832">&nbsp;&nbsp;</span>	}
+<span id="L1833" class="ln" data-content="  1833">&nbsp;&nbsp;</span>}
+<span id="L1834" class="ln" data-content="  1834">&nbsp;&nbsp;</span>
+</pre><p><a href="float_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

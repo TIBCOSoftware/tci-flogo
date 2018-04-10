@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/net/url/url_test.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="url_test.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/net">net</a>/<a href="../url.1.html">url</a>/<span class="text-muted">url_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="../../../pkg/net/url.1.html">net/url</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2009 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package url
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	encodingPkg &#34;encoding&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;encoding/gob&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;encoding/json&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;io&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>	&#34;net&#34;
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>	&#34;reflect&#34;
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span>	&#34;testing&#34;
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span>)
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span>type URLTest struct {
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>	in        string
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	out       *URL   <span class="comment">// expected parse; RawPath=&#34;&#34; means same as Path</span>
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	roundtrip string <span class="comment">// expected result of reserializing the URL; empty means same as &#34;in&#34;.</span>
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>}
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>var urltests = []URLTest{
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>	<span class="comment">// no path</span>
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	{
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>		&#34;http://www.google.com&#34;,
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>			Host:   &#34;www.google.com&#34;,
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>		},
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>	},
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	<span class="comment">// path</span>
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>	{
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>		&#34;http://www.google.com/&#34;,
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>			Host:   &#34;www.google.com&#34;,
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>		},
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>	},
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>	<span class="comment">// path with hex escaping</span>
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>	{
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>		&#34;http://www.google.com/file%20one%26two&#34;,
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>			Scheme:  &#34;http&#34;,
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>			Host:    &#34;www.google.com&#34;,
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>			Path:    &#34;/file one&amp;two&#34;,
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>			RawPath: &#34;/file%20one%26two&#34;,
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>		},
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>	},
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>	<span class="comment">// user</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>	{
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		&#34;ftp://webmaster@www.google.com/&#34;,
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>			Scheme: &#34;ftp&#34;,
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>			User:   User(&#34;webmaster&#34;),
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>			Host:   &#34;www.google.com&#34;,
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>		},
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>	},
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>	<span class="comment">// escape sequence in username</span>
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>	{
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>		&#34;ftp://john%20doe@www.google.com/&#34;,
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>			Scheme: &#34;ftp&#34;,
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>			User:   User(&#34;john doe&#34;),
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>			Host:   &#34;www.google.com&#34;,
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>		},
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>		&#34;ftp://john%20doe@www.google.com/&#34;,
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	},
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>	<span class="comment">// empty query</span>
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	{
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>		&#34;http://www.google.com/?&#34;,
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>			Scheme:     &#34;http&#34;,
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>			Host:       &#34;www.google.com&#34;,
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>			Path:       &#34;/&#34;,
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>			ForceQuery: true,
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>		},
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>	},
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>	<span class="comment">// query ending in question mark (Issue 14573)</span>
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	{
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>		&#34;http://www.google.com/?foo=bar?&#34;,
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>			Host:     &#34;www.google.com&#34;,
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>			Path:     &#34;/&#34;,
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span>			RawQuery: &#34;foo=bar?&#34;,
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span>		},
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>	},
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>	<span class="comment">// query</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span>	{
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span>		&#34;http://www.google.com/?q=go+language&#34;,
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span>			Host:     &#34;www.google.com&#34;,
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span>			Path:     &#34;/&#34;,
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span>		},
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span>	},
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>	<span class="comment">// query with hex escaping: NOT parsed</span>
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	{
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>		&#34;http://www.google.com/?q=go%20language&#34;,
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>			Host:     &#34;www.google.com&#34;,
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>			Path:     &#34;/&#34;,
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go%20language&#34;,
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>		},
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	},
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>	<span class="comment">// %20 outside query</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	{
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>		&#34;http://www.google.com/a%20b?q=c+d&#34;,
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>			Host:     &#34;www.google.com&#34;,
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>			Path:     &#34;/a b&#34;,
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>			RawQuery: &#34;q=c+d&#34;,
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>		},
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>	},
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>	<span class="comment">// path without leading /, so no parsing</span>
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>	{
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>		&#34;http:www.google.com/?q=go+language&#34;,
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>			Opaque:   &#34;www.google.com/&#34;,
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>		},
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>		&#34;http:www.google.com/?q=go+language&#34;,
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>	},
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>	<span class="comment">// path without leading /, so no parsing</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>	{
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>		&#34;http:%2f%2fwww.google.com/?q=go+language&#34;,
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>			Opaque:   &#34;%2f%2fwww.google.com/&#34;,
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>		},
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>		&#34;http:%2f%2fwww.google.com/?q=go+language&#34;,
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>	},
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>	<span class="comment">// non-authority with path</span>
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>	{
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>		&#34;mailto:/webmaster@golang.org&#34;,
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>			Scheme: &#34;mailto&#34;,
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>			Path:   &#34;/webmaster@golang.org&#34;,
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		},
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>		&#34;mailto:///webmaster@golang.org&#34;, <span class="comment">// unfortunate compromise</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>	},
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>	<span class="comment">// non-authority</span>
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>	{
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>		&#34;mailto:webmaster@golang.org&#34;,
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>			Scheme: &#34;mailto&#34;,
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>			Opaque: &#34;webmaster@golang.org&#34;,
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>		},
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	},
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>	<span class="comment">// unescaped :// in query should not create a scheme</span>
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>	{
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>		&#34;/foo?query=http://bad&#34;,
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>			Path:     &#34;/foo&#34;,
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>			RawQuery: &#34;query=http://bad&#34;,
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>		},
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>	},
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>	<span class="comment">// leading // without scheme should create an authority</span>
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>	{
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>		&#34;//foo&#34;,
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>			Host: &#34;foo&#34;,
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>		},
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>	},
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>	<span class="comment">// leading // without scheme, with userinfo, path, and query</span>
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>	{
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>		&#34;//user@foo/path?a=b&#34;,
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>			User:     User(&#34;user&#34;),
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>			Host:     &#34;foo&#34;,
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>			Path:     &#34;/path&#34;,
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>			RawQuery: &#34;a=b&#34;,
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>		},
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>	},
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>	<span class="comment">// Three leading slashes isn&#39;t an authority, but doesn&#39;t return an error.</span>
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>	<span class="comment">// (We can&#39;t return an error, as this code is also used via</span>
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>	<span class="comment">// ServeHTTP -&gt; ReadRequest -&gt; Parse, which is arguably a</span>
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>	<span class="comment">// different URL parsing context, but currently shares the</span>
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	<span class="comment">// same codepath)</span>
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>	{
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>		&#34;///threeslashes&#34;,
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>			Path: &#34;///threeslashes&#34;,
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>		},
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	},
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>	{
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>		&#34;http://user:password@google.com&#34;,
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>			User:   UserPassword(&#34;user&#34;, &#34;password&#34;),
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>			Host:   &#34;google.com&#34;,
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>		},
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		&#34;http://user:password@google.com&#34;,
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>	},
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	<span class="comment">// unescaped @ in username should not confuse host</span>
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>	{
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>		&#34;http://j@ne:password@google.com&#34;,
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>			User:   UserPassword(&#34;j@ne&#34;, &#34;password&#34;),
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>			Host:   &#34;google.com&#34;,
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>		},
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>		&#34;http://j%40ne:password@google.com&#34;,
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span>	},
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span>	<span class="comment">// unescaped @ in password should not confuse host</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span>	{
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span>		&#34;http://jane:p@ssword@google.com&#34;,
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>			User:   UserPassword(&#34;jane&#34;, &#34;p@ssword&#34;),
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>			Host:   &#34;google.com&#34;,
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>		},
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>		&#34;http://jane:p%40ssword@google.com&#34;,
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>	},
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	{
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>		&#34;http://j@ne:password@google.com/p@th?q=@go&#34;,
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span>			User:     UserPassword(&#34;j@ne&#34;, &#34;password&#34;),
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span>			Host:     &#34;google.com&#34;,
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span>			Path:     &#34;/p@th&#34;,
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span>			RawQuery: &#34;q=@go&#34;,
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span>		},
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>		&#34;http://j%40ne:password@google.com/p@th?q=@go&#34;,
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	},
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>	{
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>		&#34;http://www.google.com/?q=go+language#foo&#34;,
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>			Host:     &#34;www.google.com&#34;,
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>			Path:     &#34;/&#34;,
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>			Fragment: &#34;foo&#34;,
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>		},
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>	},
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>	{
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>		&#34;http://www.google.com/?q=go+language#foo%26bar&#34;,
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>			Host:     &#34;www.google.com&#34;,
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>			Path:     &#34;/&#34;,
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>			Fragment: &#34;foo&amp;bar&#34;,
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		},
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>		&#34;http://www.google.com/?q=go+language#foo&amp;bar&#34;,
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>	},
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>	{
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>		&#34;file:///home/adg/rabbits&#34;,
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>			Scheme: &#34;file&#34;,
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>			Host:   &#34;&#34;,
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>			Path:   &#34;/home/adg/rabbits&#34;,
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>		},
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>		&#34;file:///home/adg/rabbits&#34;,
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>	},
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>	<span class="comment">// &#34;Windows&#34; paths are no exception to the rule.</span>
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	<span class="comment">// See golang.org/issue/6027, especially comment #9.</span>
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	{
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>		&#34;file:///C:/FooBar/Baz.txt&#34;,
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>			Scheme: &#34;file&#34;,
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>			Host:   &#34;&#34;,
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>			Path:   &#34;/C:/FooBar/Baz.txt&#34;,
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>		},
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>		&#34;file:///C:/FooBar/Baz.txt&#34;,
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	},
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>	<span class="comment">// case-insensitive scheme</span>
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	{
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>		&#34;MaIlTo:webmaster@golang.org&#34;,
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>			Scheme: &#34;mailto&#34;,
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>			Opaque: &#34;webmaster@golang.org&#34;,
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		},
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>		&#34;mailto:webmaster@golang.org&#34;,
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>	},
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	<span class="comment">// Relative path</span>
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	{
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>		&#34;a/b/c&#34;,
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>			Path: &#34;a/b/c&#34;,
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>		},
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>		&#34;a/b/c&#34;,
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	},
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>	<span class="comment">// escaped &#39;?&#39; in username and password</span>
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	{
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>		&#34;http://%3Fam:pa%3Fsword@google.com&#34;,
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>			User:   UserPassword(&#34;?am&#34;, &#34;pa?sword&#34;),
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>			Host:   &#34;google.com&#34;,
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>		},
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>	},
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>	<span class="comment">// host subcomponent; IPv4 address in RFC 3986</span>
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>	{
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>		&#34;http://192.168.0.1/&#34;,
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>			Host:   &#34;192.168.0.1&#34;,
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>		},
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>	},
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>	<span class="comment">// host and port subcomponents; IPv4 address in RFC 3986</span>
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>	{
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>		&#34;http://192.168.0.1:8080/&#34;,
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>			Host:   &#34;192.168.0.1:8080&#34;,
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>		},
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	},
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	<span class="comment">// host subcomponent; IPv6 address in RFC 3986</span>
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>	{
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>		&#34;http://[fe80::1]/&#34;,
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>			Host:   &#34;[fe80::1]&#34;,
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>		},
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>	},
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>	<span class="comment">// host and port subcomponents; IPv6 address in RFC 3986</span>
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>	{
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>		&#34;http://[fe80::1]:8080/&#34;,
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>			Host:   &#34;[fe80::1]:8080&#34;,
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>		},
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	},
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>	<span class="comment">// host subcomponent; IPv6 address with zone identifier in RFC 6874</span>
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	{
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		&#34;http://[fe80::1%25en0]/&#34;, <span class="comment">// alphanum zone identifier</span>
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>			Host:   &#34;[fe80::1%en0]&#34;,
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>		},
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	},
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>	<span class="comment">// host and port subcomponents; IPv6 address with zone identifier in RFC 6874</span>
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	{
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>		&#34;http://[fe80::1%25en0]:8080/&#34;, <span class="comment">// alphanum zone identifier</span>
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>			Host:   &#34;[fe80::1%en0]:8080&#34;,
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>		},
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L380" class="ln" data-content="   380">&nbsp;&nbsp;</span>	},
+<span id="L381" class="ln" data-content="   381">&nbsp;&nbsp;</span>	<span class="comment">// host subcomponent; IPv6 address with zone identifier in RFC 6874</span>
+<span id="L382" class="ln" data-content="   382">&nbsp;&nbsp;</span>	{
+<span id="L383" class="ln" data-content="   383">&nbsp;&nbsp;</span>		&#34;http://[fe80::1%25%65%6e%301-._~]/&#34;, <span class="comment">// percent-encoded+unreserved zone identifier</span>
+<span id="L384" class="ln" data-content="   384">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L385" class="ln" data-content="   385">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L386" class="ln" data-content="   386">&nbsp;&nbsp;</span>			Host:   &#34;[fe80::1%en01-._~]&#34;,
+<span id="L387" class="ln" data-content="   387">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L388" class="ln" data-content="   388">&nbsp;&nbsp;</span>		},
+<span id="L389" class="ln" data-content="   389">&nbsp;&nbsp;</span>		&#34;http://[fe80::1%25en01-._~]/&#34;,
+<span id="L390" class="ln" data-content="   390">&nbsp;&nbsp;</span>	},
+<span id="L391" class="ln" data-content="   391">&nbsp;&nbsp;</span>	<span class="comment">// host and port subcomponents; IPv6 address with zone identifier in RFC 6874</span>
+<span id="L392" class="ln" data-content="   392">&nbsp;&nbsp;</span>	{
+<span id="L393" class="ln" data-content="   393">&nbsp;&nbsp;</span>		&#34;http://[fe80::1%25%65%6e%301-._~]:8080/&#34;, <span class="comment">// percent-encoded+unreserved zone identifier</span>
+<span id="L394" class="ln" data-content="   394">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L395" class="ln" data-content="   395">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L396" class="ln" data-content="   396">&nbsp;&nbsp;</span>			Host:   &#34;[fe80::1%en01-._~]:8080&#34;,
+<span id="L397" class="ln" data-content="   397">&nbsp;&nbsp;</span>			Path:   &#34;/&#34;,
+<span id="L398" class="ln" data-content="   398">&nbsp;&nbsp;</span>		},
+<span id="L399" class="ln" data-content="   399">&nbsp;&nbsp;</span>		&#34;http://[fe80::1%25en01-._~]:8080/&#34;,
+<span id="L400" class="ln" data-content="   400">&nbsp;&nbsp;</span>	},
+<span id="L401" class="ln" data-content="   401">&nbsp;&nbsp;</span>	<span class="comment">// alternate escapings of path survive round trip</span>
+<span id="L402" class="ln" data-content="   402">&nbsp;&nbsp;</span>	{
+<span id="L403" class="ln" data-content="   403">&nbsp;&nbsp;</span>		&#34;http://rest.rsc.io/foo%2fbar/baz%2Fquux?alt=media&#34;,
+<span id="L404" class="ln" data-content="   404">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L405" class="ln" data-content="   405">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L406" class="ln" data-content="   406">&nbsp;&nbsp;</span>			Host:     &#34;rest.rsc.io&#34;,
+<span id="L407" class="ln" data-content="   407">&nbsp;&nbsp;</span>			Path:     &#34;/foo/bar/baz/quux&#34;,
+<span id="L408" class="ln" data-content="   408">&nbsp;&nbsp;</span>			RawPath:  &#34;/foo%2fbar/baz%2Fquux&#34;,
+<span id="L409" class="ln" data-content="   409">&nbsp;&nbsp;</span>			RawQuery: &#34;alt=media&#34;,
+<span id="L410" class="ln" data-content="   410">&nbsp;&nbsp;</span>		},
+<span id="L411" class="ln" data-content="   411">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L412" class="ln" data-content="   412">&nbsp;&nbsp;</span>	},
+<span id="L413" class="ln" data-content="   413">&nbsp;&nbsp;</span>	<span class="comment">// issue 12036</span>
+<span id="L414" class="ln" data-content="   414">&nbsp;&nbsp;</span>	{
+<span id="L415" class="ln" data-content="   415">&nbsp;&nbsp;</span>		&#34;mysql://a,b,c/bar&#34;,
+<span id="L416" class="ln" data-content="   416">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L417" class="ln" data-content="   417">&nbsp;&nbsp;</span>			Scheme: &#34;mysql&#34;,
+<span id="L418" class="ln" data-content="   418">&nbsp;&nbsp;</span>			Host:   &#34;a,b,c&#34;,
+<span id="L419" class="ln" data-content="   419">&nbsp;&nbsp;</span>			Path:   &#34;/bar&#34;,
+<span id="L420" class="ln" data-content="   420">&nbsp;&nbsp;</span>		},
+<span id="L421" class="ln" data-content="   421">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L422" class="ln" data-content="   422">&nbsp;&nbsp;</span>	},
+<span id="L423" class="ln" data-content="   423">&nbsp;&nbsp;</span>	<span class="comment">// worst case host, still round trips</span>
+<span id="L424" class="ln" data-content="   424">&nbsp;&nbsp;</span>	{
+<span id="L425" class="ln" data-content="   425">&nbsp;&nbsp;</span>		&#34;scheme://!$&amp;&#39;()*+,;=hello!:port/path&#34;,
+<span id="L426" class="ln" data-content="   426">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L427" class="ln" data-content="   427">&nbsp;&nbsp;</span>			Scheme: &#34;scheme&#34;,
+<span id="L428" class="ln" data-content="   428">&nbsp;&nbsp;</span>			Host:   &#34;!$&amp;&#39;()*+,;=hello!:port&#34;,
+<span id="L429" class="ln" data-content="   429">&nbsp;&nbsp;</span>			Path:   &#34;/path&#34;,
+<span id="L430" class="ln" data-content="   430">&nbsp;&nbsp;</span>		},
+<span id="L431" class="ln" data-content="   431">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L432" class="ln" data-content="   432">&nbsp;&nbsp;</span>	},
+<span id="L433" class="ln" data-content="   433">&nbsp;&nbsp;</span>	<span class="comment">// worst case path, still round trips</span>
+<span id="L434" class="ln" data-content="   434">&nbsp;&nbsp;</span>	{
+<span id="L435" class="ln" data-content="   435">&nbsp;&nbsp;</span>		&#34;http://host/!$&amp;&#39;()*+,;=:@[hello]&#34;,
+<span id="L436" class="ln" data-content="   436">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L437" class="ln" data-content="   437">&nbsp;&nbsp;</span>			Scheme:  &#34;http&#34;,
+<span id="L438" class="ln" data-content="   438">&nbsp;&nbsp;</span>			Host:    &#34;host&#34;,
+<span id="L439" class="ln" data-content="   439">&nbsp;&nbsp;</span>			Path:    &#34;/!$&amp;&#39;()*+,;=:@[hello]&#34;,
+<span id="L440" class="ln" data-content="   440">&nbsp;&nbsp;</span>			RawPath: &#34;/!$&amp;&#39;()*+,;=:@[hello]&#34;,
+<span id="L441" class="ln" data-content="   441">&nbsp;&nbsp;</span>		},
+<span id="L442" class="ln" data-content="   442">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L443" class="ln" data-content="   443">&nbsp;&nbsp;</span>	},
+<span id="L444" class="ln" data-content="   444">&nbsp;&nbsp;</span>	<span class="comment">// golang.org/issue/5684</span>
+<span id="L445" class="ln" data-content="   445">&nbsp;&nbsp;</span>	{
+<span id="L446" class="ln" data-content="   446">&nbsp;&nbsp;</span>		&#34;http://example.com/oid/[order_id]&#34;,
+<span id="L447" class="ln" data-content="   447">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L448" class="ln" data-content="   448">&nbsp;&nbsp;</span>			Scheme:  &#34;http&#34;,
+<span id="L449" class="ln" data-content="   449">&nbsp;&nbsp;</span>			Host:    &#34;example.com&#34;,
+<span id="L450" class="ln" data-content="   450">&nbsp;&nbsp;</span>			Path:    &#34;/oid/[order_id]&#34;,
+<span id="L451" class="ln" data-content="   451">&nbsp;&nbsp;</span>			RawPath: &#34;/oid/[order_id]&#34;,
+<span id="L452" class="ln" data-content="   452">&nbsp;&nbsp;</span>		},
+<span id="L453" class="ln" data-content="   453">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L454" class="ln" data-content="   454">&nbsp;&nbsp;</span>	},
+<span id="L455" class="ln" data-content="   455">&nbsp;&nbsp;</span>	<span class="comment">// golang.org/issue/12200 (colon with empty port)</span>
+<span id="L456" class="ln" data-content="   456">&nbsp;&nbsp;</span>	{
+<span id="L457" class="ln" data-content="   457">&nbsp;&nbsp;</span>		&#34;http://192.168.0.2:8080/foo&#34;,
+<span id="L458" class="ln" data-content="   458">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L459" class="ln" data-content="   459">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L460" class="ln" data-content="   460">&nbsp;&nbsp;</span>			Host:   &#34;192.168.0.2:8080&#34;,
+<span id="L461" class="ln" data-content="   461">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L462" class="ln" data-content="   462">&nbsp;&nbsp;</span>		},
+<span id="L463" class="ln" data-content="   463">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L464" class="ln" data-content="   464">&nbsp;&nbsp;</span>	},
+<span id="L465" class="ln" data-content="   465">&nbsp;&nbsp;</span>	{
+<span id="L466" class="ln" data-content="   466">&nbsp;&nbsp;</span>		&#34;http://192.168.0.2:/foo&#34;,
+<span id="L467" class="ln" data-content="   467">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L468" class="ln" data-content="   468">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L469" class="ln" data-content="   469">&nbsp;&nbsp;</span>			Host:   &#34;192.168.0.2:&#34;,
+<span id="L470" class="ln" data-content="   470">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L471" class="ln" data-content="   471">&nbsp;&nbsp;</span>		},
+<span id="L472" class="ln" data-content="   472">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L473" class="ln" data-content="   473">&nbsp;&nbsp;</span>	},
+<span id="L474" class="ln" data-content="   474">&nbsp;&nbsp;</span>	{
+<span id="L475" class="ln" data-content="   475">&nbsp;&nbsp;</span>		<span class="comment">// Malformed IPv6 but still accepted.</span>
+<span id="L476" class="ln" data-content="   476">&nbsp;&nbsp;</span>		&#34;http://2b01:e34:ef40:7730:8e70:5aff:fefe:edac:8080/foo&#34;,
+<span id="L477" class="ln" data-content="   477">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L478" class="ln" data-content="   478">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L479" class="ln" data-content="   479">&nbsp;&nbsp;</span>			Host:   &#34;2b01:e34:ef40:7730:8e70:5aff:fefe:edac:8080&#34;,
+<span id="L480" class="ln" data-content="   480">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L481" class="ln" data-content="   481">&nbsp;&nbsp;</span>		},
+<span id="L482" class="ln" data-content="   482">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L483" class="ln" data-content="   483">&nbsp;&nbsp;</span>	},
+<span id="L484" class="ln" data-content="   484">&nbsp;&nbsp;</span>	{
+<span id="L485" class="ln" data-content="   485">&nbsp;&nbsp;</span>		<span class="comment">// Malformed IPv6 but still accepted.</span>
+<span id="L486" class="ln" data-content="   486">&nbsp;&nbsp;</span>		&#34;http://2b01:e34:ef40:7730:8e70:5aff:fefe:edac:/foo&#34;,
+<span id="L487" class="ln" data-content="   487">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L488" class="ln" data-content="   488">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L489" class="ln" data-content="   489">&nbsp;&nbsp;</span>			Host:   &#34;2b01:e34:ef40:7730:8e70:5aff:fefe:edac:&#34;,
+<span id="L490" class="ln" data-content="   490">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L491" class="ln" data-content="   491">&nbsp;&nbsp;</span>		},
+<span id="L492" class="ln" data-content="   492">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L493" class="ln" data-content="   493">&nbsp;&nbsp;</span>	},
+<span id="L494" class="ln" data-content="   494">&nbsp;&nbsp;</span>	{
+<span id="L495" class="ln" data-content="   495">&nbsp;&nbsp;</span>		&#34;http://[2b01:e34:ef40:7730:8e70:5aff:fefe:edac]:8080/foo&#34;,
+<span id="L496" class="ln" data-content="   496">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L497" class="ln" data-content="   497">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L498" class="ln" data-content="   498">&nbsp;&nbsp;</span>			Host:   &#34;[2b01:e34:ef40:7730:8e70:5aff:fefe:edac]:8080&#34;,
+<span id="L499" class="ln" data-content="   499">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L500" class="ln" data-content="   500">&nbsp;&nbsp;</span>		},
+<span id="L501" class="ln" data-content="   501">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L502" class="ln" data-content="   502">&nbsp;&nbsp;</span>	},
+<span id="L503" class="ln" data-content="   503">&nbsp;&nbsp;</span>	{
+<span id="L504" class="ln" data-content="   504">&nbsp;&nbsp;</span>		&#34;http://[2b01:e34:ef40:7730:8e70:5aff:fefe:edac]:/foo&#34;,
+<span id="L505" class="ln" data-content="   505">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L506" class="ln" data-content="   506">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L507" class="ln" data-content="   507">&nbsp;&nbsp;</span>			Host:   &#34;[2b01:e34:ef40:7730:8e70:5aff:fefe:edac]:&#34;,
+<span id="L508" class="ln" data-content="   508">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L509" class="ln" data-content="   509">&nbsp;&nbsp;</span>		},
+<span id="L510" class="ln" data-content="   510">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L511" class="ln" data-content="   511">&nbsp;&nbsp;</span>	},
+<span id="L512" class="ln" data-content="   512">&nbsp;&nbsp;</span>	<span class="comment">// golang.org/issue/7991 and golang.org/issue/12719 (non-ascii %-encoded in host)</span>
+<span id="L513" class="ln" data-content="   513">&nbsp;&nbsp;</span>	{
+<span id="L514" class="ln" data-content="   514">&nbsp;&nbsp;</span>		&#34;http://hello.世界.com/foo&#34;,
+<span id="L515" class="ln" data-content="   515">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L516" class="ln" data-content="   516">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L517" class="ln" data-content="   517">&nbsp;&nbsp;</span>			Host:   &#34;hello.世界.com&#34;,
+<span id="L518" class="ln" data-content="   518">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L519" class="ln" data-content="   519">&nbsp;&nbsp;</span>		},
+<span id="L520" class="ln" data-content="   520">&nbsp;&nbsp;</span>		&#34;http://hello.%E4%B8%96%E7%95%8C.com/foo&#34;,
+<span id="L521" class="ln" data-content="   521">&nbsp;&nbsp;</span>	},
+<span id="L522" class="ln" data-content="   522">&nbsp;&nbsp;</span>	{
+<span id="L523" class="ln" data-content="   523">&nbsp;&nbsp;</span>		&#34;http://hello.%e4%b8%96%e7%95%8c.com/foo&#34;,
+<span id="L524" class="ln" data-content="   524">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L525" class="ln" data-content="   525">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L526" class="ln" data-content="   526">&nbsp;&nbsp;</span>			Host:   &#34;hello.世界.com&#34;,
+<span id="L527" class="ln" data-content="   527">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L528" class="ln" data-content="   528">&nbsp;&nbsp;</span>		},
+<span id="L529" class="ln" data-content="   529">&nbsp;&nbsp;</span>		&#34;http://hello.%E4%B8%96%E7%95%8C.com/foo&#34;,
+<span id="L530" class="ln" data-content="   530">&nbsp;&nbsp;</span>	},
+<span id="L531" class="ln" data-content="   531">&nbsp;&nbsp;</span>	{
+<span id="L532" class="ln" data-content="   532">&nbsp;&nbsp;</span>		&#34;http://hello.%E4%B8%96%E7%95%8C.com/foo&#34;,
+<span id="L533" class="ln" data-content="   533">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L534" class="ln" data-content="   534">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L535" class="ln" data-content="   535">&nbsp;&nbsp;</span>			Host:   &#34;hello.世界.com&#34;,
+<span id="L536" class="ln" data-content="   536">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L537" class="ln" data-content="   537">&nbsp;&nbsp;</span>		},
+<span id="L538" class="ln" data-content="   538">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L539" class="ln" data-content="   539">&nbsp;&nbsp;</span>	},
+<span id="L540" class="ln" data-content="   540">&nbsp;&nbsp;</span>	<span class="comment">// golang.org/issue/10433 (path beginning with //)</span>
+<span id="L541" class="ln" data-content="   541">&nbsp;&nbsp;</span>	{
+<span id="L542" class="ln" data-content="   542">&nbsp;&nbsp;</span>		&#34;http://example.com//foo&#34;,
+<span id="L543" class="ln" data-content="   543">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L544" class="ln" data-content="   544">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L545" class="ln" data-content="   545">&nbsp;&nbsp;</span>			Host:   &#34;example.com&#34;,
+<span id="L546" class="ln" data-content="   546">&nbsp;&nbsp;</span>			Path:   &#34;//foo&#34;,
+<span id="L547" class="ln" data-content="   547">&nbsp;&nbsp;</span>		},
+<span id="L548" class="ln" data-content="   548">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L549" class="ln" data-content="   549">&nbsp;&nbsp;</span>	},
+<span id="L550" class="ln" data-content="   550">&nbsp;&nbsp;</span>	<span class="comment">// test that we can reparse the host names we accept.</span>
+<span id="L551" class="ln" data-content="   551">&nbsp;&nbsp;</span>	{
+<span id="L552" class="ln" data-content="   552">&nbsp;&nbsp;</span>		&#34;myscheme://authority&lt;\&#34;hi\&#34;&gt;/foo&#34;,
+<span id="L553" class="ln" data-content="   553">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L554" class="ln" data-content="   554">&nbsp;&nbsp;</span>			Scheme: &#34;myscheme&#34;,
+<span id="L555" class="ln" data-content="   555">&nbsp;&nbsp;</span>			Host:   &#34;authority&lt;\&#34;hi\&#34;&gt;&#34;,
+<span id="L556" class="ln" data-content="   556">&nbsp;&nbsp;</span>			Path:   &#34;/foo&#34;,
+<span id="L557" class="ln" data-content="   557">&nbsp;&nbsp;</span>		},
+<span id="L558" class="ln" data-content="   558">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L559" class="ln" data-content="   559">&nbsp;&nbsp;</span>	},
+<span id="L560" class="ln" data-content="   560">&nbsp;&nbsp;</span>	<span class="comment">// spaces in hosts are disallowed but escaped spaces in IPv6 scope IDs are grudgingly OK.</span>
+<span id="L561" class="ln" data-content="   561">&nbsp;&nbsp;</span>	<span class="comment">// This happens on Windows.</span>
+<span id="L562" class="ln" data-content="   562">&nbsp;&nbsp;</span>	<span class="comment">// golang.org/issue/14002</span>
+<span id="L563" class="ln" data-content="   563">&nbsp;&nbsp;</span>	{
+<span id="L564" class="ln" data-content="   564">&nbsp;&nbsp;</span>		&#34;tcp://[2020::2020:20:2020:2020%25Windows%20Loves%20Spaces]:2020&#34;,
+<span id="L565" class="ln" data-content="   565">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L566" class="ln" data-content="   566">&nbsp;&nbsp;</span>			Scheme: &#34;tcp&#34;,
+<span id="L567" class="ln" data-content="   567">&nbsp;&nbsp;</span>			Host:   &#34;[2020::2020:20:2020:2020%Windows Loves Spaces]:2020&#34;,
+<span id="L568" class="ln" data-content="   568">&nbsp;&nbsp;</span>		},
+<span id="L569" class="ln" data-content="   569">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L570" class="ln" data-content="   570">&nbsp;&nbsp;</span>	},
+<span id="L571" class="ln" data-content="   571">&nbsp;&nbsp;</span>}
+<span id="L572" class="ln" data-content="   572">&nbsp;&nbsp;</span>
+<span id="L573" class="ln" data-content="   573">&nbsp;&nbsp;</span><span class="comment">// more useful string for debugging than fmt&#39;s struct printer</span>
+<span id="L574" class="ln" data-content="   574">&nbsp;&nbsp;</span>func ufmt(u *URL) string {
+<span id="L575" class="ln" data-content="   575">&nbsp;&nbsp;</span>	var user, pass interface{}
+<span id="L576" class="ln" data-content="   576">&nbsp;&nbsp;</span>	if u.User != nil {
+<span id="L577" class="ln" data-content="   577">&nbsp;&nbsp;</span>		user = u.User.Username()
+<span id="L578" class="ln" data-content="   578">&nbsp;&nbsp;</span>		if p, ok := u.User.Password(); ok {
+<span id="L579" class="ln" data-content="   579">&nbsp;&nbsp;</span>			pass = p
+<span id="L580" class="ln" data-content="   580">&nbsp;&nbsp;</span>		}
+<span id="L581" class="ln" data-content="   581">&nbsp;&nbsp;</span>	}
+<span id="L582" class="ln" data-content="   582">&nbsp;&nbsp;</span>	return fmt.Sprintf(&#34;opaque=%q, scheme=%q, user=%#v, pass=%#v, host=%q, path=%q, rawpath=%q, rawq=%q, frag=%q, forcequery=%v&#34;,
+<span id="L583" class="ln" data-content="   583">&nbsp;&nbsp;</span>		u.Opaque, u.Scheme, user, pass, u.Host, u.Path, u.RawPath, u.RawQuery, u.Fragment, u.ForceQuery)
+<span id="L584" class="ln" data-content="   584">&nbsp;&nbsp;</span>}
+<span id="L585" class="ln" data-content="   585">&nbsp;&nbsp;</span>
+<span id="L586" class="ln" data-content="   586">&nbsp;&nbsp;</span>func BenchmarkString(b *testing.B) {
+<span id="L587" class="ln" data-content="   587">&nbsp;&nbsp;</span>	b.StopTimer()
+<span id="L588" class="ln" data-content="   588">&nbsp;&nbsp;</span>	b.ReportAllocs()
+<span id="L589" class="ln" data-content="   589">&nbsp;&nbsp;</span>	for _, tt := range urltests {
+<span id="L590" class="ln" data-content="   590">&nbsp;&nbsp;</span>		u, err := Parse(tt.in)
+<span id="L591" class="ln" data-content="   591">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L592" class="ln" data-content="   592">&nbsp;&nbsp;</span>			b.Errorf(&#34;Parse(%q) returned error %s&#34;, tt.in, err)
+<span id="L593" class="ln" data-content="   593">&nbsp;&nbsp;</span>			continue
+<span id="L594" class="ln" data-content="   594">&nbsp;&nbsp;</span>		}
+<span id="L595" class="ln" data-content="   595">&nbsp;&nbsp;</span>		if tt.roundtrip == &#34;&#34; {
+<span id="L596" class="ln" data-content="   596">&nbsp;&nbsp;</span>			continue
+<span id="L597" class="ln" data-content="   597">&nbsp;&nbsp;</span>		}
+<span id="L598" class="ln" data-content="   598">&nbsp;&nbsp;</span>		b.StartTimer()
+<span id="L599" class="ln" data-content="   599">&nbsp;&nbsp;</span>		var g string
+<span id="L600" class="ln" data-content="   600">&nbsp;&nbsp;</span>		for i := 0; i &lt; b.N; i++ {
+<span id="L601" class="ln" data-content="   601">&nbsp;&nbsp;</span>			g = u.String()
+<span id="L602" class="ln" data-content="   602">&nbsp;&nbsp;</span>		}
+<span id="L603" class="ln" data-content="   603">&nbsp;&nbsp;</span>		b.StopTimer()
+<span id="L604" class="ln" data-content="   604">&nbsp;&nbsp;</span>		if w := tt.roundtrip; b.N &gt; 0 &amp;&amp; g != w {
+<span id="L605" class="ln" data-content="   605">&nbsp;&nbsp;</span>			b.Errorf(&#34;Parse(%q).String() == %q, want %q&#34;, tt.in, g, w)
+<span id="L606" class="ln" data-content="   606">&nbsp;&nbsp;</span>		}
+<span id="L607" class="ln" data-content="   607">&nbsp;&nbsp;</span>	}
+<span id="L608" class="ln" data-content="   608">&nbsp;&nbsp;</span>}
+<span id="L609" class="ln" data-content="   609">&nbsp;&nbsp;</span>
+<span id="L610" class="ln" data-content="   610">&nbsp;&nbsp;</span>func TestParse(t *testing.T) {
+<span id="L611" class="ln" data-content="   611">&nbsp;&nbsp;</span>	for _, tt := range urltests {
+<span id="L612" class="ln" data-content="   612">&nbsp;&nbsp;</span>		u, err := Parse(tt.in)
+<span id="L613" class="ln" data-content="   613">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L614" class="ln" data-content="   614">&nbsp;&nbsp;</span>			t.Errorf(&#34;Parse(%q) returned error %v&#34;, tt.in, err)
+<span id="L615" class="ln" data-content="   615">&nbsp;&nbsp;</span>			continue
+<span id="L616" class="ln" data-content="   616">&nbsp;&nbsp;</span>		}
+<span id="L617" class="ln" data-content="   617">&nbsp;&nbsp;</span>		if !reflect.DeepEqual(u, tt.out) {
+<span id="L618" class="ln" data-content="   618">&nbsp;&nbsp;</span>			t.Errorf(&#34;Parse(%q):\n\tgot  %v\n\twant %v\n&#34;, tt.in, ufmt(u), ufmt(tt.out))
+<span id="L619" class="ln" data-content="   619">&nbsp;&nbsp;</span>		}
+<span id="L620" class="ln" data-content="   620">&nbsp;&nbsp;</span>	}
+<span id="L621" class="ln" data-content="   621">&nbsp;&nbsp;</span>}
+<span id="L622" class="ln" data-content="   622">&nbsp;&nbsp;</span>
+<span id="L623" class="ln" data-content="   623">&nbsp;&nbsp;</span>const pathThatLooksSchemeRelative = &#34;//not.a.user@not.a.host/just/a/path&#34;
+<span id="L624" class="ln" data-content="   624">&nbsp;&nbsp;</span>
+<span id="L625" class="ln" data-content="   625">&nbsp;&nbsp;</span>var parseRequestURLTests = []struct {
+<span id="L626" class="ln" data-content="   626">&nbsp;&nbsp;</span>	url           string
+<span id="L627" class="ln" data-content="   627">&nbsp;&nbsp;</span>	expectedValid bool
+<span id="L628" class="ln" data-content="   628">&nbsp;&nbsp;</span>}{
+<span id="L629" class="ln" data-content="   629">&nbsp;&nbsp;</span>	{&#34;http://foo.com&#34;, true},
+<span id="L630" class="ln" data-content="   630">&nbsp;&nbsp;</span>	{&#34;http://foo.com/&#34;, true},
+<span id="L631" class="ln" data-content="   631">&nbsp;&nbsp;</span>	{&#34;http://foo.com/path&#34;, true},
+<span id="L632" class="ln" data-content="   632">&nbsp;&nbsp;</span>	{&#34;/&#34;, true},
+<span id="L633" class="ln" data-content="   633">&nbsp;&nbsp;</span>	{pathThatLooksSchemeRelative, true},
+<span id="L634" class="ln" data-content="   634">&nbsp;&nbsp;</span>	{&#34;//not.a.user@%66%6f%6f.com/just/a/path/also&#34;, true},
+<span id="L635" class="ln" data-content="   635">&nbsp;&nbsp;</span>	{&#34;*&#34;, true},
+<span id="L636" class="ln" data-content="   636">&nbsp;&nbsp;</span>	{&#34;http://192.168.0.1/&#34;, true},
+<span id="L637" class="ln" data-content="   637">&nbsp;&nbsp;</span>	{&#34;http://192.168.0.1:8080/&#34;, true},
+<span id="L638" class="ln" data-content="   638">&nbsp;&nbsp;</span>	{&#34;http://[fe80::1]/&#34;, true},
+<span id="L639" class="ln" data-content="   639">&nbsp;&nbsp;</span>	{&#34;http://[fe80::1]:8080/&#34;, true},
+<span id="L640" class="ln" data-content="   640">&nbsp;&nbsp;</span>
+<span id="L641" class="ln" data-content="   641">&nbsp;&nbsp;</span>	<span class="comment">// Tests exercising RFC 6874 compliance:</span>
+<span id="L642" class="ln" data-content="   642">&nbsp;&nbsp;</span>	{&#34;http://[fe80::1%25en0]/&#34;, true},                 <span class="comment">// with alphanum zone identifier</span>
+<span id="L643" class="ln" data-content="   643">&nbsp;&nbsp;</span>	{&#34;http://[fe80::1%25en0]:8080/&#34;, true},            <span class="comment">// with alphanum zone identifier</span>
+<span id="L644" class="ln" data-content="   644">&nbsp;&nbsp;</span>	{&#34;http://[fe80::1%25%65%6e%301-._~]/&#34;, true},      <span class="comment">// with percent-encoded+unreserved zone identifier</span>
+<span id="L645" class="ln" data-content="   645">&nbsp;&nbsp;</span>	{&#34;http://[fe80::1%25%65%6e%301-._~]:8080/&#34;, true}, <span class="comment">// with percent-encoded+unreserved zone identifier</span>
+<span id="L646" class="ln" data-content="   646">&nbsp;&nbsp;</span>
+<span id="L647" class="ln" data-content="   647">&nbsp;&nbsp;</span>	{&#34;foo.html&#34;, false},
+<span id="L648" class="ln" data-content="   648">&nbsp;&nbsp;</span>	{&#34;../dir/&#34;, false},
+<span id="L649" class="ln" data-content="   649">&nbsp;&nbsp;</span>	{&#34;http://192.168.0.%31/&#34;, false},
+<span id="L650" class="ln" data-content="   650">&nbsp;&nbsp;</span>	{&#34;http://192.168.0.%31:8080/&#34;, false},
+<span id="L651" class="ln" data-content="   651">&nbsp;&nbsp;</span>	{&#34;http://[fe80::%31]/&#34;, false},
+<span id="L652" class="ln" data-content="   652">&nbsp;&nbsp;</span>	{&#34;http://[fe80::%31]:8080/&#34;, false},
+<span id="L653" class="ln" data-content="   653">&nbsp;&nbsp;</span>	{&#34;http://[fe80::%31%25en0]/&#34;, false},
+<span id="L654" class="ln" data-content="   654">&nbsp;&nbsp;</span>	{&#34;http://[fe80::%31%25en0]:8080/&#34;, false},
+<span id="L655" class="ln" data-content="   655">&nbsp;&nbsp;</span>
+<span id="L656" class="ln" data-content="   656">&nbsp;&nbsp;</span>	<span class="comment">// These two cases are valid as textual representations as</span>
+<span id="L657" class="ln" data-content="   657">&nbsp;&nbsp;</span>	<span class="comment">// described in RFC 4007, but are not valid as address</span>
+<span id="L658" class="ln" data-content="   658">&nbsp;&nbsp;</span>	<span class="comment">// literals with IPv6 zone identifiers in URIs as described in</span>
+<span id="L659" class="ln" data-content="   659">&nbsp;&nbsp;</span>	<span class="comment">// RFC 6874.</span>
+<span id="L660" class="ln" data-content="   660">&nbsp;&nbsp;</span>	{&#34;http://[fe80::1%en0]/&#34;, false},
+<span id="L661" class="ln" data-content="   661">&nbsp;&nbsp;</span>	{&#34;http://[fe80::1%en0]:8080/&#34;, false},
+<span id="L662" class="ln" data-content="   662">&nbsp;&nbsp;</span>}
+<span id="L663" class="ln" data-content="   663">&nbsp;&nbsp;</span>
+<span id="L664" class="ln" data-content="   664">&nbsp;&nbsp;</span>func TestParseRequestURI(t *testing.T) {
+<span id="L665" class="ln" data-content="   665">&nbsp;&nbsp;</span>	for _, test := range parseRequestURLTests {
+<span id="L666" class="ln" data-content="   666">&nbsp;&nbsp;</span>		_, err := ParseRequestURI(test.url)
+<span id="L667" class="ln" data-content="   667">&nbsp;&nbsp;</span>		if test.expectedValid &amp;&amp; err != nil {
+<span id="L668" class="ln" data-content="   668">&nbsp;&nbsp;</span>			t.Errorf(&#34;ParseRequestURI(%q) gave err %v; want no error&#34;, test.url, err)
+<span id="L669" class="ln" data-content="   669">&nbsp;&nbsp;</span>		} else if !test.expectedValid &amp;&amp; err == nil {
+<span id="L670" class="ln" data-content="   670">&nbsp;&nbsp;</span>			t.Errorf(&#34;ParseRequestURI(%q) gave nil error; want some error&#34;, test.url)
+<span id="L671" class="ln" data-content="   671">&nbsp;&nbsp;</span>		}
+<span id="L672" class="ln" data-content="   672">&nbsp;&nbsp;</span>	}
+<span id="L673" class="ln" data-content="   673">&nbsp;&nbsp;</span>
+<span id="L674" class="ln" data-content="   674">&nbsp;&nbsp;</span>	url, err := ParseRequestURI(pathThatLooksSchemeRelative)
+<span id="L675" class="ln" data-content="   675">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L676" class="ln" data-content="   676">&nbsp;&nbsp;</span>		t.Fatalf(&#34;Unexpected error %v&#34;, err)
+<span id="L677" class="ln" data-content="   677">&nbsp;&nbsp;</span>	}
+<span id="L678" class="ln" data-content="   678">&nbsp;&nbsp;</span>	if url.Path != pathThatLooksSchemeRelative {
+<span id="L679" class="ln" data-content="   679">&nbsp;&nbsp;</span>		t.Errorf(&#34;ParseRequestURI path:\ngot  %q\nwant %q&#34;, url.Path, pathThatLooksSchemeRelative)
+<span id="L680" class="ln" data-content="   680">&nbsp;&nbsp;</span>	}
+<span id="L681" class="ln" data-content="   681">&nbsp;&nbsp;</span>}
+<span id="L682" class="ln" data-content="   682">&nbsp;&nbsp;</span>
+<span id="L683" class="ln" data-content="   683">&nbsp;&nbsp;</span>var stringURLTests = []struct {
+<span id="L684" class="ln" data-content="   684">&nbsp;&nbsp;</span>	url  URL
+<span id="L685" class="ln" data-content="   685">&nbsp;&nbsp;</span>	want string
+<span id="L686" class="ln" data-content="   686">&nbsp;&nbsp;</span>}{
+<span id="L687" class="ln" data-content="   687">&nbsp;&nbsp;</span>	<span class="comment">// No leading slash on path should prepend slash on String() call</span>
+<span id="L688" class="ln" data-content="   688">&nbsp;&nbsp;</span>	{
+<span id="L689" class="ln" data-content="   689">&nbsp;&nbsp;</span>		url: URL{
+<span id="L690" class="ln" data-content="   690">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L691" class="ln" data-content="   691">&nbsp;&nbsp;</span>			Host:   &#34;www.google.com&#34;,
+<span id="L692" class="ln" data-content="   692">&nbsp;&nbsp;</span>			Path:   &#34;search&#34;,
+<span id="L693" class="ln" data-content="   693">&nbsp;&nbsp;</span>		},
+<span id="L694" class="ln" data-content="   694">&nbsp;&nbsp;</span>		want: &#34;http://www.google.com/search&#34;,
+<span id="L695" class="ln" data-content="   695">&nbsp;&nbsp;</span>	},
+<span id="L696" class="ln" data-content="   696">&nbsp;&nbsp;</span>	<span class="comment">// Relative path with first element containing &#34;:&#34; should be prepended with &#34;./&#34;, golang.org/issue/17184</span>
+<span id="L697" class="ln" data-content="   697">&nbsp;&nbsp;</span>	{
+<span id="L698" class="ln" data-content="   698">&nbsp;&nbsp;</span>		url: URL{
+<span id="L699" class="ln" data-content="   699">&nbsp;&nbsp;</span>			Path: &#34;this:that&#34;,
+<span id="L700" class="ln" data-content="   700">&nbsp;&nbsp;</span>		},
+<span id="L701" class="ln" data-content="   701">&nbsp;&nbsp;</span>		want: &#34;./this:that&#34;,
+<span id="L702" class="ln" data-content="   702">&nbsp;&nbsp;</span>	},
+<span id="L703" class="ln" data-content="   703">&nbsp;&nbsp;</span>	<span class="comment">// Relative path with second element containing &#34;:&#34; should not be prepended with &#34;./&#34;</span>
+<span id="L704" class="ln" data-content="   704">&nbsp;&nbsp;</span>	{
+<span id="L705" class="ln" data-content="   705">&nbsp;&nbsp;</span>		url: URL{
+<span id="L706" class="ln" data-content="   706">&nbsp;&nbsp;</span>			Path: &#34;here/this:that&#34;,
+<span id="L707" class="ln" data-content="   707">&nbsp;&nbsp;</span>		},
+<span id="L708" class="ln" data-content="   708">&nbsp;&nbsp;</span>		want: &#34;here/this:that&#34;,
+<span id="L709" class="ln" data-content="   709">&nbsp;&nbsp;</span>	},
+<span id="L710" class="ln" data-content="   710">&nbsp;&nbsp;</span>	<span class="comment">// Non-relative path with first element containing &#34;:&#34; should not be prepended with &#34;./&#34;</span>
+<span id="L711" class="ln" data-content="   711">&nbsp;&nbsp;</span>	{
+<span id="L712" class="ln" data-content="   712">&nbsp;&nbsp;</span>		url: URL{
+<span id="L713" class="ln" data-content="   713">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L714" class="ln" data-content="   714">&nbsp;&nbsp;</span>			Host:   &#34;www.google.com&#34;,
+<span id="L715" class="ln" data-content="   715">&nbsp;&nbsp;</span>			Path:   &#34;this:that&#34;,
+<span id="L716" class="ln" data-content="   716">&nbsp;&nbsp;</span>		},
+<span id="L717" class="ln" data-content="   717">&nbsp;&nbsp;</span>		want: &#34;http://www.google.com/this:that&#34;,
+<span id="L718" class="ln" data-content="   718">&nbsp;&nbsp;</span>	},
+<span id="L719" class="ln" data-content="   719">&nbsp;&nbsp;</span>}
+<span id="L720" class="ln" data-content="   720">&nbsp;&nbsp;</span>
+<span id="L721" class="ln" data-content="   721">&nbsp;&nbsp;</span>func TestURLString(t *testing.T) {
+<span id="L722" class="ln" data-content="   722">&nbsp;&nbsp;</span>	for _, tt := range urltests {
+<span id="L723" class="ln" data-content="   723">&nbsp;&nbsp;</span>		u, err := Parse(tt.in)
+<span id="L724" class="ln" data-content="   724">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L725" class="ln" data-content="   725">&nbsp;&nbsp;</span>			t.Errorf(&#34;Parse(%q) returned error %s&#34;, tt.in, err)
+<span id="L726" class="ln" data-content="   726">&nbsp;&nbsp;</span>			continue
+<span id="L727" class="ln" data-content="   727">&nbsp;&nbsp;</span>		}
+<span id="L728" class="ln" data-content="   728">&nbsp;&nbsp;</span>		expected := tt.in
+<span id="L729" class="ln" data-content="   729">&nbsp;&nbsp;</span>		if tt.roundtrip != &#34;&#34; {
+<span id="L730" class="ln" data-content="   730">&nbsp;&nbsp;</span>			expected = tt.roundtrip
+<span id="L731" class="ln" data-content="   731">&nbsp;&nbsp;</span>		}
+<span id="L732" class="ln" data-content="   732">&nbsp;&nbsp;</span>		s := u.String()
+<span id="L733" class="ln" data-content="   733">&nbsp;&nbsp;</span>		if s != expected {
+<span id="L734" class="ln" data-content="   734">&nbsp;&nbsp;</span>			t.Errorf(&#34;Parse(%q).String() == %q (expected %q)&#34;, tt.in, s, expected)
+<span id="L735" class="ln" data-content="   735">&nbsp;&nbsp;</span>		}
+<span id="L736" class="ln" data-content="   736">&nbsp;&nbsp;</span>	}
+<span id="L737" class="ln" data-content="   737">&nbsp;&nbsp;</span>
+<span id="L738" class="ln" data-content="   738">&nbsp;&nbsp;</span>	for _, tt := range stringURLTests {
+<span id="L739" class="ln" data-content="   739">&nbsp;&nbsp;</span>		if got := tt.url.String(); got != tt.want {
+<span id="L740" class="ln" data-content="   740">&nbsp;&nbsp;</span>			t.Errorf(&#34;%+v.String() = %q; want %q&#34;, tt.url, got, tt.want)
+<span id="L741" class="ln" data-content="   741">&nbsp;&nbsp;</span>		}
+<span id="L742" class="ln" data-content="   742">&nbsp;&nbsp;</span>	}
+<span id="L743" class="ln" data-content="   743">&nbsp;&nbsp;</span>}
+<span id="L744" class="ln" data-content="   744">&nbsp;&nbsp;</span>
+<span id="L745" class="ln" data-content="   745">&nbsp;&nbsp;</span>type EscapeTest struct {
+<span id="L746" class="ln" data-content="   746">&nbsp;&nbsp;</span>	in  string
+<span id="L747" class="ln" data-content="   747">&nbsp;&nbsp;</span>	out string
+<span id="L748" class="ln" data-content="   748">&nbsp;&nbsp;</span>	err error
+<span id="L749" class="ln" data-content="   749">&nbsp;&nbsp;</span>}
+<span id="L750" class="ln" data-content="   750">&nbsp;&nbsp;</span>
+<span id="L751" class="ln" data-content="   751">&nbsp;&nbsp;</span>var unescapeTests = []EscapeTest{
+<span id="L752" class="ln" data-content="   752">&nbsp;&nbsp;</span>	{
+<span id="L753" class="ln" data-content="   753">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L754" class="ln" data-content="   754">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L755" class="ln" data-content="   755">&nbsp;&nbsp;</span>		nil,
+<span id="L756" class="ln" data-content="   756">&nbsp;&nbsp;</span>	},
+<span id="L757" class="ln" data-content="   757">&nbsp;&nbsp;</span>	{
+<span id="L758" class="ln" data-content="   758">&nbsp;&nbsp;</span>		&#34;abc&#34;,
+<span id="L759" class="ln" data-content="   759">&nbsp;&nbsp;</span>		&#34;abc&#34;,
+<span id="L760" class="ln" data-content="   760">&nbsp;&nbsp;</span>		nil,
+<span id="L761" class="ln" data-content="   761">&nbsp;&nbsp;</span>	},
+<span id="L762" class="ln" data-content="   762">&nbsp;&nbsp;</span>	{
+<span id="L763" class="ln" data-content="   763">&nbsp;&nbsp;</span>		&#34;1%41&#34;,
+<span id="L764" class="ln" data-content="   764">&nbsp;&nbsp;</span>		&#34;1A&#34;,
+<span id="L765" class="ln" data-content="   765">&nbsp;&nbsp;</span>		nil,
+<span id="L766" class="ln" data-content="   766">&nbsp;&nbsp;</span>	},
+<span id="L767" class="ln" data-content="   767">&nbsp;&nbsp;</span>	{
+<span id="L768" class="ln" data-content="   768">&nbsp;&nbsp;</span>		&#34;1%41%42%43&#34;,
+<span id="L769" class="ln" data-content="   769">&nbsp;&nbsp;</span>		&#34;1ABC&#34;,
+<span id="L770" class="ln" data-content="   770">&nbsp;&nbsp;</span>		nil,
+<span id="L771" class="ln" data-content="   771">&nbsp;&nbsp;</span>	},
+<span id="L772" class="ln" data-content="   772">&nbsp;&nbsp;</span>	{
+<span id="L773" class="ln" data-content="   773">&nbsp;&nbsp;</span>		&#34;%4a&#34;,
+<span id="L774" class="ln" data-content="   774">&nbsp;&nbsp;</span>		&#34;J&#34;,
+<span id="L775" class="ln" data-content="   775">&nbsp;&nbsp;</span>		nil,
+<span id="L776" class="ln" data-content="   776">&nbsp;&nbsp;</span>	},
+<span id="L777" class="ln" data-content="   777">&nbsp;&nbsp;</span>	{
+<span id="L778" class="ln" data-content="   778">&nbsp;&nbsp;</span>		&#34;%6F&#34;,
+<span id="L779" class="ln" data-content="   779">&nbsp;&nbsp;</span>		&#34;o&#34;,
+<span id="L780" class="ln" data-content="   780">&nbsp;&nbsp;</span>		nil,
+<span id="L781" class="ln" data-content="   781">&nbsp;&nbsp;</span>	},
+<span id="L782" class="ln" data-content="   782">&nbsp;&nbsp;</span>	{
+<span id="L783" class="ln" data-content="   783">&nbsp;&nbsp;</span>		&#34;%&#34;, <span class="comment">// not enough characters after %</span>
+<span id="L784" class="ln" data-content="   784">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L785" class="ln" data-content="   785">&nbsp;&nbsp;</span>		EscapeError(&#34;%&#34;),
+<span id="L786" class="ln" data-content="   786">&nbsp;&nbsp;</span>	},
+<span id="L787" class="ln" data-content="   787">&nbsp;&nbsp;</span>	{
+<span id="L788" class="ln" data-content="   788">&nbsp;&nbsp;</span>		&#34;%a&#34;, <span class="comment">// not enough characters after %</span>
+<span id="L789" class="ln" data-content="   789">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L790" class="ln" data-content="   790">&nbsp;&nbsp;</span>		EscapeError(&#34;%a&#34;),
+<span id="L791" class="ln" data-content="   791">&nbsp;&nbsp;</span>	},
+<span id="L792" class="ln" data-content="   792">&nbsp;&nbsp;</span>	{
+<span id="L793" class="ln" data-content="   793">&nbsp;&nbsp;</span>		&#34;%1&#34;, <span class="comment">// not enough characters after %</span>
+<span id="L794" class="ln" data-content="   794">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L795" class="ln" data-content="   795">&nbsp;&nbsp;</span>		EscapeError(&#34;%1&#34;),
+<span id="L796" class="ln" data-content="   796">&nbsp;&nbsp;</span>	},
+<span id="L797" class="ln" data-content="   797">&nbsp;&nbsp;</span>	{
+<span id="L798" class="ln" data-content="   798">&nbsp;&nbsp;</span>		&#34;123%45%6&#34;, <span class="comment">// not enough characters after %</span>
+<span id="L799" class="ln" data-content="   799">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L800" class="ln" data-content="   800">&nbsp;&nbsp;</span>		EscapeError(&#34;%6&#34;),
+<span id="L801" class="ln" data-content="   801">&nbsp;&nbsp;</span>	},
+<span id="L802" class="ln" data-content="   802">&nbsp;&nbsp;</span>	{
+<span id="L803" class="ln" data-content="   803">&nbsp;&nbsp;</span>		&#34;%zzzzz&#34;, <span class="comment">// invalid hex digits</span>
+<span id="L804" class="ln" data-content="   804">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L805" class="ln" data-content="   805">&nbsp;&nbsp;</span>		EscapeError(&#34;%zz&#34;),
+<span id="L806" class="ln" data-content="   806">&nbsp;&nbsp;</span>	},
+<span id="L807" class="ln" data-content="   807">&nbsp;&nbsp;</span>	{
+<span id="L808" class="ln" data-content="   808">&nbsp;&nbsp;</span>		&#34;a+b&#34;,
+<span id="L809" class="ln" data-content="   809">&nbsp;&nbsp;</span>		&#34;a b&#34;,
+<span id="L810" class="ln" data-content="   810">&nbsp;&nbsp;</span>		nil,
+<span id="L811" class="ln" data-content="   811">&nbsp;&nbsp;</span>	},
+<span id="L812" class="ln" data-content="   812">&nbsp;&nbsp;</span>	{
+<span id="L813" class="ln" data-content="   813">&nbsp;&nbsp;</span>		&#34;a%20b&#34;,
+<span id="L814" class="ln" data-content="   814">&nbsp;&nbsp;</span>		&#34;a b&#34;,
+<span id="L815" class="ln" data-content="   815">&nbsp;&nbsp;</span>		nil,
+<span id="L816" class="ln" data-content="   816">&nbsp;&nbsp;</span>	},
+<span id="L817" class="ln" data-content="   817">&nbsp;&nbsp;</span>}
+<span id="L818" class="ln" data-content="   818">&nbsp;&nbsp;</span>
+<span id="L819" class="ln" data-content="   819">&nbsp;&nbsp;</span>func TestUnescape(t *testing.T) {
+<span id="L820" class="ln" data-content="   820">&nbsp;&nbsp;</span>	for _, tt := range unescapeTests {
+<span id="L821" class="ln" data-content="   821">&nbsp;&nbsp;</span>		actual, err := QueryUnescape(tt.in)
+<span id="L822" class="ln" data-content="   822">&nbsp;&nbsp;</span>		if actual != tt.out || (err != nil) != (tt.err != nil) {
+<span id="L823" class="ln" data-content="   823">&nbsp;&nbsp;</span>			t.Errorf(&#34;QueryUnescape(%q) = %q, %s; want %q, %s&#34;, tt.in, actual, err, tt.out, tt.err)
+<span id="L824" class="ln" data-content="   824">&nbsp;&nbsp;</span>		}
+<span id="L825" class="ln" data-content="   825">&nbsp;&nbsp;</span>
+<span id="L826" class="ln" data-content="   826">&nbsp;&nbsp;</span>		in := tt.in
+<span id="L827" class="ln" data-content="   827">&nbsp;&nbsp;</span>		out := tt.out
+<span id="L828" class="ln" data-content="   828">&nbsp;&nbsp;</span>		if strings.Contains(tt.in, &#34;+&#34;) {
+<span id="L829" class="ln" data-content="   829">&nbsp;&nbsp;</span>			in = strings.Replace(tt.in, &#34;+&#34;, &#34;%20&#34;, -1)
+<span id="L830" class="ln" data-content="   830">&nbsp;&nbsp;</span>			actual, err := PathUnescape(in)
+<span id="L831" class="ln" data-content="   831">&nbsp;&nbsp;</span>			if actual != tt.out || (err != nil) != (tt.err != nil) {
+<span id="L832" class="ln" data-content="   832">&nbsp;&nbsp;</span>				t.Errorf(&#34;PathUnescape(%q) = %q, %s; want %q, %s&#34;, in, actual, err, tt.out, tt.err)
+<span id="L833" class="ln" data-content="   833">&nbsp;&nbsp;</span>			}
+<span id="L834" class="ln" data-content="   834">&nbsp;&nbsp;</span>			if tt.err == nil {
+<span id="L835" class="ln" data-content="   835">&nbsp;&nbsp;</span>				s, err := QueryUnescape(strings.Replace(tt.in, &#34;+&#34;, &#34;XXX&#34;, -1))
+<span id="L836" class="ln" data-content="   836">&nbsp;&nbsp;</span>				if err != nil {
+<span id="L837" class="ln" data-content="   837">&nbsp;&nbsp;</span>					continue
+<span id="L838" class="ln" data-content="   838">&nbsp;&nbsp;</span>				}
+<span id="L839" class="ln" data-content="   839">&nbsp;&nbsp;</span>				in = tt.in
+<span id="L840" class="ln" data-content="   840">&nbsp;&nbsp;</span>				out = strings.Replace(s, &#34;XXX&#34;, &#34;+&#34;, -1)
+<span id="L841" class="ln" data-content="   841">&nbsp;&nbsp;</span>			}
+<span id="L842" class="ln" data-content="   842">&nbsp;&nbsp;</span>		}
+<span id="L843" class="ln" data-content="   843">&nbsp;&nbsp;</span>
+<span id="L844" class="ln" data-content="   844">&nbsp;&nbsp;</span>		actual, err = PathUnescape(in)
+<span id="L845" class="ln" data-content="   845">&nbsp;&nbsp;</span>		if actual != out || (err != nil) != (tt.err != nil) {
+<span id="L846" class="ln" data-content="   846">&nbsp;&nbsp;</span>			t.Errorf(&#34;PathUnescape(%q) = %q, %s; want %q, %s&#34;, in, actual, err, out, tt.err)
+<span id="L847" class="ln" data-content="   847">&nbsp;&nbsp;</span>		}
+<span id="L848" class="ln" data-content="   848">&nbsp;&nbsp;</span>	}
+<span id="L849" class="ln" data-content="   849">&nbsp;&nbsp;</span>}
+<span id="L850" class="ln" data-content="   850">&nbsp;&nbsp;</span>
+<span id="L851" class="ln" data-content="   851">&nbsp;&nbsp;</span>var queryEscapeTests = []EscapeTest{
+<span id="L852" class="ln" data-content="   852">&nbsp;&nbsp;</span>	{
+<span id="L853" class="ln" data-content="   853">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L854" class="ln" data-content="   854">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L855" class="ln" data-content="   855">&nbsp;&nbsp;</span>		nil,
+<span id="L856" class="ln" data-content="   856">&nbsp;&nbsp;</span>	},
+<span id="L857" class="ln" data-content="   857">&nbsp;&nbsp;</span>	{
+<span id="L858" class="ln" data-content="   858">&nbsp;&nbsp;</span>		&#34;abc&#34;,
+<span id="L859" class="ln" data-content="   859">&nbsp;&nbsp;</span>		&#34;abc&#34;,
+<span id="L860" class="ln" data-content="   860">&nbsp;&nbsp;</span>		nil,
+<span id="L861" class="ln" data-content="   861">&nbsp;&nbsp;</span>	},
+<span id="L862" class="ln" data-content="   862">&nbsp;&nbsp;</span>	{
+<span id="L863" class="ln" data-content="   863">&nbsp;&nbsp;</span>		&#34;one two&#34;,
+<span id="L864" class="ln" data-content="   864">&nbsp;&nbsp;</span>		&#34;one+two&#34;,
+<span id="L865" class="ln" data-content="   865">&nbsp;&nbsp;</span>		nil,
+<span id="L866" class="ln" data-content="   866">&nbsp;&nbsp;</span>	},
+<span id="L867" class="ln" data-content="   867">&nbsp;&nbsp;</span>	{
+<span id="L868" class="ln" data-content="   868">&nbsp;&nbsp;</span>		&#34;10%&#34;,
+<span id="L869" class="ln" data-content="   869">&nbsp;&nbsp;</span>		&#34;10%25&#34;,
+<span id="L870" class="ln" data-content="   870">&nbsp;&nbsp;</span>		nil,
+<span id="L871" class="ln" data-content="   871">&nbsp;&nbsp;</span>	},
+<span id="L872" class="ln" data-content="   872">&nbsp;&nbsp;</span>	{
+<span id="L873" class="ln" data-content="   873">&nbsp;&nbsp;</span>		&#34; ?&amp;=#+%!&lt;&gt;#\&#34;{}|\\^[]`☺\t:/@$&#39;()*,;&#34;,
+<span id="L874" class="ln" data-content="   874">&nbsp;&nbsp;</span>		&#34;+%3F%26%3D%23%2B%25%21%3C%3E%23%22%7B%7D%7C%5C%5E%5B%5D%60%E2%98%BA%09%3A%2F%40%24%27%28%29%2A%2C%3B&#34;,
+<span id="L875" class="ln" data-content="   875">&nbsp;&nbsp;</span>		nil,
+<span id="L876" class="ln" data-content="   876">&nbsp;&nbsp;</span>	},
+<span id="L877" class="ln" data-content="   877">&nbsp;&nbsp;</span>}
+<span id="L878" class="ln" data-content="   878">&nbsp;&nbsp;</span>
+<span id="L879" class="ln" data-content="   879">&nbsp;&nbsp;</span>func TestQueryEscape(t *testing.T) {
+<span id="L880" class="ln" data-content="   880">&nbsp;&nbsp;</span>	for _, tt := range queryEscapeTests {
+<span id="L881" class="ln" data-content="   881">&nbsp;&nbsp;</span>		actual := QueryEscape(tt.in)
+<span id="L882" class="ln" data-content="   882">&nbsp;&nbsp;</span>		if tt.out != actual {
+<span id="L883" class="ln" data-content="   883">&nbsp;&nbsp;</span>			t.Errorf(&#34;QueryEscape(%q) = %q, want %q&#34;, tt.in, actual, tt.out)
+<span id="L884" class="ln" data-content="   884">&nbsp;&nbsp;</span>		}
+<span id="L885" class="ln" data-content="   885">&nbsp;&nbsp;</span>
+<span id="L886" class="ln" data-content="   886">&nbsp;&nbsp;</span>		<span class="comment">// for bonus points, verify that escape:unescape is an identity.</span>
+<span id="L887" class="ln" data-content="   887">&nbsp;&nbsp;</span>		roundtrip, err := QueryUnescape(actual)
+<span id="L888" class="ln" data-content="   888">&nbsp;&nbsp;</span>		if roundtrip != tt.in || err != nil {
+<span id="L889" class="ln" data-content="   889">&nbsp;&nbsp;</span>			t.Errorf(&#34;QueryUnescape(%q) = %q, %s; want %q, %s&#34;, actual, roundtrip, err, tt.in, &#34;[no error]&#34;)
+<span id="L890" class="ln" data-content="   890">&nbsp;&nbsp;</span>		}
+<span id="L891" class="ln" data-content="   891">&nbsp;&nbsp;</span>	}
+<span id="L892" class="ln" data-content="   892">&nbsp;&nbsp;</span>}
+<span id="L893" class="ln" data-content="   893">&nbsp;&nbsp;</span>
+<span id="L894" class="ln" data-content="   894">&nbsp;&nbsp;</span>var pathEscapeTests = []EscapeTest{
+<span id="L895" class="ln" data-content="   895">&nbsp;&nbsp;</span>	{
+<span id="L896" class="ln" data-content="   896">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L897" class="ln" data-content="   897">&nbsp;&nbsp;</span>		&#34;&#34;,
+<span id="L898" class="ln" data-content="   898">&nbsp;&nbsp;</span>		nil,
+<span id="L899" class="ln" data-content="   899">&nbsp;&nbsp;</span>	},
+<span id="L900" class="ln" data-content="   900">&nbsp;&nbsp;</span>	{
+<span id="L901" class="ln" data-content="   901">&nbsp;&nbsp;</span>		&#34;abc&#34;,
+<span id="L902" class="ln" data-content="   902">&nbsp;&nbsp;</span>		&#34;abc&#34;,
+<span id="L903" class="ln" data-content="   903">&nbsp;&nbsp;</span>		nil,
+<span id="L904" class="ln" data-content="   904">&nbsp;&nbsp;</span>	},
+<span id="L905" class="ln" data-content="   905">&nbsp;&nbsp;</span>	{
+<span id="L906" class="ln" data-content="   906">&nbsp;&nbsp;</span>		&#34;abc+def&#34;,
+<span id="L907" class="ln" data-content="   907">&nbsp;&nbsp;</span>		&#34;abc+def&#34;,
+<span id="L908" class="ln" data-content="   908">&nbsp;&nbsp;</span>		nil,
+<span id="L909" class="ln" data-content="   909">&nbsp;&nbsp;</span>	},
+<span id="L910" class="ln" data-content="   910">&nbsp;&nbsp;</span>	{
+<span id="L911" class="ln" data-content="   911">&nbsp;&nbsp;</span>		&#34;one two&#34;,
+<span id="L912" class="ln" data-content="   912">&nbsp;&nbsp;</span>		&#34;one%20two&#34;,
+<span id="L913" class="ln" data-content="   913">&nbsp;&nbsp;</span>		nil,
+<span id="L914" class="ln" data-content="   914">&nbsp;&nbsp;</span>	},
+<span id="L915" class="ln" data-content="   915">&nbsp;&nbsp;</span>	{
+<span id="L916" class="ln" data-content="   916">&nbsp;&nbsp;</span>		&#34;10%&#34;,
+<span id="L917" class="ln" data-content="   917">&nbsp;&nbsp;</span>		&#34;10%25&#34;,
+<span id="L918" class="ln" data-content="   918">&nbsp;&nbsp;</span>		nil,
+<span id="L919" class="ln" data-content="   919">&nbsp;&nbsp;</span>	},
+<span id="L920" class="ln" data-content="   920">&nbsp;&nbsp;</span>	{
+<span id="L921" class="ln" data-content="   921">&nbsp;&nbsp;</span>		&#34; ?&amp;=#+%!&lt;&gt;#\&#34;{}|\\^[]`☺\t:/@$&#39;()*,;&#34;,
+<span id="L922" class="ln" data-content="   922">&nbsp;&nbsp;</span>		&#34;%20%3F&amp;=%23+%25%21%3C%3E%23%22%7B%7D%7C%5C%5E%5B%5D%60%E2%98%BA%09:%2F@$%27%28%29%2A%2C%3B&#34;,
+<span id="L923" class="ln" data-content="   923">&nbsp;&nbsp;</span>		nil,
+<span id="L924" class="ln" data-content="   924">&nbsp;&nbsp;</span>	},
+<span id="L925" class="ln" data-content="   925">&nbsp;&nbsp;</span>}
+<span id="L926" class="ln" data-content="   926">&nbsp;&nbsp;</span>
+<span id="L927" class="ln" data-content="   927">&nbsp;&nbsp;</span>func TestPathEscape(t *testing.T) {
+<span id="L928" class="ln" data-content="   928">&nbsp;&nbsp;</span>	for _, tt := range pathEscapeTests {
+<span id="L929" class="ln" data-content="   929">&nbsp;&nbsp;</span>		actual := PathEscape(tt.in)
+<span id="L930" class="ln" data-content="   930">&nbsp;&nbsp;</span>		if tt.out != actual {
+<span id="L931" class="ln" data-content="   931">&nbsp;&nbsp;</span>			t.Errorf(&#34;PathEscape(%q) = %q, want %q&#34;, tt.in, actual, tt.out)
+<span id="L932" class="ln" data-content="   932">&nbsp;&nbsp;</span>		}
+<span id="L933" class="ln" data-content="   933">&nbsp;&nbsp;</span>
+<span id="L934" class="ln" data-content="   934">&nbsp;&nbsp;</span>		<span class="comment">// for bonus points, verify that escape:unescape is an identity.</span>
+<span id="L935" class="ln" data-content="   935">&nbsp;&nbsp;</span>		roundtrip, err := PathUnescape(actual)
+<span id="L936" class="ln" data-content="   936">&nbsp;&nbsp;</span>		if roundtrip != tt.in || err != nil {
+<span id="L937" class="ln" data-content="   937">&nbsp;&nbsp;</span>			t.Errorf(&#34;PathUnescape(%q) = %q, %s; want %q, %s&#34;, actual, roundtrip, err, tt.in, &#34;[no error]&#34;)
+<span id="L938" class="ln" data-content="   938">&nbsp;&nbsp;</span>		}
+<span id="L939" class="ln" data-content="   939">&nbsp;&nbsp;</span>	}
+<span id="L940" class="ln" data-content="   940">&nbsp;&nbsp;</span>}
+<span id="L941" class="ln" data-content="   941">&nbsp;&nbsp;</span>
+<span id="L942" class="ln" data-content="   942">&nbsp;&nbsp;</span><span class="comment">//var userinfoTests = []UserinfoTest{</span>
+<span id="L943" class="ln" data-content="   943">&nbsp;&nbsp;</span><span class="comment">//	{&#34;user&#34;, &#34;password&#34;, &#34;user:password&#34;},</span>
+<span id="L944" class="ln" data-content="   944">&nbsp;&nbsp;</span><span class="comment">//	{&#34;foo:bar&#34;, &#34;~!@#$%^&amp;*()_+{}|[]\\-=`:;&#39;\&#34;&lt;&gt;?,./&#34;,</span>
+<span id="L945" class="ln" data-content="   945">&nbsp;&nbsp;</span><span class="comment">//		&#34;foo%3Abar:~!%40%23$%25%5E&amp;*()_+%7B%7D%7C%5B%5D%5C-=%60%3A;&#39;%22%3C%3E?,.%2F&#34;},</span>
+<span id="L946" class="ln" data-content="   946">&nbsp;&nbsp;</span><span class="comment">//}</span>
+<span id="L947" class="ln" data-content="   947">&nbsp;&nbsp;</span>
+<span id="L948" class="ln" data-content="   948">&nbsp;&nbsp;</span>type EncodeQueryTest struct {
+<span id="L949" class="ln" data-content="   949">&nbsp;&nbsp;</span>	m        Values
+<span id="L950" class="ln" data-content="   950">&nbsp;&nbsp;</span>	expected string
+<span id="L951" class="ln" data-content="   951">&nbsp;&nbsp;</span>}
+<span id="L952" class="ln" data-content="   952">&nbsp;&nbsp;</span>
+<span id="L953" class="ln" data-content="   953">&nbsp;&nbsp;</span>var encodeQueryTests = []EncodeQueryTest{
+<span id="L954" class="ln" data-content="   954">&nbsp;&nbsp;</span>	{nil, &#34;&#34;},
+<span id="L955" class="ln" data-content="   955">&nbsp;&nbsp;</span>	{Values{&#34;q&#34;: {&#34;puppies&#34;}, &#34;oe&#34;: {&#34;utf8&#34;}}, &#34;oe=utf8&amp;q=puppies&#34;},
+<span id="L956" class="ln" data-content="   956">&nbsp;&nbsp;</span>	{Values{&#34;q&#34;: {&#34;dogs&#34;, &#34;&amp;&#34;, &#34;7&#34;}}, &#34;q=dogs&amp;q=%26&amp;q=7&#34;},
+<span id="L957" class="ln" data-content="   957">&nbsp;&nbsp;</span>	{Values{
+<span id="L958" class="ln" data-content="   958">&nbsp;&nbsp;</span>		&#34;a&#34;: {&#34;a1&#34;, &#34;a2&#34;, &#34;a3&#34;},
+<span id="L959" class="ln" data-content="   959">&nbsp;&nbsp;</span>		&#34;b&#34;: {&#34;b1&#34;, &#34;b2&#34;, &#34;b3&#34;},
+<span id="L960" class="ln" data-content="   960">&nbsp;&nbsp;</span>		&#34;c&#34;: {&#34;c1&#34;, &#34;c2&#34;, &#34;c3&#34;},
+<span id="L961" class="ln" data-content="   961">&nbsp;&nbsp;</span>	}, &#34;a=a1&amp;a=a2&amp;a=a3&amp;b=b1&amp;b=b2&amp;b=b3&amp;c=c1&amp;c=c2&amp;c=c3&#34;},
+<span id="L962" class="ln" data-content="   962">&nbsp;&nbsp;</span>}
+<span id="L963" class="ln" data-content="   963">&nbsp;&nbsp;</span>
+<span id="L964" class="ln" data-content="   964">&nbsp;&nbsp;</span>func TestEncodeQuery(t *testing.T) {
+<span id="L965" class="ln" data-content="   965">&nbsp;&nbsp;</span>	for _, tt := range encodeQueryTests {
+<span id="L966" class="ln" data-content="   966">&nbsp;&nbsp;</span>		if q := tt.m.Encode(); q != tt.expected {
+<span id="L967" class="ln" data-content="   967">&nbsp;&nbsp;</span>			t.Errorf(`EncodeQuery(%+v) = %q, want %q`, tt.m, q, tt.expected)
+<span id="L968" class="ln" data-content="   968">&nbsp;&nbsp;</span>		}
+<span id="L969" class="ln" data-content="   969">&nbsp;&nbsp;</span>	}
+<span id="L970" class="ln" data-content="   970">&nbsp;&nbsp;</span>}
+<span id="L971" class="ln" data-content="   971">&nbsp;&nbsp;</span>
+<span id="L972" class="ln" data-content="   972">&nbsp;&nbsp;</span>var resolvePathTests = []struct {
+<span id="L973" class="ln" data-content="   973">&nbsp;&nbsp;</span>	base, ref, expected string
+<span id="L974" class="ln" data-content="   974">&nbsp;&nbsp;</span>}{
+<span id="L975" class="ln" data-content="   975">&nbsp;&nbsp;</span>	{&#34;a/b&#34;, &#34;.&#34;, &#34;/a/&#34;},
+<span id="L976" class="ln" data-content="   976">&nbsp;&nbsp;</span>	{&#34;a/b&#34;, &#34;c&#34;, &#34;/a/c&#34;},
+<span id="L977" class="ln" data-content="   977">&nbsp;&nbsp;</span>	{&#34;a/b&#34;, &#34;..&#34;, &#34;/&#34;},
+<span id="L978" class="ln" data-content="   978">&nbsp;&nbsp;</span>	{&#34;a/&#34;, &#34;..&#34;, &#34;/&#34;},
+<span id="L979" class="ln" data-content="   979">&nbsp;&nbsp;</span>	{&#34;a/&#34;, &#34;../..&#34;, &#34;/&#34;},
+<span id="L980" class="ln" data-content="   980">&nbsp;&nbsp;</span>	{&#34;a/b/c&#34;, &#34;..&#34;, &#34;/a/&#34;},
+<span id="L981" class="ln" data-content="   981">&nbsp;&nbsp;</span>	{&#34;a/b/c&#34;, &#34;../d&#34;, &#34;/a/d&#34;},
+<span id="L982" class="ln" data-content="   982">&nbsp;&nbsp;</span>	{&#34;a/b/c&#34;, &#34;.././d&#34;, &#34;/a/d&#34;},
+<span id="L983" class="ln" data-content="   983">&nbsp;&nbsp;</span>	{&#34;a/b&#34;, &#34;./..&#34;, &#34;/&#34;},
+<span id="L984" class="ln" data-content="   984">&nbsp;&nbsp;</span>	{&#34;a/./b&#34;, &#34;.&#34;, &#34;/a/&#34;},
+<span id="L985" class="ln" data-content="   985">&nbsp;&nbsp;</span>	{&#34;a/../&#34;, &#34;.&#34;, &#34;/&#34;},
+<span id="L986" class="ln" data-content="   986">&nbsp;&nbsp;</span>	{&#34;a/.././b&#34;, &#34;c&#34;, &#34;/c&#34;},
+<span id="L987" class="ln" data-content="   987">&nbsp;&nbsp;</span>}
+<span id="L988" class="ln" data-content="   988">&nbsp;&nbsp;</span>
+<span id="L989" class="ln" data-content="   989">&nbsp;&nbsp;</span>func TestResolvePath(t *testing.T) {
+<span id="L990" class="ln" data-content="   990">&nbsp;&nbsp;</span>	for _, test := range resolvePathTests {
+<span id="L991" class="ln" data-content="   991">&nbsp;&nbsp;</span>		got := resolvePath(test.base, test.ref)
+<span id="L992" class="ln" data-content="   992">&nbsp;&nbsp;</span>		if got != test.expected {
+<span id="L993" class="ln" data-content="   993">&nbsp;&nbsp;</span>			t.Errorf(&#34;For %q + %q got %q; expected %q&#34;, test.base, test.ref, got, test.expected)
+<span id="L994" class="ln" data-content="   994">&nbsp;&nbsp;</span>		}
+<span id="L995" class="ln" data-content="   995">&nbsp;&nbsp;</span>	}
+<span id="L996" class="ln" data-content="   996">&nbsp;&nbsp;</span>}
+<span id="L997" class="ln" data-content="   997">&nbsp;&nbsp;</span>
+<span id="L998" class="ln" data-content="   998">&nbsp;&nbsp;</span>var resolveReferenceTests = []struct {
+<span id="L999" class="ln" data-content="   999">&nbsp;&nbsp;</span>	base, rel, expected string
+<span id="L1000" class="ln" data-content="  1000">&nbsp;&nbsp;</span>}{
+<span id="L1001" class="ln" data-content="  1001">&nbsp;&nbsp;</span>	<span class="comment">// Absolute URL references</span>
+<span id="L1002" class="ln" data-content="  1002">&nbsp;&nbsp;</span>	{&#34;http://foo.com?a=b&#34;, &#34;https://bar.com/&#34;, &#34;https://bar.com/&#34;},
+<span id="L1003" class="ln" data-content="  1003">&nbsp;&nbsp;</span>	{&#34;http://foo.com/&#34;, &#34;https://bar.com/?a=b&#34;, &#34;https://bar.com/?a=b&#34;},
+<span id="L1004" class="ln" data-content="  1004">&nbsp;&nbsp;</span>	{&#34;http://foo.com/&#34;, &#34;https://bar.com/?&#34;, &#34;https://bar.com/?&#34;},
+<span id="L1005" class="ln" data-content="  1005">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar&#34;, &#34;mailto:foo@example.com&#34;, &#34;mailto:foo@example.com&#34;},
+<span id="L1006" class="ln" data-content="  1006">&nbsp;&nbsp;</span>
+<span id="L1007" class="ln" data-content="  1007">&nbsp;&nbsp;</span>	<span class="comment">// Path-absolute references</span>
+<span id="L1008" class="ln" data-content="  1008">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar&#34;, &#34;/baz&#34;, &#34;http://foo.com/baz&#34;},
+<span id="L1009" class="ln" data-content="  1009">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar?a=b#f&#34;, &#34;/baz&#34;, &#34;http://foo.com/baz&#34;},
+<span id="L1010" class="ln" data-content="  1010">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar?a=b&#34;, &#34;/baz?&#34;, &#34;http://foo.com/baz?&#34;},
+<span id="L1011" class="ln" data-content="  1011">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar?a=b&#34;, &#34;/baz?c=d&#34;, &#34;http://foo.com/baz?c=d&#34;},
+<span id="L1012" class="ln" data-content="  1012">&nbsp;&nbsp;</span>
+<span id="L1013" class="ln" data-content="  1013">&nbsp;&nbsp;</span>	<span class="comment">// Scheme-relative</span>
+<span id="L1014" class="ln" data-content="  1014">&nbsp;&nbsp;</span>	{&#34;https://foo.com/bar?a=b&#34;, &#34;//bar.com/quux&#34;, &#34;https://bar.com/quux&#34;},
+<span id="L1015" class="ln" data-content="  1015">&nbsp;&nbsp;</span>
+<span id="L1016" class="ln" data-content="  1016">&nbsp;&nbsp;</span>	<span class="comment">// Path-relative references:</span>
+<span id="L1017" class="ln" data-content="  1017">&nbsp;&nbsp;</span>
+<span id="L1018" class="ln" data-content="  1018">&nbsp;&nbsp;</span>	<span class="comment">// ... current directory</span>
+<span id="L1019" class="ln" data-content="  1019">&nbsp;&nbsp;</span>	{&#34;http://foo.com&#34;, &#34;.&#34;, &#34;http://foo.com/&#34;},
+<span id="L1020" class="ln" data-content="  1020">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar&#34;, &#34;.&#34;, &#34;http://foo.com/&#34;},
+<span id="L1021" class="ln" data-content="  1021">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/&#34;, &#34;.&#34;, &#34;http://foo.com/bar/&#34;},
+<span id="L1022" class="ln" data-content="  1022">&nbsp;&nbsp;</span>
+<span id="L1023" class="ln" data-content="  1023">&nbsp;&nbsp;</span>	<span class="comment">// ... going down</span>
+<span id="L1024" class="ln" data-content="  1024">&nbsp;&nbsp;</span>	{&#34;http://foo.com&#34;, &#34;bar&#34;, &#34;http://foo.com/bar&#34;},
+<span id="L1025" class="ln" data-content="  1025">&nbsp;&nbsp;</span>	{&#34;http://foo.com/&#34;, &#34;bar&#34;, &#34;http://foo.com/bar&#34;},
+<span id="L1026" class="ln" data-content="  1026">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux&#34;, &#34;http://foo.com/bar/quux&#34;},
+<span id="L1027" class="ln" data-content="  1027">&nbsp;&nbsp;</span>
+<span id="L1028" class="ln" data-content="  1028">&nbsp;&nbsp;</span>	<span class="comment">// ... going up</span>
+<span id="L1029" class="ln" data-content="  1029">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;../quux&#34;, &#34;http://foo.com/quux&#34;},
+<span id="L1030" class="ln" data-content="  1030">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;../../../../../quux&#34;, &#34;http://foo.com/quux&#34;},
+<span id="L1031" class="ln" data-content="  1031">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar&#34;, &#34;..&#34;, &#34;http://foo.com/&#34;},
+<span id="L1032" class="ln" data-content="  1032">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;./..&#34;, &#34;http://foo.com/&#34;},
+<span id="L1033" class="ln" data-content="  1033">&nbsp;&nbsp;</span>	<span class="comment">// &#34;..&#34; in the middle (issue 3560)</span>
+<span id="L1034" class="ln" data-content="  1034">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux/dotdot/../tail&#34;, &#34;http://foo.com/bar/quux/tail&#34;},
+<span id="L1035" class="ln" data-content="  1035">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux/./dotdot/../tail&#34;, &#34;http://foo.com/bar/quux/tail&#34;},
+<span id="L1036" class="ln" data-content="  1036">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux/./dotdot/.././tail&#34;, &#34;http://foo.com/bar/quux/tail&#34;},
+<span id="L1037" class="ln" data-content="  1037">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux/./dotdot/./../tail&#34;, &#34;http://foo.com/bar/quux/tail&#34;},
+<span id="L1038" class="ln" data-content="  1038">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux/./dotdot/dotdot/././../../tail&#34;, &#34;http://foo.com/bar/quux/tail&#34;},
+<span id="L1039" class="ln" data-content="  1039">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux/./dotdot/dotdot/./.././../tail&#34;, &#34;http://foo.com/bar/quux/tail&#34;},
+<span id="L1040" class="ln" data-content="  1040">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux/./dotdot/dotdot/dotdot/./../../.././././tail&#34;, &#34;http://foo.com/bar/quux/tail&#34;},
+<span id="L1041" class="ln" data-content="  1041">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar/baz&#34;, &#34;quux/./dotdot/../dotdot/../dot/./tail/..&#34;, &#34;http://foo.com/bar/quux/dot/&#34;},
+<span id="L1042" class="ln" data-content="  1042">&nbsp;&nbsp;</span>
+<span id="L1043" class="ln" data-content="  1043">&nbsp;&nbsp;</span>	<span class="comment">// Remove any dot-segments prior to forming the target URI.</span>
+<span id="L1044" class="ln" data-content="  1044">&nbsp;&nbsp;</span>	<span class="comment">// http://tools.ietf.org/html/rfc3986#section-5.2.4</span>
+<span id="L1045" class="ln" data-content="  1045">&nbsp;&nbsp;</span>	{&#34;http://foo.com/dot/./dotdot/../foo/bar&#34;, &#34;../baz&#34;, &#34;http://foo.com/dot/baz&#34;},
+<span id="L1046" class="ln" data-content="  1046">&nbsp;&nbsp;</span>
+<span id="L1047" class="ln" data-content="  1047">&nbsp;&nbsp;</span>	<span class="comment">// Triple dot isn&#39;t special</span>
+<span id="L1048" class="ln" data-content="  1048">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar&#34;, &#34;...&#34;, &#34;http://foo.com/...&#34;},
+<span id="L1049" class="ln" data-content="  1049">&nbsp;&nbsp;</span>
+<span id="L1050" class="ln" data-content="  1050">&nbsp;&nbsp;</span>	<span class="comment">// Fragment</span>
+<span id="L1051" class="ln" data-content="  1051">&nbsp;&nbsp;</span>	{&#34;http://foo.com/bar&#34;, &#34;.#frag&#34;, &#34;http://foo.com/#frag&#34;},
+<span id="L1052" class="ln" data-content="  1052">&nbsp;&nbsp;</span>
+<span id="L1053" class="ln" data-content="  1053">&nbsp;&nbsp;</span>	<span class="comment">// Paths with escaping (issue 16947).</span>
+<span id="L1054" class="ln" data-content="  1054">&nbsp;&nbsp;</span>	{&#34;http://foo.com/foo%2fbar/&#34;, &#34;../baz&#34;, &#34;http://foo.com/baz&#34;},
+<span id="L1055" class="ln" data-content="  1055">&nbsp;&nbsp;</span>	{&#34;http://foo.com/1/2%2f/3%2f4/5&#34;, &#34;../../a/b/c&#34;, &#34;http://foo.com/1/a/b/c&#34;},
+<span id="L1056" class="ln" data-content="  1056">&nbsp;&nbsp;</span>	{&#34;http://foo.com/1/2/3&#34;, &#34;./a%2f../../b/..%2fc&#34;, &#34;http://foo.com/1/2/b/..%2fc&#34;},
+<span id="L1057" class="ln" data-content="  1057">&nbsp;&nbsp;</span>	{&#34;http://foo.com/1/2%2f/3%2f4/5&#34;, &#34;./a%2f../b/../c&#34;, &#34;http://foo.com/1/2%2f/3%2f4/a%2f../c&#34;},
+<span id="L1058" class="ln" data-content="  1058">&nbsp;&nbsp;</span>	{&#34;http://foo.com/foo%20bar/&#34;, &#34;../baz&#34;, &#34;http://foo.com/baz&#34;},
+<span id="L1059" class="ln" data-content="  1059">&nbsp;&nbsp;</span>	{&#34;http://foo.com/foo&#34;, &#34;../bar%2fbaz&#34;, &#34;http://foo.com/bar%2fbaz&#34;},
+<span id="L1060" class="ln" data-content="  1060">&nbsp;&nbsp;</span>	{&#34;http://foo.com/foo%2dbar/&#34;, &#34;./baz-quux&#34;, &#34;http://foo.com/foo%2dbar/baz-quux&#34;},
+<span id="L1061" class="ln" data-content="  1061">&nbsp;&nbsp;</span>
+<span id="L1062" class="ln" data-content="  1062">&nbsp;&nbsp;</span>	<span class="comment">// RFC 3986: Normal Examples</span>
+<span id="L1063" class="ln" data-content="  1063">&nbsp;&nbsp;</span>	<span class="comment">// http://tools.ietf.org/html/rfc3986#section-5.4.1</span>
+<span id="L1064" class="ln" data-content="  1064">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g:h&#34;, &#34;g:h&#34;},
+<span id="L1065" class="ln" data-content="  1065">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g&#34;, &#34;http://a/b/c/g&#34;},
+<span id="L1066" class="ln" data-content="  1066">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;./g&#34;, &#34;http://a/b/c/g&#34;},
+<span id="L1067" class="ln" data-content="  1067">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g/&#34;, &#34;http://a/b/c/g/&#34;},
+<span id="L1068" class="ln" data-content="  1068">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;/g&#34;, &#34;http://a/g&#34;},
+<span id="L1069" class="ln" data-content="  1069">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;//g&#34;, &#34;http://g&#34;},
+<span id="L1070" class="ln" data-content="  1070">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;?y&#34;, &#34;http://a/b/c/d;p?y&#34;},
+<span id="L1071" class="ln" data-content="  1071">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g?y&#34;, &#34;http://a/b/c/g?y&#34;},
+<span id="L1072" class="ln" data-content="  1072">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;#s&#34;, &#34;http://a/b/c/d;p?q#s&#34;},
+<span id="L1073" class="ln" data-content="  1073">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g#s&#34;, &#34;http://a/b/c/g#s&#34;},
+<span id="L1074" class="ln" data-content="  1074">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g?y#s&#34;, &#34;http://a/b/c/g?y#s&#34;},
+<span id="L1075" class="ln" data-content="  1075">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;;x&#34;, &#34;http://a/b/c/;x&#34;},
+<span id="L1076" class="ln" data-content="  1076">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g;x&#34;, &#34;http://a/b/c/g;x&#34;},
+<span id="L1077" class="ln" data-content="  1077">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g;x?y#s&#34;, &#34;http://a/b/c/g;x?y#s&#34;},
+<span id="L1078" class="ln" data-content="  1078">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;&#34;, &#34;http://a/b/c/d;p?q&#34;},
+<span id="L1079" class="ln" data-content="  1079">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;.&#34;, &#34;http://a/b/c/&#34;},
+<span id="L1080" class="ln" data-content="  1080">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;./&#34;, &#34;http://a/b/c/&#34;},
+<span id="L1081" class="ln" data-content="  1081">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;..&#34;, &#34;http://a/b/&#34;},
+<span id="L1082" class="ln" data-content="  1082">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;../&#34;, &#34;http://a/b/&#34;},
+<span id="L1083" class="ln" data-content="  1083">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;../g&#34;, &#34;http://a/b/g&#34;},
+<span id="L1084" class="ln" data-content="  1084">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;../..&#34;, &#34;http://a/&#34;},
+<span id="L1085" class="ln" data-content="  1085">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;../../&#34;, &#34;http://a/&#34;},
+<span id="L1086" class="ln" data-content="  1086">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;../../g&#34;, &#34;http://a/g&#34;},
+<span id="L1087" class="ln" data-content="  1087">&nbsp;&nbsp;</span>
+<span id="L1088" class="ln" data-content="  1088">&nbsp;&nbsp;</span>	<span class="comment">// RFC 3986: Abnormal Examples</span>
+<span id="L1089" class="ln" data-content="  1089">&nbsp;&nbsp;</span>	<span class="comment">// http://tools.ietf.org/html/rfc3986#section-5.4.2</span>
+<span id="L1090" class="ln" data-content="  1090">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;../../../g&#34;, &#34;http://a/g&#34;},
+<span id="L1091" class="ln" data-content="  1091">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;../../../../g&#34;, &#34;http://a/g&#34;},
+<span id="L1092" class="ln" data-content="  1092">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;/./g&#34;, &#34;http://a/g&#34;},
+<span id="L1093" class="ln" data-content="  1093">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;/../g&#34;, &#34;http://a/g&#34;},
+<span id="L1094" class="ln" data-content="  1094">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g.&#34;, &#34;http://a/b/c/g.&#34;},
+<span id="L1095" class="ln" data-content="  1095">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;.g&#34;, &#34;http://a/b/c/.g&#34;},
+<span id="L1096" class="ln" data-content="  1096">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g..&#34;, &#34;http://a/b/c/g..&#34;},
+<span id="L1097" class="ln" data-content="  1097">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;..g&#34;, &#34;http://a/b/c/..g&#34;},
+<span id="L1098" class="ln" data-content="  1098">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;./../g&#34;, &#34;http://a/b/g&#34;},
+<span id="L1099" class="ln" data-content="  1099">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;./g/.&#34;, &#34;http://a/b/c/g/&#34;},
+<span id="L1100" class="ln" data-content="  1100">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g/./h&#34;, &#34;http://a/b/c/g/h&#34;},
+<span id="L1101" class="ln" data-content="  1101">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g/../h&#34;, &#34;http://a/b/c/h&#34;},
+<span id="L1102" class="ln" data-content="  1102">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g;x=1/./y&#34;, &#34;http://a/b/c/g;x=1/y&#34;},
+<span id="L1103" class="ln" data-content="  1103">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g;x=1/../y&#34;, &#34;http://a/b/c/y&#34;},
+<span id="L1104" class="ln" data-content="  1104">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g?y/./x&#34;, &#34;http://a/b/c/g?y/./x&#34;},
+<span id="L1105" class="ln" data-content="  1105">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g?y/../x&#34;, &#34;http://a/b/c/g?y/../x&#34;},
+<span id="L1106" class="ln" data-content="  1106">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g#s/./x&#34;, &#34;http://a/b/c/g#s/./x&#34;},
+<span id="L1107" class="ln" data-content="  1107">&nbsp;&nbsp;</span>	{&#34;http://a/b/c/d;p?q&#34;, &#34;g#s/../x&#34;, &#34;http://a/b/c/g#s/../x&#34;},
+<span id="L1108" class="ln" data-content="  1108">&nbsp;&nbsp;</span>
+<span id="L1109" class="ln" data-content="  1109">&nbsp;&nbsp;</span>	<span class="comment">// Extras.</span>
+<span id="L1110" class="ln" data-content="  1110">&nbsp;&nbsp;</span>	{&#34;https://a/b/c/d;p?q&#34;, &#34;//g?q&#34;, &#34;https://g?q&#34;},
+<span id="L1111" class="ln" data-content="  1111">&nbsp;&nbsp;</span>	{&#34;https://a/b/c/d;p?q&#34;, &#34;//g#s&#34;, &#34;https://g#s&#34;},
+<span id="L1112" class="ln" data-content="  1112">&nbsp;&nbsp;</span>	{&#34;https://a/b/c/d;p?q&#34;, &#34;//g/d/e/f?y#s&#34;, &#34;https://g/d/e/f?y#s&#34;},
+<span id="L1113" class="ln" data-content="  1113">&nbsp;&nbsp;</span>	{&#34;https://a/b/c/d;p#s&#34;, &#34;?y&#34;, &#34;https://a/b/c/d;p?y&#34;},
+<span id="L1114" class="ln" data-content="  1114">&nbsp;&nbsp;</span>	{&#34;https://a/b/c/d;p?q#s&#34;, &#34;?y&#34;, &#34;https://a/b/c/d;p?y&#34;},
+<span id="L1115" class="ln" data-content="  1115">&nbsp;&nbsp;</span>}
+<span id="L1116" class="ln" data-content="  1116">&nbsp;&nbsp;</span>
+<span id="L1117" class="ln" data-content="  1117">&nbsp;&nbsp;</span>func TestResolveReference(t *testing.T) {
+<span id="L1118" class="ln" data-content="  1118">&nbsp;&nbsp;</span>	mustParse := func(url string) *URL {
+<span id="L1119" class="ln" data-content="  1119">&nbsp;&nbsp;</span>		u, err := Parse(url)
+<span id="L1120" class="ln" data-content="  1120">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L1121" class="ln" data-content="  1121">&nbsp;&nbsp;</span>			t.Fatalf(&#34;Parse(%q) got err %v&#34;, url, err)
+<span id="L1122" class="ln" data-content="  1122">&nbsp;&nbsp;</span>		}
+<span id="L1123" class="ln" data-content="  1123">&nbsp;&nbsp;</span>		return u
+<span id="L1124" class="ln" data-content="  1124">&nbsp;&nbsp;</span>	}
+<span id="L1125" class="ln" data-content="  1125">&nbsp;&nbsp;</span>	opaque := &amp;URL{Scheme: &#34;scheme&#34;, Opaque: &#34;opaque&#34;}
+<span id="L1126" class="ln" data-content="  1126">&nbsp;&nbsp;</span>	for _, test := range resolveReferenceTests {
+<span id="L1127" class="ln" data-content="  1127">&nbsp;&nbsp;</span>		base := mustParse(test.base)
+<span id="L1128" class="ln" data-content="  1128">&nbsp;&nbsp;</span>		rel := mustParse(test.rel)
+<span id="L1129" class="ln" data-content="  1129">&nbsp;&nbsp;</span>		url := base.ResolveReference(rel)
+<span id="L1130" class="ln" data-content="  1130">&nbsp;&nbsp;</span>		if got := url.String(); got != test.expected {
+<span id="L1131" class="ln" data-content="  1131">&nbsp;&nbsp;</span>			t.Errorf(&#34;URL(%q).ResolveReference(%q)\ngot  %q\nwant %q&#34;, test.base, test.rel, got, test.expected)
+<span id="L1132" class="ln" data-content="  1132">&nbsp;&nbsp;</span>		}
+<span id="L1133" class="ln" data-content="  1133">&nbsp;&nbsp;</span>		<span class="comment">// Ensure that new instances are returned.</span>
+<span id="L1134" class="ln" data-content="  1134">&nbsp;&nbsp;</span>		if base == url {
+<span id="L1135" class="ln" data-content="  1135">&nbsp;&nbsp;</span>			t.Errorf(&#34;Expected URL.ResolveReference to return new URL instance.&#34;)
+<span id="L1136" class="ln" data-content="  1136">&nbsp;&nbsp;</span>		}
+<span id="L1137" class="ln" data-content="  1137">&nbsp;&nbsp;</span>		<span class="comment">// Test the convenience wrapper too.</span>
+<span id="L1138" class="ln" data-content="  1138">&nbsp;&nbsp;</span>		url, err := base.Parse(test.rel)
+<span id="L1139" class="ln" data-content="  1139">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L1140" class="ln" data-content="  1140">&nbsp;&nbsp;</span>			t.Errorf(&#34;URL(%q).Parse(%q) failed: %v&#34;, test.base, test.rel, err)
+<span id="L1141" class="ln" data-content="  1141">&nbsp;&nbsp;</span>		} else if got := url.String(); got != test.expected {
+<span id="L1142" class="ln" data-content="  1142">&nbsp;&nbsp;</span>			t.Errorf(&#34;URL(%q).Parse(%q)\ngot  %q\nwant %q&#34;, test.base, test.rel, got, test.expected)
+<span id="L1143" class="ln" data-content="  1143">&nbsp;&nbsp;</span>		} else if base == url {
+<span id="L1144" class="ln" data-content="  1144">&nbsp;&nbsp;</span>			<span class="comment">// Ensure that new instances are returned for the wrapper too.</span>
+<span id="L1145" class="ln" data-content="  1145">&nbsp;&nbsp;</span>			t.Errorf(&#34;Expected URL.Parse to return new URL instance.&#34;)
+<span id="L1146" class="ln" data-content="  1146">&nbsp;&nbsp;</span>		}
+<span id="L1147" class="ln" data-content="  1147">&nbsp;&nbsp;</span>		<span class="comment">// Ensure Opaque resets the URL.</span>
+<span id="L1148" class="ln" data-content="  1148">&nbsp;&nbsp;</span>		url = base.ResolveReference(opaque)
+<span id="L1149" class="ln" data-content="  1149">&nbsp;&nbsp;</span>		if *url != *opaque {
+<span id="L1150" class="ln" data-content="  1150">&nbsp;&nbsp;</span>			t.Errorf(&#34;ResolveReference failed to resolve opaque URL:\ngot  %#v\nwant %#v&#34;, url, opaque)
+<span id="L1151" class="ln" data-content="  1151">&nbsp;&nbsp;</span>		}
+<span id="L1152" class="ln" data-content="  1152">&nbsp;&nbsp;</span>		<span class="comment">// Test the convenience wrapper with an opaque URL too.</span>
+<span id="L1153" class="ln" data-content="  1153">&nbsp;&nbsp;</span>		url, err = base.Parse(&#34;scheme:opaque&#34;)
+<span id="L1154" class="ln" data-content="  1154">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L1155" class="ln" data-content="  1155">&nbsp;&nbsp;</span>			t.Errorf(`URL(%q).Parse(&#34;scheme:opaque&#34;) failed: %v`, test.base, err)
+<span id="L1156" class="ln" data-content="  1156">&nbsp;&nbsp;</span>		} else if *url != *opaque {
+<span id="L1157" class="ln" data-content="  1157">&nbsp;&nbsp;</span>			t.Errorf(&#34;Parse failed to resolve opaque URL:\ngot  %#v\nwant %#v&#34;, opaque, url)
+<span id="L1158" class="ln" data-content="  1158">&nbsp;&nbsp;</span>		} else if base == url {
+<span id="L1159" class="ln" data-content="  1159">&nbsp;&nbsp;</span>			<span class="comment">// Ensure that new instances are returned, again.</span>
+<span id="L1160" class="ln" data-content="  1160">&nbsp;&nbsp;</span>			t.Errorf(&#34;Expected URL.Parse to return new URL instance.&#34;)
+<span id="L1161" class="ln" data-content="  1161">&nbsp;&nbsp;</span>		}
+<span id="L1162" class="ln" data-content="  1162">&nbsp;&nbsp;</span>	}
+<span id="L1163" class="ln" data-content="  1163">&nbsp;&nbsp;</span>}
+<span id="L1164" class="ln" data-content="  1164">&nbsp;&nbsp;</span>
+<span id="L1165" class="ln" data-content="  1165">&nbsp;&nbsp;</span>func TestQueryValues(t *testing.T) {
+<span id="L1166" class="ln" data-content="  1166">&nbsp;&nbsp;</span>	u, _ := Parse(&#34;http://x.com?foo=bar&amp;bar=1&amp;bar=2&#34;)
+<span id="L1167" class="ln" data-content="  1167">&nbsp;&nbsp;</span>	v := u.Query()
+<span id="L1168" class="ln" data-content="  1168">&nbsp;&nbsp;</span>	if len(v) != 2 {
+<span id="L1169" class="ln" data-content="  1169">&nbsp;&nbsp;</span>		t.Errorf(&#34;got %d keys in Query values, want 2&#34;, len(v))
+<span id="L1170" class="ln" data-content="  1170">&nbsp;&nbsp;</span>	}
+<span id="L1171" class="ln" data-content="  1171">&nbsp;&nbsp;</span>	if g, e := v.Get(&#34;foo&#34;), &#34;bar&#34;; g != e {
+<span id="L1172" class="ln" data-content="  1172">&nbsp;&nbsp;</span>		t.Errorf(&#34;Get(foo) = %q, want %q&#34;, g, e)
+<span id="L1173" class="ln" data-content="  1173">&nbsp;&nbsp;</span>	}
+<span id="L1174" class="ln" data-content="  1174">&nbsp;&nbsp;</span>	<span class="comment">// Case sensitive:</span>
+<span id="L1175" class="ln" data-content="  1175">&nbsp;&nbsp;</span>	if g, e := v.Get(&#34;Foo&#34;), &#34;&#34;; g != e {
+<span id="L1176" class="ln" data-content="  1176">&nbsp;&nbsp;</span>		t.Errorf(&#34;Get(Foo) = %q, want %q&#34;, g, e)
+<span id="L1177" class="ln" data-content="  1177">&nbsp;&nbsp;</span>	}
+<span id="L1178" class="ln" data-content="  1178">&nbsp;&nbsp;</span>	if g, e := v.Get(&#34;bar&#34;), &#34;1&#34;; g != e {
+<span id="L1179" class="ln" data-content="  1179">&nbsp;&nbsp;</span>		t.Errorf(&#34;Get(bar) = %q, want %q&#34;, g, e)
+<span id="L1180" class="ln" data-content="  1180">&nbsp;&nbsp;</span>	}
+<span id="L1181" class="ln" data-content="  1181">&nbsp;&nbsp;</span>	if g, e := v.Get(&#34;baz&#34;), &#34;&#34;; g != e {
+<span id="L1182" class="ln" data-content="  1182">&nbsp;&nbsp;</span>		t.Errorf(&#34;Get(baz) = %q, want %q&#34;, g, e)
+<span id="L1183" class="ln" data-content="  1183">&nbsp;&nbsp;</span>	}
+<span id="L1184" class="ln" data-content="  1184">&nbsp;&nbsp;</span>	v.Del(&#34;bar&#34;)
+<span id="L1185" class="ln" data-content="  1185">&nbsp;&nbsp;</span>	if g, e := v.Get(&#34;bar&#34;), &#34;&#34;; g != e {
+<span id="L1186" class="ln" data-content="  1186">&nbsp;&nbsp;</span>		t.Errorf(&#34;second Get(bar) = %q, want %q&#34;, g, e)
+<span id="L1187" class="ln" data-content="  1187">&nbsp;&nbsp;</span>	}
+<span id="L1188" class="ln" data-content="  1188">&nbsp;&nbsp;</span>}
+<span id="L1189" class="ln" data-content="  1189">&nbsp;&nbsp;</span>
+<span id="L1190" class="ln" data-content="  1190">&nbsp;&nbsp;</span>type parseTest struct {
+<span id="L1191" class="ln" data-content="  1191">&nbsp;&nbsp;</span>	query string
+<span id="L1192" class="ln" data-content="  1192">&nbsp;&nbsp;</span>	out   Values
+<span id="L1193" class="ln" data-content="  1193">&nbsp;&nbsp;</span>}
+<span id="L1194" class="ln" data-content="  1194">&nbsp;&nbsp;</span>
+<span id="L1195" class="ln" data-content="  1195">&nbsp;&nbsp;</span>var parseTests = []parseTest{
+<span id="L1196" class="ln" data-content="  1196">&nbsp;&nbsp;</span>	{
+<span id="L1197" class="ln" data-content="  1197">&nbsp;&nbsp;</span>		query: &#34;a=1&amp;b=2&#34;,
+<span id="L1198" class="ln" data-content="  1198">&nbsp;&nbsp;</span>		out:   Values{&#34;a&#34;: []string{&#34;1&#34;}, &#34;b&#34;: []string{&#34;2&#34;}},
+<span id="L1199" class="ln" data-content="  1199">&nbsp;&nbsp;</span>	},
+<span id="L1200" class="ln" data-content="  1200">&nbsp;&nbsp;</span>	{
+<span id="L1201" class="ln" data-content="  1201">&nbsp;&nbsp;</span>		query: &#34;a=1&amp;a=2&amp;a=banana&#34;,
+<span id="L1202" class="ln" data-content="  1202">&nbsp;&nbsp;</span>		out:   Values{&#34;a&#34;: []string{&#34;1&#34;, &#34;2&#34;, &#34;banana&#34;}},
+<span id="L1203" class="ln" data-content="  1203">&nbsp;&nbsp;</span>	},
+<span id="L1204" class="ln" data-content="  1204">&nbsp;&nbsp;</span>	{
+<span id="L1205" class="ln" data-content="  1205">&nbsp;&nbsp;</span>		query: &#34;ascii=%3Ckey%3A+0x90%3E&#34;,
+<span id="L1206" class="ln" data-content="  1206">&nbsp;&nbsp;</span>		out:   Values{&#34;ascii&#34;: []string{&#34;&lt;key: 0x90&gt;&#34;}},
+<span id="L1207" class="ln" data-content="  1207">&nbsp;&nbsp;</span>	},
+<span id="L1208" class="ln" data-content="  1208">&nbsp;&nbsp;</span>	{
+<span id="L1209" class="ln" data-content="  1209">&nbsp;&nbsp;</span>		query: &#34;a=1;b=2&#34;,
+<span id="L1210" class="ln" data-content="  1210">&nbsp;&nbsp;</span>		out:   Values{&#34;a&#34;: []string{&#34;1&#34;}, &#34;b&#34;: []string{&#34;2&#34;}},
+<span id="L1211" class="ln" data-content="  1211">&nbsp;&nbsp;</span>	},
+<span id="L1212" class="ln" data-content="  1212">&nbsp;&nbsp;</span>	{
+<span id="L1213" class="ln" data-content="  1213">&nbsp;&nbsp;</span>		query: &#34;a=1&amp;a=2;a=banana&#34;,
+<span id="L1214" class="ln" data-content="  1214">&nbsp;&nbsp;</span>		out:   Values{&#34;a&#34;: []string{&#34;1&#34;, &#34;2&#34;, &#34;banana&#34;}},
+<span id="L1215" class="ln" data-content="  1215">&nbsp;&nbsp;</span>	},
+<span id="L1216" class="ln" data-content="  1216">&nbsp;&nbsp;</span>}
+<span id="L1217" class="ln" data-content="  1217">&nbsp;&nbsp;</span>
+<span id="L1218" class="ln" data-content="  1218">&nbsp;&nbsp;</span>func TestParseQuery(t *testing.T) {
+<span id="L1219" class="ln" data-content="  1219">&nbsp;&nbsp;</span>	for i, test := range parseTests {
+<span id="L1220" class="ln" data-content="  1220">&nbsp;&nbsp;</span>		form, err := ParseQuery(test.query)
+<span id="L1221" class="ln" data-content="  1221">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L1222" class="ln" data-content="  1222">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %d: Unexpected error: %v&#34;, i, err)
+<span id="L1223" class="ln" data-content="  1223">&nbsp;&nbsp;</span>			continue
+<span id="L1224" class="ln" data-content="  1224">&nbsp;&nbsp;</span>		}
+<span id="L1225" class="ln" data-content="  1225">&nbsp;&nbsp;</span>		if len(form) != len(test.out) {
+<span id="L1226" class="ln" data-content="  1226">&nbsp;&nbsp;</span>			t.Errorf(&#34;test %d: len(form) = %d, want %d&#34;, i, len(form), len(test.out))
+<span id="L1227" class="ln" data-content="  1227">&nbsp;&nbsp;</span>		}
+<span id="L1228" class="ln" data-content="  1228">&nbsp;&nbsp;</span>		for k, evs := range test.out {
+<span id="L1229" class="ln" data-content="  1229">&nbsp;&nbsp;</span>			vs, ok := form[k]
+<span id="L1230" class="ln" data-content="  1230">&nbsp;&nbsp;</span>			if !ok {
+<span id="L1231" class="ln" data-content="  1231">&nbsp;&nbsp;</span>				t.Errorf(&#34;test %d: Missing key %q&#34;, i, k)
+<span id="L1232" class="ln" data-content="  1232">&nbsp;&nbsp;</span>				continue
+<span id="L1233" class="ln" data-content="  1233">&nbsp;&nbsp;</span>			}
+<span id="L1234" class="ln" data-content="  1234">&nbsp;&nbsp;</span>			if len(vs) != len(evs) {
+<span id="L1235" class="ln" data-content="  1235">&nbsp;&nbsp;</span>				t.Errorf(&#34;test %d: len(form[%q]) = %d, want %d&#34;, i, k, len(vs), len(evs))
+<span id="L1236" class="ln" data-content="  1236">&nbsp;&nbsp;</span>				continue
+<span id="L1237" class="ln" data-content="  1237">&nbsp;&nbsp;</span>			}
+<span id="L1238" class="ln" data-content="  1238">&nbsp;&nbsp;</span>			for j, ev := range evs {
+<span id="L1239" class="ln" data-content="  1239">&nbsp;&nbsp;</span>				if v := vs[j]; v != ev {
+<span id="L1240" class="ln" data-content="  1240">&nbsp;&nbsp;</span>					t.Errorf(&#34;test %d: form[%q][%d] = %q, want %q&#34;, i, k, j, v, ev)
+<span id="L1241" class="ln" data-content="  1241">&nbsp;&nbsp;</span>				}
+<span id="L1242" class="ln" data-content="  1242">&nbsp;&nbsp;</span>			}
+<span id="L1243" class="ln" data-content="  1243">&nbsp;&nbsp;</span>		}
+<span id="L1244" class="ln" data-content="  1244">&nbsp;&nbsp;</span>	}
+<span id="L1245" class="ln" data-content="  1245">&nbsp;&nbsp;</span>}
+<span id="L1246" class="ln" data-content="  1246">&nbsp;&nbsp;</span>
+<span id="L1247" class="ln" data-content="  1247">&nbsp;&nbsp;</span>type RequestURITest struct {
+<span id="L1248" class="ln" data-content="  1248">&nbsp;&nbsp;</span>	url *URL
+<span id="L1249" class="ln" data-content="  1249">&nbsp;&nbsp;</span>	out string
+<span id="L1250" class="ln" data-content="  1250">&nbsp;&nbsp;</span>}
+<span id="L1251" class="ln" data-content="  1251">&nbsp;&nbsp;</span>
+<span id="L1252" class="ln" data-content="  1252">&nbsp;&nbsp;</span>var requritests = []RequestURITest{
+<span id="L1253" class="ln" data-content="  1253">&nbsp;&nbsp;</span>	{
+<span id="L1254" class="ln" data-content="  1254">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1255" class="ln" data-content="  1255">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L1256" class="ln" data-content="  1256">&nbsp;&nbsp;</span>			Host:   &#34;example.com&#34;,
+<span id="L1257" class="ln" data-content="  1257">&nbsp;&nbsp;</span>			Path:   &#34;&#34;,
+<span id="L1258" class="ln" data-content="  1258">&nbsp;&nbsp;</span>		},
+<span id="L1259" class="ln" data-content="  1259">&nbsp;&nbsp;</span>		&#34;/&#34;,
+<span id="L1260" class="ln" data-content="  1260">&nbsp;&nbsp;</span>	},
+<span id="L1261" class="ln" data-content="  1261">&nbsp;&nbsp;</span>	{
+<span id="L1262" class="ln" data-content="  1262">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1263" class="ln" data-content="  1263">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L1264" class="ln" data-content="  1264">&nbsp;&nbsp;</span>			Host:   &#34;example.com&#34;,
+<span id="L1265" class="ln" data-content="  1265">&nbsp;&nbsp;</span>			Path:   &#34;/a b&#34;,
+<span id="L1266" class="ln" data-content="  1266">&nbsp;&nbsp;</span>		},
+<span id="L1267" class="ln" data-content="  1267">&nbsp;&nbsp;</span>		&#34;/a%20b&#34;,
+<span id="L1268" class="ln" data-content="  1268">&nbsp;&nbsp;</span>	},
+<span id="L1269" class="ln" data-content="  1269">&nbsp;&nbsp;</span>	<span class="comment">// golang.org/issue/4860 variant 1</span>
+<span id="L1270" class="ln" data-content="  1270">&nbsp;&nbsp;</span>	{
+<span id="L1271" class="ln" data-content="  1271">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1272" class="ln" data-content="  1272">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L1273" class="ln" data-content="  1273">&nbsp;&nbsp;</span>			Host:   &#34;example.com&#34;,
+<span id="L1274" class="ln" data-content="  1274">&nbsp;&nbsp;</span>			Opaque: &#34;/%2F/%2F/&#34;,
+<span id="L1275" class="ln" data-content="  1275">&nbsp;&nbsp;</span>		},
+<span id="L1276" class="ln" data-content="  1276">&nbsp;&nbsp;</span>		&#34;/%2F/%2F/&#34;,
+<span id="L1277" class="ln" data-content="  1277">&nbsp;&nbsp;</span>	},
+<span id="L1278" class="ln" data-content="  1278">&nbsp;&nbsp;</span>	<span class="comment">// golang.org/issue/4860 variant 2</span>
+<span id="L1279" class="ln" data-content="  1279">&nbsp;&nbsp;</span>	{
+<span id="L1280" class="ln" data-content="  1280">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1281" class="ln" data-content="  1281">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L1282" class="ln" data-content="  1282">&nbsp;&nbsp;</span>			Host:   &#34;example.com&#34;,
+<span id="L1283" class="ln" data-content="  1283">&nbsp;&nbsp;</span>			Opaque: &#34;//other.example.com/%2F/%2F/&#34;,
+<span id="L1284" class="ln" data-content="  1284">&nbsp;&nbsp;</span>		},
+<span id="L1285" class="ln" data-content="  1285">&nbsp;&nbsp;</span>		&#34;http://other.example.com/%2F/%2F/&#34;,
+<span id="L1286" class="ln" data-content="  1286">&nbsp;&nbsp;</span>	},
+<span id="L1287" class="ln" data-content="  1287">&nbsp;&nbsp;</span>	<span class="comment">// better fix for issue 4860</span>
+<span id="L1288" class="ln" data-content="  1288">&nbsp;&nbsp;</span>	{
+<span id="L1289" class="ln" data-content="  1289">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1290" class="ln" data-content="  1290">&nbsp;&nbsp;</span>			Scheme:  &#34;http&#34;,
+<span id="L1291" class="ln" data-content="  1291">&nbsp;&nbsp;</span>			Host:    &#34;example.com&#34;,
+<span id="L1292" class="ln" data-content="  1292">&nbsp;&nbsp;</span>			Path:    &#34;/////&#34;,
+<span id="L1293" class="ln" data-content="  1293">&nbsp;&nbsp;</span>			RawPath: &#34;/%2F/%2F/&#34;,
+<span id="L1294" class="ln" data-content="  1294">&nbsp;&nbsp;</span>		},
+<span id="L1295" class="ln" data-content="  1295">&nbsp;&nbsp;</span>		&#34;/%2F/%2F/&#34;,
+<span id="L1296" class="ln" data-content="  1296">&nbsp;&nbsp;</span>	},
+<span id="L1297" class="ln" data-content="  1297">&nbsp;&nbsp;</span>	{
+<span id="L1298" class="ln" data-content="  1298">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1299" class="ln" data-content="  1299">&nbsp;&nbsp;</span>			Scheme:  &#34;http&#34;,
+<span id="L1300" class="ln" data-content="  1300">&nbsp;&nbsp;</span>			Host:    &#34;example.com&#34;,
+<span id="L1301" class="ln" data-content="  1301">&nbsp;&nbsp;</span>			Path:    &#34;/////&#34;,
+<span id="L1302" class="ln" data-content="  1302">&nbsp;&nbsp;</span>			RawPath: &#34;/WRONG/&#34;, <span class="comment">// ignored because doesn&#39;t match Path</span>
+<span id="L1303" class="ln" data-content="  1303">&nbsp;&nbsp;</span>		},
+<span id="L1304" class="ln" data-content="  1304">&nbsp;&nbsp;</span>		&#34;/////&#34;,
+<span id="L1305" class="ln" data-content="  1305">&nbsp;&nbsp;</span>	},
+<span id="L1306" class="ln" data-content="  1306">&nbsp;&nbsp;</span>	{
+<span id="L1307" class="ln" data-content="  1307">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1308" class="ln" data-content="  1308">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L1309" class="ln" data-content="  1309">&nbsp;&nbsp;</span>			Host:     &#34;example.com&#34;,
+<span id="L1310" class="ln" data-content="  1310">&nbsp;&nbsp;</span>			Path:     &#34;/a b&#34;,
+<span id="L1311" class="ln" data-content="  1311">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L1312" class="ln" data-content="  1312">&nbsp;&nbsp;</span>		},
+<span id="L1313" class="ln" data-content="  1313">&nbsp;&nbsp;</span>		&#34;/a%20b?q=go+language&#34;,
+<span id="L1314" class="ln" data-content="  1314">&nbsp;&nbsp;</span>	},
+<span id="L1315" class="ln" data-content="  1315">&nbsp;&nbsp;</span>	{
+<span id="L1316" class="ln" data-content="  1316">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1317" class="ln" data-content="  1317">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L1318" class="ln" data-content="  1318">&nbsp;&nbsp;</span>			Host:     &#34;example.com&#34;,
+<span id="L1319" class="ln" data-content="  1319">&nbsp;&nbsp;</span>			Path:     &#34;/a b&#34;,
+<span id="L1320" class="ln" data-content="  1320">&nbsp;&nbsp;</span>			RawPath:  &#34;/a b&#34;, <span class="comment">// ignored because invalid</span>
+<span id="L1321" class="ln" data-content="  1321">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L1322" class="ln" data-content="  1322">&nbsp;&nbsp;</span>		},
+<span id="L1323" class="ln" data-content="  1323">&nbsp;&nbsp;</span>		&#34;/a%20b?q=go+language&#34;,
+<span id="L1324" class="ln" data-content="  1324">&nbsp;&nbsp;</span>	},
+<span id="L1325" class="ln" data-content="  1325">&nbsp;&nbsp;</span>	{
+<span id="L1326" class="ln" data-content="  1326">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1327" class="ln" data-content="  1327">&nbsp;&nbsp;</span>			Scheme:   &#34;http&#34;,
+<span id="L1328" class="ln" data-content="  1328">&nbsp;&nbsp;</span>			Host:     &#34;example.com&#34;,
+<span id="L1329" class="ln" data-content="  1329">&nbsp;&nbsp;</span>			Path:     &#34;/a?b&#34;,
+<span id="L1330" class="ln" data-content="  1330">&nbsp;&nbsp;</span>			RawPath:  &#34;/a?b&#34;, <span class="comment">// ignored because invalid</span>
+<span id="L1331" class="ln" data-content="  1331">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L1332" class="ln" data-content="  1332">&nbsp;&nbsp;</span>		},
+<span id="L1333" class="ln" data-content="  1333">&nbsp;&nbsp;</span>		&#34;/a%3Fb?q=go+language&#34;,
+<span id="L1334" class="ln" data-content="  1334">&nbsp;&nbsp;</span>	},
+<span id="L1335" class="ln" data-content="  1335">&nbsp;&nbsp;</span>	{
+<span id="L1336" class="ln" data-content="  1336">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1337" class="ln" data-content="  1337">&nbsp;&nbsp;</span>			Scheme: &#34;myschema&#34;,
+<span id="L1338" class="ln" data-content="  1338">&nbsp;&nbsp;</span>			Opaque: &#34;opaque&#34;,
+<span id="L1339" class="ln" data-content="  1339">&nbsp;&nbsp;</span>		},
+<span id="L1340" class="ln" data-content="  1340">&nbsp;&nbsp;</span>		&#34;opaque&#34;,
+<span id="L1341" class="ln" data-content="  1341">&nbsp;&nbsp;</span>	},
+<span id="L1342" class="ln" data-content="  1342">&nbsp;&nbsp;</span>	{
+<span id="L1343" class="ln" data-content="  1343">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1344" class="ln" data-content="  1344">&nbsp;&nbsp;</span>			Scheme:   &#34;myschema&#34;,
+<span id="L1345" class="ln" data-content="  1345">&nbsp;&nbsp;</span>			Opaque:   &#34;opaque&#34;,
+<span id="L1346" class="ln" data-content="  1346">&nbsp;&nbsp;</span>			RawQuery: &#34;q=go+language&#34;,
+<span id="L1347" class="ln" data-content="  1347">&nbsp;&nbsp;</span>		},
+<span id="L1348" class="ln" data-content="  1348">&nbsp;&nbsp;</span>		&#34;opaque?q=go+language&#34;,
+<span id="L1349" class="ln" data-content="  1349">&nbsp;&nbsp;</span>	},
+<span id="L1350" class="ln" data-content="  1350">&nbsp;&nbsp;</span>	{
+<span id="L1351" class="ln" data-content="  1351">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1352" class="ln" data-content="  1352">&nbsp;&nbsp;</span>			Scheme: &#34;http&#34;,
+<span id="L1353" class="ln" data-content="  1353">&nbsp;&nbsp;</span>			Host:   &#34;example.com&#34;,
+<span id="L1354" class="ln" data-content="  1354">&nbsp;&nbsp;</span>			Path:   &#34;//foo&#34;,
+<span id="L1355" class="ln" data-content="  1355">&nbsp;&nbsp;</span>		},
+<span id="L1356" class="ln" data-content="  1356">&nbsp;&nbsp;</span>		&#34;//foo&#34;,
+<span id="L1357" class="ln" data-content="  1357">&nbsp;&nbsp;</span>	},
+<span id="L1358" class="ln" data-content="  1358">&nbsp;&nbsp;</span>	{
+<span id="L1359" class="ln" data-content="  1359">&nbsp;&nbsp;</span>		&amp;URL{
+<span id="L1360" class="ln" data-content="  1360">&nbsp;&nbsp;</span>			Scheme:     &#34;http&#34;,
+<span id="L1361" class="ln" data-content="  1361">&nbsp;&nbsp;</span>			Host:       &#34;example.com&#34;,
+<span id="L1362" class="ln" data-content="  1362">&nbsp;&nbsp;</span>			Path:       &#34;/foo&#34;,
+<span id="L1363" class="ln" data-content="  1363">&nbsp;&nbsp;</span>			ForceQuery: true,
+<span id="L1364" class="ln" data-content="  1364">&nbsp;&nbsp;</span>		},
+<span id="L1365" class="ln" data-content="  1365">&nbsp;&nbsp;</span>		&#34;/foo?&#34;,
+<span id="L1366" class="ln" data-content="  1366">&nbsp;&nbsp;</span>	},
+<span id="L1367" class="ln" data-content="  1367">&nbsp;&nbsp;</span>}
+<span id="L1368" class="ln" data-content="  1368">&nbsp;&nbsp;</span>
+<span id="L1369" class="ln" data-content="  1369">&nbsp;&nbsp;</span>func TestRequestURI(t *testing.T) {
+<span id="L1370" class="ln" data-content="  1370">&nbsp;&nbsp;</span>	for _, tt := range requritests {
+<span id="L1371" class="ln" data-content="  1371">&nbsp;&nbsp;</span>		s := tt.url.RequestURI()
+<span id="L1372" class="ln" data-content="  1372">&nbsp;&nbsp;</span>		if s != tt.out {
+<span id="L1373" class="ln" data-content="  1373">&nbsp;&nbsp;</span>			t.Errorf(&#34;%#v.RequestURI() == %q (expected %q)&#34;, tt.url, s, tt.out)
+<span id="L1374" class="ln" data-content="  1374">&nbsp;&nbsp;</span>		}
+<span id="L1375" class="ln" data-content="  1375">&nbsp;&nbsp;</span>	}
+<span id="L1376" class="ln" data-content="  1376">&nbsp;&nbsp;</span>}
+<span id="L1377" class="ln" data-content="  1377">&nbsp;&nbsp;</span>
+<span id="L1378" class="ln" data-content="  1378">&nbsp;&nbsp;</span>func TestParseFailure(t *testing.T) {
+<span id="L1379" class="ln" data-content="  1379">&nbsp;&nbsp;</span>	<span class="comment">// Test that the first parse error is returned.</span>
+<span id="L1380" class="ln" data-content="  1380">&nbsp;&nbsp;</span>	const url = &#34;%gh&amp;%ij&#34;
+<span id="L1381" class="ln" data-content="  1381">&nbsp;&nbsp;</span>	_, err := ParseQuery(url)
+<span id="L1382" class="ln" data-content="  1382">&nbsp;&nbsp;</span>	errStr := fmt.Sprint(err)
+<span id="L1383" class="ln" data-content="  1383">&nbsp;&nbsp;</span>	if !strings.Contains(errStr, &#34;%gh&#34;) {
+<span id="L1384" class="ln" data-content="  1384">&nbsp;&nbsp;</span>		t.Errorf(`ParseQuery(%q) returned error %q, want something containing %q&#34;`, url, errStr, &#34;%gh&#34;)
+<span id="L1385" class="ln" data-content="  1385">&nbsp;&nbsp;</span>	}
+<span id="L1386" class="ln" data-content="  1386">&nbsp;&nbsp;</span>}
+<span id="L1387" class="ln" data-content="  1387">&nbsp;&nbsp;</span>
+<span id="L1388" class="ln" data-content="  1388">&nbsp;&nbsp;</span>func TestParseErrors(t *testing.T) {
+<span id="L1389" class="ln" data-content="  1389">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L1390" class="ln" data-content="  1390">&nbsp;&nbsp;</span>		in      string
+<span id="L1391" class="ln" data-content="  1391">&nbsp;&nbsp;</span>		wantErr bool
+<span id="L1392" class="ln" data-content="  1392">&nbsp;&nbsp;</span>	}{
+<span id="L1393" class="ln" data-content="  1393">&nbsp;&nbsp;</span>		{&#34;http://[::1]&#34;, false},
+<span id="L1394" class="ln" data-content="  1394">&nbsp;&nbsp;</span>		{&#34;http://[::1]:80&#34;, false},
+<span id="L1395" class="ln" data-content="  1395">&nbsp;&nbsp;</span>		{&#34;http://[::1]:namedport&#34;, true}, <span class="comment">// rfc3986 3.2.3</span>
+<span id="L1396" class="ln" data-content="  1396">&nbsp;&nbsp;</span>		{&#34;http://[::1]/&#34;, false},
+<span id="L1397" class="ln" data-content="  1397">&nbsp;&nbsp;</span>		{&#34;http://[::1]a&#34;, true},
+<span id="L1398" class="ln" data-content="  1398">&nbsp;&nbsp;</span>		{&#34;http://[::1]%23&#34;, true},
+<span id="L1399" class="ln" data-content="  1399">&nbsp;&nbsp;</span>		{&#34;http://[::1%25en0]&#34;, false},     <span class="comment">// valid zone id</span>
+<span id="L1400" class="ln" data-content="  1400">&nbsp;&nbsp;</span>		{&#34;http://[::1]:&#34;, false},          <span class="comment">// colon, but no port OK</span>
+<span id="L1401" class="ln" data-content="  1401">&nbsp;&nbsp;</span>		{&#34;http://[::1]:%38%30&#34;, true},     <span class="comment">// not allowed: % encoding only for non-ASCII</span>
+<span id="L1402" class="ln" data-content="  1402">&nbsp;&nbsp;</span>		{&#34;http://[::1%25%41]&#34;, false},     <span class="comment">// RFC 6874 allows over-escaping in zone</span>
+<span id="L1403" class="ln" data-content="  1403">&nbsp;&nbsp;</span>		{&#34;http://[%10::1]&#34;, true},         <span class="comment">// no %xx escapes in IP address</span>
+<span id="L1404" class="ln" data-content="  1404">&nbsp;&nbsp;</span>		{&#34;http://[::1]/%48&#34;, false},       <span class="comment">// %xx in path is fine</span>
+<span id="L1405" class="ln" data-content="  1405">&nbsp;&nbsp;</span>		{&#34;http://%41:8080/&#34;, true},        <span class="comment">// not allowed: % encoding only for non-ASCII</span>
+<span id="L1406" class="ln" data-content="  1406">&nbsp;&nbsp;</span>		{&#34;mysql://x@y(z:123)/foo&#34;, false}, <span class="comment">// golang.org/issue/12023</span>
+<span id="L1407" class="ln" data-content="  1407">&nbsp;&nbsp;</span>		{&#34;mysql://x@y(1.2.3.4:123)/foo&#34;, false},
+<span id="L1408" class="ln" data-content="  1408">&nbsp;&nbsp;</span>
+<span id="L1409" class="ln" data-content="  1409">&nbsp;&nbsp;</span>		{&#34;http://[]%20%48%54%54%50%2f%31%2e%31%0a%4d%79%48%65%61%64%65%72%3a%20%31%32%33%0a%0a/&#34;, true}, <span class="comment">// golang.org/issue/11208</span>
+<span id="L1410" class="ln" data-content="  1410">&nbsp;&nbsp;</span>		{&#34;http://a b.com/&#34;, true},                                                                       <span class="comment">// no space in host name please</span>
+<span id="L1411" class="ln" data-content="  1411">&nbsp;&nbsp;</span>		{&#34;cache_object://foo&#34;, true},                                                                    <span class="comment">// scheme cannot have _, relative path cannot have : in first segment</span>
+<span id="L1412" class="ln" data-content="  1412">&nbsp;&nbsp;</span>		{&#34;cache_object:foo&#34;, true},
+<span id="L1413" class="ln" data-content="  1413">&nbsp;&nbsp;</span>		{&#34;cache_object:foo/bar&#34;, true},
+<span id="L1414" class="ln" data-content="  1414">&nbsp;&nbsp;</span>		{&#34;cache_object/:foo/bar&#34;, false},
+<span id="L1415" class="ln" data-content="  1415">&nbsp;&nbsp;</span>	}
+<span id="L1416" class="ln" data-content="  1416">&nbsp;&nbsp;</span>	for _, tt := range tests {
+<span id="L1417" class="ln" data-content="  1417">&nbsp;&nbsp;</span>		u, err := Parse(tt.in)
+<span id="L1418" class="ln" data-content="  1418">&nbsp;&nbsp;</span>		if tt.wantErr {
+<span id="L1419" class="ln" data-content="  1419">&nbsp;&nbsp;</span>			if err == nil {
+<span id="L1420" class="ln" data-content="  1420">&nbsp;&nbsp;</span>				t.Errorf(&#34;Parse(%q) = %#v; want an error&#34;, tt.in, u)
+<span id="L1421" class="ln" data-content="  1421">&nbsp;&nbsp;</span>			}
+<span id="L1422" class="ln" data-content="  1422">&nbsp;&nbsp;</span>			continue
+<span id="L1423" class="ln" data-content="  1423">&nbsp;&nbsp;</span>		}
+<span id="L1424" class="ln" data-content="  1424">&nbsp;&nbsp;</span>		if err != nil {
+<span id="L1425" class="ln" data-content="  1425">&nbsp;&nbsp;</span>			t.Logf(&#34;Parse(%q) = %v; want no error&#34;, tt.in, err)
+<span id="L1426" class="ln" data-content="  1426">&nbsp;&nbsp;</span>		}
+<span id="L1427" class="ln" data-content="  1427">&nbsp;&nbsp;</span>	}
+<span id="L1428" class="ln" data-content="  1428">&nbsp;&nbsp;</span>}
+<span id="L1429" class="ln" data-content="  1429">&nbsp;&nbsp;</span>
+<span id="L1430" class="ln" data-content="  1430">&nbsp;&nbsp;</span><span class="comment">// Issue 11202</span>
+<span id="L1431" class="ln" data-content="  1431">&nbsp;&nbsp;</span>func TestStarRequest(t *testing.T) {
+<span id="L1432" class="ln" data-content="  1432">&nbsp;&nbsp;</span>	u, err := Parse(&#34;*&#34;)
+<span id="L1433" class="ln" data-content="  1433">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1434" class="ln" data-content="  1434">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1435" class="ln" data-content="  1435">&nbsp;&nbsp;</span>	}
+<span id="L1436" class="ln" data-content="  1436">&nbsp;&nbsp;</span>	if got, want := u.RequestURI(), &#34;*&#34;; got != want {
+<span id="L1437" class="ln" data-content="  1437">&nbsp;&nbsp;</span>		t.Errorf(&#34;RequestURI = %q; want %q&#34;, got, want)
+<span id="L1438" class="ln" data-content="  1438">&nbsp;&nbsp;</span>	}
+<span id="L1439" class="ln" data-content="  1439">&nbsp;&nbsp;</span>}
+<span id="L1440" class="ln" data-content="  1440">&nbsp;&nbsp;</span>
+<span id="L1441" class="ln" data-content="  1441">&nbsp;&nbsp;</span>type shouldEscapeTest struct {
+<span id="L1442" class="ln" data-content="  1442">&nbsp;&nbsp;</span>	in     byte
+<span id="L1443" class="ln" data-content="  1443">&nbsp;&nbsp;</span>	mode   encoding
+<span id="L1444" class="ln" data-content="  1444">&nbsp;&nbsp;</span>	escape bool
+<span id="L1445" class="ln" data-content="  1445">&nbsp;&nbsp;</span>}
+<span id="L1446" class="ln" data-content="  1446">&nbsp;&nbsp;</span>
+<span id="L1447" class="ln" data-content="  1447">&nbsp;&nbsp;</span>var shouldEscapeTests = []shouldEscapeTest{
+<span id="L1448" class="ln" data-content="  1448">&nbsp;&nbsp;</span>	<span class="comment">// Unreserved characters (§2.3)</span>
+<span id="L1449" class="ln" data-content="  1449">&nbsp;&nbsp;</span>	{&#39;a&#39;, encodePath, false},
+<span id="L1450" class="ln" data-content="  1450">&nbsp;&nbsp;</span>	{&#39;a&#39;, encodeUserPassword, false},
+<span id="L1451" class="ln" data-content="  1451">&nbsp;&nbsp;</span>	{&#39;a&#39;, encodeQueryComponent, false},
+<span id="L1452" class="ln" data-content="  1452">&nbsp;&nbsp;</span>	{&#39;a&#39;, encodeFragment, false},
+<span id="L1453" class="ln" data-content="  1453">&nbsp;&nbsp;</span>	{&#39;a&#39;, encodeHost, false},
+<span id="L1454" class="ln" data-content="  1454">&nbsp;&nbsp;</span>	{&#39;z&#39;, encodePath, false},
+<span id="L1455" class="ln" data-content="  1455">&nbsp;&nbsp;</span>	{&#39;A&#39;, encodePath, false},
+<span id="L1456" class="ln" data-content="  1456">&nbsp;&nbsp;</span>	{&#39;Z&#39;, encodePath, false},
+<span id="L1457" class="ln" data-content="  1457">&nbsp;&nbsp;</span>	{&#39;0&#39;, encodePath, false},
+<span id="L1458" class="ln" data-content="  1458">&nbsp;&nbsp;</span>	{&#39;9&#39;, encodePath, false},
+<span id="L1459" class="ln" data-content="  1459">&nbsp;&nbsp;</span>	{&#39;-&#39;, encodePath, false},
+<span id="L1460" class="ln" data-content="  1460">&nbsp;&nbsp;</span>	{&#39;-&#39;, encodeUserPassword, false},
+<span id="L1461" class="ln" data-content="  1461">&nbsp;&nbsp;</span>	{&#39;-&#39;, encodeQueryComponent, false},
+<span id="L1462" class="ln" data-content="  1462">&nbsp;&nbsp;</span>	{&#39;-&#39;, encodeFragment, false},
+<span id="L1463" class="ln" data-content="  1463">&nbsp;&nbsp;</span>	{&#39;.&#39;, encodePath, false},
+<span id="L1464" class="ln" data-content="  1464">&nbsp;&nbsp;</span>	{&#39;_&#39;, encodePath, false},
+<span id="L1465" class="ln" data-content="  1465">&nbsp;&nbsp;</span>	{&#39;~&#39;, encodePath, false},
+<span id="L1466" class="ln" data-content="  1466">&nbsp;&nbsp;</span>
+<span id="L1467" class="ln" data-content="  1467">&nbsp;&nbsp;</span>	<span class="comment">// User information (§3.2.1)</span>
+<span id="L1468" class="ln" data-content="  1468">&nbsp;&nbsp;</span>	{&#39;:&#39;, encodeUserPassword, true},
+<span id="L1469" class="ln" data-content="  1469">&nbsp;&nbsp;</span>	{&#39;/&#39;, encodeUserPassword, true},
+<span id="L1470" class="ln" data-content="  1470">&nbsp;&nbsp;</span>	{&#39;?&#39;, encodeUserPassword, true},
+<span id="L1471" class="ln" data-content="  1471">&nbsp;&nbsp;</span>	{&#39;@&#39;, encodeUserPassword, true},
+<span id="L1472" class="ln" data-content="  1472">&nbsp;&nbsp;</span>	{&#39;$&#39;, encodeUserPassword, false},
+<span id="L1473" class="ln" data-content="  1473">&nbsp;&nbsp;</span>	{&#39;&amp;&#39;, encodeUserPassword, false},
+<span id="L1474" class="ln" data-content="  1474">&nbsp;&nbsp;</span>	{&#39;+&#39;, encodeUserPassword, false},
+<span id="L1475" class="ln" data-content="  1475">&nbsp;&nbsp;</span>	{&#39;,&#39;, encodeUserPassword, false},
+<span id="L1476" class="ln" data-content="  1476">&nbsp;&nbsp;</span>	{&#39;;&#39;, encodeUserPassword, false},
+<span id="L1477" class="ln" data-content="  1477">&nbsp;&nbsp;</span>	{&#39;=&#39;, encodeUserPassword, false},
+<span id="L1478" class="ln" data-content="  1478">&nbsp;&nbsp;</span>
+<span id="L1479" class="ln" data-content="  1479">&nbsp;&nbsp;</span>	<span class="comment">// Host (IP address, IPv6 address, registered name, port suffix; §3.2.2)</span>
+<span id="L1480" class="ln" data-content="  1480">&nbsp;&nbsp;</span>	{&#39;!&#39;, encodeHost, false},
+<span id="L1481" class="ln" data-content="  1481">&nbsp;&nbsp;</span>	{&#39;$&#39;, encodeHost, false},
+<span id="L1482" class="ln" data-content="  1482">&nbsp;&nbsp;</span>	{&#39;&amp;&#39;, encodeHost, false},
+<span id="L1483" class="ln" data-content="  1483">&nbsp;&nbsp;</span>	{&#39;\&#39;&#39;, encodeHost, false},
+<span id="L1484" class="ln" data-content="  1484">&nbsp;&nbsp;</span>	{&#39;(&#39;, encodeHost, false},
+<span id="L1485" class="ln" data-content="  1485">&nbsp;&nbsp;</span>	{&#39;)&#39;, encodeHost, false},
+<span id="L1486" class="ln" data-content="  1486">&nbsp;&nbsp;</span>	{&#39;*&#39;, encodeHost, false},
+<span id="L1487" class="ln" data-content="  1487">&nbsp;&nbsp;</span>	{&#39;+&#39;, encodeHost, false},
+<span id="L1488" class="ln" data-content="  1488">&nbsp;&nbsp;</span>	{&#39;,&#39;, encodeHost, false},
+<span id="L1489" class="ln" data-content="  1489">&nbsp;&nbsp;</span>	{&#39;;&#39;, encodeHost, false},
+<span id="L1490" class="ln" data-content="  1490">&nbsp;&nbsp;</span>	{&#39;=&#39;, encodeHost, false},
+<span id="L1491" class="ln" data-content="  1491">&nbsp;&nbsp;</span>	{&#39;:&#39;, encodeHost, false},
+<span id="L1492" class="ln" data-content="  1492">&nbsp;&nbsp;</span>	{&#39;[&#39;, encodeHost, false},
+<span id="L1493" class="ln" data-content="  1493">&nbsp;&nbsp;</span>	{&#39;]&#39;, encodeHost, false},
+<span id="L1494" class="ln" data-content="  1494">&nbsp;&nbsp;</span>	{&#39;0&#39;, encodeHost, false},
+<span id="L1495" class="ln" data-content="  1495">&nbsp;&nbsp;</span>	{&#39;9&#39;, encodeHost, false},
+<span id="L1496" class="ln" data-content="  1496">&nbsp;&nbsp;</span>	{&#39;A&#39;, encodeHost, false},
+<span id="L1497" class="ln" data-content="  1497">&nbsp;&nbsp;</span>	{&#39;z&#39;, encodeHost, false},
+<span id="L1498" class="ln" data-content="  1498">&nbsp;&nbsp;</span>	{&#39;_&#39;, encodeHost, false},
+<span id="L1499" class="ln" data-content="  1499">&nbsp;&nbsp;</span>	{&#39;-&#39;, encodeHost, false},
+<span id="L1500" class="ln" data-content="  1500">&nbsp;&nbsp;</span>	{&#39;.&#39;, encodeHost, false},
+<span id="L1501" class="ln" data-content="  1501">&nbsp;&nbsp;</span>}
+<span id="L1502" class="ln" data-content="  1502">&nbsp;&nbsp;</span>
+<span id="L1503" class="ln" data-content="  1503">&nbsp;&nbsp;</span>func TestShouldEscape(t *testing.T) {
+<span id="L1504" class="ln" data-content="  1504">&nbsp;&nbsp;</span>	for _, tt := range shouldEscapeTests {
+<span id="L1505" class="ln" data-content="  1505">&nbsp;&nbsp;</span>		if shouldEscape(tt.in, tt.mode) != tt.escape {
+<span id="L1506" class="ln" data-content="  1506">&nbsp;&nbsp;</span>			t.Errorf(&#34;shouldEscape(%q, %v) returned %v; expected %v&#34;, tt.in, tt.mode, !tt.escape, tt.escape)
+<span id="L1507" class="ln" data-content="  1507">&nbsp;&nbsp;</span>		}
+<span id="L1508" class="ln" data-content="  1508">&nbsp;&nbsp;</span>	}
+<span id="L1509" class="ln" data-content="  1509">&nbsp;&nbsp;</span>}
+<span id="L1510" class="ln" data-content="  1510">&nbsp;&nbsp;</span>
+<span id="L1511" class="ln" data-content="  1511">&nbsp;&nbsp;</span>type timeoutError struct {
+<span id="L1512" class="ln" data-content="  1512">&nbsp;&nbsp;</span>	timeout bool
+<span id="L1513" class="ln" data-content="  1513">&nbsp;&nbsp;</span>}
+<span id="L1514" class="ln" data-content="  1514">&nbsp;&nbsp;</span>
+<span id="L1515" class="ln" data-content="  1515">&nbsp;&nbsp;</span>func (e *timeoutError) Error() string { return &#34;timeout error&#34; }
+<span id="L1516" class="ln" data-content="  1516">&nbsp;&nbsp;</span>func (e *timeoutError) Timeout() bool { return e.timeout }
+<span id="L1517" class="ln" data-content="  1517">&nbsp;&nbsp;</span>
+<span id="L1518" class="ln" data-content="  1518">&nbsp;&nbsp;</span>type temporaryError struct {
+<span id="L1519" class="ln" data-content="  1519">&nbsp;&nbsp;</span>	temporary bool
+<span id="L1520" class="ln" data-content="  1520">&nbsp;&nbsp;</span>}
+<span id="L1521" class="ln" data-content="  1521">&nbsp;&nbsp;</span>
+<span id="L1522" class="ln" data-content="  1522">&nbsp;&nbsp;</span>func (e *temporaryError) Error() string   { return &#34;temporary error&#34; }
+<span id="L1523" class="ln" data-content="  1523">&nbsp;&nbsp;</span>func (e *temporaryError) Temporary() bool { return e.temporary }
+<span id="L1524" class="ln" data-content="  1524">&nbsp;&nbsp;</span>
+<span id="L1525" class="ln" data-content="  1525">&nbsp;&nbsp;</span>type timeoutTemporaryError struct {
+<span id="L1526" class="ln" data-content="  1526">&nbsp;&nbsp;</span>	timeoutError
+<span id="L1527" class="ln" data-content="  1527">&nbsp;&nbsp;</span>	temporaryError
+<span id="L1528" class="ln" data-content="  1528">&nbsp;&nbsp;</span>}
+<span id="L1529" class="ln" data-content="  1529">&nbsp;&nbsp;</span>
+<span id="L1530" class="ln" data-content="  1530">&nbsp;&nbsp;</span>func (e *timeoutTemporaryError) Error() string { return &#34;timeout/temporary error&#34; }
+<span id="L1531" class="ln" data-content="  1531">&nbsp;&nbsp;</span>
+<span id="L1532" class="ln" data-content="  1532">&nbsp;&nbsp;</span>var netErrorTests = []struct {
+<span id="L1533" class="ln" data-content="  1533">&nbsp;&nbsp;</span>	err       error
+<span id="L1534" class="ln" data-content="  1534">&nbsp;&nbsp;</span>	timeout   bool
+<span id="L1535" class="ln" data-content="  1535">&nbsp;&nbsp;</span>	temporary bool
+<span id="L1536" class="ln" data-content="  1536">&nbsp;&nbsp;</span>}{{
+<span id="L1537" class="ln" data-content="  1537">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, &amp;timeoutError{timeout: true}},
+<span id="L1538" class="ln" data-content="  1538">&nbsp;&nbsp;</span>	timeout:   true,
+<span id="L1539" class="ln" data-content="  1539">&nbsp;&nbsp;</span>	temporary: false,
+<span id="L1540" class="ln" data-content="  1540">&nbsp;&nbsp;</span>}, {
+<span id="L1541" class="ln" data-content="  1541">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, &amp;timeoutError{timeout: false}},
+<span id="L1542" class="ln" data-content="  1542">&nbsp;&nbsp;</span>	timeout:   false,
+<span id="L1543" class="ln" data-content="  1543">&nbsp;&nbsp;</span>	temporary: false,
+<span id="L1544" class="ln" data-content="  1544">&nbsp;&nbsp;</span>}, {
+<span id="L1545" class="ln" data-content="  1545">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, &amp;temporaryError{temporary: true}},
+<span id="L1546" class="ln" data-content="  1546">&nbsp;&nbsp;</span>	timeout:   false,
+<span id="L1547" class="ln" data-content="  1547">&nbsp;&nbsp;</span>	temporary: true,
+<span id="L1548" class="ln" data-content="  1548">&nbsp;&nbsp;</span>}, {
+<span id="L1549" class="ln" data-content="  1549">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, &amp;temporaryError{temporary: false}},
+<span id="L1550" class="ln" data-content="  1550">&nbsp;&nbsp;</span>	timeout:   false,
+<span id="L1551" class="ln" data-content="  1551">&nbsp;&nbsp;</span>	temporary: false,
+<span id="L1552" class="ln" data-content="  1552">&nbsp;&nbsp;</span>}, {
+<span id="L1553" class="ln" data-content="  1553">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, &amp;timeoutTemporaryError{timeoutError{timeout: true}, temporaryError{temporary: true}}},
+<span id="L1554" class="ln" data-content="  1554">&nbsp;&nbsp;</span>	timeout:   true,
+<span id="L1555" class="ln" data-content="  1555">&nbsp;&nbsp;</span>	temporary: true,
+<span id="L1556" class="ln" data-content="  1556">&nbsp;&nbsp;</span>}, {
+<span id="L1557" class="ln" data-content="  1557">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, &amp;timeoutTemporaryError{timeoutError{timeout: false}, temporaryError{temporary: true}}},
+<span id="L1558" class="ln" data-content="  1558">&nbsp;&nbsp;</span>	timeout:   false,
+<span id="L1559" class="ln" data-content="  1559">&nbsp;&nbsp;</span>	temporary: true,
+<span id="L1560" class="ln" data-content="  1560">&nbsp;&nbsp;</span>}, {
+<span id="L1561" class="ln" data-content="  1561">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, &amp;timeoutTemporaryError{timeoutError{timeout: true}, temporaryError{temporary: false}}},
+<span id="L1562" class="ln" data-content="  1562">&nbsp;&nbsp;</span>	timeout:   true,
+<span id="L1563" class="ln" data-content="  1563">&nbsp;&nbsp;</span>	temporary: false,
+<span id="L1564" class="ln" data-content="  1564">&nbsp;&nbsp;</span>}, {
+<span id="L1565" class="ln" data-content="  1565">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, &amp;timeoutTemporaryError{timeoutError{timeout: false}, temporaryError{temporary: false}}},
+<span id="L1566" class="ln" data-content="  1566">&nbsp;&nbsp;</span>	timeout:   false,
+<span id="L1567" class="ln" data-content="  1567">&nbsp;&nbsp;</span>	temporary: false,
+<span id="L1568" class="ln" data-content="  1568">&nbsp;&nbsp;</span>}, {
+<span id="L1569" class="ln" data-content="  1569">&nbsp;&nbsp;</span>	err:       &amp;Error{&#34;Get&#34;, &#34;http://google.com/&#34;, io.EOF},
+<span id="L1570" class="ln" data-content="  1570">&nbsp;&nbsp;</span>	timeout:   false,
+<span id="L1571" class="ln" data-content="  1571">&nbsp;&nbsp;</span>	temporary: false,
+<span id="L1572" class="ln" data-content="  1572">&nbsp;&nbsp;</span>}}
+<span id="L1573" class="ln" data-content="  1573">&nbsp;&nbsp;</span>
+<span id="L1574" class="ln" data-content="  1574">&nbsp;&nbsp;</span><span class="comment">// Test that url.Error implements net.Error and that it forwards</span>
+<span id="L1575" class="ln" data-content="  1575">&nbsp;&nbsp;</span>func TestURLErrorImplementsNetError(t *testing.T) {
+<span id="L1576" class="ln" data-content="  1576">&nbsp;&nbsp;</span>	for i, tt := range netErrorTests {
+<span id="L1577" class="ln" data-content="  1577">&nbsp;&nbsp;</span>		err, ok := tt.err.(net.Error)
+<span id="L1578" class="ln" data-content="  1578">&nbsp;&nbsp;</span>		if !ok {
+<span id="L1579" class="ln" data-content="  1579">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d: %T does not implement net.Error&#34;, i+1, tt.err)
+<span id="L1580" class="ln" data-content="  1580">&nbsp;&nbsp;</span>			continue
+<span id="L1581" class="ln" data-content="  1581">&nbsp;&nbsp;</span>		}
+<span id="L1582" class="ln" data-content="  1582">&nbsp;&nbsp;</span>		if err.Timeout() != tt.timeout {
+<span id="L1583" class="ln" data-content="  1583">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d: err.Timeout(): got %v, want %v&#34;, i+1, err.Timeout(), tt.timeout)
+<span id="L1584" class="ln" data-content="  1584">&nbsp;&nbsp;</span>			continue
+<span id="L1585" class="ln" data-content="  1585">&nbsp;&nbsp;</span>		}
+<span id="L1586" class="ln" data-content="  1586">&nbsp;&nbsp;</span>		if err.Temporary() != tt.temporary {
+<span id="L1587" class="ln" data-content="  1587">&nbsp;&nbsp;</span>			t.Errorf(&#34;%d: err.Temporary(): got %v, want %v&#34;, i+1, err.Temporary(), tt.temporary)
+<span id="L1588" class="ln" data-content="  1588">&nbsp;&nbsp;</span>		}
+<span id="L1589" class="ln" data-content="  1589">&nbsp;&nbsp;</span>	}
+<span id="L1590" class="ln" data-content="  1590">&nbsp;&nbsp;</span>}
+<span id="L1591" class="ln" data-content="  1591">&nbsp;&nbsp;</span>
+<span id="L1592" class="ln" data-content="  1592">&nbsp;&nbsp;</span>func TestURLHostname(t *testing.T) {
+<span id="L1593" class="ln" data-content="  1593">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L1594" class="ln" data-content="  1594">&nbsp;&nbsp;</span>		host string <span class="comment">// URL.Host field</span>
+<span id="L1595" class="ln" data-content="  1595">&nbsp;&nbsp;</span>		want string
+<span id="L1596" class="ln" data-content="  1596">&nbsp;&nbsp;</span>	}{
+<span id="L1597" class="ln" data-content="  1597">&nbsp;&nbsp;</span>		{&#34;foo.com:80&#34;, &#34;foo.com&#34;},
+<span id="L1598" class="ln" data-content="  1598">&nbsp;&nbsp;</span>		{&#34;foo.com&#34;, &#34;foo.com&#34;},
+<span id="L1599" class="ln" data-content="  1599">&nbsp;&nbsp;</span>		{&#34;FOO.COM&#34;, &#34;FOO.COM&#34;}, <span class="comment">// no canonicalization (yet?)</span>
+<span id="L1600" class="ln" data-content="  1600">&nbsp;&nbsp;</span>		{&#34;1.2.3.4&#34;, &#34;1.2.3.4&#34;},
+<span id="L1601" class="ln" data-content="  1601">&nbsp;&nbsp;</span>		{&#34;1.2.3.4:80&#34;, &#34;1.2.3.4&#34;},
+<span id="L1602" class="ln" data-content="  1602">&nbsp;&nbsp;</span>		{&#34;[1:2:3:4]&#34;, &#34;1:2:3:4&#34;},
+<span id="L1603" class="ln" data-content="  1603">&nbsp;&nbsp;</span>		{&#34;[1:2:3:4]:80&#34;, &#34;1:2:3:4&#34;},
+<span id="L1604" class="ln" data-content="  1604">&nbsp;&nbsp;</span>		{&#34;[::1]:80&#34;, &#34;::1&#34;},
+<span id="L1605" class="ln" data-content="  1605">&nbsp;&nbsp;</span>	}
+<span id="L1606" class="ln" data-content="  1606">&nbsp;&nbsp;</span>	for _, tt := range tests {
+<span id="L1607" class="ln" data-content="  1607">&nbsp;&nbsp;</span>		u := &amp;URL{Host: tt.host}
+<span id="L1608" class="ln" data-content="  1608">&nbsp;&nbsp;</span>		got := u.Hostname()
+<span id="L1609" class="ln" data-content="  1609">&nbsp;&nbsp;</span>		if got != tt.want {
+<span id="L1610" class="ln" data-content="  1610">&nbsp;&nbsp;</span>			t.Errorf(&#34;Hostname for Host %q = %q; want %q&#34;, tt.host, got, tt.want)
+<span id="L1611" class="ln" data-content="  1611">&nbsp;&nbsp;</span>		}
+<span id="L1612" class="ln" data-content="  1612">&nbsp;&nbsp;</span>	}
+<span id="L1613" class="ln" data-content="  1613">&nbsp;&nbsp;</span>}
+<span id="L1614" class="ln" data-content="  1614">&nbsp;&nbsp;</span>
+<span id="L1615" class="ln" data-content="  1615">&nbsp;&nbsp;</span>func TestURLPort(t *testing.T) {
+<span id="L1616" class="ln" data-content="  1616">&nbsp;&nbsp;</span>	tests := []struct {
+<span id="L1617" class="ln" data-content="  1617">&nbsp;&nbsp;</span>		host string <span class="comment">// URL.Host field</span>
+<span id="L1618" class="ln" data-content="  1618">&nbsp;&nbsp;</span>		want string
+<span id="L1619" class="ln" data-content="  1619">&nbsp;&nbsp;</span>	}{
+<span id="L1620" class="ln" data-content="  1620">&nbsp;&nbsp;</span>		{&#34;foo.com&#34;, &#34;&#34;},
+<span id="L1621" class="ln" data-content="  1621">&nbsp;&nbsp;</span>		{&#34;foo.com:80&#34;, &#34;80&#34;},
+<span id="L1622" class="ln" data-content="  1622">&nbsp;&nbsp;</span>		{&#34;1.2.3.4&#34;, &#34;&#34;},
+<span id="L1623" class="ln" data-content="  1623">&nbsp;&nbsp;</span>		{&#34;1.2.3.4:80&#34;, &#34;80&#34;},
+<span id="L1624" class="ln" data-content="  1624">&nbsp;&nbsp;</span>		{&#34;[1:2:3:4]&#34;, &#34;&#34;},
+<span id="L1625" class="ln" data-content="  1625">&nbsp;&nbsp;</span>		{&#34;[1:2:3:4]:80&#34;, &#34;80&#34;},
+<span id="L1626" class="ln" data-content="  1626">&nbsp;&nbsp;</span>	}
+<span id="L1627" class="ln" data-content="  1627">&nbsp;&nbsp;</span>	for _, tt := range tests {
+<span id="L1628" class="ln" data-content="  1628">&nbsp;&nbsp;</span>		u := &amp;URL{Host: tt.host}
+<span id="L1629" class="ln" data-content="  1629">&nbsp;&nbsp;</span>		got := u.Port()
+<span id="L1630" class="ln" data-content="  1630">&nbsp;&nbsp;</span>		if got != tt.want {
+<span id="L1631" class="ln" data-content="  1631">&nbsp;&nbsp;</span>			t.Errorf(&#34;Port for Host %q = %q; want %q&#34;, tt.host, got, tt.want)
+<span id="L1632" class="ln" data-content="  1632">&nbsp;&nbsp;</span>		}
+<span id="L1633" class="ln" data-content="  1633">&nbsp;&nbsp;</span>	}
+<span id="L1634" class="ln" data-content="  1634">&nbsp;&nbsp;</span>}
+<span id="L1635" class="ln" data-content="  1635">&nbsp;&nbsp;</span>
+<span id="L1636" class="ln" data-content="  1636">&nbsp;&nbsp;</span>var _ encodingPkg.BinaryMarshaler = (*URL)(nil)
+<span id="L1637" class="ln" data-content="  1637">&nbsp;&nbsp;</span>var _ encodingPkg.BinaryUnmarshaler = (*URL)(nil)
+<span id="L1638" class="ln" data-content="  1638">&nbsp;&nbsp;</span>
+<span id="L1639" class="ln" data-content="  1639">&nbsp;&nbsp;</span>func TestJSON(t *testing.T) {
+<span id="L1640" class="ln" data-content="  1640">&nbsp;&nbsp;</span>	u, err := Parse(&#34;https://www.google.com/x?y=z&#34;)
+<span id="L1641" class="ln" data-content="  1641">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1642" class="ln" data-content="  1642">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1643" class="ln" data-content="  1643">&nbsp;&nbsp;</span>	}
+<span id="L1644" class="ln" data-content="  1644">&nbsp;&nbsp;</span>	js, err := json.Marshal(u)
+<span id="L1645" class="ln" data-content="  1645">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1646" class="ln" data-content="  1646">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1647" class="ln" data-content="  1647">&nbsp;&nbsp;</span>	}
+<span id="L1648" class="ln" data-content="  1648">&nbsp;&nbsp;</span>
+<span id="L1649" class="ln" data-content="  1649">&nbsp;&nbsp;</span>	<span class="comment">// If only we could implement TextMarshaler/TextUnmarshaler,</span>
+<span id="L1650" class="ln" data-content="  1650">&nbsp;&nbsp;</span>	<span class="comment">// this would work:</span>
+<span id="L1651" class="ln" data-content="  1651">&nbsp;&nbsp;</span>	<span class="comment">//</span>
+<span id="L1652" class="ln" data-content="  1652">&nbsp;&nbsp;</span>	<span class="comment">// if string(js) != strconv.Quote(u.String()) {</span>
+<span id="L1653" class="ln" data-content="  1653">&nbsp;&nbsp;</span>	<span class="comment">// 	t.Errorf(&#34;json encoding: %s\nwant: %s\n&#34;, js, strconv.Quote(u.String()))</span>
+<span id="L1654" class="ln" data-content="  1654">&nbsp;&nbsp;</span>	<span class="comment">// }</span>
+<span id="L1655" class="ln" data-content="  1655">&nbsp;&nbsp;</span>
+<span id="L1656" class="ln" data-content="  1656">&nbsp;&nbsp;</span>	u1 := new(URL)
+<span id="L1657" class="ln" data-content="  1657">&nbsp;&nbsp;</span>	err = json.Unmarshal(js, u1)
+<span id="L1658" class="ln" data-content="  1658">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1659" class="ln" data-content="  1659">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1660" class="ln" data-content="  1660">&nbsp;&nbsp;</span>	}
+<span id="L1661" class="ln" data-content="  1661">&nbsp;&nbsp;</span>	if u1.String() != u.String() {
+<span id="L1662" class="ln" data-content="  1662">&nbsp;&nbsp;</span>		t.Errorf(&#34;json decoded to: %s\nwant: %s\n&#34;, u1, u)
+<span id="L1663" class="ln" data-content="  1663">&nbsp;&nbsp;</span>	}
+<span id="L1664" class="ln" data-content="  1664">&nbsp;&nbsp;</span>}
+<span id="L1665" class="ln" data-content="  1665">&nbsp;&nbsp;</span>
+<span id="L1666" class="ln" data-content="  1666">&nbsp;&nbsp;</span>func TestGob(t *testing.T) {
+<span id="L1667" class="ln" data-content="  1667">&nbsp;&nbsp;</span>	u, err := Parse(&#34;https://www.google.com/x?y=z&#34;)
+<span id="L1668" class="ln" data-content="  1668">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1669" class="ln" data-content="  1669">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1670" class="ln" data-content="  1670">&nbsp;&nbsp;</span>	}
+<span id="L1671" class="ln" data-content="  1671">&nbsp;&nbsp;</span>	var w bytes.Buffer
+<span id="L1672" class="ln" data-content="  1672">&nbsp;&nbsp;</span>	err = gob.NewEncoder(&amp;w).Encode(u)
+<span id="L1673" class="ln" data-content="  1673">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1674" class="ln" data-content="  1674">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1675" class="ln" data-content="  1675">&nbsp;&nbsp;</span>	}
+<span id="L1676" class="ln" data-content="  1676">&nbsp;&nbsp;</span>
+<span id="L1677" class="ln" data-content="  1677">&nbsp;&nbsp;</span>	u1 := new(URL)
+<span id="L1678" class="ln" data-content="  1678">&nbsp;&nbsp;</span>	err = gob.NewDecoder(&amp;w).Decode(u1)
+<span id="L1679" class="ln" data-content="  1679">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L1680" class="ln" data-content="  1680">&nbsp;&nbsp;</span>		t.Fatal(err)
+<span id="L1681" class="ln" data-content="  1681">&nbsp;&nbsp;</span>	}
+<span id="L1682" class="ln" data-content="  1682">&nbsp;&nbsp;</span>	if u1.String() != u.String() {
+<span id="L1683" class="ln" data-content="  1683">&nbsp;&nbsp;</span>		t.Errorf(&#34;json decoded to: %s\nwant: %s\n&#34;, u1, u)
+<span id="L1684" class="ln" data-content="  1684">&nbsp;&nbsp;</span>	}
+<span id="L1685" class="ln" data-content="  1685">&nbsp;&nbsp;</span>}
+<span id="L1686" class="ln" data-content="  1686">&nbsp;&nbsp;</span>
+<span id="L1687" class="ln" data-content="  1687">&nbsp;&nbsp;</span>func TestInvalidUserPassword(t *testing.T) {
+<span id="L1688" class="ln" data-content="  1688">&nbsp;&nbsp;</span>	_, err := Parse(&#34;http://us\ner:pass\nword@foo.com/&#34;)
+<span id="L1689" class="ln" data-content="  1689">&nbsp;&nbsp;</span>	if got, wantsub := fmt.Sprint(err), &#34;net/url: invalid userinfo&#34;; !strings.Contains(got, wantsub) {
+<span id="L1690" class="ln" data-content="  1690">&nbsp;&nbsp;</span>		t.Errorf(&#34;error = %q; want substring %q&#34;, got, wantsub)
+<span id="L1691" class="ln" data-content="  1691">&nbsp;&nbsp;</span>	}
+<span id="L1692" class="ln" data-content="  1692">&nbsp;&nbsp;</span>}
+<span id="L1693" class="ln" data-content="  1693">&nbsp;&nbsp;</span>
+</pre><p><a href="url_test.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+

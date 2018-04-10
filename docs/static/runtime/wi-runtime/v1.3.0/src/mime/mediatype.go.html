@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>src/mime/mediatype.go - The Go Programming Language</title>
+
+<link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
+
+<link rel="stylesheet" href="../../lib/godoc/jquery.treeview.css">
+<script type="text/javascript">window.initFuncs = [];</script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:6060/">The Go Programming Language</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:6060/">Go</a></div>
+<a href="mediatype.go.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:6060/search">
+<div id="menu">
+<a href="http://localhost:6060/doc/">Documents</a>
+<a href="http://localhost:6060/pkg/">Packages</a>
+<a href="http://localhost:6060/project/">The Project</a>
+<a href="http://localhost:6060/help/">Help</a>
+<a href="http://localhost:6060/blog/">Blog</a>
+
+<input type="text" id="search" name="q" class="inactive" value="Search" placeholder="Search">
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:6060/src">src</a>/<a href="http://localhost:6060/src/mime">mime</a>/<span class="text-muted">mediatype.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:6060/pkg/mime">mime</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type='text/javascript'>document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln" data-content="     1">&nbsp;&nbsp;</span><span class="comment">// Copyright 2010 The Go Authors. All rights reserved.</span>
+<span id="L2" class="ln" data-content="     2">&nbsp;&nbsp;</span><span class="comment">// Use of this source code is governed by a BSD-style</span>
+<span id="L3" class="ln" data-content="     3">&nbsp;&nbsp;</span><span class="comment">// license that can be found in the LICENSE file.</span>
+<span id="L4" class="ln" data-content="     4">&nbsp;&nbsp;</span>
+<span id="L5" class="ln" data-content="     5">&nbsp;&nbsp;</span>package mime
+<span id="L6" class="ln" data-content="     6">&nbsp;&nbsp;</span>
+<span id="L7" class="ln" data-content="     7">&nbsp;&nbsp;</span>import (
+<span id="L8" class="ln" data-content="     8">&nbsp;&nbsp;</span>	&#34;bytes&#34;
+<span id="L9" class="ln" data-content="     9">&nbsp;&nbsp;</span>	&#34;errors&#34;
+<span id="L10" class="ln" data-content="    10">&nbsp;&nbsp;</span>	&#34;fmt&#34;
+<span id="L11" class="ln" data-content="    11">&nbsp;&nbsp;</span>	&#34;sort&#34;
+<span id="L12" class="ln" data-content="    12">&nbsp;&nbsp;</span>	&#34;strings&#34;
+<span id="L13" class="ln" data-content="    13">&nbsp;&nbsp;</span>	&#34;unicode&#34;
+<span id="L14" class="ln" data-content="    14">&nbsp;&nbsp;</span>)
+<span id="L15" class="ln" data-content="    15">&nbsp;&nbsp;</span>
+<span id="L16" class="ln" data-content="    16">&nbsp;&nbsp;</span><span class="comment">// FormatMediaType serializes mediatype t and the parameters</span>
+<span id="L17" class="ln" data-content="    17">&nbsp;&nbsp;</span><span class="comment">// param as a media type conforming to RFC 2045 and RFC 2616.</span>
+<span id="L18" class="ln" data-content="    18">&nbsp;&nbsp;</span><span class="comment">// The type and parameter names are written in lower-case.</span>
+<span id="L19" class="ln" data-content="    19">&nbsp;&nbsp;</span><span class="comment">// When any of the arguments result in a standard violation then</span>
+<span id="L20" class="ln" data-content="    20">&nbsp;&nbsp;</span><span class="comment">// FormatMediaType returns the empty string.</span>
+<span id="L21" class="ln" data-content="    21">&nbsp;&nbsp;</span>func FormatMediaType(t string, param map[string]string) string {
+<span id="L22" class="ln" data-content="    22">&nbsp;&nbsp;</span>	var b bytes.Buffer
+<span id="L23" class="ln" data-content="    23">&nbsp;&nbsp;</span>	if slash := strings.Index(t, &#34;/&#34;); slash == -1 {
+<span id="L24" class="ln" data-content="    24">&nbsp;&nbsp;</span>		if !isToken(t) {
+<span id="L25" class="ln" data-content="    25">&nbsp;&nbsp;</span>			return &#34;&#34;
+<span id="L26" class="ln" data-content="    26">&nbsp;&nbsp;</span>		}
+<span id="L27" class="ln" data-content="    27">&nbsp;&nbsp;</span>		b.WriteString(strings.ToLower(t))
+<span id="L28" class="ln" data-content="    28">&nbsp;&nbsp;</span>	} else {
+<span id="L29" class="ln" data-content="    29">&nbsp;&nbsp;</span>		major, sub := t[:slash], t[slash+1:]
+<span id="L30" class="ln" data-content="    30">&nbsp;&nbsp;</span>		if !isToken(major) || !isToken(sub) {
+<span id="L31" class="ln" data-content="    31">&nbsp;&nbsp;</span>			return &#34;&#34;
+<span id="L32" class="ln" data-content="    32">&nbsp;&nbsp;</span>		}
+<span id="L33" class="ln" data-content="    33">&nbsp;&nbsp;</span>		b.WriteString(strings.ToLower(major))
+<span id="L34" class="ln" data-content="    34">&nbsp;&nbsp;</span>		b.WriteByte(&#39;/&#39;)
+<span id="L35" class="ln" data-content="    35">&nbsp;&nbsp;</span>		b.WriteString(strings.ToLower(sub))
+<span id="L36" class="ln" data-content="    36">&nbsp;&nbsp;</span>	}
+<span id="L37" class="ln" data-content="    37">&nbsp;&nbsp;</span>
+<span id="L38" class="ln" data-content="    38">&nbsp;&nbsp;</span>	attrs := make([]string, 0, len(param))
+<span id="L39" class="ln" data-content="    39">&nbsp;&nbsp;</span>	for a := range param {
+<span id="L40" class="ln" data-content="    40">&nbsp;&nbsp;</span>		attrs = append(attrs, a)
+<span id="L41" class="ln" data-content="    41">&nbsp;&nbsp;</span>	}
+<span id="L42" class="ln" data-content="    42">&nbsp;&nbsp;</span>	sort.Strings(attrs)
+<span id="L43" class="ln" data-content="    43">&nbsp;&nbsp;</span>
+<span id="L44" class="ln" data-content="    44">&nbsp;&nbsp;</span>	for _, attribute := range attrs {
+<span id="L45" class="ln" data-content="    45">&nbsp;&nbsp;</span>		value := param[attribute]
+<span id="L46" class="ln" data-content="    46">&nbsp;&nbsp;</span>		b.WriteByte(&#39;;&#39;)
+<span id="L47" class="ln" data-content="    47">&nbsp;&nbsp;</span>		b.WriteByte(&#39; &#39;)
+<span id="L48" class="ln" data-content="    48">&nbsp;&nbsp;</span>		if !isToken(attribute) {
+<span id="L49" class="ln" data-content="    49">&nbsp;&nbsp;</span>			return &#34;&#34;
+<span id="L50" class="ln" data-content="    50">&nbsp;&nbsp;</span>		}
+<span id="L51" class="ln" data-content="    51">&nbsp;&nbsp;</span>		b.WriteString(strings.ToLower(attribute))
+<span id="L52" class="ln" data-content="    52">&nbsp;&nbsp;</span>		b.WriteByte(&#39;=&#39;)
+<span id="L53" class="ln" data-content="    53">&nbsp;&nbsp;</span>		if isToken(value) {
+<span id="L54" class="ln" data-content="    54">&nbsp;&nbsp;</span>			b.WriteString(value)
+<span id="L55" class="ln" data-content="    55">&nbsp;&nbsp;</span>			continue
+<span id="L56" class="ln" data-content="    56">&nbsp;&nbsp;</span>		}
+<span id="L57" class="ln" data-content="    57">&nbsp;&nbsp;</span>
+<span id="L58" class="ln" data-content="    58">&nbsp;&nbsp;</span>		b.WriteByte(&#39;&#34;&#39;)
+<span id="L59" class="ln" data-content="    59">&nbsp;&nbsp;</span>		offset := 0
+<span id="L60" class="ln" data-content="    60">&nbsp;&nbsp;</span>		for index, character := range value {
+<span id="L61" class="ln" data-content="    61">&nbsp;&nbsp;</span>			if character == &#39;&#34;&#39; || character == &#39;\\&#39; {
+<span id="L62" class="ln" data-content="    62">&nbsp;&nbsp;</span>				b.WriteString(value[offset:index])
+<span id="L63" class="ln" data-content="    63">&nbsp;&nbsp;</span>				offset = index
+<span id="L64" class="ln" data-content="    64">&nbsp;&nbsp;</span>				b.WriteByte(&#39;\\&#39;)
+<span id="L65" class="ln" data-content="    65">&nbsp;&nbsp;</span>			}
+<span id="L66" class="ln" data-content="    66">&nbsp;&nbsp;</span>			if character&amp;0x80 != 0 {
+<span id="L67" class="ln" data-content="    67">&nbsp;&nbsp;</span>				return &#34;&#34;
+<span id="L68" class="ln" data-content="    68">&nbsp;&nbsp;</span>			}
+<span id="L69" class="ln" data-content="    69">&nbsp;&nbsp;</span>		}
+<span id="L70" class="ln" data-content="    70">&nbsp;&nbsp;</span>		b.WriteString(value[offset:])
+<span id="L71" class="ln" data-content="    71">&nbsp;&nbsp;</span>		b.WriteByte(&#39;&#34;&#39;)
+<span id="L72" class="ln" data-content="    72">&nbsp;&nbsp;</span>	}
+<span id="L73" class="ln" data-content="    73">&nbsp;&nbsp;</span>	return b.String()
+<span id="L74" class="ln" data-content="    74">&nbsp;&nbsp;</span>}
+<span id="L75" class="ln" data-content="    75">&nbsp;&nbsp;</span>
+<span id="L76" class="ln" data-content="    76">&nbsp;&nbsp;</span>func checkMediaTypeDisposition(s string) error {
+<span id="L77" class="ln" data-content="    77">&nbsp;&nbsp;</span>	typ, rest := consumeToken(s)
+<span id="L78" class="ln" data-content="    78">&nbsp;&nbsp;</span>	if typ == &#34;&#34; {
+<span id="L79" class="ln" data-content="    79">&nbsp;&nbsp;</span>		return errors.New(&#34;mime: no media type&#34;)
+<span id="L80" class="ln" data-content="    80">&nbsp;&nbsp;</span>	}
+<span id="L81" class="ln" data-content="    81">&nbsp;&nbsp;</span>	if rest == &#34;&#34; {
+<span id="L82" class="ln" data-content="    82">&nbsp;&nbsp;</span>		return nil
+<span id="L83" class="ln" data-content="    83">&nbsp;&nbsp;</span>	}
+<span id="L84" class="ln" data-content="    84">&nbsp;&nbsp;</span>	if !strings.HasPrefix(rest, &#34;/&#34;) {
+<span id="L85" class="ln" data-content="    85">&nbsp;&nbsp;</span>		return errors.New(&#34;mime: expected slash after first token&#34;)
+<span id="L86" class="ln" data-content="    86">&nbsp;&nbsp;</span>	}
+<span id="L87" class="ln" data-content="    87">&nbsp;&nbsp;</span>	subtype, rest := consumeToken(rest[1:])
+<span id="L88" class="ln" data-content="    88">&nbsp;&nbsp;</span>	if subtype == &#34;&#34; {
+<span id="L89" class="ln" data-content="    89">&nbsp;&nbsp;</span>		return errors.New(&#34;mime: expected token after slash&#34;)
+<span id="L90" class="ln" data-content="    90">&nbsp;&nbsp;</span>	}
+<span id="L91" class="ln" data-content="    91">&nbsp;&nbsp;</span>	if rest != &#34;&#34; {
+<span id="L92" class="ln" data-content="    92">&nbsp;&nbsp;</span>		return errors.New(&#34;mime: unexpected content after media subtype&#34;)
+<span id="L93" class="ln" data-content="    93">&nbsp;&nbsp;</span>	}
+<span id="L94" class="ln" data-content="    94">&nbsp;&nbsp;</span>	return nil
+<span id="L95" class="ln" data-content="    95">&nbsp;&nbsp;</span>}
+<span id="L96" class="ln" data-content="    96">&nbsp;&nbsp;</span>
+<span id="L97" class="ln" data-content="    97">&nbsp;&nbsp;</span><span class="comment">// ErrInvalidMediaParameter is returned by ParseMediaType if</span>
+<span id="L98" class="ln" data-content="    98">&nbsp;&nbsp;</span><span class="comment">// the media type value was found but there was an error parsing</span>
+<span id="L99" class="ln" data-content="    99">&nbsp;&nbsp;</span><span class="comment">// the optional parameters</span>
+<span id="L100" class="ln" data-content="   100">&nbsp;&nbsp;</span>var ErrInvalidMediaParameter = errors.New(&#34;mime: invalid media parameter&#34;)
+<span id="L101" class="ln" data-content="   101">&nbsp;&nbsp;</span>
+<span id="L102" class="ln" data-content="   102">&nbsp;&nbsp;</span><span class="comment">// ParseMediaType parses a media type value and any optional</span>
+<span id="L103" class="ln" data-content="   103">&nbsp;&nbsp;</span><span class="comment">// parameters, per RFC 1521.  Media types are the values in</span>
+<span id="L104" class="ln" data-content="   104">&nbsp;&nbsp;</span><span class="comment">// Content-Type and Content-Disposition headers (RFC 2183).</span>
+<span id="L105" class="ln" data-content="   105">&nbsp;&nbsp;</span><span class="comment">// On success, ParseMediaType returns the media type converted</span>
+<span id="L106" class="ln" data-content="   106">&nbsp;&nbsp;</span><span class="comment">// to lowercase and trimmed of white space and a non-nil map.</span>
+<span id="L107" class="ln" data-content="   107">&nbsp;&nbsp;</span><span class="comment">// If there is an error parsing the optional parameter,</span>
+<span id="L108" class="ln" data-content="   108">&nbsp;&nbsp;</span><span class="comment">// the media type will be returned along with the error</span>
+<span id="L109" class="ln" data-content="   109">&nbsp;&nbsp;</span><span class="comment">// ErrInvalidMediaParameter.</span>
+<span id="L110" class="ln" data-content="   110">&nbsp;&nbsp;</span><span class="comment">// The returned map, params, maps from the lowercase</span>
+<span id="L111" class="ln" data-content="   111">&nbsp;&nbsp;</span><span class="comment">// attribute to the attribute value with its case preserved.</span>
+<span id="L112" class="ln" data-content="   112">&nbsp;&nbsp;</span>func ParseMediaType(v string) (mediatype string, params map[string]string, err error) {
+<span id="L113" class="ln" data-content="   113">&nbsp;&nbsp;</span>	i := strings.Index(v, &#34;;&#34;)
+<span id="L114" class="ln" data-content="   114">&nbsp;&nbsp;</span>	if i == -1 {
+<span id="L115" class="ln" data-content="   115">&nbsp;&nbsp;</span>		i = len(v)
+<span id="L116" class="ln" data-content="   116">&nbsp;&nbsp;</span>	}
+<span id="L117" class="ln" data-content="   117">&nbsp;&nbsp;</span>	mediatype = strings.TrimSpace(strings.ToLower(v[0:i]))
+<span id="L118" class="ln" data-content="   118">&nbsp;&nbsp;</span>
+<span id="L119" class="ln" data-content="   119">&nbsp;&nbsp;</span>	err = checkMediaTypeDisposition(mediatype)
+<span id="L120" class="ln" data-content="   120">&nbsp;&nbsp;</span>	if err != nil {
+<span id="L121" class="ln" data-content="   121">&nbsp;&nbsp;</span>		return &#34;&#34;, nil, err
+<span id="L122" class="ln" data-content="   122">&nbsp;&nbsp;</span>	}
+<span id="L123" class="ln" data-content="   123">&nbsp;&nbsp;</span>
+<span id="L124" class="ln" data-content="   124">&nbsp;&nbsp;</span>	params = make(map[string]string)
+<span id="L125" class="ln" data-content="   125">&nbsp;&nbsp;</span>
+<span id="L126" class="ln" data-content="   126">&nbsp;&nbsp;</span>	<span class="comment">// Map of base parameter name -&gt; parameter name -&gt; value</span>
+<span id="L127" class="ln" data-content="   127">&nbsp;&nbsp;</span>	<span class="comment">// for parameters containing a &#39;*&#39; character.</span>
+<span id="L128" class="ln" data-content="   128">&nbsp;&nbsp;</span>	<span class="comment">// Lazily initialized.</span>
+<span id="L129" class="ln" data-content="   129">&nbsp;&nbsp;</span>	var continuation map[string]map[string]string
+<span id="L130" class="ln" data-content="   130">&nbsp;&nbsp;</span>
+<span id="L131" class="ln" data-content="   131">&nbsp;&nbsp;</span>	v = v[i:]
+<span id="L132" class="ln" data-content="   132">&nbsp;&nbsp;</span>	for len(v) &gt; 0 {
+<span id="L133" class="ln" data-content="   133">&nbsp;&nbsp;</span>		v = strings.TrimLeftFunc(v, unicode.IsSpace)
+<span id="L134" class="ln" data-content="   134">&nbsp;&nbsp;</span>		if len(v) == 0 {
+<span id="L135" class="ln" data-content="   135">&nbsp;&nbsp;</span>			break
+<span id="L136" class="ln" data-content="   136">&nbsp;&nbsp;</span>		}
+<span id="L137" class="ln" data-content="   137">&nbsp;&nbsp;</span>		key, value, rest := consumeMediaParam(v)
+<span id="L138" class="ln" data-content="   138">&nbsp;&nbsp;</span>		if key == &#34;&#34; {
+<span id="L139" class="ln" data-content="   139">&nbsp;&nbsp;</span>			if strings.TrimSpace(rest) == &#34;;&#34; {
+<span id="L140" class="ln" data-content="   140">&nbsp;&nbsp;</span>				<span class="comment">// Ignore trailing semicolons.</span>
+<span id="L141" class="ln" data-content="   141">&nbsp;&nbsp;</span>				<span class="comment">// Not an error.</span>
+<span id="L142" class="ln" data-content="   142">&nbsp;&nbsp;</span>				return
+<span id="L143" class="ln" data-content="   143">&nbsp;&nbsp;</span>			}
+<span id="L144" class="ln" data-content="   144">&nbsp;&nbsp;</span>			<span class="comment">// Parse error.</span>
+<span id="L145" class="ln" data-content="   145">&nbsp;&nbsp;</span>			return mediatype, nil, ErrInvalidMediaParameter
+<span id="L146" class="ln" data-content="   146">&nbsp;&nbsp;</span>		}
+<span id="L147" class="ln" data-content="   147">&nbsp;&nbsp;</span>
+<span id="L148" class="ln" data-content="   148">&nbsp;&nbsp;</span>		pmap := params
+<span id="L149" class="ln" data-content="   149">&nbsp;&nbsp;</span>		if idx := strings.Index(key, &#34;*&#34;); idx != -1 {
+<span id="L150" class="ln" data-content="   150">&nbsp;&nbsp;</span>			baseName := key[:idx]
+<span id="L151" class="ln" data-content="   151">&nbsp;&nbsp;</span>			if continuation == nil {
+<span id="L152" class="ln" data-content="   152">&nbsp;&nbsp;</span>				continuation = make(map[string]map[string]string)
+<span id="L153" class="ln" data-content="   153">&nbsp;&nbsp;</span>			}
+<span id="L154" class="ln" data-content="   154">&nbsp;&nbsp;</span>			var ok bool
+<span id="L155" class="ln" data-content="   155">&nbsp;&nbsp;</span>			if pmap, ok = continuation[baseName]; !ok {
+<span id="L156" class="ln" data-content="   156">&nbsp;&nbsp;</span>				continuation[baseName] = make(map[string]string)
+<span id="L157" class="ln" data-content="   157">&nbsp;&nbsp;</span>				pmap = continuation[baseName]
+<span id="L158" class="ln" data-content="   158">&nbsp;&nbsp;</span>			}
+<span id="L159" class="ln" data-content="   159">&nbsp;&nbsp;</span>		}
+<span id="L160" class="ln" data-content="   160">&nbsp;&nbsp;</span>		if _, exists := pmap[key]; exists {
+<span id="L161" class="ln" data-content="   161">&nbsp;&nbsp;</span>			<span class="comment">// Duplicate parameter name is bogus.</span>
+<span id="L162" class="ln" data-content="   162">&nbsp;&nbsp;</span>			return &#34;&#34;, nil, errors.New(&#34;mime: duplicate parameter name&#34;)
+<span id="L163" class="ln" data-content="   163">&nbsp;&nbsp;</span>		}
+<span id="L164" class="ln" data-content="   164">&nbsp;&nbsp;</span>		pmap[key] = value
+<span id="L165" class="ln" data-content="   165">&nbsp;&nbsp;</span>		v = rest
+<span id="L166" class="ln" data-content="   166">&nbsp;&nbsp;</span>	}
+<span id="L167" class="ln" data-content="   167">&nbsp;&nbsp;</span>
+<span id="L168" class="ln" data-content="   168">&nbsp;&nbsp;</span>	<span class="comment">// Stitch together any continuations or things with stars</span>
+<span id="L169" class="ln" data-content="   169">&nbsp;&nbsp;</span>	<span class="comment">// (i.e. RFC 2231 things with stars: &#34;foo*0&#34; or &#34;foo*&#34;)</span>
+<span id="L170" class="ln" data-content="   170">&nbsp;&nbsp;</span>	var buf bytes.Buffer
+<span id="L171" class="ln" data-content="   171">&nbsp;&nbsp;</span>	for key, pieceMap := range continuation {
+<span id="L172" class="ln" data-content="   172">&nbsp;&nbsp;</span>		singlePartKey := key + &#34;*&#34;
+<span id="L173" class="ln" data-content="   173">&nbsp;&nbsp;</span>		if v, ok := pieceMap[singlePartKey]; ok {
+<span id="L174" class="ln" data-content="   174">&nbsp;&nbsp;</span>			decv := decode2231Enc(v)
+<span id="L175" class="ln" data-content="   175">&nbsp;&nbsp;</span>			params[key] = decv
+<span id="L176" class="ln" data-content="   176">&nbsp;&nbsp;</span>			continue
+<span id="L177" class="ln" data-content="   177">&nbsp;&nbsp;</span>		}
+<span id="L178" class="ln" data-content="   178">&nbsp;&nbsp;</span>
+<span id="L179" class="ln" data-content="   179">&nbsp;&nbsp;</span>		buf.Reset()
+<span id="L180" class="ln" data-content="   180">&nbsp;&nbsp;</span>		valid := false
+<span id="L181" class="ln" data-content="   181">&nbsp;&nbsp;</span>		for n := 0; ; n++ {
+<span id="L182" class="ln" data-content="   182">&nbsp;&nbsp;</span>			simplePart := fmt.Sprintf(&#34;%s*%d&#34;, key, n)
+<span id="L183" class="ln" data-content="   183">&nbsp;&nbsp;</span>			if v, ok := pieceMap[simplePart]; ok {
+<span id="L184" class="ln" data-content="   184">&nbsp;&nbsp;</span>				valid = true
+<span id="L185" class="ln" data-content="   185">&nbsp;&nbsp;</span>				buf.WriteString(v)
+<span id="L186" class="ln" data-content="   186">&nbsp;&nbsp;</span>				continue
+<span id="L187" class="ln" data-content="   187">&nbsp;&nbsp;</span>			}
+<span id="L188" class="ln" data-content="   188">&nbsp;&nbsp;</span>			encodedPart := simplePart + &#34;*&#34;
+<span id="L189" class="ln" data-content="   189">&nbsp;&nbsp;</span>			if v, ok := pieceMap[encodedPart]; ok {
+<span id="L190" class="ln" data-content="   190">&nbsp;&nbsp;</span>				valid = true
+<span id="L191" class="ln" data-content="   191">&nbsp;&nbsp;</span>				if n == 0 {
+<span id="L192" class="ln" data-content="   192">&nbsp;&nbsp;</span>					buf.WriteString(decode2231Enc(v))
+<span id="L193" class="ln" data-content="   193">&nbsp;&nbsp;</span>				} else {
+<span id="L194" class="ln" data-content="   194">&nbsp;&nbsp;</span>					decv, _ := percentHexUnescape(v)
+<span id="L195" class="ln" data-content="   195">&nbsp;&nbsp;</span>					buf.WriteString(decv)
+<span id="L196" class="ln" data-content="   196">&nbsp;&nbsp;</span>				}
+<span id="L197" class="ln" data-content="   197">&nbsp;&nbsp;</span>			} else {
+<span id="L198" class="ln" data-content="   198">&nbsp;&nbsp;</span>				break
+<span id="L199" class="ln" data-content="   199">&nbsp;&nbsp;</span>			}
+<span id="L200" class="ln" data-content="   200">&nbsp;&nbsp;</span>		}
+<span id="L201" class="ln" data-content="   201">&nbsp;&nbsp;</span>		if valid {
+<span id="L202" class="ln" data-content="   202">&nbsp;&nbsp;</span>			params[key] = buf.String()
+<span id="L203" class="ln" data-content="   203">&nbsp;&nbsp;</span>		}
+<span id="L204" class="ln" data-content="   204">&nbsp;&nbsp;</span>	}
+<span id="L205" class="ln" data-content="   205">&nbsp;&nbsp;</span>
+<span id="L206" class="ln" data-content="   206">&nbsp;&nbsp;</span>	return
+<span id="L207" class="ln" data-content="   207">&nbsp;&nbsp;</span>}
+<span id="L208" class="ln" data-content="   208">&nbsp;&nbsp;</span>
+<span id="L209" class="ln" data-content="   209">&nbsp;&nbsp;</span>func decode2231Enc(v string) string {
+<span id="L210" class="ln" data-content="   210">&nbsp;&nbsp;</span>	sv := strings.SplitN(v, &#34;&#39;&#34;, 3)
+<span id="L211" class="ln" data-content="   211">&nbsp;&nbsp;</span>	if len(sv) != 3 {
+<span id="L212" class="ln" data-content="   212">&nbsp;&nbsp;</span>		return &#34;&#34;
+<span id="L213" class="ln" data-content="   213">&nbsp;&nbsp;</span>	}
+<span id="L214" class="ln" data-content="   214">&nbsp;&nbsp;</span>	<span class="comment">// TODO: ignoring lang in sv[1] for now. If anybody needs it we&#39;ll</span>
+<span id="L215" class="ln" data-content="   215">&nbsp;&nbsp;</span>	<span class="comment">// need to decide how to expose it in the API. But I&#39;m not sure</span>
+<span id="L216" class="ln" data-content="   216">&nbsp;&nbsp;</span>	<span class="comment">// anybody uses it in practice.</span>
+<span id="L217" class="ln" data-content="   217">&nbsp;&nbsp;</span>	charset := strings.ToLower(sv[0])
+<span id="L218" class="ln" data-content="   218">&nbsp;&nbsp;</span>	if charset != &#34;us-ascii&#34; &amp;&amp; charset != &#34;utf-8&#34; {
+<span id="L219" class="ln" data-content="   219">&nbsp;&nbsp;</span>		<span class="comment">// TODO: unsupported encoding</span>
+<span id="L220" class="ln" data-content="   220">&nbsp;&nbsp;</span>		return &#34;&#34;
+<span id="L221" class="ln" data-content="   221">&nbsp;&nbsp;</span>	}
+<span id="L222" class="ln" data-content="   222">&nbsp;&nbsp;</span>	encv, _ := percentHexUnescape(sv[2])
+<span id="L223" class="ln" data-content="   223">&nbsp;&nbsp;</span>	return encv
+<span id="L224" class="ln" data-content="   224">&nbsp;&nbsp;</span>}
+<span id="L225" class="ln" data-content="   225">&nbsp;&nbsp;</span>
+<span id="L226" class="ln" data-content="   226">&nbsp;&nbsp;</span>func isNotTokenChar(r rune) bool {
+<span id="L227" class="ln" data-content="   227">&nbsp;&nbsp;</span>	return !isTokenChar(r)
+<span id="L228" class="ln" data-content="   228">&nbsp;&nbsp;</span>}
+<span id="L229" class="ln" data-content="   229">&nbsp;&nbsp;</span>
+<span id="L230" class="ln" data-content="   230">&nbsp;&nbsp;</span><span class="comment">// consumeToken consumes a token from the beginning of provided</span>
+<span id="L231" class="ln" data-content="   231">&nbsp;&nbsp;</span><span class="comment">// string, per RFC 2045 section 5.1 (referenced from 2183), and return</span>
+<span id="L232" class="ln" data-content="   232">&nbsp;&nbsp;</span><span class="comment">// the token consumed and the rest of the string. Returns (&#34;&#34;, v) on</span>
+<span id="L233" class="ln" data-content="   233">&nbsp;&nbsp;</span><span class="comment">// failure to consume at least one character.</span>
+<span id="L234" class="ln" data-content="   234">&nbsp;&nbsp;</span>func consumeToken(v string) (token, rest string) {
+<span id="L235" class="ln" data-content="   235">&nbsp;&nbsp;</span>	notPos := strings.IndexFunc(v, isNotTokenChar)
+<span id="L236" class="ln" data-content="   236">&nbsp;&nbsp;</span>	if notPos == -1 {
+<span id="L237" class="ln" data-content="   237">&nbsp;&nbsp;</span>		return v, &#34;&#34;
+<span id="L238" class="ln" data-content="   238">&nbsp;&nbsp;</span>	}
+<span id="L239" class="ln" data-content="   239">&nbsp;&nbsp;</span>	if notPos == 0 {
+<span id="L240" class="ln" data-content="   240">&nbsp;&nbsp;</span>		return &#34;&#34;, v
+<span id="L241" class="ln" data-content="   241">&nbsp;&nbsp;</span>	}
+<span id="L242" class="ln" data-content="   242">&nbsp;&nbsp;</span>	return v[0:notPos], v[notPos:]
+<span id="L243" class="ln" data-content="   243">&nbsp;&nbsp;</span>}
+<span id="L244" class="ln" data-content="   244">&nbsp;&nbsp;</span>
+<span id="L245" class="ln" data-content="   245">&nbsp;&nbsp;</span><span class="comment">// consumeValue consumes a &#34;value&#34; per RFC 2045, where a value is</span>
+<span id="L246" class="ln" data-content="   246">&nbsp;&nbsp;</span><span class="comment">// either a &#39;token&#39; or a &#39;quoted-string&#39;.  On success, consumeValue</span>
+<span id="L247" class="ln" data-content="   247">&nbsp;&nbsp;</span><span class="comment">// returns the value consumed (and de-quoted/escaped, if a</span>
+<span id="L248" class="ln" data-content="   248">&nbsp;&nbsp;</span><span class="comment">// quoted-string) and the rest of the string. On failure, returns</span>
+<span id="L249" class="ln" data-content="   249">&nbsp;&nbsp;</span><span class="comment">// (&#34;&#34;, v).</span>
+<span id="L250" class="ln" data-content="   250">&nbsp;&nbsp;</span>func consumeValue(v string) (value, rest string) {
+<span id="L251" class="ln" data-content="   251">&nbsp;&nbsp;</span>	if v == &#34;&#34; {
+<span id="L252" class="ln" data-content="   252">&nbsp;&nbsp;</span>		return
+<span id="L253" class="ln" data-content="   253">&nbsp;&nbsp;</span>	}
+<span id="L254" class="ln" data-content="   254">&nbsp;&nbsp;</span>	if v[0] != &#39;&#34;&#39; {
+<span id="L255" class="ln" data-content="   255">&nbsp;&nbsp;</span>		return consumeToken(v)
+<span id="L256" class="ln" data-content="   256">&nbsp;&nbsp;</span>	}
+<span id="L257" class="ln" data-content="   257">&nbsp;&nbsp;</span>
+<span id="L258" class="ln" data-content="   258">&nbsp;&nbsp;</span>	<span class="comment">// parse a quoted-string</span>
+<span id="L259" class="ln" data-content="   259">&nbsp;&nbsp;</span>	buffer := new(bytes.Buffer)
+<span id="L260" class="ln" data-content="   260">&nbsp;&nbsp;</span>	for i := 1; i &lt; len(v); i++ {
+<span id="L261" class="ln" data-content="   261">&nbsp;&nbsp;</span>		r := v[i]
+<span id="L262" class="ln" data-content="   262">&nbsp;&nbsp;</span>		if r == &#39;&#34;&#39; {
+<span id="L263" class="ln" data-content="   263">&nbsp;&nbsp;</span>			return buffer.String(), v[i+1:]
+<span id="L264" class="ln" data-content="   264">&nbsp;&nbsp;</span>		}
+<span id="L265" class="ln" data-content="   265">&nbsp;&nbsp;</span>		<span class="comment">// When MSIE sends a full file path (in &#34;intranet mode&#34;), it does not</span>
+<span id="L266" class="ln" data-content="   266">&nbsp;&nbsp;</span>		<span class="comment">// escape backslashes: &#34;C:\dev\go\foo.txt&#34;, not &#34;C:\\dev\\go\\foo.txt&#34;.</span>
+<span id="L267" class="ln" data-content="   267">&nbsp;&nbsp;</span>		<span class="comment">//</span>
+<span id="L268" class="ln" data-content="   268">&nbsp;&nbsp;</span>		<span class="comment">// No known MIME generators emit unnecessary backslash escapes</span>
+<span id="L269" class="ln" data-content="   269">&nbsp;&nbsp;</span>		<span class="comment">// for simple token characters like numbers and letters.</span>
+<span id="L270" class="ln" data-content="   270">&nbsp;&nbsp;</span>		<span class="comment">//</span>
+<span id="L271" class="ln" data-content="   271">&nbsp;&nbsp;</span>		<span class="comment">// If we see an unnecessary backslash escape, assume it is from MSIE</span>
+<span id="L272" class="ln" data-content="   272">&nbsp;&nbsp;</span>		<span class="comment">// and intended as a literal backslash. This makes Go servers deal better</span>
+<span id="L273" class="ln" data-content="   273">&nbsp;&nbsp;</span>		<span class="comment">// with MSIE without affecting the way they handle conforming MIME</span>
+<span id="L274" class="ln" data-content="   274">&nbsp;&nbsp;</span>		<span class="comment">// generators.</span>
+<span id="L275" class="ln" data-content="   275">&nbsp;&nbsp;</span>		if r == &#39;\\&#39; &amp;&amp; i+1 &lt; len(v) &amp;&amp; !isTokenChar(rune(v[i+1])) {
+<span id="L276" class="ln" data-content="   276">&nbsp;&nbsp;</span>			buffer.WriteByte(v[i+1])
+<span id="L277" class="ln" data-content="   277">&nbsp;&nbsp;</span>			i++
+<span id="L278" class="ln" data-content="   278">&nbsp;&nbsp;</span>			continue
+<span id="L279" class="ln" data-content="   279">&nbsp;&nbsp;</span>		}
+<span id="L280" class="ln" data-content="   280">&nbsp;&nbsp;</span>		if r == &#39;\r&#39; || r == &#39;\n&#39; {
+<span id="L281" class="ln" data-content="   281">&nbsp;&nbsp;</span>			return &#34;&#34;, v
+<span id="L282" class="ln" data-content="   282">&nbsp;&nbsp;</span>		}
+<span id="L283" class="ln" data-content="   283">&nbsp;&nbsp;</span>		buffer.WriteByte(v[i])
+<span id="L284" class="ln" data-content="   284">&nbsp;&nbsp;</span>	}
+<span id="L285" class="ln" data-content="   285">&nbsp;&nbsp;</span>	<span class="comment">// Did not find end quote.</span>
+<span id="L286" class="ln" data-content="   286">&nbsp;&nbsp;</span>	return &#34;&#34;, v
+<span id="L287" class="ln" data-content="   287">&nbsp;&nbsp;</span>}
+<span id="L288" class="ln" data-content="   288">&nbsp;&nbsp;</span>
+<span id="L289" class="ln" data-content="   289">&nbsp;&nbsp;</span>func consumeMediaParam(v string) (param, value, rest string) {
+<span id="L290" class="ln" data-content="   290">&nbsp;&nbsp;</span>	rest = strings.TrimLeftFunc(v, unicode.IsSpace)
+<span id="L291" class="ln" data-content="   291">&nbsp;&nbsp;</span>	if !strings.HasPrefix(rest, &#34;;&#34;) {
+<span id="L292" class="ln" data-content="   292">&nbsp;&nbsp;</span>		return &#34;&#34;, &#34;&#34;, v
+<span id="L293" class="ln" data-content="   293">&nbsp;&nbsp;</span>	}
+<span id="L294" class="ln" data-content="   294">&nbsp;&nbsp;</span>
+<span id="L295" class="ln" data-content="   295">&nbsp;&nbsp;</span>	rest = rest[1:] <span class="comment">// consume semicolon</span>
+<span id="L296" class="ln" data-content="   296">&nbsp;&nbsp;</span>	rest = strings.TrimLeftFunc(rest, unicode.IsSpace)
+<span id="L297" class="ln" data-content="   297">&nbsp;&nbsp;</span>	param, rest = consumeToken(rest)
+<span id="L298" class="ln" data-content="   298">&nbsp;&nbsp;</span>	param = strings.ToLower(param)
+<span id="L299" class="ln" data-content="   299">&nbsp;&nbsp;</span>	if param == &#34;&#34; {
+<span id="L300" class="ln" data-content="   300">&nbsp;&nbsp;</span>		return &#34;&#34;, &#34;&#34;, v
+<span id="L301" class="ln" data-content="   301">&nbsp;&nbsp;</span>	}
+<span id="L302" class="ln" data-content="   302">&nbsp;&nbsp;</span>
+<span id="L303" class="ln" data-content="   303">&nbsp;&nbsp;</span>	rest = strings.TrimLeftFunc(rest, unicode.IsSpace)
+<span id="L304" class="ln" data-content="   304">&nbsp;&nbsp;</span>	if !strings.HasPrefix(rest, &#34;=&#34;) {
+<span id="L305" class="ln" data-content="   305">&nbsp;&nbsp;</span>		return &#34;&#34;, &#34;&#34;, v
+<span id="L306" class="ln" data-content="   306">&nbsp;&nbsp;</span>	}
+<span id="L307" class="ln" data-content="   307">&nbsp;&nbsp;</span>	rest = rest[1:] <span class="comment">// consume equals sign</span>
+<span id="L308" class="ln" data-content="   308">&nbsp;&nbsp;</span>	rest = strings.TrimLeftFunc(rest, unicode.IsSpace)
+<span id="L309" class="ln" data-content="   309">&nbsp;&nbsp;</span>	value, rest2 := consumeValue(rest)
+<span id="L310" class="ln" data-content="   310">&nbsp;&nbsp;</span>	if value == &#34;&#34; &amp;&amp; rest2 == rest {
+<span id="L311" class="ln" data-content="   311">&nbsp;&nbsp;</span>		return &#34;&#34;, &#34;&#34;, v
+<span id="L312" class="ln" data-content="   312">&nbsp;&nbsp;</span>	}
+<span id="L313" class="ln" data-content="   313">&nbsp;&nbsp;</span>	rest = rest2
+<span id="L314" class="ln" data-content="   314">&nbsp;&nbsp;</span>	return param, value, rest
+<span id="L315" class="ln" data-content="   315">&nbsp;&nbsp;</span>}
+<span id="L316" class="ln" data-content="   316">&nbsp;&nbsp;</span>
+<span id="L317" class="ln" data-content="   317">&nbsp;&nbsp;</span>func percentHexUnescape(s string) (string, error) {
+<span id="L318" class="ln" data-content="   318">&nbsp;&nbsp;</span>	<span class="comment">// Count %, check that they&#39;re well-formed.</span>
+<span id="L319" class="ln" data-content="   319">&nbsp;&nbsp;</span>	percents := 0
+<span id="L320" class="ln" data-content="   320">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); {
+<span id="L321" class="ln" data-content="   321">&nbsp;&nbsp;</span>		if s[i] != &#39;%&#39; {
+<span id="L322" class="ln" data-content="   322">&nbsp;&nbsp;</span>			i++
+<span id="L323" class="ln" data-content="   323">&nbsp;&nbsp;</span>			continue
+<span id="L324" class="ln" data-content="   324">&nbsp;&nbsp;</span>		}
+<span id="L325" class="ln" data-content="   325">&nbsp;&nbsp;</span>		percents++
+<span id="L326" class="ln" data-content="   326">&nbsp;&nbsp;</span>		if i+2 &gt;= len(s) || !ishex(s[i+1]) || !ishex(s[i+2]) {
+<span id="L327" class="ln" data-content="   327">&nbsp;&nbsp;</span>			s = s[i:]
+<span id="L328" class="ln" data-content="   328">&nbsp;&nbsp;</span>			if len(s) &gt; 3 {
+<span id="L329" class="ln" data-content="   329">&nbsp;&nbsp;</span>				s = s[0:3]
+<span id="L330" class="ln" data-content="   330">&nbsp;&nbsp;</span>			}
+<span id="L331" class="ln" data-content="   331">&nbsp;&nbsp;</span>			return &#34;&#34;, fmt.Errorf(&#34;mime: bogus characters after %%: %q&#34;, s)
+<span id="L332" class="ln" data-content="   332">&nbsp;&nbsp;</span>		}
+<span id="L333" class="ln" data-content="   333">&nbsp;&nbsp;</span>		i += 3
+<span id="L334" class="ln" data-content="   334">&nbsp;&nbsp;</span>	}
+<span id="L335" class="ln" data-content="   335">&nbsp;&nbsp;</span>	if percents == 0 {
+<span id="L336" class="ln" data-content="   336">&nbsp;&nbsp;</span>		return s, nil
+<span id="L337" class="ln" data-content="   337">&nbsp;&nbsp;</span>	}
+<span id="L338" class="ln" data-content="   338">&nbsp;&nbsp;</span>
+<span id="L339" class="ln" data-content="   339">&nbsp;&nbsp;</span>	t := make([]byte, len(s)-2*percents)
+<span id="L340" class="ln" data-content="   340">&nbsp;&nbsp;</span>	j := 0
+<span id="L341" class="ln" data-content="   341">&nbsp;&nbsp;</span>	for i := 0; i &lt; len(s); {
+<span id="L342" class="ln" data-content="   342">&nbsp;&nbsp;</span>		switch s[i] {
+<span id="L343" class="ln" data-content="   343">&nbsp;&nbsp;</span>		case &#39;%&#39;:
+<span id="L344" class="ln" data-content="   344">&nbsp;&nbsp;</span>			t[j] = unhex(s[i+1])&lt;&lt;4 | unhex(s[i+2])
+<span id="L345" class="ln" data-content="   345">&nbsp;&nbsp;</span>			j++
+<span id="L346" class="ln" data-content="   346">&nbsp;&nbsp;</span>			i += 3
+<span id="L347" class="ln" data-content="   347">&nbsp;&nbsp;</span>		default:
+<span id="L348" class="ln" data-content="   348">&nbsp;&nbsp;</span>			t[j] = s[i]
+<span id="L349" class="ln" data-content="   349">&nbsp;&nbsp;</span>			j++
+<span id="L350" class="ln" data-content="   350">&nbsp;&nbsp;</span>			i++
+<span id="L351" class="ln" data-content="   351">&nbsp;&nbsp;</span>		}
+<span id="L352" class="ln" data-content="   352">&nbsp;&nbsp;</span>	}
+<span id="L353" class="ln" data-content="   353">&nbsp;&nbsp;</span>	return string(t), nil
+<span id="L354" class="ln" data-content="   354">&nbsp;&nbsp;</span>}
+<span id="L355" class="ln" data-content="   355">&nbsp;&nbsp;</span>
+<span id="L356" class="ln" data-content="   356">&nbsp;&nbsp;</span>func ishex(c byte) bool {
+<span id="L357" class="ln" data-content="   357">&nbsp;&nbsp;</span>	switch {
+<span id="L358" class="ln" data-content="   358">&nbsp;&nbsp;</span>	case &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39;:
+<span id="L359" class="ln" data-content="   359">&nbsp;&nbsp;</span>		return true
+<span id="L360" class="ln" data-content="   360">&nbsp;&nbsp;</span>	case &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;f&#39;:
+<span id="L361" class="ln" data-content="   361">&nbsp;&nbsp;</span>		return true
+<span id="L362" class="ln" data-content="   362">&nbsp;&nbsp;</span>	case &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;F&#39;:
+<span id="L363" class="ln" data-content="   363">&nbsp;&nbsp;</span>		return true
+<span id="L364" class="ln" data-content="   364">&nbsp;&nbsp;</span>	}
+<span id="L365" class="ln" data-content="   365">&nbsp;&nbsp;</span>	return false
+<span id="L366" class="ln" data-content="   366">&nbsp;&nbsp;</span>}
+<span id="L367" class="ln" data-content="   367">&nbsp;&nbsp;</span>
+<span id="L368" class="ln" data-content="   368">&nbsp;&nbsp;</span>func unhex(c byte) byte {
+<span id="L369" class="ln" data-content="   369">&nbsp;&nbsp;</span>	switch {
+<span id="L370" class="ln" data-content="   370">&nbsp;&nbsp;</span>	case &#39;0&#39; &lt;= c &amp;&amp; c &lt;= &#39;9&#39;:
+<span id="L371" class="ln" data-content="   371">&nbsp;&nbsp;</span>		return c - &#39;0&#39;
+<span id="L372" class="ln" data-content="   372">&nbsp;&nbsp;</span>	case &#39;a&#39; &lt;= c &amp;&amp; c &lt;= &#39;f&#39;:
+<span id="L373" class="ln" data-content="   373">&nbsp;&nbsp;</span>		return c - &#39;a&#39; + 10
+<span id="L374" class="ln" data-content="   374">&nbsp;&nbsp;</span>	case &#39;A&#39; &lt;= c &amp;&amp; c &lt;= &#39;F&#39;:
+<span id="L375" class="ln" data-content="   375">&nbsp;&nbsp;</span>		return c - &#39;A&#39; + 10
+<span id="L376" class="ln" data-content="   376">&nbsp;&nbsp;</span>	}
+<span id="L377" class="ln" data-content="   377">&nbsp;&nbsp;</span>	return 0
+<span id="L378" class="ln" data-content="   378">&nbsp;&nbsp;</span>}
+<span id="L379" class="ln" data-content="   379">&nbsp;&nbsp;</span>
+</pre><p><a href="mediatype.go%3Fm=text">View as plain text</a></p>
+
+<div id="footer">
+Build version go1.9.4.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
+<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> | 
+<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+<!-- TODO(adonovan): load these from <head> using "defer" attribute? -->
+<script type="text/javascript" src="../../lib/godoc/jquery.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.js"></script>
+<script type="text/javascript" src="../../lib/godoc/jquery.treeview.edit.js"></script>
+
+
+<script>var goVersion = "go1.9.4";</script>
+<script type="text/javascript" src="../../lib/godoc/godocs.js"></script>
+
+</body>
+</html>
+
