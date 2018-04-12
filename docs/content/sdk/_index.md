@@ -16,7 +16,7 @@ TIBCO Cloud Integration - Flogo provides two types of SDK's to build an extensio
 
 | Version | Download URL | Designtime Documentation URL | Runtime Documentation URL 
 | ------- | ------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------
-| v1.0.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.0.0) | [Designtime API](../designtime/wi-studio/v1.0.0/) | [Runtime API](../runtime/wi-runtime/v1.0.0/pkg/github.com/index.html)        
-| v1.1.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.1.0) | [Designtime API](../designtime/wi-studio/v1.1.0/) | [Runtime API](../runtime/wi-runtime/v1.1.0/pkg/github.com/index.html)
-| v1.2.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.2.0) | [Designtime API](../designtime/wi-studio/v1.2.0/) | [Runtime API](../runtime/wi-runtime/v1.2.0/pkg/github.com/index.html)
-| v1.3.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.3.0) | [Designtime API](../designtime/wi-studio/v1.3.0/) | [Runtime API](../runtime/wi-runtime/v1.3.0/pkg/github.com/index.html)
+| v1.0.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.0.0) | [Designtime API](../wi-studio/v1.0.0/) | [Runtime API](../wi-runtime/v1.0.0/pkg/github.com/index.html)        
+| v1.1.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.1.0) | [Designtime API](../wi-studio/v1.1.0/) | [Runtime API](../wi-runtime/v1.1.0/pkg/github.com/index.html)
+| v1.2.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.2.0) | [Designtime API](../wi-studio/v1.2.0/) | [Runtime API](../wi-runtime/v1.2.0/pkg/github.com/index.html)
+| v1.3.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.3.0) | [Designtime API](../wi-studio/v1.3.0/) | [Runtime API](../wi-runtime/v1.3.0/pkg/github.com/index.html)
