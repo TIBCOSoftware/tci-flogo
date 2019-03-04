@@ -1,3 +1,3 @@
-# TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> SDK
+# TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup>
 
-<center>Docs and Tutorials to build your own awesome extensions</center>
+<center>Samples, tutorials and docs to get started with TIBCO Flogo and build your own awesome extensions</center>
