@@ -30,7 +30,7 @@ If you have feedback, don't hesitate to talk to us!
 ## Other TIBCO Cloud Integration repos
 You might also want to visit our other repos
 * [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome), a curated set of awesome projects built on or for TIBCO Cloud Integration
-* [Connectors for TIBCO Business Studio - Cloud Edition](https://github.com/TIBCOSoftware/tci-studio-samples)
+* [Connectors for TIBCO Cloud Integration - BusinessWorks](https://github.com/TIBCOSoftware/businessworks-awesome)
 * [Visual Studio Code extension for Node.js](https://github.com/TIBCOSoftware/vscode-extension-tci)
 * [Command Line Interface for Node.js](https://github.com/TIBCOSoftware/tibcli-node)
 
