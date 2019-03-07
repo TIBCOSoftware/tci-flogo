@@ -7,7 +7,7 @@ pre: "<i class=\"fa fa-home\" aria-hidden=\"true\"></i> "
 
 [TIBCO Cloud<sup>&trade;</sup> Integration(TCI)](https://www.tibco.com/products/tibco-cloud-integration) provides pervasive integration capabilities to enable API-led Integration through tailored user experiences. 
 
-TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> and TIBCO Flogo<sup>&reg;</sup> Enterprise(FE), based on open source Project Flogo<sup>&reg;</sup>, empower developers to build event-driven microservices and functions.
+TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> and TIBCO Flogo<sup>&reg;</sup> Enterprise(FE), based on open source Project Flogo<sup>&trade;</sup>, empower developers to build event-driven microservices and functions.
 
 [This](https://github.com/TIBCOSoftware/tci-flogo) repository is the place to find the docs, samples and tools to build Flogo applications as well as build extensions. There are a few ways you can help us:
 
