@@ -1,5 +1,5 @@
 ---
-title: Samples
+title: Flogo Samples
 weight: 3
 chapter: true
 pre: "<i class=\"fa fa-wrench\" aria-hidden=\"true\"></i> "
