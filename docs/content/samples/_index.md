@@ -1,5 +1,5 @@
 ---
-title: Building extensions
+title: Samples
 weight: 3
 chapter: true
 pre: "<i class=\"fa fa-wrench\" aria-hidden=\"true\"></i> "
