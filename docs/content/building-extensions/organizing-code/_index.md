@@ -2,9 +2,10 @@
 date: 2016-04-09T16:50:16+02:00
 title: Organizing your code
 weight: 51
+pre: "<i class=\"fa fa-folder-open\" aria-hidden=\"true\"></i> "
 ---
 
-The extensions for TIBCO Cloud<sup>&trade;</sup> Integration Flogo<sup>&trade;</sup> consist of several files that all have a very specific function. The files are either used for the model, the UI or the runtime. In the below tables you can see which files you need and which are optional when you're developing connectors and activities.
+The extensions for TIBCO Cloud<sup>&trade;</sup> Integration Flogo<sup>&trade;</sup> or TIBCO Flogo<sup>&trade;</sup> Enterprise consist of several files that all have a very specific function. The files are either used for the model, the UI or the runtime. In the below tables you can see which files you need and which are optional when you're developing connectors and activities.
 
 ## Connector
 

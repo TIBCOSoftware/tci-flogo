@@ -7,7 +7,7 @@ pre: "<i class=\"fa fa-list-alt\" aria-hidden=\"true\"></i> "
 
 # SDK
 
-TIBCO Cloud Integration - Flogo provides two types of SDK's to build an extension.
+TIBCO Cloud Integration - Flogo and TIBCO Flogo Enterprise provide two types of SDK's to build an extension.
 
  1. `Designtime` 
  The design-time SDK is used to build the extension user interface code.

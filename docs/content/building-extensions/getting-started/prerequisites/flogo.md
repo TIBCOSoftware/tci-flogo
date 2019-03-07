@@ -19,9 +19,9 @@ zip -r counter.zip counter/
 You can obviously do this with Finder or Windows Explorer too
 {{% /notice %}}
 
-The last step is to upload the zip file to TIBCO<sup>&reg;</sup> Cloud Integration:
+The last step is to upload the zip file to TIBCO<sup>&reg;</sup> Cloud Integration or TIBCO Flogo<sup>&reg;</sup> Enterprise:
 
-* On the TIBCO Cloud Integration page, click **Extensions**.
+* On the TIBCO Cloud Integration page or TIBCO Flogo<sup>&reg;</sup> Enterprise web UI, click **Extensions**.
 * If this is the first extension, click the **Upload an extension** button, if there are existing extensions that were previously uploaded, click the **Upload** button on the upper right corner.
 * Click the **browse to upload** link and navigate to your extension .zip file. Alternatively, drag and drop the .zip file from your local machine to the area defined by a dotted line in the **Upload an extension** dialog.
 * Click **Upload and compile**. TIBCO Cloud Integration validates the contents in the .zip file. If the .zip file contains a valid folder structure, it compiles the extension code. Once the code is compiled successfully, it uploads the extension to the cloud. You can view the progress of the upload or any errors that occur in the logs. You will see a Complete message after the extension is successfully uploaded. If there were any compilation errors during the upload, you see an error message and the upload exits. You can copy-paste the error message if need be.

@@ -37,7 +37,7 @@ The activity.json file needs a few small changes and now has a boolean to tell i
        "description": "This activity returns concatenation of two strings"
     },
  
-    "ref": "github.com/TIBCOSoftware/tci/examples/TIBCO/activity/concat",
+    "ref": "github.com/TIBCOSoftware/tci-flogo/samples/extensions/TIBCO/activity/concat",
     "inputs": [
            {
             "name": "firstString",

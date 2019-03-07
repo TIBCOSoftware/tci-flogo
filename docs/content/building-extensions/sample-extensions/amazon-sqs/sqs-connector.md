@@ -22,7 +22,7 @@ The connector will use a bunch of files `connector.json` for the model and `conn
        "smallIcon": "sqs.png"
     },
  
-    "ref": "github.com/TIBCOSoftware/tci/examples/AWSSQS/connector/sqs",
+    "ref": "github.com/TIBCOSoftware/tci-flogo/samples/extensions/AWSSQS/connector/sqs",
     "keyfield": "name",
     "settings": [
            {

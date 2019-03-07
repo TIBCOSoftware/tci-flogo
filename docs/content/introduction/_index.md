@@ -5,13 +5,15 @@ weight: 1
 pre: "<i class=\"fa fa-home\" aria-hidden=\"true\"></i> "
 ---
 
-[TIBCO Cloud<sup>&trade;</sup> Integration](https://www.tibco.com/products/tibco-cloud-integration) is a way to seamlessly connect cloud-based services and on-premises applications, and easily model, create, test, and deploy custom APIs. The latest addition to TIBCO<sup>&reg;</sup> Cloud Integration is our Flogo. A web-native design-time making sure that you can connect apps and APIs from within your browser.
+[TIBCO Cloud<sup>&trade;</sup> Integration(TCI)](https://www.tibco.com/products/tibco-cloud-integration) provides pervasive integration capabilities to enable API-led Integration through tailored user experiences. 
 
-[This](https://github.com/TIBCOSoftware/tci-flogo) repository is the place to find the docs and tools to build extensions for Flogo integration product. There are a few ways you can help us:
+TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> and TIBCO Flogo<sup>&reg;</sup> Enterprise(FE), based on open source Project Flogo<sup>&reg;</sup>, empower developers to build event-driven microservices and functions.
 
-* Submit feature requests on our [ideas](https://ideas.tibco.com/?project=TCI) portal
+[This](https://github.com/TIBCOSoftware/tci-flogo) repository is the place to find the docs, samples and tools to build Flogo applications as well as build extensions. There are a few ways you can help us:
+
+* Submit feature requests on our [TCI Ideas](https://ideas.tibco.com/?project=TCI) or [FE Ideas](https://ideas.tibco.com/?project=FE) portal
 * Review the docs in this repo or on our docs [page](https://integration.cloud.tibco.com/docs/index.html) and let us know at `tci@tibco.com` what we've missed.
-* Contribute new activities or projects for our TCI Flogo or Business Studio.
+* Contribute new activities or projects for our TCI Flogo or BusinessWorks.
 
 ## Contributing
 If you want to build your own activities for Flogo please read the docs here.
@@ -23,7 +25,7 @@ You can also send an email to `tci@tibco.com`
 ## Feedback
 If you have feedback, don't hesitate to talk to us!
 
-* Submit feature requests on our [ideas](https://ideas.tibco.com/?project=TCI) portal
+* Submit feature requests on our [TCI Ideas](https://ideas.tibco.com/?project=TCI) or [FE Ideas](https://ideas.tibco.com/?project=FE) portal
 * Ask questions on the [TIBCO Community](https://community.tibco.com/answers/product/344006)
 * Send us a note at `tci@tibco.com`
 
@@ -31,9 +33,9 @@ If you have feedback, don't hesitate to talk to us!
 You might also want to visit our other repos
 
 * [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome), a curated set of awesome projects built on TIBCO Cloud Integration
-* [Connectors for TIBCO Business Studio - Cloud Edition](https://github.com/TIBCOSoftware/tci-studio-samples)
+* [Connectors for TIBCO Business Studio for BusinessWorks](https://github.com/TIBCOSoftware/businessworks-awesome)
 * [Visual Studio Code extension for Node.js](https://github.com/TIBCOSoftware/vscode-extension-tci)
 * [Command Line Interface for Node.js](https://github.com/TIBCOSoftware/tibcli-node)
 
 ## License
-This TCI Flogo SDK project is licensed under a BSD-type license. See [license.txt](https://github.com/TIBCOSoftware/tci-flogo/blob/master/license.txt).
+This TCI Flogo SDK and Samples project is licensed under a BSD-type license. See [license.txt](https://github.com/TIBCOSoftware/tci-flogo/blob/master/license.txt).

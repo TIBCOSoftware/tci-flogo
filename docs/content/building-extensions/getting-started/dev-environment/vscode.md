@@ -4,7 +4,7 @@ title: Using VS Code
 weight: 8
 ---
 
-To use Microsoft Visual Studio Code as your IDE to develop extensions for TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> you can install a few extensions to make your life easier.
+To use Microsoft Visual Studio Code as your IDE to develop extensions for TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> orTIBCO Flogo<sup>&reg;</sup> Enterprise you can install a few extensions to make your life easier.
 
 * Install the **Go** extension from the **extensions** marketplace in Visual Studio Code.
 

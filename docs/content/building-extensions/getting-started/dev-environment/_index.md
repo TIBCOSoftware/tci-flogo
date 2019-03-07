@@ -7,7 +7,7 @@ weight: 6
 Let's get started with the setup of your development environment!
 
 ## The Go part
-TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> is powered by [Project Flogo](https://flogo.io), so when you're developing extensions for TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup>, the runtime parts are the same as you would create them for Project Flogo. That also means that extensions for Project Flogo will work in TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> and vice versa.
+TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> and TIBCO Flogo<sup>&reg;</sup> Enterprise are powered by [Project Flogo](https://flogo.io), so when you're developing extensions the runtime parts are the same as you would create them for Project Flogo. That also means that extensions for Project Flogo will work in TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> or in TIBCO Flogo<sup>&reg;</sup> Enterprise and vice versa.
 
 To install the Project Flogo parts you need to:
 

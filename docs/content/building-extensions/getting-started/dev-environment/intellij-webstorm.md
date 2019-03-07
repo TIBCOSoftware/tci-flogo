@@ -4,7 +4,7 @@ title: Using IntelliJ WebStorm
 weight: 7
 ---
 
-To use IntelliJ WebStorm as your IDE to develop extensions for TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup>, you can install a few extensions to make your life easier.
+To use IntelliJ WebStorm as your IDE to develop extensions for TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> or TIBCO Flogo<sup>&reg;</sup> Enterprise, you can install a few extensions to make your life easier.
 
 * First you need to install the **Go Plugin**. This plugin can be downloaded from the **Preferences** dialog
 

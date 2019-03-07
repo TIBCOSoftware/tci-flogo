@@ -39,4 +39,4 @@ AWSSQS
         └───sqs.png
 ```
 
-The complete code of this connector and the two activities can be found in our [GitHub](https://github.com/TIBCOSoftware/tci-flogo/tree/master/examples/AWSSQS) repo too.
+The complete code of this connector and the two activities can be found in our [GitHub](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/extensions/AWSSQS) repo too.
