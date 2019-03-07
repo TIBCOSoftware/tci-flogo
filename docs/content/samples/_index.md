@@ -1,6 +1,6 @@
 ---
 title: Building extensions
-weight:3
+weight: 3
 chapter: true
 pre: "<i class=\"fa fa-wrench\" aria-hidden=\"true\"></i> "
 ---
