@@ -1,4 +1,4 @@
-All the samples in this folder are modeled on BookStore REST and invoke a REST service hosted at https://my-json-server.typicode.com/tibcosoftware/bookstore/Book at the backend. This REST service delivers sample JSON data.
+All the samples in this folder are modeled on sample BookStore application and invoke a REST API  at the backend that delivers sample JSON data. This backend REST API is hosted at - hosted at https://my-json-server.typicode.com/tibcosoftware/bookstore/Book
 
 If you run any of these samples locally using TIBCO Flogo Enterprise -
 
