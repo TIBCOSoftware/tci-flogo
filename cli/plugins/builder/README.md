@@ -14,7 +14,7 @@ Installation
       
 Usage:
     
-    The plugin wraper Flogo Enterprise builder, so all build option will avabile at thisc command as well.
+    The plugin wrapper Flogo Enterprise builder, so all build options will available at this command as well.
    
      Example:
      flogo febuilder build --f ~/Downloads/log.json
