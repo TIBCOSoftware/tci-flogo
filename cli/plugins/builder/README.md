@@ -1,4 +1,4 @@
-[Flogo CLI](https://github.com/project-flogo/cli) Plugin for Flogo Enterprise Builder
+[Project Flogo CLI](https://github.com/project-flogo/cli) Plugin for Flogo Enterprise
 
 
 Preparation:
