@@ -39,7 +39,7 @@ var file, name, output, platform string
 var verbose bool
 
 var enterpriseBuilderCmd = &cobra.Command{
-	Use:   "febuilder",
+	Use:   "enterprise",
 	Short: "Flogo Enterprise builder support",
 	Long:  "Using this command to build Flogo Enterprise apps",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
