@@ -96,12 +96,17 @@ func (a *IFTTTActivity) Eval(context activity.Context) (done bool, err error) {
 	activityLog.Info("The WebHook URL is set to " + iftttURL)
 
 	// Create JSON payload. The data is completely optional, and you can also pass value1, value2, and value3 as query parameters or form variables. This content will be passed on to the Action in your Recipe.
-	var data Payload
+	data := Payload{}
+	if context.GetInput(ivValue3) != nil {
+		data.Value3 = context.GetInput(ivValue3).(string)
+	}
 
-	if context.GetInput(ivValue3) == nil {
-		data = Payload{Value1: context.GetInput(ivValue1).(string), Value2: context.GetInput(ivValue2).(string)}
-	} else if context.GetInput(ivValue2) == nil {
-		data = Payload{Value1: context.GetInput(ivValue1).(string)}
+	if context.GetInput(ivValue2) != nil {
+		data.Value2 = context.GetInput(ivValue2).(string)
+	}
+
+	if context.GetInput(ivValue1) != nil {
+		data.Value1 = context.GetInput(ivValue1).(string)
 	}
 
 	payloadBytes, err := json.Marshal(data)
@@ -129,6 +134,7 @@ func (a *IFTTTActivity) Eval(context activity.Context) (done bool, err error) {
 	context.SetOutput(ovResult, strconv.Itoa(resp.StatusCode))
 	return true, nil
 }
+
 ```
 
 ## activity_test.go
