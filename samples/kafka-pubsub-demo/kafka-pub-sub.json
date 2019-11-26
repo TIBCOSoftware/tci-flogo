@@ -1,0 +1,465 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/mapper",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/log",
+        "git.tibco.com/git/product/ipaas/wi-plugins.git/contributions/kafka/src/app/Kafka/activity/producer",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/httpresponse",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/rest",
+        "git.tibco.com/git/product/ipaas/wi-plugins.git/contributions/kafka/src/app/Kafka/trigger/consumer",
+        "github.com/project-flogo/contrib/function/number",
+        "github.com/project-flogo/contrib/function/string",
+        "git.tibco.com/git/product/ipaas/wi-plugins.git/contributions/kafka/src/app/Kafka/connector/kafka"
+    ],
+    "name": "kafka-pub-sub",
+    "description": " ",
+    "version": "1.1.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "feVersion": "2.8.0",
+    "triggers": [
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9999,
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": "",
+                "swagger": ""
+            },
+            "id": "ReceiveHTTPMessage",
+            "handlers": [
+                {
+                    "description": "Publish sensor data to Kafka",
+                    "settings": {
+                        "Method": "GET",
+                        "Path": "/sensor/simulator",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:KafkaProducer"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "responseBody": "=$.responseBody"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": true,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "responseCodesSchema": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"},\"responseType\":{\"type\":\"string\"},\"responseSchema\":{\"type\":\"string\"},\"responseHeaders\":{\"type\":\"string\"}}}}",
+                                "fe_metadata": "[{\"code\":\"200\",\"responseType\":\"object\",\"responseSchema\":\"{\\\"ContainerID\\\":965,\\\"Humidity\\\":87,\\\"Temperature\\\":36}\",\"responseHeaders\":\"\"}]"
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "ref": "#consumer",
+            "name": "tibco-kafka-consumer-trigger",
+            "description": "",
+            "settings": {
+                "kafkaConnection": "conn://5c3a4870-83ba-11e9-ac06-6d34b620396a"
+            },
+            "id": "KafkaConsumer",
+            "handlers": [
+                {
+                    "description": "Consume sensor data and log alerts",
+                    "settings": {
+                        "topic": "flogo.demo",
+                        "topicPattern": "",
+                        "consumerGroup": "flogo-demo-consumer",
+                        "valueType": "JSON",
+                        "commitInterval": 5000,
+                        "initialOffset": "Oldest",
+                        "fetchMinBytes": 1,
+                        "fetchMaxWait": 500,
+                        "heartbeatInterval": 3000,
+                        "sessionTimeout": 30000
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:KafkaConsumer"
+                        },
+                        "input": {
+                            "topic": "=$.topic",
+                            "partition": "=$.partition",
+                            "offset": "=$.offset",
+                            "key": "=$.key",
+                            "jsonValue": "=$.jsonValue"
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "jsonValue": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"ContainerID\":{\"type\":\"number\"},\"Humidity\":{\"type\":\"number\"},\"Temperature\":{\"type\":\"number\"}}}",
+                                "fe_metadata": "{\"ContainerID\":965,\"Humidity\":87,\"Temperature\":36}"
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:KafkaProducer",
+            "data": {
+                "name": "KafkaProducer",
+                "description": "Publish sensor data to Kafka",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "Mapper",
+                        "to": "LogMessage",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "LogMessage",
+                        "to": "KafkaProducer",
+                        "type": "default"
+                    },
+                    {
+                        "id": 3,
+                        "from": "KafkaProducer",
+                        "to": "ConfigureHTTPResponse",
+                        "type": "default"
+                    },
+                    {
+                        "id": 4,
+                        "from": "ConfigureHTTPResponse",
+                        "to": "Return",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "Mapper",
+                        "name": "Mapper",
+                        "description": "Mapper Activity",
+                        "activity": {
+                            "ref": "#mapper",
+                            "input": {
+                                "input": {
+                                    "mapping": {
+                                        "ContainerID": "=number.random(1000)",
+                                        "Humidity": "=number.random(100)",
+                                        "Temperature": "=number.random(40)"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"ContainerID\":{\"type\":\"number\"},\"Humidity\":{\"type\":\"number\"},\"Temperature\":{\"type\":\"number\"}}}",
+                                        "fe_metadata": "{\"ContainerID\":965,\"Humidity\":87,\"Temperature\":36}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\n  \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"ContainerID\": {\n      \"type\": \"number\"\n    },\n    \"Humidity\": {\n      \"type\": \"number\"\n    },\n    \"Temperature\": {\n      \"type\": \"number\"\n    }\n  }\n}",
+                                        "fe_metadata": "{\n  \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"ContainerID\": {\n      \"type\": \"number\"\n    },\n    \"Humidity\": {\n      \"type\": \"number\"\n    },\n    \"Temperature\": {\n      \"type\": \"number\"\n    }\n  }\n}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.concat(\"Publish data: \", string.tostring($activity[Mapper].output))"
+                            }
+                        }
+                    },
+                    {
+                        "id": "KafkaProducer",
+                        "name": "KafkaProducer",
+                        "description": "",
+                        "activity": {
+                            "ref": "#producer",
+                            "input": {
+                                "kafkaConnection": "conn://5c3a4870-83ba-11e9-ac06-6d34b620396a",
+                                "ackMode": "All",
+                                "ackTimeout": 10000,
+                                "compressionType": "None",
+                                "valueType": "JSON",
+                                "maxRequestSize": 1048576,
+                                "maxMessages": 0,
+                                "frequency": 1000,
+                                "topic": "flogo.demo",
+                                "partition": 0,
+                                "key": "sensordata",
+                                "stringValue": "",
+                                "jsonValue": "=$activity[Mapper].output"
+                            },
+                            "schemas": {
+                                "input": {
+                                    "jsonValue": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"ContainerID\":{\"type\":\"number\"},\"Humidity\":{\"type\":\"number\"},\"Temperature\":{\"type\":\"number\"}}}",
+                                        "fe_metadata": "{\"ContainerID\":965,\"Humidity\":87,\"Temperature\":36}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "ConfigureHTTPResponse",
+                        "name": "ConfigureHTTPResponse",
+                        "description": "Configure HTTP Response Activity",
+                        "activity": {
+                            "ref": "#httpresponse",
+                            "input": {
+                                "trigger": "",
+                                "responsecode": "200",
+                                "input": {
+                                    "mapping": {
+                                        "body": "=$activity[Mapper].output"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"object\",\"properties\":{\"ContainerID\":{\"type\":\"number\"},\"Humidity\":{\"type\":\"number\"},\"Temperature\":{\"type\":\"number\"}}}}}",
+                                        "fe_metadata": "{\"body\":{\"ContainerID\":965,\"Humidity\":87,\"Temperature\":36}}"
+                                    }
+                                },
+                                "output": {
+                                    "response": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"object\",\"properties\":{\"ContainerID\":{\"type\":\"number\"},\"Humidity\":{\"type\":\"number\"},\"Temperature\":{\"type\":\"number\"}}}}}",
+                                        "fe_metadata": "{\"body\":{\"ContainerID\":965,\"Humidity\":87,\"Temperature\":36}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": "=$activity[ConfigureHTTPResponse].code",
+                                    "responseBody": {
+                                        "mapping": {
+                                            "body": "=$activity[ConfigureHTTPResponse].response.body"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "responseBody",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"responseBody\":{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:KafkaConsumer",
+            "data": {
+                "name": "KafkaConsumer",
+                "description": "Consume sensor data and log alerts",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "LogData",
+                        "to": "HumidityAlert",
+                        "type": "expression",
+                        "label": "LogData to HumidityAlert",
+                        "value": "$flow.jsonValue.Humidity > 80"
+                    },
+                    {
+                        "id": 2,
+                        "from": "LogData",
+                        "to": "TemperatureAlert",
+                        "type": "expression",
+                        "label": "LogData to TemperatureAlert",
+                        "value": "$flow.jsonValue.Temperature > 25"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "LogData",
+                        "name": "LogData",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.concat(\" ======== Sensor data: \", string.tostring($flow.jsonValue))"
+                            }
+                        }
+                    },
+                    {
+                        "id": "HumidityAlert",
+                        "name": "HumidityAlert",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "WARN",
+                                "flowInfo": false,
+                                "message": "=string.concat(\" **** Humidity Alert!! **** Container ID: \", string.tostring($flow.jsonValue.ContainerID), \"Humidity: \", string.tostring($flow.jsonValue.Humidity))"
+                            }
+                        }
+                    },
+                    {
+                        "id": "TemperatureAlert",
+                        "name": "TemperatureAlert",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "WARN",
+                                "flowInfo": false,
+                                "message": "=string.concat(\"**** Temperature  Alert!! **** Container ID: \", string.tostring($flow.jsonValue.ContainerID), \"Temperature: \", string.tostring($flow.jsonValue.Temperature))"
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "topic",
+                            "type": "string"
+                        },
+                        {
+                            "name": "partition",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "offset",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "key",
+                            "type": "string"
+                        },
+                        {
+                            "name": "jsonValue",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"ContainerID\":{\"type\":\"number\"},\"Humidity\":{\"type\":\"number\"},\"Temperature\":{\"type\":\"number\"}}"
+                            }
+                        }
+                    ],
+                    "output": [],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"KafkaConsumer\",\"properties\":{\"topic\":{\"type\":\"string\",\"required\":false},\"partition\":{\"type\":\"integer\",\"required\":false},\"offset\":{\"type\":\"integer\",\"required\":false},\"key\":{\"type\":\"string\",\"required\":false},\"jsonValue\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"ContainerID\":{\"type\":\"number\"},\"Humidity\":{\"type\":\"number\"},\"Temperature\":{\"type\":\"number\"}}}}}"
+                    }
+                },
+                "explicitReply": true
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "Kafka.kafka_demo.Brokers",
+            "type": "string",
+            "value": "ec2-52-53-225-102.us-west-1.compute.amazonaws.com:9092"
+        },
+        {
+            "name": "Kafka.kafka_demo.Connection_Timeout",
+            "type": "float64",
+            "value": 30
+        },
+        {
+            "name": "Kafka.kafka_demo.Retry_Backoff",
+            "type": "float64",
+            "value": 250
+        }
+    ],
+    "connections": {
+        "5c3a4870-83ba-11e9-ac06-6d34b620396a": {
+            "id": "5c3a4870-83ba-11e9-ac06-6d34b620396a",
+            "name": "kafka_demo",
+            "ref": "#kafka",
+            "settings": {
+                "name": "kafka_demo",
+                "description": "Apache Kafka client configuration",
+                "brokers": "=$property[\"Kafka.kafka_demo.Brokers\"]",
+                "authMode": "None",
+                "userName": "",
+                "password": "",
+                "clientCert": "",
+                "clientKey": "",
+                "caCert": "",
+                "connectionTimeout": "=$property[\"Kafka.kafka_demo.Connection_Timeout\"]",
+                "retryBackoff": "=$property[\"Kafka.kafka_demo.Retry_Backoff\"]",
+                "retryMax": 3,
+                "refreshFrequency": 40
+            }
+        }
+    },
+    "contrib": "W3sicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1wbHVnaW5zLmdpdC9jb250cmlidXRpb25zL2thZmthL3NyYy9hcHAvS2Fma2EiLCJzM2xvY2F0aW9uIjoiVGliY28vS2Fma2EifV0=",
+    "fe_metadata": "UEsDBAoAAAAIABljek+rqSRGFQAAABMAAAAIAAAAYXBwLmpzb26rViopykxPTy1yy8kvL1ayio6tBQBQSwECFAAKAAAACAAZY3pPq6kkRhUAAAATAAAACAAAAAAAAAAAAAAAAAAAAAAAYXBwLmpzb25QSwUGAAAAAAEAAQA2AAAAOwAAAAAA"
+}

@@ -1,0 +1,646 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "github.com/project-flogo/grpc/activity/grpc",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/rest",
+        "git.tibco.com/git/product/ipaas/wi-plugins.git/contributions/Lambda/activity/invokesync",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "github.com/project-flogo/graphql/trigger/graphql",
+        "github.com/project-flogo/contrib/function/coerce"
+    ],
+    "name": "bookstore-graphql",
+    "description": " ",
+    "version": "1.1.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "feVersion": "2.7.0",
+    "triggers": [
+        {
+            "ref": "#graphql",
+            "name": "tibco-graphql",
+            "description": "Simple GraphQL Trigger",
+            "settings": {
+                "port": 7879,
+                "path": "/graphql",
+                "schemaFile": {
+                    "filename": "bookstore.graphql",
+                    "content": "data:application/octet-stream;base64,c2NoZW1hIHsKICBxdWVyeTogYm9va2RldGFpbHMKfQoKdHlwZSBib29rZGV0YWlscyB7CiAgICBCb29rKGlkOkludCEsIGN1cnJlbmN5OkN1cnJlbmN5KTogQm9vawp9CgplbnVtIEN1cnJlbmN5IHsKICAgIFVTRAogICAgRVVSCiAgICBJTlIKfQoKdHlwZSBCb29rIHsKICAgIGlkOiBJbnQKICAgIGlzYm46IEludAogICAgYXV0aG9yOiBTdHJpbmcKICAgIHRpdGxlOiBTdHJpbmcKICAgIHB1YmxpY2F0aW9uX3llYXI6IEludAogICAgcHJpY2U6IEZsb2F0CiAgICByYXRpbmc6IFJhdGluZwp9Cgp0eXBlIFJhdGluZyB7CiAgICBhdmVyYWdlX3JhdGluZzogRmxvYXQKICAgIHJhdGluZ3NfY291bnQ6IEludAp9"
+                },
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": "",
+                "graphqlSchema": "schema {\n  query: bookdetails\n}\n\ntype bookdetails {\n    Book(id:Int!, currency:Currency): Book\n}\n\nenum Currency {\n    USD\n    EUR\n    INR\n}\n\ntype Book {\n    id: Int\n    isbn: Int\n    author: String\n    title: String\n    publication_year: Int\n    price: Float\n    rating: Rating\n}\n\ntype Rating {\n    average_rating: Float\n    ratings_count: Int\n}"
+            },
+            "id": "GraphQLTrigger",
+            "handlers": [
+                {
+                    "description": "Query book details",
+                    "settings": {
+                        "operation": "Query",
+                        "resolverFor": "Book"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:Query_Book"
+                        },
+                        "input": {
+                            "arguments": "=$.arguments"
+                        },
+                        "output": {
+                            "data": "=$.data"
+                        }
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Book\":{\"type\":\"object\",\"required\":[],\"properties\":{\"id\":{\"type\":\"number\"},\"isbn\":{\"type\":\"number\"},\"author\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"publication_year\":{\"type\":\"number\"},\"price\":{\"type\":\"number\"},\"rating\":{\"type\":\"object\",\"required\":[],\"properties\":{\"average_rating\":{\"type\":\"number\"},\"ratings_count\":{\"type\":\"number\"}}}}}},\"required\":[]}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"Book\":{\"type\":\"object\",\"required\":[],\"properties\":{\"id\":{\"type\":\"number\"},\"isbn\":{\"type\":\"number\"},\"author\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"publication_year\":{\"type\":\"number\"},\"price\":{\"type\":\"number\"},\"rating\":{\"type\":\"object\",\"required\":[],\"properties\":{\"average_rating\":{\"type\":\"number\"},\"ratings_count\":{\"type\":\"number\"}}}}}},\"required\":[]}"
+                            }
+                        },
+                        "output": {
+                            "arguments": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"number\"},\"currency\":{\"type\":\"string\"}},\"required\":[\"id\"]}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"number\"},\"currency\":{\"type\":\"string\"}},\"required\":[\"id\"]}"
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:Query_Book",
+            "data": {
+                "name": "Query_Book",
+                "description": "Query book details",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "GetBookInfo_gRPC",
+                        "to": "GetBookRating_REST",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "GetBookRating_REST",
+                        "to": "CurrencyConverter_Lambda",
+                        "type": "expression",
+                        "label": "GetBookRating_RESTto",
+                        "value": "$activity[GetBookRating_REST].statusCode == 200 && $flow.arguments.currency != \"USD\""
+                    },
+                    {
+                        "id": 3,
+                        "from": "CurrencyConverter_Lambda",
+                        "to": "Return_CurrencyConversion",
+                        "type": "default"
+                    },
+                    {
+                        "id": 4,
+                        "from": "CurrencyConverter_Lambda",
+                        "to": "Return",
+                        "type": "error",
+                        "label": "CurrencyConverter_LambdatoReturn"
+                    },
+                    {
+                        "id": 5,
+                        "from": "GetBookRating_REST",
+                        "to": "Return_DefaultCurrency",
+                        "type": "expression",
+                        "label": "GetBookRating_RESTtoReturn",
+                        "value": "$activity[GetBookRating_REST].statusCode == 200 && ($flow.arguments.currency == null || $flow.arguments.currency == \"USD\")"
+                    },
+                    {
+                        "id": 6,
+                        "from": "GetBookRating_REST",
+                        "to": "Return_RESTError",
+                        "type": "error",
+                        "label": "GetBookRating_RESTtoReturn1"
+                    },
+                    {
+                        "id": 7,
+                        "from": "GetBookInfo_gRPC",
+                        "to": "Return_gRPCError",
+                        "type": "error",
+                        "label": "GetBookInfo_gRPCto"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "GetBookInfo_gRPC",
+                        "name": "GetBookInfo_gRPC",
+                        "description": "GRPC Activity",
+                        "activity": {
+                            "ref": "#grpc",
+                            "settings": {
+                                "operatingMode": "grpc-to-grpc",
+                                "hosturl": "=$property[\"BOOKINFO_GRPC_SERVER\"]",
+                                "enableTLS": false,
+                                "clientCert": "",
+                                "protoFile": {
+                                    "filename": "bookinfo.proto",
+                                    "content": "data:application/octet-stream;base64,c3ludGF4ID0gInByb3RvMyI7CgpwYWNrYWdlIGJvb2tpbmZvOwoKLy8gQm9va2luZm8gc2VydmljZSBkZWZpbml0aW9uLgpzZXJ2aWNlIEJvb2tJbmZvIHsKICAvLyBHZXQgYm9vayBkZXRhaWxzIGJ5IGlkCiAgcnBjIEdldEJvb2tieUlkIChCb29rUmVxdWVzdCkgcmV0dXJucyAoQm9va1Jlc3BvbnNlKSB7fQp9CgovLyBUaGUgcmVxdWVzdCBtZXNzYWdlIGNvbnRhaW5pbmcgdGhlIGJvb2sncyBpZC4KbWVzc2FnZSBCb29rUmVxdWVzdCB7CiAgaW50NjQgaWQgPSAxOwp9CgovLyBUaGUgcmVzcG9uc2UgbWVzc2FnZSBjb250YWluaW5nIHRoZSBib29rJ3MgZGV0YWlscwptZXNzYWdlIEJvb2tSZXNwb25zZSB7CiAgaW50NjQgaWQgPSAxOwogIGludDY0IGlzYm4gPSAyOwogIHN0cmluZyBhdXRob3IgPSAzOwogIHN0cmluZyB0aXRsZSA9IDQ7CiAgaW50NjQgcHVibGljYXRpb25feWVhciA9IDU7CiAgZmxvYXQgcHJpY2VfdXNkICA9IDY7Cn0K"
+                                }
+                            },
+                            "input": {
+                                "header": "",
+                                "serviceName": "BookInfo",
+                                "protoName": "bookinfo.proto",
+                                "methodName": "GetBookbyId",
+                                "params": "",
+                                "queryParams": "",
+                                "pathParams": "",
+                                "grpcMthdParamtrs": {
+                                    "mapping": {
+                                        "id": "=$flow.arguments.id"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "GetBookRating_REST",
+                        "name": "GetBookRating_REST",
+                        "description": "Simple REST Activity",
+                        "activity": {
+                            "ref": "#rest",
+                            "input": {
+                                "Method": "GET",
+                                "Uri": "=$property[\"RATINGS_REST_URL\"]",
+                                "Timeout": 0,
+                                "requestType": "application/json",
+                                "Use certificate for verification": false,
+                                "Server Certificate": "",
+                                "proxy": "",
+                                "pathParams": {
+                                    "mapping": {
+                                        "bookid": "=coerce.toString($flow.arguments.id)"
+                                    }
+                                }
+                            },
+                            "output": {
+                                "configureResponseCodes": false,
+                                "responseType": "application/json"
+                            },
+                            "schemas": {
+                                "input": {
+                                    "pathParams": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"bookid\":{\"type\":\"string\"}},\"required\":[]}",
+                                        "fe_metadata": "[{\"parameterName\":\"bookid\",\"type\":\"string\"}]"
+                                    },
+                                    "headers": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                        "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                                    }
+                                },
+                                "output": {
+                                    "responseBody": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"average_rating\":{\"type\":\"number\"},\"book_id\":{\"type\":\"number\"},\"ratings_count\":{\"type\":\"number\"}}}",
+                                        "fe_metadata": "{\n  \"average_rating\": 4.34,\n  \"book_id\": 1,\n  \"ratings_count\": 4780653\n}"
+                                    },
+                                    "headers": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                        "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "CurrencyConverter_Lambda",
+                        "name": "CurrencyConverter_Lambda",
+                        "description": "Invoke Lambda Function",
+                        "activity": {
+                            "ref": "#invokesync",
+                            "input": {
+                                "ConnectionName": {
+                                    "id": "263952b0-ede7-11e9-945c-a5715bd30726",
+                                    "type": "flogo:connector",
+                                    "version": "1.1.0",
+                                    "name": "tibco-aws",
+                                    "hashTags": [],
+                                    "inputMappings": {},
+                                    "outputMappings": {},
+                                    "iteratorMappings": {},
+                                    "title": "AWS Connector",
+                                    "description": "AWS Connection",
+                                    "ref": "git.tibco.com/git/product/ipaas/wi-plugins.git/contributions/AWS/connector",
+                                    "settings": [
+                                        {
+                                            "name": "name",
+                                            "type": "string",
+                                            "required": true,
+                                            "display": {
+                                                "name": "Name",
+                                                "visible": true
+                                            },
+                                            "value": "bookstore-demo-aws-config-rishi"
+                                        },
+                                        {
+                                            "name": "description",
+                                            "type": "string",
+                                            "required": false,
+                                            "display": {
+                                                "name": "Description",
+                                                "visible": true
+                                            },
+                                            "value": "AWS account access credentials"
+                                        },
+                                        {
+                                            "name": "region",
+                                            "type": "string",
+                                            "required": true,
+                                            "allowed": [
+                                                "us-east-1",
+                                                "us-east-2",
+                                                "us-west-1",
+                                                "us-west-2",
+                                                "eu-central-1",
+                                                "eu-west-1",
+                                                "eu-west-2",
+                                                "eu-west-3",
+                                                "ap-south-1",
+                                                "ap-northeast-1",
+                                                "ap-northeast-2",
+                                                "ap-southeast-1",
+                                                "ap-southeast-2"
+                                            ],
+                                            "display": {
+                                                "name": "Region",
+                                                "description": "AWS Region",
+                                                "appPropertySupport": true,
+                                                "visible": true
+                                            },
+                                            "value": "=$property[\"AWS.bookstore-demo-aws-config-rishi.Region\"]"
+                                        },
+                                        {
+                                            "name": "accessKey",
+                                            "type": "string",
+                                            "required": true,
+                                            "display": {
+                                                "name": "Access key ID",
+                                                "description": "AWS Access key ID",
+                                                "appPropertySupport": true,
+                                                "visible": true
+                                            },
+                                            "value": "=$property[\"AWS.bookstore-demo-aws-config-rishi.Access_key_ID\"]"
+                                        },
+                                        {
+                                            "name": "secretKey",
+                                            "type": "string",
+                                            "required": true,
+                                            "display": {
+                                                "name": "Secret access key",
+                                                "description": "AWS Secret access key",
+                                                "appPropertySupport": true,
+                                                "visible": true,
+                                                "type": "password"
+                                            },
+                                            "value": "=$property[\"AWS.bookstore-demo-aws-config-rishi.Secret_access_key\"]"
+                                        },
+                                        {
+                                            "name": "assumeRole",
+                                            "type": "boolean",
+                                            "required": true,
+                                            "display": {
+                                                "name": "Use Assume Role",
+                                                "description": "Use for AWS Assume role, default is false"
+                                            },
+                                            "value": false
+                                        },
+                                        {
+                                            "name": "roleArn",
+                                            "type": "string",
+                                            "required": true,
+                                            "display": {
+                                                "name": "Role ARN",
+                                                "description": "The Amazon Resource Name (ARN) of the role to assume",
+                                                "appPropertySupport": true,
+                                                "readonly": false,
+                                                "valid": true,
+                                                "visible": false
+                                            },
+                                            "value": ""
+                                        },
+                                        {
+                                            "name": "roleSessionName",
+                                            "type": "string",
+                                            "required": true,
+                                            "display": {
+                                                "name": "Role Session Name",
+                                                "description": "An identifier for the assumed role session",
+                                                "appPropertySupport": true,
+                                                "readonly": false,
+                                                "valid": true,
+                                                "visible": false
+                                            },
+                                            "value": ""
+                                        },
+                                        {
+                                            "name": "externalId",
+                                            "type": "string",
+                                            "required": false,
+                                            "display": {
+                                                "name": "External ID",
+                                                "description": "A unique identifier that might be required when you assume a role in another account",
+                                                "appPropertySupport": true,
+                                                "readonly": false,
+                                                "valid": true,
+                                                "visible": false
+                                            },
+                                            "value": ""
+                                        },
+                                        {
+                                            "name": "expirationDuration",
+                                            "type": "integer",
+                                            "required": true,
+                                            "display": {
+                                                "name": "Expiration Duration(secs) ",
+                                                "description": "The duration, in seconds, of the role session. The value can range from 900 seconds (15 minutes) up to the maximum session duration setting for the role",
+                                                "appPropertySupport": true,
+                                                "readonly": false,
+                                                "valid": true,
+                                                "visible": false
+                                            },
+                                            "value": 900
+                                        },
+                                        {
+                                            "name": "LAMBDA_CONNECTION_INFO",
+                                            "type": "string",
+                                            "required": true,
+                                            "display": {
+                                                "visible": false
+                                            },
+                                            "value": ""
+                                        }
+                                    ],
+                                    "outputs": [],
+                                    "inputs": [],
+                                    "handler": {
+                                        "settings": []
+                                    },
+                                    "reply": [],
+                                    "s3Prefix": "Tibco",
+                                    "key": "Tibco/AWS/connector/connector.json",
+                                    "display": {
+                                        "description": "AWS Connection",
+                                        "category": "AWS",
+                                        "visible": true,
+                                        "smallIcon": "icons/ic-flogo-aws-connector.png",
+                                        "largeIcon": "icons/ic-flogo-aws-connector@2x.png"
+                                    },
+                                    "actions": [
+                                        {
+                                            "name": "Save"
+                                        }
+                                    ],
+                                    "feature": {},
+                                    "propertyMap": {},
+                                    "keyfield": "name",
+                                    "iteratorAccumulate": false,
+                                    "isValid": true,
+                                    "lastUpdatedTime": 1570991321231,
+                                    "user": "flogo",
+                                    "connectorName": "bookstore-demo-aws-config-rishi",
+                                    "connectorDescription": "AWS account access credentials"
+                                },
+                                "arn": "=$property[\"CURRENCY_LAMBDA_ARN\"]",
+                                "LambdaARN": "",
+                                "payload": {
+                                    "mapping": {
+                                        "price_usd": "=$activity[GetBookInfo_gRPC].body.price_usd",
+                                        "currency_code": "=$flow.arguments.currency"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "payload": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"price_usd\":{\"type\":\"number\"},\"currency_code\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\n  \"price_usd\": 10,\n  \"currency_code\": \"EUR\"\n}"
+                                    }
+                                },
+                                "output": {
+                                    "result": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"price\":{\"type\":\"number\"}}}",
+                                        "fe_metadata": "{\n  \"price\": 9.06\n}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return_CurrencyConversion",
+                        "name": "Return_CurrencyConversion",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "data": {
+                                        "mapping": {
+                                            "Book": {
+                                                "id": "=$activity[GetBookInfo_gRPC].body.id",
+                                                "isbn": "=$activity[GetBookInfo_gRPC].body.isbn",
+                                                "author": "=$activity[GetBookInfo_gRPC].body.author",
+                                                "title": "=$activity[GetBookInfo_gRPC].body.title",
+                                                "publication_year": "=$activity[GetBookInfo_gRPC].body.publication_year",
+                                                "price": "=$activity[CurrencyConverter_Lambda].result.price",
+                                                "rating": {
+                                                    "average_rating": "=coerce.toFloat64($activity[GetBookRating_REST].responseBody.average_rating)",
+                                                    "ratings_count": "=coerce.toInt($activity[GetBookRating_REST].responseBody.ratings_count)"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "data": {
+                                        "mapping": {
+                                            "Book": {
+                                                "id": "=$activity[GetBookInfo_gRPC].body.id",
+                                                "isbn": "=$activity[GetBookInfo_gRPC].body.isbn",
+                                                "author": "=$activity[GetBookInfo_gRPC].body.author",
+                                                "title": "=$activity[GetBookInfo_gRPC].body.title",
+                                                "publication_year": "=$activity[GetBookInfo_gRPC].body.publication_year",
+                                                "price": "=$activity[GetBookInfo_gRPC].body.price_usd",
+                                                "rating": {
+                                                    "average_rating": "=coerce.toFloat64($activity[GetBookRating_REST].responseBody.average_rating)",
+                                                    "ratings_count": "=coerce.toInt($activity[GetBookRating_REST].responseBody.ratings_count)"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return_DefaultCurrency",
+                        "name": "Return_DefaultCurrency",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "data": {
+                                        "mapping": {
+                                            "Book": {
+                                                "id": "=$activity[GetBookInfo_gRPC].body.id",
+                                                "isbn": "=$activity[GetBookInfo_gRPC].body.isbn",
+                                                "author": "=$activity[GetBookInfo_gRPC].body.author",
+                                                "title": "=$activity[GetBookInfo_gRPC].body.title",
+                                                "publication_year": "=$activity[GetBookInfo_gRPC].body.publication_year",
+                                                "price": "=$activity[GetBookInfo_gRPC].body.price_usd",
+                                                "rating": {
+                                                    "average_rating": "=coerce.toFloat64($activity[GetBookRating_REST].responseBody.average_rating)",
+                                                    "ratings_count": "=coerce.toInt($activity[GetBookRating_REST].responseBody.ratings_count)"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return_RESTError",
+                        "name": "Return_RESTError",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "data": {
+                                        "mapping": {
+                                            "Book": {
+                                                "id": "=$activity[GetBookInfo_gRPC].body.id",
+                                                "isbn": "=$activity[GetBookInfo_gRPC].body.isbn",
+                                                "author": "=$activity[GetBookInfo_gRPC].body.author",
+                                                "title": "=$activity[GetBookInfo_gRPC].body.title",
+                                                "publication_year": "=$activity[GetBookInfo_gRPC].body.publication_year",
+                                                "price": "=$activity[GetBookInfo_gRPC].body.price_usd",
+                                                "rating": {
+                                                    "average_rating": 0,
+                                                    "ratings_count": 0
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return_gRPCError",
+                        "name": "Return_gRPCError",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "data": {
+                                        "mapping": {
+                                            "Book": {
+                                                "id": 0,
+                                                "isbn": 0,
+                                                "author": "N/A",
+                                                "title": "gRPC Service Error",
+                                                "publication_year": 0,
+                                                "price": 0,
+                                                "rating": {
+                                                    "average_rating": 0,
+                                                    "ratings_count": 0
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "arguments",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"id\":{\"type\":\"number\"},\"currency\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Book\":{\"type\":\"object\",\"required\":[],\"properties\":{\"id\":{\"type\":\"number\"},\"isbn\":{\"type\":\"number\"},\"author\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"publication_year\":{\"type\":\"number\"},\"price\":{\"type\":\"number\"},\"rating\":{\"type\":\"object\",\"required\":[],\"properties\":{\"average_rating\":{\"type\":\"number\"},\"ratings_count\":{\"type\":\"number\"}}}}}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"GraphQLTrigger\",\"properties\":{\"arguments\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"number\"},\"currency\":{\"type\":\"string\"}},\"required\":[\"id\"]}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"data\":{\"type\":\"object\",\"properties\":{\"Book\":{\"type\":\"object\",\"required\":[],\"properties\":{\"id\":{\"type\":\"number\"},\"isbn\":{\"type\":\"number\"},\"author\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"publication_year\":{\"type\":\"number\"},\"price\":{\"type\":\"number\"},\"rating\":{\"type\":\"object\",\"required\":[],\"properties\":{\"average_rating\":{\"type\":\"number\"},\"ratings_count\":{\"type\":\"number\"}}}}}},\"required\":[]}},\"required\":[]}"
+                    }
+                }
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "BOOKINFO_GRPC_SERVER",
+            "type": "string",
+            "value": "localhost:7878"
+        },
+        {
+            "name": "RATINGS_REST_URL",
+            "type": "string",
+            "value": "https://integration.cloud.tibcoapps.com:443/kvgzdxokhdjlvkf4n37iwjvbzq7c4p3g/ratings/{bookid}"
+        },
+        {
+            "name": "CURRENCY_LAMBDA_ARN",
+            "type": "string",
+            "value": "arn:aws:lambda:us-east-1:049576074772:function:bookstore-currency-converter"
+        },
+        {
+            "name": "AWS.bookstore-demo-aws-config-rishi.Region",
+            "type": "string",
+            "value": "us-east-1"
+        },
+        {
+            "name": "AWS.bookstore-demo-aws-config-rishi.Access_key_ID",
+            "type": "string",
+            "value": "AKIAING3FKHD7DQKFRQQ"
+        },
+        {
+            "name": "AWS.bookstore-demo-aws-config-rishi.Secret_access_key",
+            "type": "string",
+            "value": "SECRET:7ypmCvv0diqjNoTeQ3ZvQK7MAWaxek7cJUinnIbimA91Bnxxpse5qDdUWOMtgewCcPr22l0cnU8="
+        }
+    ],
+    "connections": {},
+    "contrib": "W3sicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1wbHVnaW5zLmdpdC9jb250cmlidXRpb25zL0xhbWJkYSIsInMzbG9jYXRpb24iOiJUaWJjby9MYW1iZGEifV0=",
+    "fe_metadata": "UEsDBAoAAAAIABp9c0+rqSRGFQAAABMAAAAIAAAAYXBwLmpzb26rViopykxPTy1yy8kvL1ayio6tBQBQSwECFAAKAAAACAAafXNPq6kkRhUAAAATAAAACAAAAAAAAAAAAAAAAAAAAAAAYXBwLmpzb25QSwUGAAAAAAEAAQA2AAAAOwAAAAAA"
+}
