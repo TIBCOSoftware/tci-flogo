@@ -6,174 +6,170 @@
 package sqsreceivemessage
 
 import (
-	"fmt"
-	"github.com/TIBCOSoftware/flogo-lib/core/activity"
-	"github.com/TIBCOSoftware/flogo-lib/core/data"
-	"github.com/TIBCOSoftware/flogo-lib/logger"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sqs"
+    "errors"
+    "fmt"
+    "github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/service/sqs"
+    "github.com/project-flogo/core/activity"
+    "github.com/project-flogo/core/data/coerce"
+    "github.com/project-flogo/core/data/metadata"
+    "github.com/project-flogo/core/support/log"
 )
 
-const (
-	ivConnection            = "sqsConnection"
-	ivDeleteMessage         = "deleteMessage"
-	ivQueueUrl              = "queueUrl"
-	ivMessageAttributeNames = "MessageAttributeNames"
-	ivAttributeNames        = "AttributeNames"
-	ivMaxNumberOfMessages   = "MaxNumberOfMessages"
-	ivVisibilityTimeout     = "VisibilityTimeout"
-	ivWaitTimeSeconds       = "WaitTimeSeconds"
-	ovMessage               = "Message"
-)
-
-var activityLog = logger.GetLogger("aws-activity-sqsreceivemessage")
-
-type SQSReceiveMessageActivity struct {
-	metadata *activity.Metadata
+func init() {
+    _ = activity.Register(&SQSReceiveMessageActivity{}, New)
 }
 
-func NewActivity(metadata *activity.Metadata) activity.Activity {
-	return &SQSReceiveMessageActivity{metadata: metadata}
+var activityLog = log.ChildLogger(log.RootLogger(), "aws-activity-sqsreceivemessage")
+var activityMd = activity.ToMetadata(&Settings{},&Input{},&Output{})
+
+type SQSReceiveMessageActivity struct {
+    settings *Settings
+    sqssvc *sqs.SQS
+}
+
+func New(ctx activity.InitContext) (activity.Activity, error) {
+    s := &Settings{}
+    err := metadata.MapToStruct(ctx.Settings(),s,true)
+
+    if err!=nil {
+        return nil, err
+    }
+
+    cm,err := coerce.ToConnection(s.SQSConnection)
+
+    if err!=nil {
+        return nil, err
+    }
+
+    c,ok := cm.GetConnection().(*sqs.SQS)
+    if !ok {
+        activityLog.Error("Connection Error")
+        return nil, errors.New("Connection Error")
+    }
+
+    act := &SQSReceiveMessageActivity{settings: s, sqssvc: c}
+    return act, nil
 }
 
 func (a *SQSReceiveMessageActivity) Metadata() *activity.Metadata {
-	return a.metadata
+  return activityMd
 }
+
+
 func (a *SQSReceiveMessageActivity) Eval(context activity.Context) (done bool, err error) {
-	activityLog.Info("Executing SQS Receive Message activity")
 
-	if context.GetInput(ivQueueUrl) == nil {
-		return false, activity.NewError("SQS Queue URL is not configured", "SQS-RECEIVEMESSAGE-4002", nil)
-	}
+  input := &Input{}
 
-	//Read connection details
-	connectionInfo, _ := data.CoerceToObject(context.GetInput(ivConnection))
+  err = context.GetInputObject(input)
+  if err != nil {
+    return false, err
+  }
 
-	if connectionInfo == nil {
-		return false, activity.NewError("SQS connection is not configured", "SQS-RECEIVEMESSAGE-4001", nil)
-	}
+  activityLog.Info("Executing SQS Receive Message activity")
 
-	var region string
-	var accesskey string
-	var secreteKey string
-	connectionSettings, _ := connectionInfo["settings"].([]interface{})
-	if connectionSettings != nil {
-		for _, v := range connectionSettings {
-			setting, _ := data.CoerceToObject(v)
-			if setting != nil {
-				if setting["name"] == "accessKeyId" {
-					accesskey, _ = data.CoerceToString(setting["value"])
-				} else if setting["name"] == "region" {
-					region, _ = data.CoerceToString(setting["value"])
-				} else if setting["name"] == "secreteAccessKey" {
-					secreteKey, _ = data.CoerceToString(setting["value"])
-				}
-			}
-		}
-	}
+  if a.settings.QueueURL == "" {
+    return false, activity.NewError("SQS Queue URL is not configured", "SQS-RECEIVEMESSAGE-4002", nil)
+  }
 
-	session, err := session.NewSession(aws.NewConfig().WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accesskey, secreteKey, "")))
-	if err != nil {
-		return false, activity.NewError(fmt.Sprintf("Failed to connect to AWS due to error:%s. Check credentials configured in the connection:%s.", err.Error(), connectionInfo["name"].(string)), "SQS-SENDMESSAGE-4004", nil)
-	}
-	//Create SQS service instance
-	sqsSvc := sqs.New(session)
-	receiveMessageInput := &sqs.ReceiveMessageInput{}
-	receiveMessageInput.QueueUrl = aws.String(context.GetInput(ivQueueUrl).(string))
+  //Read connection details
+  sqsSvc := a.sqssvc
+  receiveMessageInput := &sqs.ReceiveMessageInput{}
+  receiveMessageInput.QueueUrl = aws.String(a.settings.QueueURL)
 
-	attrsNames, _ := context.GetInput(ivAttributeNames).([]interface{})
-	if attrsNames != nil && len(attrsNames) > 0 {
-		//Add attribute names
-		attrs := make([]*string, len(attrsNames))
-		for i, v := range attrsNames {
-			attrInfo, _ := data.CoerceToObject(v)
-			if attrInfo != nil && attrInfo["Name"] != nil {
-				attrs[i] = aws.String(attrInfo["Name"].(string))
-			}
-		}
-		receiveMessageInput.AttributeNames = attrs
-	}
+  attrsNames := input.AttributeNames
+    if attrsNames != nil && len(attrsNames) > 0 {
+     //Add attribute names
+     attrs := make([]*string, len(attrsNames))
+     for i, v := range attrsNames {
+       attrInfo, _ := coerce.ToObject(v)
+       if attrInfo != nil && attrInfo["Name"] != nil {
+         attrs[i] = aws.String(attrInfo["Name"].(string))
+       }
+     }
+     receiveMessageInput.AttributeNames = attrs
+   }
 
-	attrsNames, _ = context.GetInput(ivMessageAttributeNames).([]interface{})
-	if attrsNames != nil && len(attrsNames) > 0 {
-		attrs := make([]*string, len(attrsNames))
-		for i, v := range attrsNames {
-			attrInfo, _ := data.CoerceToObject(v)
-			if attrInfo != nil && attrInfo["Name"] != nil {
-				attrs[i] = aws.String(attrInfo["Name"].(string))
-			}
-		}
-		receiveMessageInput.MessageAttributeNames = attrs
-	}
+   attrsNames = input.MessageAttributeNames
+   if attrsNames != nil && len(attrsNames) > 0 {
+     attrs := make([]*string, len(attrsNames))
+     for i, v := range attrsNames {
+       attrInfo, _ := coerce.ToObject(v)
+       if attrInfo != nil && attrInfo["Name"] != nil {
+         attrs[i] = aws.String(attrInfo["Name"].(string))
+       }
+     }
+     receiveMessageInput.MessageAttributeNames = attrs
+   }
 
-	maxNumberOfMessages := context.GetInput(ivMaxNumberOfMessages)
-	if maxNumberOfMessages != nil {
-		receiveMessageInput.MaxNumberOfMessages = aws.Int64(int64(maxNumberOfMessages.(int)))
-	}
+   maxNumberOfMessages := a.settings.MaxNumberOfMessages
+   if maxNumberOfMessages != 0 {
+     receiveMessageInput.MaxNumberOfMessages = aws.Int64(int64(maxNumberOfMessages))
+   }
 
-	visibilityTimeout := context.GetInput(ivVisibilityTimeout)
-	if visibilityTimeout != nil {
-		receiveMessageInput.VisibilityTimeout = aws.Int64(int64(visibilityTimeout.(int)))
-	}
+   visibilityTimeout := a.settings.VisibilityTimeout
+   if visibilityTimeout != 0 {
+     receiveMessageInput.VisibilityTimeout = aws.Int64(int64(visibilityTimeout))
+   }
 
-	waitTimeSeconds := context.GetInput(ivWaitTimeSeconds)
-	if waitTimeSeconds != nil {
-		receiveMessageInput.WaitTimeSeconds = aws.Int64(int64(waitTimeSeconds.(int)))
-	}
+   waitTimeSeconds := a.settings.WaitTimeSeconds
+   if waitTimeSeconds != 0 {
+     receiveMessageInput.WaitTimeSeconds = aws.Int64(int64(waitTimeSeconds))
+   }
 
-	//Receive message from SQS
-	response, err1 := sqsSvc.ReceiveMessage(receiveMessageInput)
-	if err1 != nil {
-		return false, activity.NewError(fmt.Sprintf("Failed to receive message from SQS due to error:%s", err1.Error()), "SQS-RECEIVEMESSAGE-4004", nil)
-	}
+   //Receive message from SQS
+   response, err1 := sqsSvc.ReceiveMessage(receiveMessageInput)
+   if err1 != nil {
+     return false, activity.NewError(fmt.Sprintf("Failed to receive message from SQS due to error:%s", err1.Error()), "SQS-RECEIVEMESSAGE-4004", nil)
+   }
 
-	deleteMsgs := context.GetInput(ivDeleteMessage).(bool)
+  deleteMsgs := a.settings.DeleteMessage
 
-	//Set Message details in the output
-	msgs := make([]map[string]interface{}, len(response.Messages))
-	if len(response.Messages) > 0 {
-		for i, msg := range response.Messages {
-			if deleteMsgs {
-				deleteMsgInput := &sqs.DeleteMessageInput{}
-				deleteMsgInput.SetQueueUrl(context.GetInput(ivQueueUrl).(string))
-				deleteMsgInput.SetReceiptHandle(*msg.ReceiptHandle)
-				_, err := sqsSvc.DeleteMessage(deleteMsgInput)
-				if err != nil {
-					return false, activity.NewError(fmt.Sprintf("Failed to delete received message from SQS due to error:%s", err.Error()), "SQS-RECEIVEMESSAGE-4005", nil)
-				}
-			}
-			msgs[i] = make(map[string]interface{})
-			//read attributes
-			if len(msg.Attributes) > 0 {
-				msgs[i]["Attribute"] = make(map[string]string, len(msg.Attributes))
-				attrs := msgs[i]["Attribute"].(map[string]string)
-				for k, v := range msg.Attributes {
-					attrs[k] = *v
-				}
-			}
-			//read message attributes
-			if len(msg.MessageAttributes) > 0 {
-				msgs[i]["MessageAttributes"] = make(map[string]string, len(msg.MessageAttributes))
-				attrs := msgs[i]["MessageAttributes"].(map[string]string)
-				for k, v := range msg.MessageAttributes {
-					attrs[k] = *v.StringValue
-				}
-				msgs[i]["MD5OfMessageAttributes"] = *msg.MD5OfMessageAttributes
-			}
+   //Set Message details in the output
+   msgs := make([]map[string]interface{}, len(response.Messages))
+   if len(response.Messages) > 0 {
+     for i, msg := range response.Messages {
+       if deleteMsgs {
+         deleteMsgInput := &sqs.DeleteMessageInput{}
+         deleteMsgInput.SetQueueUrl(a.settings.QueueURL)
+         deleteMsgInput.SetReceiptHandle(*msg.ReceiptHandle)
+         _, err := sqsSvc.DeleteMessage(deleteMsgInput)
+         if err != nil {
+           return false, activity.NewError(fmt.Sprintf("Failed to delete received message from SQS due to error:%s", err.Error()), "SQS-RECEIVEMESSAGE-4005", nil)
+         }
+       }
+       msgs[i] = make(map[string]interface{})
+       //read attributes
+       if len(msg.Attributes) > 0 {
+         msgs[i]["Attribute"] = make(map[string]string, len(msg.Attributes))
+         attrs := msgs[i]["Attribute"].(map[string]string)
+         for k, v := range msg.Attributes {
+           attrs[k] = *v
+         }
+       }
+       //read message attributes
+       if len(msg.MessageAttributes) > 0 {
+         msgs[i]["MessageAttributes"] = make(map[string]string, len(msg.MessageAttributes))
+         attrs := msgs[i]["MessageAttributes"].(map[string]string)
+         for k, v := range msg.MessageAttributes {
+           attrs[k] = *v.StringValue
+         }
+         msgs[i]["MD5OfMessageAttributes"] = *msg.MD5OfMessageAttributes
+       }
 
-			if msg.Body != nil {
-				msgs[i]["Body"] = *msg.Body
-				msgs[i]["MD5OfBody"] = *msg.MD5OfBody
-			}
-			if msg.MessageId != nil {
-				msgs[i]["MessageId"] = *msg.MessageId
-			}
-			msgs[i]["ReceiptHandle"] = *msg.ReceiptHandle
-		}
-	}
-	output := &data.ComplexObject{Metadata: "", Value: msgs}
-	context.SetOutput(ovMessage, output)
-	return true, nil
+       if msg.Body != nil {
+         msgs[i]["Body"] = *msg.Body
+         msgs[i]["MD5OfBody"] = *msg.MD5OfBody
+       }
+       if msg.MessageId != nil {
+         msgs[i]["MessageId"] = *msg.MessageId
+       }
+       msgs[i]["ReceiptHandle"] = *msg.ReceiptHandle
+     }
+   }
+
+  output := &Output{}
+  output.Message = msgs
+  context.SetOutputObject(output)
+  return true, nil
 }
