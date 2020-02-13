@@ -3,125 +3,119 @@
  * This file is subject to the license terms contained
  * in the license file that is distributed with this file.
  */
+
 package sqssendmessage
 
 import (
 	"fmt"
-	"github.com/TIBCOSoftware/flogo-lib/core/activity"
-	"github.com/TIBCOSoftware/flogo-lib/core/data"
-	"github.com/TIBCOSoftware/flogo-lib/logger"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/pkg/errors"
+	"github.com/project-flogo/core/activity"
+	"github.com/project-flogo/core/data/coerce"
+	"github.com/project-flogo/core/data/metadata"
+	"github.com/project-flogo/core/support/log"
 )
 
-const (
-	ivConnection            = "sqsConnection"
-	ivQueueUrl              = "queueUrl"
-	ivMessageAttributes     = "MessageAttributes"
-	ivMessageAttributeNames = "MessageAttributeNames"
-	ivDelaySeconds          = "DelaySeconds"
-	ivMessageBody           = "MessageBody"
-	ovMessageId             = "MessageId"
-)
-
-var activityLog = logger.GetLogger("aws-activity-sqssendmessage")
-
-type SQSSendMessageActivity struct {
-	metadata *activity.Metadata
+func init() {
+	_ = activity.Register(&SQSSendMessageActivity{}, New)
 }
 
-func NewActivity(metadata *activity.Metadata) activity.Activity {
-	return &SQSSendMessageActivity{metadata: metadata}
+var activityLog = log.ChildLogger(log.RootLogger(), "aws-activity-sqssendmessage")
+
+var activityMd = activity.ToMetadata(&Settings{},&Input{},&Output{})
+
+type SQSSendMessageActivity struct {
+	settings *Settings
+	sqssvc *sqs.SQS
+}
+
+func New(ctx activity.InitContext) (activity.Activity, error) {
+	s := &Settings{}
+	err := metadata.MapToStruct(ctx.Settings(),s,true)
+
+	if err!=nil {
+			return nil, err
+	}
+
+	cm,err := coerce.ToConnection(s.SQSConnection)
+
+	if err!=nil {
+		return nil, err
+	}
+
+	c,ok := cm.GetConnection().(*sqs.SQS)
+	if !ok {
+		activityLog.Error("Connection Error")
+		return nil, errors.New("Connection Error")
+	}
+
+	act := &SQSSendMessageActivity{settings: s, sqssvc: c}
+	return act, nil
 }
 
 func (a *SQSSendMessageActivity) Metadata() *activity.Metadata {
-	return a.metadata
+	return activityMd
 }
+
 func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err error) {
+
+	input := &Input{}
+
+	err = context.GetInputObject(input)
+	if err != nil {
+		return false, err
+	}
+
 	activityLog.Info("Executing SQS Send Message activity")
 
-	if context.GetInput(ivQueueUrl) == nil {
+	if a.settings.QueueURL == "" {
 		return false, activity.NewError("SQS Queue URL is not configured", "SQS-SENDMESSAGE-4002", nil)
 	}
 
-	if context.GetInput(ivMessageBody) == nil {
+	if input.MessageBody == "" {
 		return false, activity.NewError("Message body is not configured", "SQS-SENDMESSAGE-4003", nil)
 	}
 
-	//Read connection details
-	connectionInfo, _ := data.CoerceToObject(context.GetInput(ivConnection))
-
-	if connectionInfo == nil {
-		return false, activity.NewError("SQS connection is not configured", "SQS-SENDMESSAGE-4001", nil)
-	}
-
-	var region string
-	var accesskey string
-	var secreteKey string
-	connectionSettings, _ := connectionInfo["settings"].([]interface{})
-	if connectionSettings != nil {
-		for _, v := range connectionSettings {
-			setting, _ := data.CoerceToObject(v)
-			if setting != nil {
-				if setting["name"] == "accessKeyId" {
-					accesskey, _ = data.CoerceToString(setting["value"])
-				} else if setting["name"] == "region" {
-					region, _ = data.CoerceToString(setting["value"])
-				} else if setting["name"] == "secreteAccessKey" {
-					secreteKey, _ = data.CoerceToString(setting["value"])
-				}
-			}
-		}
-	}
-	session, err := session.NewSession(aws.NewConfig().WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accesskey, secreteKey, "")))
-	if err != nil {
-		return false, activity.NewError(fmt.Sprintf("Failed to connect to AWS due to error:%s. Check credentials configured in the connection:%s.", err.Error(), connectionInfo["name"].(string)), "SQS-SENDMESSAGE-4004", nil)
-	}
-	//Create SQS service instance
-	sqsSvc := sqs.New(session)
+	sqsSvc := a.sqssvc
 	sendMessageInput := &sqs.SendMessageInput{}
-	sendMessageInput.QueueUrl = aws.String(context.GetInput(ivQueueUrl).(string))
-	sendMessageInput.MessageBody = aws.String(context.GetInput(ivMessageBody).(string))
+	sendMessageInput.QueueUrl = aws.String(a.settings.QueueURL)
+	sendMessageInput.MessageBody = aws.String(input.MessageBody)
 
-	messageAttributes, _ := data.CoerceToComplexObject(context.GetInput(ivMessageAttributes))
-	attrsName, _ := context.GetInput(ivMessageAttributeNames).([]interface{})
+	messageAttributes := input.MessageAttributes
+	attrsName := input.MessageAttributeNames
 	if messageAttributes != nil && attrsName != nil {
 
 		//Read mapped values
-		if messageAttributes.Value != nil {
-			switch messageAttributes.Value.(type) {
-			case map[string]interface{}:
-				msgAttrs, _ := data.CoerceToObject(messageAttributes.Value)
-				if msgAttrs != nil {
-					//Read table values
-					attrs := make(map[string]*sqs.MessageAttributeValue, len(msgAttrs))
-					for _, v := range attrsName {
-						attr, _ := data.CoerceToObject(v)
-						if attr != nil && attr["Name"] != nil && attr["Type"] != nil {
-							// Has mapped value??
-							if msgAttrs[attr["Name"].(string)] != nil {
-								attrVal, err := data.CoerceToString(msgAttrs[attr["Name"].(string)])
-								if err != nil && attr["Type"].(string) == "Number" {
-									attrVal, err = data.CoerceToString(int(msgAttrs[attr["Name"].(string)].(int64)))
-								}
-								attrs[attr["Name"].(string)] = &sqs.MessageAttributeValue{
-									DataType:    aws.String(attr["Type"].(string)),
-									StringValue: aws.String(attrVal),
-								}
+		if messageAttributes != nil {
+			msgAttrs, _ := coerce.ToObject(messageAttributes)
+			if msgAttrs != nil {
+				//Read table values
+				attrs := make(map[string]*sqs.MessageAttributeValue, len(msgAttrs))
+				for _, v := range attrsName {
+					attr, _ := coerce.ToObject(v)
+					if attr != nil && attr["Name"] != nil && attr["Type"] != nil {
+						// Has mapped value??
+						if msgAttrs[attr["Name"].(string)] != nil {
+							attrVal, err := coerce.ToString(msgAttrs[attr["Name"].(string)])
+							if err != nil && attr["Type"].(string) == "Number" {
+								attrVal, err = coerce.ToString(int(msgAttrs[attr["Name"].(string)].(int64)))
+							}
+							attrs[attr["Name"].(string)] = &sqs.MessageAttributeValue{
+								DataType:    aws.String(attr["Type"].(string)),
+								StringValue: aws.String(attrVal),
 							}
 						}
 					}
-					sendMessageInput.MessageAttributes = attrs
 				}
+				sendMessageInput.MessageAttributes = attrs
 			}
 		}
 	}
 
-	delaySeconds := context.GetInput(ivDelaySeconds)
-	if delaySeconds != nil {
-		sendMessageInput.DelaySeconds = aws.Int64(int64(delaySeconds.(int)))
+	delaySeconds := a.settings.Delay
+	if delaySeconds != 0 {
+		sendMessageInput.DelaySeconds = aws.Int64(int64(delaySeconds))
 	}
 
 	//Send message to SQS
@@ -131,6 +125,11 @@ func (a *SQSSendMessageActivity) Eval(context activity.Context) (done bool, err 
 	}
 
 	//Set Message ID in the output
-	context.SetOutput(ovMessageId, *response.MessageId)
+	output := &Output{}
+	output.MessageId = *response.MessageId
+	err = context.SetOutputObject(output)
+	if err != nil {
+		return false, fmt.Errorf("error setting output for Activity [%s]: %s", context.Name(), err.Error())
+	}
 	return true, nil
 }

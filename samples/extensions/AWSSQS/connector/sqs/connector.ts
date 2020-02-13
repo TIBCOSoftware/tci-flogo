@@ -26,20 +26,20 @@ export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution 
     validate = (name: string, context: IConnectorContribution): Observable<IValidationResult> | IValidationResult => {
       if( name === "Connect") {
          let accessKeyId: IFieldDefinition;
-         let secreteKey: IFieldDefinition;
+         let secretKey: IFieldDefinition;
          let region: IFieldDefinition;
          
          for (let configuration of context.settings) {
     		if( configuration.name === "accessKeyId") {
     		   accessKeyId = configuration
-    		} else if( configuration.name === "secreteAccessKey") {
-    		   secreteKey = configuration
+    		} else if( configuration.name === "secretAccessKey") {
+    		   secretKey = configuration
     		} else if( configuration.name === "region") {
     		   region = configuration
     		}
 		 }
 		 
-         if( accessKeyId.value && secreteKey.value && region.value) {
+         if( accessKeyId.value && secretKey.value && region.value) {
             // Enable Connect button
             return ValidationResult.newValidationResult().setReadOnly(false)
          } else {
@@ -53,21 +53,21 @@ export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution 
        if( actionName == "Connect") {
           return Observable.create(observer => {
          	let accessKeyId: IFieldDefinition;
-         	let secreteKey: IFieldDefinition;
+         	let secretKey: IFieldDefinition;
          	let region: IFieldDefinition;
          
          	for (let configuration of context.settings) {
     			if( configuration.name === "accessKeyId") {
     		   		accessKeyId = configuration;
-    			} else if( configuration.name === "secreteAccessKey") {
-    		   		secreteKey = configuration;
+    			} else if( configuration.name === "secretAccessKey") {
+    		   		secretKey = configuration;
     			} else if( configuration.name === "region") {
     		   		region = configuration;
     			}
 		 	}
 		 
 			var sqs =  new AWS.SQS({
-  				credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value), region: region.value
+  				credentials: new AWS.Credentials(accessKeyId.value, secretKey.value), region: region.value
 			});
          	var params = {};
 		 	sqs.listQueues(params, function(err, data) {

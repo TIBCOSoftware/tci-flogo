@@ -66,39 +66,39 @@ export class SendMsgActivityContribution extends WiServiceHandlerContribution {
             let connectionField: IFieldDefinition = context.getField("sqsConnection");
             if (connectionField.value) {
                 return Observable.create(observer => {
-                    //Read connection configuration
-                    let queueUrls = [];
-                    WiContributionUtils.getConnection(this.http, connectionField.value)
-                        .map(data => data)
-                        .subscribe(data => {
-                            let accessKeyId: IFieldDefinition;
-                            let secreteKey: IFieldDefinition;
-                            let region: IFieldDefinition;
+                        //Read connection configuration
+                        let queueUrls = [];
+                        WiContributionUtils.getConnection(this.http, connectionField.value)
+                            .map(data => data)
+                            .subscribe(data => {
+                                let accessKeyId: IFieldDefinition;
+                                let secreteKey: IFieldDefinition;
+                                let region: IFieldDefinition;
 
-                            for (let configuration of data.settings) {
-                                if (configuration.name === "accessKeyId") {
-                                    accessKeyId = configuration
-                                } else if (configuration.name === "secreteAccessKey") {
-                                    secreteKey = configuration
-                                } else if (configuration.name === "region") {
-                                    region = configuration
+                                for (let configuration of data.settings) {
+                                    if (configuration.name === "accessKeyId") {
+                                        accessKeyId = configuration
+                                    } else if (configuration.name === "secreteAccessKey") {
+                                        secreteKey = configuration
+                                    } else if (configuration.name === "region") {
+                                        region = configuration
+                                    }
                                 }
-                            }
 
-                            var sqs = new AWS.SQS({
-                                credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value), region: region.value
-                            });
-                            var params = {};
-                            sqs.listQueues(params, function (err, data) {
-                                if (err) {
-                                    observer.next(queueUrls);
-                                } else {
-                                    observer.next(data.QueueUrls);
-                                }
-                            });
+                                var sqs = new AWS.SQS({
+                                    credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value), region: region.value
+                                });
+                                var params = {};
+                                sqs.listQueues(params, function (err, data) {
+                                    if (err) {
+                                        observer.next(queueUrls);
+                                    } else {
+                                        observer.next(data.QueueUrls);
+                                    }
+                                });
 
-                        });
-                }
+                            });
+                    }
                 );
             }
         }
