@@ -33,7 +33,7 @@ export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution 
     		if( configuration.name === "accessKeyId") {
     		   accessKeyId = configuration
     		} else if( configuration.name === "secretAccessKey") {
-    		   secreteKey = configuration
+    		   secretKey = configuration
     		} else if( configuration.name === "region") {
     		   region = configuration
     		}
