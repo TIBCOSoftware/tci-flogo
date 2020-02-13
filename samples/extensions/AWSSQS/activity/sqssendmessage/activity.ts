@@ -59,7 +59,6 @@ export class SendMsgActivityContribution extends WiServiceHandlerContribution {
                         jsonSchema[data[i].Name] = 0;
                     }
                 }
-                console.log(JSON.stringify(jsonSchema));
                 return JSON.stringify(jsonSchema);
             }
             return "{}";
