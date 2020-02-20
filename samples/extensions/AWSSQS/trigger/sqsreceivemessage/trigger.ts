@@ -6,26 +6,31 @@
 import { Observable } from "rxjs/Observable";
 import { Http } from "@angular/http";
 import { Injectable, Injector, Inject } from "@angular/core";
+import * as lodash from "lodash";
 import {
     WiContrib,
+    ActionResult,
+    CreateFlowActionResult,
+    ICreateFlowActionContext,
     WiServiceHandlerContribution,
     IValidationResult,
     ValidationResult,
     IFieldDefinition,
-    IActivityContribution,
+    ITriggerContribution,
     IConnectorContribution,
+    IActionResult,
     WiContributionUtils
 } from "wi-studio/app/contrib/wi-contrib";
 import * as AWS from "aws-sdk";
 
 @WiContrib({})
 @Injectable()
-export class RecvMsgActivityContribution extends WiServiceHandlerContribution {
+export class RecvMsgTriggerContribution extends WiServiceHandlerContribution {
     constructor( @Inject(Injector) injector, private http: Http) {
         super(injector, http);
     }
 
-    value = (fieldName: string, context: IActivityContribution): Observable<any> | any => {
+    value = (fieldName: string, context: ITriggerContribution): Observable<any> | any => {
         if (fieldName === "sqsConnection") {
             //Connector Type must match with the name defined in connector.json
             return Observable.create(observer => {
@@ -127,7 +132,7 @@ export class RecvMsgActivityContribution extends WiServiceHandlerContribution {
         return null;
     }
 
-    validate = (fieldName: string, context: IActivityContribution): Observable<IValidationResult> | IValidationResult => {
+    validate = (fieldName: string, context: ITriggerContribution): Observable<IValidationResult> | IValidationResult => {
         if (fieldName === "sqsConnection") {
             let connection: IFieldDefinition = context.getField("sqsConnection")
             if (connection.value === null) {
@@ -140,5 +145,27 @@ export class RecvMsgActivityContribution extends WiServiceHandlerContribution {
             }
         }
         return null;
+    }
+
+    action = (fieldName: string, context: ICreateFlowActionContext): Observable<IActionResult> | IActionResult => {
+        let modelService = this.getModelService();
+        let result = CreateFlowActionResult.newActionResult();
+        if (context.settings && context.settings.length > 0) {
+            let connection = <IFieldDefinition>context.getField("sqsConnection");
+            if (connection && connection.value) {
+                let trigger = modelService.createTriggerElement("AWSSQS/sqsreceivemessage");
+                if (trigger && trigger.settings  && trigger.settings.length > 0) {
+                    for (let j = 0; j < trigger.settings.length; j++) {
+                        if (trigger.settings[j].name === "sqsConnection") {
+                            trigger.settings[j].value = connection.value;
+                        }
+                    }
+                }
+                let flowModel = modelService.createFlow(context.getFlowName(), context.getFlowDescription());
+                result = result.addTriggerFlowMapping(lodash.cloneDeep(trigger), lodash.cloneDeep(flowModel));
+            }
+        }
+        let actionResult = ActionResult.newActionResult().setSuccess(true).setResult(result);
+        return actionResult;
     }
 }
