@@ -10,7 +10,7 @@ This connector allows you to send or receive message from TIBCO Enterprise Messa
 <li> Support for only auto ack mode</li>
 
 ## Using connector in Flogo Enterprise
-####Prerequisite
+#### Prerequisite
 <li> Flogo Enterprise 2.8.x and above must be installed and started</li>
 
 #### Installation:
