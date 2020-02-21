@@ -84,6 +84,8 @@ tibcli flogoconnector supplement EMS
 ```
 > Ensure that supplement is uploaded to correct org in case you are part of multi-org
 
-### Build and Push application
-<li> Use EMS activity/trigger in Flogo application. Make sure application is created in same org where supplement is uploaded</li>
+### Create and Push application
+<li> Use EMS activity/trigger in TCI Flogo application. Make sure application is created in same org where supplement is uploaded</li>
 <li> Use Push button to deploy application to TCI </li>
+
+> You can use **Flow Tester** to test flow that is using **Send Message** activity
