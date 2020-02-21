@@ -55,11 +55,12 @@ type Trigger struct {
 }
 
 type SQSHandler struct {
-    sqssvc          *sqs.SQS
-    handler         trigger.Handler
-    settings        *HandlerSettings
-    shutdown        chan bool
-    triggerName     string
+    sqssvc                  *sqs.SQS
+    handler                 trigger.Handler
+    settings                *HandlerSettings
+    shutdown                chan bool
+    triggerName             string
+    receiveMessageInput     sqs.ReceiveMessageInput
 }
 
 func (t *Trigger) Initialize(ctx trigger.InitContext) error {
@@ -82,6 +83,50 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
         sqsHandler.sqssvc = t.sqssvc
         sqsHandler.triggerName = t.name
         t.SQSHandlers[handlerSetting.QueueURL] = sqsHandler
+
+        receiveMessageInput := &sqsHandler.receiveMessageInput
+        receiveMessageInput.QueueUrl = aws.String(handlerSetting.QueueURL)
+
+        attrsNames := handlerSetting.AttributeNames
+        if attrsNames != nil && len(attrsNames) > 0 {
+            //Add attribute names
+            attrs := make([]*string, len(attrsNames))
+            for i, v := range attrsNames {
+                attrInfo, _ := coerce.ToObject(v)
+                if attrInfo != nil && attrInfo["Name"] != nil {
+                    attrs[i] = aws.String(attrInfo["Name"].(string))
+                }
+            }
+            receiveMessageInput.AttributeNames = attrs
+        }
+
+        attrsNames = handlerSetting.MessageAttributeNames
+        if attrsNames != nil && len(attrsNames) > 0 {
+            attrs := make([]*string, len(attrsNames))
+            for i, v := range attrsNames {
+                attrInfo, _ := coerce.ToObject(v)
+                if attrInfo != nil && attrInfo["Name"] != nil {
+                    attrs[i] = aws.String(attrInfo["Name"].(string))
+                }
+            }
+            receiveMessageInput.MessageAttributeNames = attrs
+        }
+
+
+        maxNumberOfMessages := handlerSetting.MaxNumberOfMessages
+        if maxNumberOfMessages != 0 {
+            receiveMessageInput.MaxNumberOfMessages = aws.Int64(int64(maxNumberOfMessages))
+        }
+
+        visibilityTimeout := handlerSetting.VisibilityTimeout
+        if visibilityTimeout != 0 {
+            receiveMessageInput.VisibilityTimeout = aws.Int64(int64(visibilityTimeout))
+        }
+
+        waitTimeSeconds := handlerSetting.WaitTimeSeconds
+        if waitTimeSeconds != 0 {
+            receiveMessageInput.WaitTimeSeconds = aws.Int64(int64(waitTimeSeconds))
+        }
     }
     return err
 }
@@ -109,51 +154,7 @@ func (h *SQSHandler) start() {
             return
         default:
             sqsSvc := h.sqssvc
-            receiveMessageInput := &sqs.ReceiveMessageInput{}
-            receiveMessageInput.QueueUrl = aws.String(h.settings.QueueURL)
-
-            attrsNames := h.settings.AttributeNames
-            if attrsNames != nil && len(attrsNames) > 0 {
-                //Add attribute names
-                attrs := make([]*string, len(attrsNames))
-                for i, v := range attrsNames {
-                    attrInfo, _ := coerce.ToObject(v)
-                    if attrInfo != nil && attrInfo["Name"] != nil {
-                        attrs[i] = aws.String(attrInfo["Name"].(string))
-                    }
-                }
-                receiveMessageInput.AttributeNames = attrs
-            }
-
-            attrsNames = h.settings.MessageAttributeNames
-            if attrsNames != nil && len(attrsNames) > 0 {
-                attrs := make([]*string, len(attrsNames))
-                for i, v := range attrsNames {
-                    attrInfo, _ := coerce.ToObject(v)
-                    if attrInfo != nil && attrInfo["Name"] != nil {
-                        attrs[i] = aws.String(attrInfo["Name"].(string))
-                    }
-                }
-                receiveMessageInput.MessageAttributeNames = attrs
-            }
-
-
-            maxNumberOfMessages := h.settings.MaxNumberOfMessages
-            if maxNumberOfMessages != 0 {
-                receiveMessageInput.MaxNumberOfMessages = aws.Int64(int64(maxNumberOfMessages))
-            }
-
-            visibilityTimeout := h.settings.VisibilityTimeout
-            if visibilityTimeout != 0 {
-                receiveMessageInput.VisibilityTimeout = aws.Int64(int64(visibilityTimeout))
-            }
-
-            waitTimeSeconds := h.settings.WaitTimeSeconds
-            if waitTimeSeconds != 0 {
-                receiveMessageInput.WaitTimeSeconds = aws.Int64(int64(waitTimeSeconds))
-            }
-
-            response, err := sqsSvc.ReceiveMessage(receiveMessageInput)
+            response, err := sqsSvc.ReceiveMessage(&h.receiveMessageInput)
             if err != nil {
                 triggerLog.Errorf("Trigger [%s] failed to receive message for Queue [%s] due to error - {%v}", h.triggerName, h.settings.QueueURL, err)
             }
