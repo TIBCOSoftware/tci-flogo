@@ -18,7 +18,7 @@ This connector allows you to send or receive message from TIBCO Enterprise Messa
 <li> Upload above zip from Extensions tab of Flogo Enterprise Web UI</li>
 
 #### Limitation:
-Since Golang wrapper usages platform specific native EMS libraries, neither flow tester nor any build options would work from Flogo Studio Web UI.
+Since Golang wrapper needs platform specific native EMS libraries, neither flow tester nor any build options would work from Flogo Studio Web UI.
 You must export the application and follow below steps to build application binary using CLI.
 
 #### Building and Running Flogo application
