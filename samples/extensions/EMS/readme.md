@@ -82,7 +82,7 @@ zip --symlinks -r ems.zip include/ lib/
 ```
 tibcli flogoconnector supplement EMS
 ```
-> Ensure that supplement is uploaded to correct org in case you are part of multi-org
+> Ensure that supplement is uploaded to correct org in case you are part of multiple orgs.
 
 ### Create and Push application
 <li> Use EMS activity/trigger in TCI Flogo application. Make sure application is created in same org where supplement is uploaded</li>
