@@ -15,7 +15,7 @@ This connector allows you to send or receive message from TIBCO Enterprise Messa
 
 #### Installation:
 <li> Zip current EMS folder</li>
-<li> Upload above zip from Extensions tab of Flogo Enterprise Web UI</li>
+<li> Upload above zip(https://docs.tibco.com/pub/flogo/2.8.0/doc/html/GUID-9E82EF1A-6C6E-4FBB-BF31-753460CF58AF.html) </li>
 
 #### Limitation:
 Since Golang wrapper needs platform specific native EMS libraries, neither flow tester nor any build options would work from Flogo Studio Web UI.
@@ -58,7 +58,7 @@ builder-linux_amd64 build -f <exported_flogo_ems_app>
 # Using connector in TIBCO Cloud Integration(TCI)
 #### Installation:
 <li> Zip current EMS folder</li>
-<li> Upload above zip from Extensions tab of TCI Flogo Web UI</li>
+<li> Upload above zip (https://integration.cloud.tibco.com/docs/flogo/GUID-9E82EF1A-6C6E-4FBB-BF31-753460CF58AF.html)</li>
 
 #### EMS Supplement
 For connector to work in TCI, Linux EMS native libraries must be uploaded. To upload required libraries, we will be using TCI supplement mechanism.
