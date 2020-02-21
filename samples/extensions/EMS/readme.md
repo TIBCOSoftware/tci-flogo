@@ -51,7 +51,7 @@ export LD_LIBRARY_PATH=$EMS_HOME/lib/64:$EMS_HOME/lib:$LD_LIBRARY_PATH
 export CGO_CFLAGS="-I$EMS_HOME/include/tibems"
 export CGO_LDFLAGS="-L$EMS_HOME/lib -ltibems64"
 
-builder-darwin_amd64 build -f <exported_flogo_ems_app>
+builder-linux_amd64 build -f <exported_flogo_ems_app>
 ```
 <li> Before running binary, set <b>LD_LIBRARY_PATH=$EMS_HOME/lib/64:$EMS_HOME/lib:$LD_LIBRARY_PATH</b> 
 
