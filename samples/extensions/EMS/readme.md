@@ -56,7 +56,7 @@ builder-darwin_amd64 build -f <exported_flogo_ems_app>
 <li> Before running binary, set <b>LD_LIBRARY_PATH=$EMS_HOME/lib/64:$EMS_HOME/lib:$LD_LIBRARY_PATH</b> 
 
 ## Using connector in TIBCO Cloud Integration(TCI)
-####Installation:
+#### Installation:
 <li> Zip current EMS folder</li>
 <li> Upload above zip from Extensions tab of TCI Flogo Web UI</li>
 
