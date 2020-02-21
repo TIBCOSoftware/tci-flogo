@@ -75,7 +75,7 @@ zip --symlinks -r ems.zip include/ lib/
 #### Upload Supplement
 > Only org admin can upload supplements. Contact your org admin in case your are not the admin.
 
-<li> Download [tibcli](https://integration.cloud.tibco.com/docs/getstarted/installation/download-tools.html) from your TCI account and add it to system PATH</li>
+<li> Download tibcli(https://integration.cloud.tibco.com/docs/getstarted/installation/download-tools.html) from your TCI account and add it to system PATH</li>
 <li> Create temporary folder and copy supplement (ems.zip) into it </li>
 <li> Change directory to above folder and run below command: </li>
 
