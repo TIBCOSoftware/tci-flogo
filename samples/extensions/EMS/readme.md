@@ -14,7 +14,7 @@ This connector allows you to send or receive message from TIBCO Enterprise Messa
 <li> Flogo Enterprise 2.8.x and above must be installed and started</li>
 
 #### Installation:
-<li> Download/Checkout this repository and zip *samples/extensions/EMS* folder</li>
+<li> Download/Checkout this repository and zip *samples/extensions/EMS* folder </li>
 <li> Upload above zip(https://docs.tibco.com/pub/flogo/2.8.0/doc/html/GUID-9E82EF1A-6C6E-4FBB-BF31-753460CF58AF.html) </li>
 
 #### Limitation:
