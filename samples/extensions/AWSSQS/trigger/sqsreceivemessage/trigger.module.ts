@@ -6,7 +6,7 @@
 import { HttpModule } from "@angular/http";
 import { NgModule } from "@angular/core";
 import { CommonModule } from "@angular/common";
-import { RecvMsgActivityContribution} from "./activity";
+import { RecvMsgTriggerContribution} from "./trigger";
 import { WiServiceContribution} from "wi-studio/app/contrib/wi-contrib";
  
 @NgModule({
@@ -17,7 +17,7 @@ import { WiServiceContribution} from "wi-studio/app/contrib/wi-contrib";
   providers: [
     {
        provide: WiServiceContribution,
-       useClass: RecvMsgActivityContribution
+       useClass: RecvMsgTriggerContribution
      }
   ]
 })

@@ -4,47 +4,22 @@ import (
 	"github.com/project-flogo/core/data/coerce"
 )
 
-// Input struct for activity input
+
 type Settings struct {
 	SQSConnection       	string     			   `md:"sqsConnection"`
+}
+
+type HandlerSettings struct {
 	QueueURL            	string                 `md:"queueUrl"`
 	DeleteMessage         	bool                   `md:"deleteMessage"`
 	MaxNumberOfMessages     int                    `md:"MaxNumberOfMessages"`
 	VisibilityTimeout       int                    `md:"VisibilityTimeout"`
 	WaitTimeSeconds         int                    `md:"WaitTimeSeconds"`
-}
-
-type Input struct {
 	MessageAttributeNames   []interface{} 		   `md:"MessageAttributeNames"`
 	AttributeNames      	[]interface{} 		   `md:"AttributeNames"`
 }
 
-// ToMap conversion
-func (i *Input) ToMap() map[string]interface{} {
-	return map[string]interface{}{
-		"MessageAttributeNames": 		i.MessageAttributeNames,
-		"AttributeNames":            	i.AttributeNames,
-	}
-}
-
-// FromMap conversion
-func (i *Input) FromMap(values map[string]interface{}) error {
-	var err error
-
-	i.MessageAttributeNames, err = coerce.ToArray(values["MessageAttributeNames"])
-	if err != nil {
-		return err
-	}
-
-	i.AttributeNames, err = coerce.ToArray(values["AttributeNames"])
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Output struct for activity output
+// Output struct for trigger output
 type Output struct {
 	Message           	interface{}                 `md:"Message"`
 }
