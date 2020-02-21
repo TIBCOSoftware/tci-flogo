@@ -9,7 +9,7 @@ This connector allows you to send or receive message from TIBCO Enterprise Messa
 <li> No support for SSL</li>
 <li> Support for only auto ack mode</li>
 
-## Using connector in Flogo Enterprise
+# Using connector in Flogo Enterprise
 #### Prerequisite
 <li> Flogo Enterprise 2.8.x and above must be installed and started</li>
 
@@ -55,7 +55,7 @@ builder-linux_amd64 build -f <exported_flogo_ems_app>
 ```
 <li> Before running binary, set <b>LD_LIBRARY_PATH=$EMS_HOME/lib/64:$EMS_HOME/lib:$LD_LIBRARY_PATH</b> 
 
-## Using connector in TIBCO Cloud Integration(TCI)
+# Using connector in TIBCO Cloud Integration(TCI)
 #### Installation:
 <li> Zip current EMS folder</li>
 <li> Upload above zip from Extensions tab of TCI Flogo Web UI</li>
