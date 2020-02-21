@@ -60,7 +60,7 @@ builder-linux_amd64 build -f <exported_flogo_ems_app>
 <li> Zip current EMS folder</li>
 <li> Upload above zip from Extensions tab of TCI Flogo Web UI</li>
 
-### EMS Supplement
+#### EMS Supplement
 For connector to work in TCI, Linux EMS native libraries must be uploaded. To upload required libraries, we will be using TCI supplement mechanism.
 
 #### Build Supplement
