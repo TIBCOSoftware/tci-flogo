@@ -134,12 +134,12 @@ export class RecvMsgTriggerContribution extends WiServiceHandlerContribution {
 
     validate = (fieldName: string, context: ITriggerContribution): Observable<IValidationResult> | IValidationResult => {
         if (fieldName === "sqsConnection") {
-            let connection: IFieldDefinition = context.getField("sqsConnection")
+            let connection: IFieldDefinition = context.getField("sqsConnection");
             if (connection.value === null) {
                 return ValidationResult.newValidationResult().setError("AWS-RECV-MSG-1000", "SQS Connection must be configured");
             }
         } else if (fieldName === "queueUrl") {
-            let queueUrl: IFieldDefinition = context.getField("queueUrl")
+            let queueUrl: IFieldDefinition = context.getField("queueUrl");
             if (queueUrl.value === null) {
                 return ValidationResult.newValidationResult().setError("AWS-RECV-MSG-1001", "Queue URL must be configured");
             }
