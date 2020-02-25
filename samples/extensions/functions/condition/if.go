@@ -19,7 +19,7 @@ func (fnIf) Name() string {
 }
 
 func (fnIf) Sig() (paramTypes []data.Type, isVariadic bool) {
-	return []data.Type{data.TypeInt, data.TypeString, data.TypeString}, false
+	return []data.Type{data.TypeBool, data.TypeAny, data.TypeAny}, false
 }
 
 func (fnIf) Eval(params ...interface{}) (interface{}, error) {

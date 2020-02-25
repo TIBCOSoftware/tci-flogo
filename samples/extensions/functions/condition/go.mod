@@ -1,4 +1,4 @@
-module TIBCO/function/condition
+module extensions/functions/condition
 
 go 1.13
 
