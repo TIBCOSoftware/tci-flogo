@@ -31,11 +31,11 @@ export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution 
          
          for (let configuration of context.settings) {
     		if( configuration.name === "accessKeyId") {
-    		   accessKeyId = configuration
+    		   accessKeyId = configuration;
     		} else if( configuration.name === "secretAccessKey") {
-    		   secretKey = configuration
+    		   secretKey = configuration;
     		} else if( configuration.name === "region") {
-    		   region = configuration
+    		   region = configuration;
     		}
 		 }
 		 
