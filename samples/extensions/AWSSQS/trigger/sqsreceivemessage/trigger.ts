@@ -105,7 +105,7 @@ export class RecvMsgTriggerContribution extends WiServiceHandlerContribution {
                             for (let configuration of data.settings) {
                                 if (configuration.name === "accessKeyId") {
                                     accessKeyId = configuration
-                                } else if (configuration.name === "secreteAccessKey") {
+                                } else if (configuration.name === "secretAccessKey") {
                                     secreteKey = configuration
                                 } else if (configuration.name === "region") {
                                     region = configuration
