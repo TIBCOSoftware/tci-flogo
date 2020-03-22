@@ -19,7 +19,7 @@ type SQSFactory struct {
 type Settings struct {
 	Name				string `md:"name,required"`
 	AccessKeyId         string `md:"accessKeyId,required"`
-	SecreteAccessKey    string `md:"secreteAccessKey,required"`
+	SecreteAccessKey    string `md:"secretAccessKey,required"`
 	Region 				string `md:"region,required"`
 }
 
