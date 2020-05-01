@@ -21,13 +21,13 @@ Operator | Supported | Description
 -------- | --------- | -----------
 $ |	Y | The root element to query. This starts all path expressions.
 @ | Y | The current node being processed by a filter predicate.
-* | X | Wildcard. Available anywhere a name or numeric are required.
 .. | X | Deep scan. Available anywhere a name is required.
 . | Y | Dot-notated child
 ['' (, '')] | X | Bracket-notated child or children
 [ (, )] | Y | Array index or indexes
 [start:end] | Y |Array slice operator
 [?()] | Y | Filter expression. Expression must evaluate to a boolean value.
+* | X | Wildcard. Available anywhere a name or numeric are required.
 
 
 
@@ -40,7 +40,8 @@ $ |	Y | The root element to query. This starts all path expressions.
 
 ## Understanding the configuration
 
-In the attached sample *jsonpath.sample.json*, there is a flow *jsonpath example* which takes book store object *bookstore_input.json* as input and returns book category attribute value using json.path function. It also returns book category when book author is 'Nigel Rees', when Availability Quantity is >=6000, when Availability Address city is 'sugarland'
+In the attached sample *jsonpath.sample.json*, there is a flow *jsonpath example* which takes book store object *bookstore_input.json* as input and returns book category attribute value using json.path function.
+It also returns book category when book author is 'Nigel Rees', when Availability Quantity is >=6000, when Availability Address city is 'sugarland'
 You can also import FLOGO Tester Launch Configuration - *jsonpath_example_Launch_Configuration_1.json*, attached in this sample and start testing in Flow Tester.
 
 ## Contributing
