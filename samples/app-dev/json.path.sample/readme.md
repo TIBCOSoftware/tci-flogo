@@ -27,7 +27,7 @@ $ |	Y | The root element to query. This starts all path expressions.
 [ (, )] | Y | Array index or indexes
 [start:end] | Y |Array slice operator
 [?()] | Y | Filter expression. Expression must evaluate to a boolean value.
-* | X | Wildcard. Available anywhere a name or numeric are required.
+*  * | X | Wildcard. Available anywhere a name or numeric are required.
 
 
 
