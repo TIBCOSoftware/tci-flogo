@@ -41,7 +41,11 @@ $ |	Y | The root element to query. This starts all path expressions.
 ## Understanding the configuration
 
 In the attached sample *jsonpath.sample.json*, there is a flow *jsonpath example* which takes book store object *bookstore_input.json* as input and returns book category attribute value using json.path function.
+
+
 It also returns book category when book author is 'Nigel Rees', when Availability Quantity is >=6000, when Availability Address city is 'sugarland'
+
+
 You can also import FLOGO Tester Launch Configuration - *jsonpath_example_Launch_Configuration_1.json*, attached in this sample and start testing in Flow Tester.
 
 ## Contributing

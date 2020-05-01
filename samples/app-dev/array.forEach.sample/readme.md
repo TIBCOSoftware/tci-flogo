@@ -24,6 +24,8 @@ array.forEach($flow.body.cakes,"cakes",$loop.type=="donut")
 ## Understanding the configuration
 
 In the attached sample *array.foreach.sample.json*, there is a flow *FilterCakesNestedArray* which takes cakes array *cakes_input.json* as input and filters it based on cakes type, batter type and topping type. 
+
+
 You can also import FLOGO Tester Launch Configuration - *FilterCakesNestedArray_Launch_Configuration_1.json*, attached in this sample and start testing in Flow Tester.
 
 ## Contributing
