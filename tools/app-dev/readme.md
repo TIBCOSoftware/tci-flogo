@@ -1,4 +1,4 @@
-This CLI tool allows you to export Flogo application from running Flogo Enterprise Web UI. This can be used as an alternative to explicit application export from the Web UI in your CICD pipelines.
+This CLI tool allows you to export Flogo application from running Flogo Enterprise Web UI. This tool can be used in Flogo Enterprise application CICD pipeline.
 
 # Using CLI
 #### Prerequisite
