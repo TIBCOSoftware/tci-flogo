@@ -1,69 +1,70 @@
 /*
- * Copyright © 2017. TIBCO Software Inc.
+ * Copyright © 2020. TIBCO Software Inc.
  * This file is subject to the license terms contained
  * in the license file that is distributed with this file.
  */
 package concat
 
 import (
-  "github.com/TIBCOSoftware/flogo-lib/core/activity"
-  "github.com/TIBCOSoftware/flogo-lib/logger"
+	"github.com/project-flogo/core/activity"
+	"github.com/project-flogo/core/support/log"
 )
 
-const (
-  ivField1    = "firstString"
-  ivField2    = "secondString"
-  ivField3    = "separator"
-  ivField4    = "useSeparator"
-  ovResult    = "result"
-)
+var activityLog = log.ChildLogger(log.RootLogger(), "tibco-activity-concat")
 
-var activityLog = logger.GetLogger("tibco-activity-concat")
-
-type ConcatActivity struct {
-  metadata *activity.Metadata
+func init() {
+	_ = activity.Register(&ConcatActivity{}, New)
 }
 
-func NewActivity(metadata *activity.Metadata) activity.Activity {
-  return &ConcatActivity{metadata: metadata}
+var activityMd = activity.ToMetadata(&Input{}, &Output{})
+
+func New(ctx activity.InitContext) (activity.Activity, error) {
+	return &ConcatActivity{}, nil
+}
+
+type ConcatActivity struct {
 }
 
 func (a *ConcatActivity) Metadata() *activity.Metadata {
-  return a.metadata
+	return activityMd
 }
 func (a *ConcatActivity) Eval(context activity.Context) (done bool, err error) {
-    activityLog.Info("Executing Concat activity")
-    //Read Inputs
-    if context.GetInput(ivField1) == nil {
-      // First string is not configured
-      // return error to the engine 
-      return false, activity.NewError("First string is not configured", "CONCAT-4001", nil)
-    }
-    field1v := context.GetInput(ivField1).(string)
-     
-    if context.GetInput(ivField2) == nil {
-      // Second string is not configured
-      // return error to the engine 
-      return false, activity.NewError("Second string is not configured", "CONCAT-4002", nil)
-    }
-    field2v := context.GetInput(ivField2).(string)
+	activityLog.Info("Executing Concat activity")
 
+	input := &Input{}
+	context.GetInputObject(input)
 
-    field4v := context.GetInput(ivField4).(bool)
-  
-    if field4v && context.GetInput(ivField3) == nil {
-      // Separator is not configured
-      // return error to the engine 
-      return false, activity.NewError("Separator is not configured", "CONCAT-4003", nil)
-    }
-    field3v := context.GetInput(ivField3).(string)
+	//Read Inputs
+	if len(input.FirstStr) <= 0 {
+		// First string is not configured
+		// return error to the engine
+		return false, activity.NewError("First string is not configured", "CONCAT-4001", nil)
+	}
 
-    if field4v {
-      //Use separator in concatenation
-      context.SetOutput(ovResult, field1v+field3v+field2v)
-    } else {
-      //No separator in concatenation
-      context.SetOutput(ovResult, field1v+field2v)
-    }
-  return true, nil
+	if len(input.SecondStr) <= 0 {
+		// Second string is not configured
+		// return error to the engine
+		return false, activity.NewError("Second string is not configured", "CONCAT-4002", nil)
+	}
+
+	if input.UseSeparator && len(input.Separator) <= 0 {
+		// Separator is not configured
+		// return error to the engine
+		return false, activity.NewError("Separator is not configured", "CONCAT-4003", nil)
+	}
+
+	output := &Output{}
+	if input.UseSeparator {
+		//Use separator in concatenation
+		output.Result = input.FirstStr + input.Separator + input.SecondStr
+	} else {
+		//No separator in concatenation
+		output.Result = input.FirstStr + input.SecondStr
+	}
+
+	err = context.SetOutputObject(output)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

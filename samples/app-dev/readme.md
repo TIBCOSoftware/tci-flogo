@@ -6,16 +6,17 @@ TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> and TIBCO Flog
 
 [This](https://github.com/TIBCOSoftware/tci-flogo) repository is the place to find the docs, samples and tools to build Flogo applications as well as build extensions. There are a few ways you can help us:
 
-All the samples in this repo are modeled on sample BookStore application and invoke a REST API  at the backend that delivers sample JSON data. This backend REST API is hosted at - hosted at https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
+In this app-dev folder, you will find below samples - 
 
-First you will need to upload Throw Error Extention from [github.com/TIBCOSoftware/flogo-contrib/activity/error](https://github.com/TIBCOSoftware/flogo-contrib/tree/master/activity/error)
+* array.forEach.sample
+* branching-errorhandling
+* ems.sample
+* json.path.sample
+* loops.sample
+* rest-api
+* subflows
 
-If you run any of these samples locally using TIBCO Flogo® Enterprise -
-
-1. To Get all Books - You will need to hit the url - http://localhost:9999/books/ 
-2. To Get Book By ISBN - you will need to hit the url - http://localhost:9999/books/1451648537
-3. If you want to test Error Handler, you can hit the above url with Invalid ISBN number like http://localhost:9999/books/999
-4. You can check the sample JSON data for correct ISBN to be used while testing the samples - https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
+Please navigate to these samples and go through the respective readme's to understand what the sample does.
 
 ## Contributing
 If you want to build your own activities for Flogo please read the docs here.
