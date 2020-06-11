@@ -12,28 +12,28 @@ This CLI tool allows you to export Flogo application from running Flogo Enterpri
 #### Usage
 
 ##### On Mac:
-``
+```
 flogodesign-darwin_amd64 --help
-``
+```
 
  
 ##### On Linux:
-``
+```
 flogodesign-linux_amd64 --help
-``
+```
 
 ##### On Windows:
-``
+```
 flogodesign-windows_amd64.exe --help
-``
+```
 
 #### Examples
-``
+```
 flogodesign-darwin_amd64 export <app_name>
-``
-``
+```
+```
 flogodesign-darwin_amd64 export <app_name> --property json
-``
-``
+```
+```
 flogodesign-darwin_amd64 export <app_name> --property env
-``
+```
