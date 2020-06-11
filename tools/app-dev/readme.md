@@ -30,6 +30,10 @@ flogodesign-windows_amd64.exe --help
 #### Examples
 ``
 flogodesign-darwin_amd64 export <app_name>
+``
+``
 flogodesign-darwin_amd64 export <app_name> --property json
+``
+``
 flogodesign-darwin_amd64 export <app_name> --property env
 ``
