@@ -1,8 +1,8 @@
-This CLI tool allows you to export Flogo application from running Flogo Enterprise Web UI. This tool can be used in Flogo Enterprise application CICD pipeline.
+This CLI tool allows you to export Flogo applications from TIBCO Flogo Enterprise Web UI. Using this tool you can export applictions to a local directory and use your choice of tooling to check them in a Version Control System such as Git. 
 
 # Using CLI
 #### Prerequisite
-<li> Flogo Enterprise 2.9.x and above must be installed and started</li>
+<li> Flogo Enterprise 2.9.x and above must be installed and the Web UI must be runnng</li>
 
 #### Installation:
 <li> Download/Checkout this repository</li>
