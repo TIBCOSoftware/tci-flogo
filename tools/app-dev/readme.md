@@ -6,7 +6,8 @@ This CLI tool allows you to export Flogo applications from TIBCO Flogo Enterpris
 
 #### Installation:
 <li> Download/Checkout this repository</li>
-<li> Add `tools/app-dev` directory to system PATH</li>
+<li> Extract `tools/app-dev/flogodesign-cli.zip`</li>
+<li> Add extracted directory path to system PATH</li>
 
 
 #### Usage
