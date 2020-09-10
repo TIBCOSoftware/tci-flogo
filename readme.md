@@ -33,7 +33,7 @@ If you have feedback, don't hesitate to talk to us!
 You might also want to visit our other repos
 
 * [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome), a curated set of awesome projects built on TIBCO Cloud Integration
-* [TIBCO BusinessWorks Tooing](https://github.com/TIBCOSoftware/bw-tooling)
+* [TIBCO BusinessWorks Tooling](https://github.com/TIBCOSoftware/bw-tooling)
 * [TIBCO BusinessWorks Samples](https://github.com/TIBCOSoftware/bw-samples)
 
 
