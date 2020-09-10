@@ -5,13 +5,13 @@
 
 # TIBCO Cloud<sup>&trade;</sup> Integration - Develop
 
-[TIBCO Cloud<sup>&trade;</sup> Integration(TCI)](https://www.tibco.com/products/tibco-cloud-integration) provides pervasive integration capabilities to enable API-led Integration through tailored user experiences.
+[TIBCO Cloud<sup>&trade;</sup> Integration(TCI)](https://www.tibco.com/products/tibco-cloud-integration) is an enterprise integration Platform-as-a-Service (iPaaS) that empowers everyone to integrate anything with an easier and faster API-led integration approach
 
 TIBCO Cloud<sup>&trade;</sup> Integration - Develop capability, based on open source Project Flogo<sup>&trade;</sup>, empower developers to build event-driven microservices and functions for all kiinds of modern application development use cases. With TIBCO Cloud<sup>&trade;</sup> Integration - Develop you get flexibility to run Flogo apps on TIBCO Cloud or in your choice of private, public or hybrid cloud environment in containers, as Serverless functions, on IoT devices using TIBCO Flogo® Enterprise
 
 [This](https://github.com/TIBCOSoftware/tci-flogo) repository is the place to find the docs, samples and tools to build Flogo applications as well as build extensions. There are a few ways you can help us:
 
-* Try out [samples] (https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples)
+* Try out [samples](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples)
 * Review the docs in this repo or on our docs [page](https://integration.cloud.tibco.com/docs/index.html) and let us know at `tci@tibco.com` what we've missed.
 * Contribute new activities or projects for TIBCO Cloud Integration.
 
