@@ -134,21 +134,6 @@ export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution 
 				  ExternalId: externalId,
 				  DurationSeconds: duration
 			  };
-			  //
-			  // if (externalId !== "") {
-				//   assumeRoleParam = {
-				// 	  RoleArn: roleArn,
-				// 	  RoleSessionName: roleSessionName,
-				// 	  ExternalId: externalId,
-				// 	  DurationSeconds: duration
-				//   };
-			  // }else {
-				//   assumeRoleParam = {
-				// 	  RoleArn: roleArn,
-				// 	  RoleSessionName: roleSessionName,
-				// 	  DurationSeconds: duration
-				//   };
-			  // }
 
 			  sts.assumeRole(assumeRoleParam, (err, data) => {
 				  if (err) {
