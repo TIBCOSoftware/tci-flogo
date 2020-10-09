@@ -118,7 +118,9 @@ export class SendMsgActivityContribution extends WiServiceHandlerContribution {
                                         ExternalId: externalId,
                                         DurationSeconds: duration
                                     };
-
+                                    if (externalId === "") {
+                                        delete assumeRoleParam.ExternalId
+                                    }
                                     sts.assumeRole(assumeRoleParam, (err, data) => {
                                         if (err) {
                                             console.log("error occured...........".concat(err.message))

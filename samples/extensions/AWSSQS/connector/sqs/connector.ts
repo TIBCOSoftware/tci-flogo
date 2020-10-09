@@ -135,6 +135,10 @@ export class TibcoSQSConnectorContribution extends WiServiceHandlerContribution 
 				  DurationSeconds: duration
 			  };
 
+			  if (externalId === "") {
+			  	 delete assumeRoleParam.ExternalId
+			  }
+
 			  sts.assumeRole(assumeRoleParam, (err, data) => {
 				  if (err) {
 					  console.log("assume role error occured...........")
