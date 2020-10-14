@@ -17,6 +17,7 @@ import {
     ValidationResult,
     IFieldDefinition,
     ITriggerContribution,
+    WiContribModelService,
     IConnectorContribution,
     IActionResult,
     WiContributionUtils
@@ -26,8 +27,9 @@ import * as AWS from "aws-sdk";
 @WiContrib({})
 @Injectable()
 export class RecvMsgTriggerContribution extends WiServiceHandlerContribution {
-    constructor( @Inject(Injector) injector, private http: Http) {
-        super(injector, http);
+
+    constructor(private injector: Injector, private http: Http, private contribModelService: WiContribModelService) {
+        super(injector, http, contribModelService);
     }
 
     value = (fieldName: string, context: ITriggerContribution): Observable<any> | any => {
