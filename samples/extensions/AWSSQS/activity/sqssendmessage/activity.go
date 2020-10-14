@@ -23,28 +23,28 @@ func init() {
 
 var activityLog = log.ChildLogger(log.RootLogger(), "aws-activity-sqssendmessage")
 
-var activityMd = activity.ToMetadata(&Settings{},&Input{},&Output{})
+var activityMd = activity.ToMetadata(&Settings{}, &Input{}, &Output{})
 
 type SQSSendMessageActivity struct {
 	settings *Settings
-	sqssvc *sqs.SQS
+	sqssvc   *sqs.SQS
 }
 
 func New(ctx activity.InitContext) (activity.Activity, error) {
 	s := &Settings{}
-	err := metadata.MapToStruct(ctx.Settings(),s,true)
+	err := metadata.MapToStruct(ctx.Settings(), s, true)
 
-	if err!=nil {
-			return nil, err
-	}
-
-	cm,err := coerce.ToConnection(s.SQSConnection)
-
-	if err!=nil {
+	if err != nil {
 		return nil, err
 	}
 
-	c,ok := cm.GetConnection().(*sqs.SQS)
+	cm, err := coerce.ToConnection(s.SQSConnection)
+
+	if err != nil {
+		return nil, err
+	}
+
+	c, ok := cm.GetConnection().(*sqs.SQS)
 	if !ok {
 		activityLog.Error("Connection Error")
 		return nil, errors.New("Connection Error")

@@ -1,8 +1,12 @@
 package sqs
 
 import (
+	"time"
+
+	"github.com/TIBCOSoftware/flogo-lib/logger"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/project-flogo/core/data/metadata"
@@ -16,13 +20,17 @@ var factory = &SQSFactory{}
 type SQSFactory struct {
 }
 
-type Settings struct {
-	Name				string `md:"name,required"`
-	AccessKeyId         string `md:"accessKeyId,required"`
-	SecreteAccessKey    string `md:"secretAccessKey,required"`
-	Region 				string `md:"region,required"`
+type sqsConnection struct {
+	Name               string `md:"name,required"`
+	AccessKey          string `md:"accessKeyId,required"`
+	SecretKey          string `md:"secretAccessKey,required"`
+	Region             string `md:"region,required"`
+	AssumeRole         bool   `md:"assumeRole"`
+	RoleArn            string `md:"roleArn"`
+	RoleSessionName    string `md:"roleSessionName"`
+	ExternalID         string `md:"externalId"`
+	ExpirationDuration int    `md:"expirationDuration"`
 }
-
 
 func (*SQSFactory) Type() string {
 	return "SQS"
@@ -36,40 +44,33 @@ func init() {
 }
 
 func (*SQSFactory) NewManager(settings map[string]interface{}) (connection.Manager, error) {
-	SQSConn := &SQSConfigManager{
-	}
-
+	sqsManager := &SQSConfigManager{}
 	var err error
-	s := &Settings{}
-	err = metadata.MapToStruct(settings, s, false)
+	sqsManager.config, err = getConnectionConfig(settings)
 	if err != nil {
 		return nil, err
 	}
+	session := sqsManager.NewSession()
+	sqsManager.sqs = sqs.New(session)
 
-	session, err := session.NewSession(aws.NewConfig().WithRegion(s.Region).WithCredentials(credentials.NewStaticCredentials(s.AccessKeyId, s.SecreteAccessKey, "")))
-	SQSSvc := sqs.New(session)
-	SQSConn.session = SQSSvc
-
-	return SQSConn, nil
+	return sqsManager, nil
 }
 
 type SQSConfigManager struct {
-	session *sqs.SQS
+	config *sqsConnection
+	sqs    *sqs.SQS
 }
-
 
 func (k *SQSConfigManager) Type() string {
 	return "SQS"
 }
 
 func (k *SQSConfigManager) GetConnection() interface{} {
-	return k.session
+	return k.sqs
 }
-
 
 func (k *SQSConfigManager) ReleaseConnection(connection interface{}) {
 }
-
 
 func (k *SQSConfigManager) Start() error {
 	return nil
@@ -80,4 +81,32 @@ func (k *SQSConfigManager) Stop() error {
 	return nil
 }
 
+func (k *SQSConfigManager) NewSession() *session.Session {
+	sess := session.Must(session.NewSession(k.GetConfig()))
+	if k.config.AssumeRole {
+		logger.Infof("Enabled Assume Role for connection [%s]", k.config.Name)
+		sess.Config.Credentials = stscreds.NewCredentials(sess, k.config.RoleArn, func(p *stscreds.AssumeRoleProvider) {
+			if len(k.config.ExternalID) > 0 {
+				p.ExternalID = aws.String(k.config.ExternalID)
+			}
+			p.RoleSessionName = k.config.RoleSessionName
+			p.Duration = time.Duration(k.config.ExpirationDuration) * time.Second
+		})
+	}
+	return sess
+}
 
+func (k *SQSConfigManager) GetConfig() *aws.Config {
+	conf := &aws.Config{Region: aws.String(k.config.Region)}
+	conf.Credentials = credentials.NewStaticCredentials(k.config.AccessKey, k.config.SecretKey, "")
+	return conf
+}
+
+func getConnectionConfig(settings map[string]interface{}) (*sqsConnection, error) {
+	s := &sqsConnection{}
+	err := metadata.MapToStruct(settings, s, false)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}

@@ -17,6 +17,7 @@ import {
     ValidationResult,
     IFieldDefinition,
     ITriggerContribution,
+    WiContribModelService,
     IConnectorContribution,
     IActionResult,
     WiContributionUtils
@@ -26,8 +27,9 @@ import * as AWS from "aws-sdk";
 @WiContrib({})
 @Injectable()
 export class RecvMsgTriggerContribution extends WiServiceHandlerContribution {
-    constructor( @Inject(Injector) injector, private http: Http) {
-        super(injector, http);
+
+    constructor(private injector: Injector, private http: Http, private contribModelService: WiContribModelService) {
+        super(injector, http, contribModelService);
     }
 
     value = (fieldName: string, context: ITriggerContribution): Observable<any> | any => {
@@ -99,32 +101,121 @@ export class RecvMsgTriggerContribution extends WiServiceHandlerContribution {
                     WiContributionUtils.getConnection(this.http, connectionField.value)
                         .map(data => data)
                         .subscribe(data => {
-                            let accessKeyId: IFieldDefinition;
-                            let secreteKey: IFieldDefinition;
-                            let region: IFieldDefinition;
-                            for (let configuration of data.settings) {
-                                if (configuration.name === "accessKeyId") {
-                                    accessKeyId = configuration
-                                } else if (configuration.name === "secretAccessKey") {
-                                    secreteKey = configuration
-                                } else if (configuration.name === "region") {
-                                    region = configuration
+                            let keyId = "", secretKey = "", region = "";
+                            let useAssumeRole = false
+                            let roleArn = "", roleSessionName = "", externalId = "";
+                            let duration = 60 * 60
+                            for (let i = 0; i < data.settings.length; i++) {
+                                if (data.settings[i].name === "accessKeyId") {
+                                    keyId = data.settings[i].value;
+                                }
+                                if (data.settings[i].name === "secretAccessKey") {
+                                    secretKey = data.settings[i].value;
+                                }
+                                if (data.settings[i].name === "region") {
+                                    region = data.settings[i].value;
+                                }
+                                if (data.settings[i].name === "assumeRole") {
+                                    useAssumeRole = data.settings[i].value;
+                                }
+                                if (data.settings[i].name === "roleArn") {
+                                    roleArn = data.settings[i].value;
+                                }
+                                if (data.settings[i].name === "roleSessionName") {
+                                    roleSessionName = data.settings[i].value;
+                                }
+                                if (data.settings[i].name === "externalId") {
+                                    externalId = data.settings[i].value;
+                                }
+                                if (data.settings[i].name === "expirationDuration") {
+                                    duration = data.settings[i].value;
                                 }
                             }
 
-                            var sqs = new AWS.SQS({
-                                credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value), region: region.value
-                            });
-                            var params = {};
-                            sqs.listQueues(params, function (err, data) {
-                                if (err) {
-                                    observer.next(queueUrls);
-                                } else {
-                                    observer.next(data.QueueUrls);
-                                }
-                            });
+                            let awsCredential = {
+                                accessKeyId: keyId,
+                                secretAccessKey: secretKey,
+                                region: region,
+                                sessionToken:""
+                            };
 
+                            if (useAssumeRole == true) {
+                                console.log("Assume role")
+                                const sts = new AWS.STS(awsCredential);
+                                const assumeRoleParam = {
+                                    RoleArn: roleArn,
+                                    RoleSessionName: roleSessionName,
+                                    ExternalId: externalId,
+                                    DurationSeconds: duration
+                                };
+                                if (externalId === "") {
+                                    delete assumeRoleParam.ExternalId
+                                }
+                                sts.assumeRole(assumeRoleParam, (err, data) => {
+                                    if (err) {
+                                        console.log("error occured...........".concat(err.message))
+                                        observer.next(queueUrls);
+                                        observer.complete();
+                                    }else {
+                                        console.log("Assume role call observer next")
+                                        awsCredential.accessKeyId = data.Credentials.AccessKeyId
+                                        awsCredential.secretAccessKey = data.Credentials.SecretAccessKey
+                                        awsCredential.sessionToken = data.Credentials.SessionToken
+
+                                        var params = {};
+                                        let sqs = new AWS.SQS(awsCredential)
+                                        sqs.listQueues(params, (err, data) => {
+                                            if (err) {
+                                                console.log("error occured...........".concat(err.message))
+                                                observer.next(queueUrls);
+                                            }else {
+                                                observer.next(data.QueueUrls);
+                                            }
+                                            observer.complete();
+                                        });
+                                    }
+                                });
+                            }else {
+                                var sqs = new AWS.SQS({
+                                    credentials: new AWS.Credentials(keyId, secretKey), region: region
+                                });
+                                var params = {};
+                                sqs.listQueues(params, function (err, data) {
+                                    if (err) {
+                                        observer.next(queueUrls);
+                                    } else {
+                                        observer.next(data.QueueUrls);
+                                    }
+                                });
+                            }
                         });
+                        // .subscribe(data => {
+                        //     // let accessKeyId: IFieldDefinition;
+                        //     // let secreteKey: IFieldDefinition;
+                        //     // let region: IFieldDefinition;
+                        //     // for (let configuration of data.settings) {
+                        //     //     if (configuration.name === "accessKeyId") {
+                        //     //         accessKeyId = configuration
+                        //     //     } else if (configuration.name === "secretAccessKey") {
+                        //     //         secreteKey = configuration
+                        //     //     } else if (configuration.name === "region") {
+                        //     //         region = configuration
+                        //     //     }
+                        //     // }
+                        //     //
+                        //     // var sqs = new AWS.SQS({
+                        //     //     credentials: new AWS.Credentials(accessKeyId.value, secreteKey.value), region: region.value
+                        //     // });
+                        //     // var params = {};
+                        //     // sqs.listQueues(params, function (err, data) {
+                        //     //     if (err) {
+                        //     //         observer.next(queueUrls);
+                        //     //     } else {
+                        //     //         observer.next(data.QueueUrls);
+                        //     //     }
+                        //     // });
+                        //
+                        // });
                 }
                 );
             }
