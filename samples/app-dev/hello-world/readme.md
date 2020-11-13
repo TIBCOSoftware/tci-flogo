@@ -1,16 +1,19 @@
-# Subflows Sample
+# Hello World Sample
 
 
-This sample is modeled on sample BookStore application and invoke a REST API  at the backend that delivers sample JSON data. This backend REST API is hosted at - hosted at https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
+This sample is a simple Flogo app that prints and returns a greeting based on the input you provide to it. It uses a HTTP trigger to receive a HTTP message with the following parameters:
+* Port: 9999
+* Method: GET
+* Resource path: `/hello/{name}`
 
-First you will need to upload Throw Error Extention from [github.com/TIBCOSoftware/flogo-contrib/activity/error](https://github.com/TIBCOSoftware/flogo-contrib/tree/master/activity/error)
+![HTTP trigger configuration](images/trigger.png)
 
-If you run any of these samples locally using TIBCO Flogo® Enterprise -
+The trigger of this sample retrieves the value of the path parameter `name` which is passed to the activities of the flow named sayHello. This flow includes two activities:
+1. Log activity: it prints `Name: {name}` in the logs. Ex: `Name: world` if you entered 'world' as a path parameter.
+![Log activity configuration](images/logactivity.png)
 
-1. To Get all Books - You will need to hit the url - http://localhost:9999/books/ 
-2. To Get Book By ISBN - you will need to hit the url - http://localhost:9999/books/1451648537
-3. If you want to test Error Handler, you can hit the above url with Invalid ISBN number like http://localhost:9999/books/999
-4. You can check the sample JSON data for correct ISBN to be used while testing the samples - https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
+2. Return activity: it returns a JSON object `{ "message": "Hello world"}` if you entered 'world' as a path parameter.
+![Return activity configuration](images/return.png)
 
 ## Import a sample
 
@@ -32,7 +35,6 @@ If you run any of these samples locally using TIBCO Flogo® Enterprise -
 
 7. Click Next. If you had not selected a trigger in the previous dialog, the flows associated with that trigger are displayed. You have the option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Clear the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow. Click Next.
 
-
 ## Contributing
 If you want to build your own activities for Flogo please read the docs here.
 
@@ -47,8 +49,9 @@ If you have feedback, don't hesitate to talk to us!
 * Ask questions on the [TIBCO Community](https://community.tibco.com/answers/product/344006)
 * Send us a note at `tci@tibco.com`
 
-## Help
-Please visit our [TIBCO Cloud<sup>&trade;</sup> Integration documentation](https://integration.cloud.tibco.com/docs/) and TIBCO Flogo® Enterprise documentation on [docs.tibco.com](https://docs.tibco.com/) for additional information.
 
 ## License
 This TCI Flogo SDK and Samples project is licensed under a BSD-type license. See [license.txt](license.txt).
+
+## Help
+Please visit our [TIBCO Cloud<sup>&trade;</sup> Integration documentation](https://integration.cloud.tibco.com/docs/) and TIBCO Flogo® Enterprise documentation on [docs.tibco.com](https://docs.tibco.com/) for additional information.
