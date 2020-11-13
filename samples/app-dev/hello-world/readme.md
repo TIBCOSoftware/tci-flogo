@@ -6,9 +6,14 @@ This sample is a simple Flogo app that prints and returns a greeting based on th
 * Method: GET
 * Resource path: `/hello/{name}`
 
+![HTTP trigger configuration](images/trigger.png)
+
 The trigger of this sample retrieves the value of the path parameter `name` which is passed to the activities of the flow named sayHello. This flow includes two activities:
 1. Log activity: it prints `Name: {name}` in the logs. Ex: `Name: world` if you entered 'world' as a path parameter.
+![Log activity configuration](images/logactivity.png)
+
 2. Return activity: it returns a JSON object `{ "message": "Hello world"}` if you entered 'world' as a path parameter.
+![Return activity configuration](images/return.png)
 
 ## Import a sample
 
