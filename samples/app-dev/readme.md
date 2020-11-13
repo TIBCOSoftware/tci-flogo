@@ -4,14 +4,14 @@
 
 In this folder, you will find below samples - 
 
-* [HelloWorld](/hello-world)
-* [Bookstore REST API](/rest-api)
-* [Branching & Error Handling](/branching-errorhandling)
-* [Subflows](/subflows)
-* [Loops](/loops.sample)
-* [JSON Path](/json.path.sample)
-* [Array Filtering](/array.forEach.sample)
-* [EMS](/ems.sample)
+* [HelloWorld](/samples/app-dev/hello-world)
+* [Bookstore REST API](/samples/app-dev/rest-api)
+* [Branching & Error Handling](/samples/app-dev/branching-errorhandling)
+* [Subflows](/samples/app-dev/subflows)
+* [Loops](/samples/app-dev/loops.sample)
+* [JSON Path](/samples/app-dev/json.path.sample)
+* [Array Filtering](/samples/app-dev/array.forEach.sample)
+* [EMS](/samples/app-dev/ems.sample)
 
 Please navigate to these samples and go through the respective readme to understand what the sample does.
 
