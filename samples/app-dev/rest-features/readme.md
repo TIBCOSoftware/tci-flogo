@@ -1,4 +1,4 @@
-# REST API Sample
+# REST Features Sample
 
 
 This sample is modeled on sample BookStore application and invoke a REST API  at the backend that delivers sample JSON data. This backend REST API is hosted at - hosted at https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
