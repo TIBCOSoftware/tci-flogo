@@ -1,20 +1,24 @@
 # REST Features Sample
 
 
-This sample is modeled on sample BookStore application and invoke a REST API  at the backend that delivers sample JSON data. This backend REST API is hosted at - hosted at https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
+This sample demonstrates some of the REST features present in the FLOGO ReceiveHTTPMessage trigger and InvokeRestService activity. Features which are covered in these sample apps are:
+## ReceiveHTTPMessage trigger
+1. Path, query and header params in the REST trigger.
+2. Configure multiple response code in REST trigger.
+3. Response Headers in REST trigger.
+4. App level schema in Request Schema and mapper activities.
+5. Multiple branching for each Response code.
+6. ConfigureHTTPResponse activity to do multiple response mapping with Return activity.
 
-First you will need to upload Throw Error Extention from [github.com/TIBCOSoftware/flogo-contrib/activity/error](https://github.com/TIBCOSoftware/flogo-contrib/tree/master/activity/error)
+## InvokeRestService activity
+1. Configuring InvokeRest activity with the API Spec of the producer REST service.
+2. Path, query, header parameters and Request and Response schema will be auto-populated.
+3. Branching with condition on the Response code received from the invoked service.
+4. App property for the URL field whch can be overriden at runtime as per the request URL. 
 
-If you run any of these samples locally using TIBCO Flogo® Enterprise -
-
-1. To Get all Books - You will need to hit the url - http://localhost:9999/books/ 
-2. To Get Book By ISBN - you will need to hit the url - http://localhost:9999/books/1451648537
-3. If you want to test Error Handler, you can hit the above url with Invalid ISBN number like http://localhost:9999/books/999
-4. You can check the sample JSON data for correct ISBN to be used while testing the samples - https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
-
-## Import a sample
-
-1. Download the sample's .json file.
+## Import the sample apps
+ 
+1. Download the sample's .json files 'flogo.rest.service.json' and 'Invoke.flogo.rest.service.json', apps for producer and consumer services respectively.
 
 2. Create a new empty app.
 ![Create an app](../import-screenshots/2.png)
@@ -22,16 +26,45 @@ If you run any of these samples locally using TIBCO Flogo® Enterprise -
 3. On the app details page, select Import app.
 ![Select import](../import-screenshots/3.png)
 
-4. Browse on your machine or drag and drop the .json file for the app that you want to import.
-![Import your sample](../import-screenshots/4.png)
+4. Browse on your machine or drag and drop the .json files for the app that you want to import.
+![Import your sample](../import-screenshots/producer_rest_service.png)
 
 5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
-![The Import app dialog](../import-screenshots/5.png)
+![The Import app dialog](../import-screenshots/producer_rest_service2.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
-7. Click Next. If you had not selected a trigger in the previous dialog, the flows associated with that trigger are displayed. You have the option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Clear the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow. Click Next.
+7. If you choose selective import, select the trigger, flow and connection. Click Next.
 
+8. After importing the 'flogo.rest.service' app(producer app), repeat the above steps to import the Invoke.flogo.rest.service app(consumer app).
+![Import your sample](../import-screenshots/consumer_invokeRest_app.png)
+![The Import app dialog](../import-screenshots/consumer_invokeRest_app2.png)
+
+##Run the application
+Once you have imported both the apps, push the 'flogo.rest.service' app first and scale the app to 1. Now we need to get the endpoint the producer service, go to the 'Endpoint' tab of the app and click on 'Copy URL' to get the endpoint URL.
+![Copy URL from Endpoint tab](../import-screenshots/copyURL.png)
+
+Now push the 'Invoke.flogo.rest.service' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'InvokeRestURL' application property to point to the endpoint URL of the producer Rest service app.
+![Application property on Endpoint tab](../import-screenshots/AppVariable_EnvControls.png)
+
+##Output
+1. Sample response for 200 Success 
+![200 Success Response](../import-screenshots/200SuccessResponse.png)
+
+2. Sample response for 222 custom code 
+![222 Custom code Response](../import-screenshots/222CustomCodeResponse.png)
+
+3. Sample response for 400 error
+![400 Error Response](../import-screenshots/400ErrorResponse.png)
+
+4. Sample response for 500 error
+![400 Error Response](../import-screenshots/500ServerResponse.png)
+
+##Troubleshooting
+If you do not see the Endpoint enabled, make sure your apps is in Running status.
+The responses are received upon meeting a particular condition, please check the branch conditions.
+If  Invoke.flogo.rest.service app is not returning expected response, please check if the 'InvokeRestURL' application property is pointing to the right endpoint URL.
+For expected payload and parameters, please refer the Resources folder.
 
 ## Contributing
 If you want to build your own activities for Flogo please read the docs here.
