@@ -27,46 +27,50 @@ This sample demonstrates some of the REST features present in the FLOGO ReceiveH
 ![Select import](../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json files for the app that you want to import.
-![Import your sample](../import-screenshots/producer_rest_service.png)
+![Import your sample](./import-screenshots/producer_rest_service.png)
 
 5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
-![The Import app dialog](../import-screenshots/producer_rest_service2.png)
+![The Import app dialog](./import-screenshots/producer_rest_service2.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
 7. If you choose selective import, select the trigger, flow and connection. Click Next.
 
 8. After importing the 'flogo.rest.service' app(producer app), repeat the above steps to import the Invoke.flogo.rest.service app(consumer app).
-![Import your sample](../import-screenshots/consumer_invokeRest_app.png)
-![The Import app dialog](../import-screenshots/consumer_invokeRest_app2.png)
+![Import your sample](./import-screenshots/consumer_invokeRest_app.png)
+![The Import app dialog](./import-screenshots/consumer_invokeRest_app2.png)
 
-##Run the application
+## Run the application
+
 Once you have imported both the apps, push the 'flogo.rest.service' app first and scale the app to 1. Now we need to get the endpoint the producer service, go to the 'Endpoint' tab of the app and click on 'Copy URL' to get the endpoint URL.
-![Copy URL from Endpoint tab](../import-screenshots/copyURL.png)
+![Copy URL from Endpoint tab](./import-screenshots/copyURL.png)
 
 Now push the 'Invoke.flogo.rest.service' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'InvokeRestURL' application property to point to the endpoint URL of the producer Rest service app.
-![Application property on Endpoint tab](../import-screenshots/AppVariable_EnvControls.png)
+![Application property on Endpoint tab](./import-screenshots/AppVariable_EnvControls.png)
 
-##Output
+## Output
+
 1. Sample response for 200 Success 
-![200 Success Response](../import-screenshots/200SuccessResponse.png)
+![200 Success Response](./import-screenshots/200SuccessResponse.png)
 
 2. Sample response for 222 custom code 
-![222 Custom code Response](../import-screenshots/222CustomCodeResponse.png)
+![222 Custom code Response](./import-screenshots/222CustomCodeResponse.png)
 
 3. Sample response for 400 error
-![400 Error Response](../import-screenshots/400ErrorResponse.png)
+![400 Error Response](./import-screenshots/400ErrorResponse.png)
 
 4. Sample response for 500 error
-![400 Error Response](../import-screenshots/500ServerResponse.png)
+![400 Error Response](./import-screenshots/500ServerResponse.png)
 
-##Troubleshooting
+## Troubleshooting
+
 If you do not see the Endpoint enabled, make sure your apps is in Running status.
 The responses are received upon meeting a particular condition, please check the branch conditions.
 If  Invoke.flogo.rest.service app is not returning expected response, please check if the 'InvokeRestURL' application property is pointing to the right endpoint URL.
 For expected payload and parameters, please refer the Resources folder.
 
 ## Contributing
+
 If you want to build your own activities for Flogo please read the docs here.
 
 If you want to showcase your project, check out [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome)
