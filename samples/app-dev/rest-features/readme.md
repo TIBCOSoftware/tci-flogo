@@ -37,6 +37,7 @@ This sample demonstrates some of the REST features present in the FLOGO ReceiveH
 7. If you choose selective import, select the trigger, flow and connection. Click Next.
 
 8. After importing the 'flogo.rest.service' app(producer app), repeat the above steps to import the Invoke.flogo.rest.service app(consumer app).
+
 ![Import your sample](./import-screenshots/consumer_invokeRest_app.png)
 ![The Import app dialog](./import-screenshots/consumer_invokeRest_app2.png)
 
