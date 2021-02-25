@@ -14,7 +14,7 @@ This sample demonstrates some of the REST features present in the FLOGO ReceiveH
 1. Configuring InvokeRest activity with the API Spec of the producer REST service.
 2. Path, query, header parameters and Request and Response schema will be auto-populated.
 3. Branching with condition on the Response code received from the invoked service.
-4. App property for the URL field whch can be overriden at runtime as per the request URL. 
+4. App property for the URL field which can be overridden at runtime as per the request URL. 
 
 ## Import the sample apps
  
@@ -42,37 +42,42 @@ This sample demonstrates some of the REST features present in the FLOGO ReceiveH
 ![The Import app dialog](./import-screenshots/consumer_invokeRest_app2.png)
 
 ## Understanding the configuration
-After importing the 'flogo.rest.service', we can see that multiple response code have been configured in the Rest trigger. Few Response codes have Response headers as well. While adding schema in Response header and Response body we need to make sure that both are in JSON data or JSON Schema format.
+After importing the 'flogo.rest.service', we can see that multiple response codes have been configured in the Rest trigger. Few Response codes have Response headers as well. While adding schema in Response header and Response body we need to make sure that both are in JSON data or JSON Schema format.
 ![MultipleResponseCode_configuration](./import-screenshots/MultipleResponseCode.png)
 
-For each response code we are returning different response for that we're using branching and conditions have been put, when these conditions are satisfied that particular branch gets executed and that response is returned. Like here for 200 Success response the condtion is that the book array should contain more than 2 objects but less than or equal to 10 objects, the count of the array object is taken from the payload passed in the input.
+For each response code we are returning a different response for that we're using branching and conditions have been put, when these conditions are satisfied that particular branch gets executed and that response is returned. Like here for 200 Success response the condition is that the book array should contain more than 2 objects but less than or equal to 10 objects, the count of the array object is taken from the payload passed in the input.
 ![SuccessBranchCondition](./import-screenshots/SuccessBranchCondition.png)
 
-Similarly, for Error 400 response we have a condtion that query parameter 'id' should not be between 0 to 10. If 'id' is negative or greater than 10 integer then 400 error will be returned.
+Similarly, for Error 400 response we have a condition that query parameter 'id' should not be between 0 to 10. If 'id' is negative or greater than 10 integer value then 400 error will be returned.
 ![ErrorBranchCondition](./import-screenshots/ErrorBranchCondition.png)
 
-App level schema is used here in the app in the mapper activity and Request schema of the Rest trigger. We can have common schema declared in 'Schema' section and use it throughout the app wherever it is supported. The advantage of App level schema is that editing the app level schema will modify the schema wherever it is used also we do not need to enter same schema everywhere.
+App level schema is used here in the app in the mapper activity and Request schema of the Rest trigger. We can have a common schema declared in the 'Schema' section and use it throughout the app wherever it is supported. The advantage of App level schema is that editing the app level schema will modify the schema wherever it is used, also we do not need to enter the same schema everywhere.
 ![MapperInputSchema](./import-screenshots/MapperInputSchema.png)
 
-ConfigureHTTPResponse activity should be used when we have configured multiple response code in Rest trigger. This activity is useful in mapping Respone body and Response headers of a particular Response code in getting input from other activities and output to 'Return' activity.
+ConfigureHTTPResponse activity should be used when we have configured multiple response codes in the Rest trigger. This activity is useful in mapping Response body and Response headers of a particular Response code in getting input from other activities and output to 'Return' activity.
 ![ConfigureHTTPResponse_Input](./import-screenshots/ConfigureHTTPResponse_Input.png)
 
 For the 'Invoke.flogo.rest.service' app, we have configured the activity with the API Spec of the 'flogo.rest.service'. We can upload swagger 2.0 or Open API spec 3.0 in the InvokeRestService activity to configure it. Request parameters, Request schema, Response schema and header would be auto-populated when a valid API spec file is uploaded. After uploading the spec we just need to map the input.
-App property is attached with the Invoke Rest activity URL field which can be overidden at runtime as per the URL of the service to be invoked without changing the app.
+App property is attached with the Invoke Rest activity URL field which can be overridden at runtime as per the URL of the service to be invoked without changing the app.
 ![InvokeRest_API_spec_config](./import-screenshots/InvokeRest_API_spec.png)
 
-In the 'Invoke.flogo.rest.service' we have have similar branching like the serivce app, but here the condition is based on the response code received when the service is invoked, like for 200 response the success branch will be executed and corresponding response will be returned.
+In the 'Invoke.flogo.rest.service' we have similar branching like the service app, but here the condition is based on the response code received when the service is invoked, like for 200 response the success branch will be executed and corresponding response will be returned.
 As the consumer app is also a multiple response code service ConfigureHTTPResponse activity is used for mapping input and output.
 ![Invoke.flogo.rest.service_app](./import-screenshots/Invoke.flogo.rest.service_app.png)
 
 
 ## Run the application
 
-Once you have imported both the apps, push the 'flogo.rest.service' app first and scale the app to 1. Now we need to get the endpoint the producer service, go to the 'Endpoint' tab of the app and click on 'Copy URL' to get the endpoint URL.
+Once you have imported both the apps, push the 'flogo.rest.service' app first and scale the app to 1. Now we need to get the endpoint of the producer service, go to the 'Endpoint' tab of the app and click on 'Copy URL' to get the endpoint URL.
 ![Copy URL from Endpoint tab](./import-screenshots/copyURL.png)
 
 Now push the 'Invoke.flogo.rest.service' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'InvokeRestURL' application property to point to the endpoint URL of the producer Rest service app.
 ![Application property on Endpoint tab](./import-screenshots/AppVariable_EnvControls.png)
+
+To run the app in Flogo Enterprise, create appropriate binaries for both the apps and run the 'flogo.rest.service'. Export the URL of the Service app in the 'Invoke.flogo.rest.service' app before running the invoking app like this:
+ $ export InvokeRestURL="http://localhost:9998"
+ $ FLOGO_APP_PROPS_ENV=auto ./Invoke.flogo.rest.service-linux_amd64 
+And then hit the endpoint of the 'Invoke.flogo.rest.service' app.
 
 ## Output
 
@@ -90,10 +95,10 @@ Now push the 'Invoke.flogo.rest.service' app and scale the app to 1. Go to 'Envi
 
 ## Troubleshooting
 
-1. If you do not see the Endpoint enabled, make sure your apps is in Running status.
+1. If you do not see the Endpoint enabled, make sure your app is in Running status.
 2. The responses are received upon meeting a particular condition, please check the branch conditions.
-3. If  'Invoke.flogo.rest.service' app is not returning expected response, please check if the 'InvokeRestURL' application property is pointing to the right endpoint URL.
-4. For expected payload and parameters, please refer the Resources folder.
+3. If the  'Invoke.flogo.rest.service' app is not returning the expected response, please check if the 'InvokeRestURL' application property is pointing to the right endpoint URL.
+4. For expected payload and parameters, please refer to the Resources folder.
 
 ## Contributing
 
@@ -116,3 +121,5 @@ Please visit our [TIBCO Cloud<sup>&trade;</sup> Integration documentation](https
 
 ## License
 This TCI Flogo SDK and Samples project is licensed under a BSD-type license. See [license.txt](license.txt).
+
+
