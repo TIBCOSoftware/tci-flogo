@@ -74,9 +74,13 @@ Once you have imported both the apps, push the 'flogo.rest.service' app first an
 Now push the 'Invoke.flogo.rest.service' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'InvokeRestURL' application property to point to the endpoint URL of the producer Rest service app.
 ![Application property on Endpoint tab](./import-screenshots/AppVariable_EnvControls.png)
 
+
 To run the app in Flogo Enterprise, create appropriate binaries for both the apps and run the 'flogo.rest.service'. Export the URL of the Service app in the 'Invoke.flogo.rest.service' app before running the invoking app like this:
+
  $ export InvokeRestURL="http://localhost:9998"
+
  $ FLOGO_APP_PROPS_ENV=auto ./Invoke.flogo.rest.service-linux_amd64 
+
 And then hit the endpoint of the 'Invoke.flogo.rest.service' app.
 
 ## Output
