@@ -57,6 +57,7 @@ The flow *Get_User2* is another flow which gets the User2 information set in flo
 ![The Import app dialog](../import-screenshots/InputInUser2Info.png)
 
 The flow *Get_User1_User2_Delete_User2* is a subflow to the main flow *Set_Get_User1_Set_User2* and gets the User1 information as well as User2 information based upon the input provided to the subflow. The input to the subflow is the same key which was set for user1 and user2 information.
+
 ![The Import app dialog](../import-screenshots/User1BranchingCondition.png)
 ![The Import app dialog](../import-screenshots/GetUser1InfoInSubflow.png)
 ![The Import app dialog](../import-screenshots/User2BranchingCondition.png)
@@ -75,7 +76,7 @@ For example, If user gives *keyInput* as "user2" and *isDelete* as true. The ope
 
 To run the application, push the app to TIBCO Cloud and then scale up to 1 instance. Once your app is scaled, you can see your app in running status.
 
-![Sample Response](../import-screenshots/1_pushApp.png)
+![Sample Response](../import-screenshots/ScaleInstance.png)
 
 
 Once your app reaches to Running state, go to Endpoints and for GET/user/{key} option, select 'Try it Out’ option and then give "user1" as value in key and false in isDelete dropdown. Then click on execute.
