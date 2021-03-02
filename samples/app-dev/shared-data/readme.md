@@ -33,22 +33,50 @@ This is Shared Data activity sample.The SharedData activity enables sharing of r
 
 ## Understanding the configuration
 
-In the attched sample *GetUsersInfo.json*, there are 3 flows *Set_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*. flow1 which is *Set_Get_User1_Set_User2* sets the information about User1 in *flow* level scope and get the User1 information in the same flow. It also set the User2 information with the *application* level scope and call a subflow *Get_User1_User2_Delete_User2*. 
+In the attched sample *GetUsersInfo.json*, there are 3 flows *Set_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*.
+
+![The Import app dialog](../import-screenshots/1_AllThreeFlows.png)
+
+First flow which is *Set_Get_User1_Set_User2* sets the information about User1 in *flow* level scope with key *user1*.  
+
+![The Import app dialog](../import-screenshots/setUser1Info.png)
+![The Import app dialog](../import-screenshots/inputInUser1Info.png)
+
+To get the User1 information in the same flow, the Get operation is used with the same key (*user1*).
+
+![The Import app dialog](../import-screenshots/getUser1InfoSameFlow.png)
+
+The flow also sets the User2 information with the *application* level scope with key *user2* and call a subflow *Get_User1_User2_Delete_User2*.
+
+![The Import app dialog](../import-screenshots/SetUser2Info.png)
+![The Import app dialog](../import-screenshots/InputUser2Info.png)
+![The Import app dialog](../import-screenshots/SubflowInFlow1.png)
 
 The flow *Get_User2* is another flow which gets the User2 information set in flow *Set_Get_User1_Set_User2*.
+![The Import app dialog](../import-screenshots/GetUser2InfoFlow2.png)
+![The Import app dialog](../import-screenshots/InputInUser2Info.png)
 
-The flow *Get_User1_User2_Delete_User2* is a subflow to the main flow *Set_Get_User1_Set_User2* and gets the User1 information as well as User2 information. It also includes *Delete* operation for the User2 information which is  set at the *application* level scope. Based upon the *keyInput* and *isDelete* parameters from user, the respective user's information and operation will be performed. 
+The flow *Get_User1_User2_Delete_User2* is a subflow to the main flow *Set_Get_User1_Set_User2* and gets the User1 information as well as User2 information based upon the input provided to the subflow. The input to the subflow is the same key which was set for user1 and user2 information.
+![The Import app dialog](../import-screenshots/User1BranchingCondition.png)
+![The Import app dialog](../import-screenshots/GetUser1InfoInSubflow.png)
+![The Import app dialog](../import-screenshots/User2BranchingCondition.png)
+![The Import app dialog](../import-screenshots/User2BranchingCondition.png)
+![The Import app dialog](../import-screenshots/GetUser2InfoInSubflow.png)
+ 
+The flow also includes *Delete* operation for the User2 information which is  set at the *application* level scope. Based upon the *keyInput* and *isDelete* parameters from user, the respective user's information and operation will be performed.
 For example, If user gives *keyInput* as "user2" and *isDelete* as true. The operation Delete will be performed on the User2 information. The same will be returned by the subflow *Get_User1_User2_Delete_User2* to the main flow *Set_Get_User1_Set_User2*.
+
+![The Import app dialog](../import-screenshots/DeleteBRanchingCondition.png)
+![The Import app dialog](../import-screenshots/DeleteOperation.png)
+
 
 
 ### Run the application
 
-For running the application, first you have to push the app and then scale up the app.
-Then after sometime you can see your app in running status.
+To run the application, push the app to TIBCO Cloud and then scale up to 1 instance. Once your app is scaled, you can see your app in running status.
 
 ![Sample Response](../import-screenshots/1_pushApp.png)
-![Sample Response](../import-screenshots/2_scaleApp.png)
-![Sample Response](../import-screenshots/3_runApp.png)
+
 
 Once your app reaches to Running state, go to Endpoints and for GET/user/{key} option, select 'Try it Out’ option and then give "user1" as value in key and false in isDelete dropdown. Then click on execute.
 
