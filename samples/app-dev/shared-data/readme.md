@@ -61,7 +61,6 @@ The flow *Get_User1_User2_Delete_User2* is a subflow to the main flow *Set_Get_U
 ![The Import app dialog](../import-screenshots/User1BranchingCondition.png)
 ![The Import app dialog](../import-screenshots/GetUser1InfoInSubflow.png)
 ![The Import app dialog](../import-screenshots/User2BranchingCondition.png)
-![The Import app dialog](../import-screenshots/User2BranchingCondition.png)
 ![The Import app dialog](../import-screenshots/GetUser2InfoInSubflow.png)
  
 The flow also includes *Delete* operation for the User2 information which is  set at the *application* level scope. Based upon the *keyInput* and *isDelete* parameters from user, the respective user's information and operation will be performed.
