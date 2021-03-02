@@ -1,37 +1,81 @@
 # SharedData Sample
 
+#Description
+This is Shared Data activity sample.The SharedData activity enables sharing of runtime data within a flow or across flows in an app.The advantage of using this feature is that you can set data anywhere in the main flow, subflow, or error handler and the data can be shared across the entire flow or app.
 
-This sample is modeled on sample BookStore application and invoke a REST API  at the backend that delivers sample JSON data. This backend REST API is hosted at - hosted at https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
 
-First you will need to upload Throw Error Extention from [github.com/TIBCOSoftware/flogo-contrib/activity/error](https://github.com/TIBCOSoftware/flogo-contrib/tree/master/activity/error)
 
-If you run any of these samples locally using TIBCO Flogo® Enterprise -
+## Import the sample
+1. Download the sample json file i.e., *GetUsersInfo.json*.
 
-1. To Get all Books - You will need to hit the url - http://localhost:9999/books/ 
-2. To Get Book By ISBN - you will need to hit the url - http://localhost:9999/books/1451648537
-3. If you want to test Error Handler, you can hit the above url with Invalid ISBN number like http://localhost:9999/books/999
-4. You can check the sample JSON data for correct ISBN to be used while testing the samples - https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
+2. Create a new empty app
 
-## Import a sample
+![Create a new empty app](../import-screenshots/2.png)
 
-1. Download the sample's .json file.
+3. On the app details page, select import app option.
 
-2. Create a new empty app.
-![Create an app](../import-screenshots/2.png)
-
-3. On the app details page, select Import app.
 ![Select import](../import-screenshots/3.png)
 
-4. Browse on your machine or drag and drop the .json file for the app that you want to import.
+4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
+
 ![Import your sample](../import-screenshots/4.png)
 
-5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
+5. Click on Upload Button. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
+
 ![The Import app dialog](../import-screenshots/5.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
-7. Click Next. If you had not selected a trigger in the previous dialog, the flows associated with that trigger are displayed. You have the option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Clear the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow. Click Next.
+7.  Click Next. If you had not selected a trigger in the previous dialog, the flows associated with that trigger are displayed. You have the option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Clear the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow. Click Next.
 
+
+
+##Understanding the configuration
+In the attched sample *GetUsersInfo.json*, there are 3 flows *Set_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*. flow1 which is *Set_Get_User1_Set_User2* sets the information about User1 in *flow* level scope and get the User1 information in the same flow. It also set the User2 information with the *application* level scope and call a subflow *Get_User1_User2_Delete_User2*. 
+
+The flow *Get_User2* is another flow which gets the User2 information set in flow *Set_Get_User1_Set_User2*.
+
+The flow *Get_User1_User2_Delete_User2* is a subflow to the main flow *Set_Get_User1_Set_User2* and gets the User1 information as well as User2 information. It also includes *Delete* operation for the User2 information which is  set at the *application* level scope. Based upon the *keyInput* and *isDelete* parameters from user, the respective user's information and operation will be performed. 
+For example, If user gives *keyInput* as "user2" and *isDelete* as true. The operation Delete will be performed on the User2 information. The same will be returned by the subflow *Get_User1_User2_Delete_User2* to the main flow *Set_Get_User1_Set_User2*.
+
+
+### Run the application
+For running the application, first you have to push the app and then scale up the app.
+Then after sometime you can see your app in running status.
+
+![Sample Response](../import-screenshots/1_pushApp.png)
+![Sample Response](../import-screenshots/2_scaleApp.png)
+![Sample Response](../import-screenshots/3_runApp.png)
+
+Once your app reaches to Running state, go to Endpoints and for GET/user/{key} option, select 'Try it Out’ option and then give "user1" as value in key and false in isDelete dropdown. Then click on execute.
+
+![sample Response](../import-screenshots/1_Execute.png)
+
+Another option, If you want to test the sample in the Flow tester then follow below instructions:
+ 
+in flow, click on Test Button -> create Launch configuration -> provide values in path params and query params -> click Next button -> click on Run
+
+![Sample Response](../import-screenshots/1_launchconfig.png)
+![Sample Response](../import-screenshots/2_launchconfig.png)
+![Sample Response](../import-screenshots/3_valuesLaunchConfig.png)
+
+
+## Outputs
+
+1. Flow Tester
+
+![Sample Response](../import-screenshots/4_testeroutput.png)
+
+
+2. When hit endpoints
+
+![Sample Response](../import-screenshots/2_user1Info.png)
+
+
+## Troubleshooting
+
+* If you do not see the Endpoint enabled, make sure your apps is in Running status.
+* If you see test connection failed in connection tab, then check your public ip if it is whitelisted or not.
 
 ## Contributing
 If you want to build your own activities for Flogo please read the docs here.
@@ -48,8 +92,17 @@ If you have feedback, don't hesitate to talk to us!
 * Send us a note at `tci@tibco.com`
 
 ## Help
-
 Please visit our [TIBCO Cloud<sup>&trade;</sup> Integration documentation](https://integration.cloud.tibco.com/docs/) and TIBCO Flogo® Enterprise documentation on [docs.tibco.com](https://docs.tibco.com/) for additional information.
 
 ## License
 This TCI Flogo SDK and Samples project is licensed under a BSD-type license. See [license.txt](license.txt).
+
+
+
+
+
+
+
+
+
+
