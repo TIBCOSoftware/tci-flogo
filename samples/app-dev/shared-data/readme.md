@@ -1,6 +1,7 @@
 # SharedData Sample
 
 #Description
+
 This is Shared Data activity sample.The SharedData activity enables sharing of runtime data within a flow or across flows in an app.The advantage of using this feature is that you can set data anywhere in the main flow, subflow, or error handler and the data can be shared across the entire flow or app.
 
 
@@ -31,6 +32,7 @@ This is Shared Data activity sample.The SharedData activity enables sharing of r
 
 
 ##Understanding the configuration
+
 In the attched sample *GetUsersInfo.json*, there are 3 flows *Set_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*. flow1 which is *Set_Get_User1_Set_User2* sets the information about User1 in *flow* level scope and get the User1 information in the same flow. It also set the User2 information with the *application* level scope and call a subflow *Get_User1_User2_Delete_User2*. 
 
 The flow *Get_User2* is another flow which gets the User2 information set in flow *Set_Get_User1_Set_User2*.
@@ -40,6 +42,7 @@ For example, If user gives *keyInput* as "user2" and *isDelete* as true. The ope
 
 
 ### Run the application
+
 For running the application, first you have to push the app and then scale up the app.
 Then after sometime you can see your app in running status.
 
