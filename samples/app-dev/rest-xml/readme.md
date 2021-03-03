@@ -1,4 +1,4 @@
-# Rest-xml support Sample
+# Support of application/xml as Response Type for InvokeRESTService Activity Sample
 
 # Description
 
