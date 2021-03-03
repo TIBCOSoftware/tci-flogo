@@ -33,7 +33,17 @@ This is rest xml support sample.The invokeRest activity supports invoking servic
 
 ## Understanding the configuration
 
-In the attched sample *GetPetByStatus.json*, there is 1 flow *Get_pet_by_Status_in_XML*. The flow contains invokeRest activity which is invoking the petstore service. The service returns the pet information by status. In the first branch,The invokeRest activity is expecting the response in XML string. There is XML2JSON activity used in the 1st branch which will convert the XML response into  JSON object. In the second branch, The invokeRest activity is expecting the response in JSON Object. The invokeRest activity will convert the XML response into JSON object. The branches will be executed based upon the *format* path paramter. For example, if value of *format* path parameter is "xml", branch with xml string will be executed. 
+In the attached sample *GetPetByStatus.json*, there is 1 flow *Get_pet_by_Status_in_XML*. The flow contains invokeRest activity which is invoking the petstore service. The service returns the pet information by status.
+
+![The Import app dialog](../import-screenshots/GetPetByStatusFlowDetail.png)
+
+In the first branch,The invokeRest activity is expecting the response in XML string. There is XML2JSON activity used in the 1st branch which will convert the XML response into  JSON object.
+![The Import app dialog](../import-screenshots/FirstBranchConfiguration.png)
+![The Import app dialog](../import-screenshots/xml2jsonactivity.png)
+
+In the second branch, The invokeRest activity is expecting the response in JSON Object. The invokeRest activity will convert the XML response into JSON object. The branches will be executed based upon the *format* path paramter. For example, if value of *format* path parameter is "xml", branch with xml string will be executed. 
+
+![The Import app dialog](../import-screenshots/secondBranchOutputSettings.png)
 
 
 ### Run the application
@@ -41,9 +51,7 @@ In the attched sample *GetPetByStatus.json*, there is 1 flow *Get_pet_by_Status_
 For running the application, first you have to push the app and then scale up the app.
 Then after sometime you can see your app in running status.
 
-![Sample Response](../import-screenshots/1_rest_push.png)
-![Sample Response](../import-screenshots/2_rest_scale.png)
-![Sample Response](../import-screenshots/3_rest_running.png)
+![Sample Response](../import-screenshots/GetPetStatusScaling.png)
 
 Once your app reaches to Running state, go to Endpoints and for GET/pet/{format} option, select 'Try it Out’ option and then give "xml" as value in format path parameter and "available" as value in status query parameter. Then click on execute.
 
