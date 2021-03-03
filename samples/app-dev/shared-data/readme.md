@@ -33,7 +33,7 @@ This is Shared Data activity sample.The SharedData activity enables sharing of r
 
 ## Understanding the configuration
 
-In the attched sample *GetUsersInfo.json*, there are 3 flows *Set_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*.
+In the attached sample *GetUsersInfo.json*, there are 3 flows *Set_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*.
 
 ![The Import app dialog](../import-screenshots/1_AllThreeFlows.png)
 
