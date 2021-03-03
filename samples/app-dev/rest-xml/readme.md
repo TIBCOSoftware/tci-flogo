@@ -48,8 +48,7 @@ In the second branch, The invokeRest activity is expecting the response in JSON 
 
 ### Run the application
 
-For running the application, first you have to push the app and then scale up the app.
-Then after sometime you can see your app in running status.
+To run the application, push the app to TIBCO Cloud and then scale up to 1 instance. Once your app is scaled, you can see your app in running status.
 
 ![Sample Response](../import-screenshots/GetPetStatusScaling.png)
 
@@ -68,7 +67,7 @@ in flow, click on Test Button -> create Launch configuration -> provide values i
 
 ## Outputs
 
-1. Flow Tester
+1. Flow Tester 	
 
 ![Sample Response](../import-screenshots/4_debugger_result.png)
 
