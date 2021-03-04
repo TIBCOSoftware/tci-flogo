@@ -1,4 +1,4 @@
-# SharedData Sample
+# Shared Data Sample - Enable sharing of data within or across flows in the application
 
 # Description
 
