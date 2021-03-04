@@ -18,16 +18,16 @@ In the Salesforce_UpsertSample app, there are two flows the main flow 'MainFlow_
 1. Download the sample's .json file 'Salesforce_UpsertSample.json'
 
 2. Create a new empty app.
-![Create an app](../../import-screenshots/2.png)
+![Create an app](../../../import-screenshots/2.png)
 
 3. On the app details page, select Import app.
-![Select import](../../import-screenshots/3.png)
+![Select import](../../../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json file for the app that you want to import.
-![Import your sample](../../import-screenshots/SalesforceUpsertSample/ImportSFApp.png)
+![Import your sample](../../../import-screenshots/SalesforceUpsertSample/ImportSFApp.png)
 
 5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
-![The Import app dialog](../../import-screenshots/SalesforceUpsertSample/ImportDialog.png)
+![The Import app dialog](../../../import-screenshots/SalesforceUpsertSample/ImportDialog.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
@@ -40,7 +40,7 @@ In the Salesforce_UpsertSample app, there are two flows the main flow 'MainFlow_
 ### The Connection
 When you import this app, you need to configure the 'Salesforce' connection in Connections page. It has pre-filled values except Client Secret. You also need to change Client Id with yours.
 
-![The connection](../../import-screenshots/SalesforceUpsertSample/ImportSFConnection.png)
+![The connection](../../../import-screenshots/SalesforceUpsertSample/ImportSFConnection.png)
 
 Note: After imported an app, in the imported connection under Connection tab,
 * Client ID has prefilled value which is the Consumer Key in the Salesforce Account (get it from the Connected Apps section in Salesforce Account).
@@ -49,44 +49,44 @@ Note: After imported an app, in the imported connection under Connection tab,
 
 Once you provide both the values then login to your salesforce account and allow access in user consent screen, a Base64 encoded access token string will get populated in OAuth2 Token field. This is the access token which will be send as Authorization Header while invoking the API to get the access to the API.
 
-![The connection](../../import-screenshots/SalesforceUpsertSample/SFConnectionTokenAfterLogin.png)
+![The connection](../../../import-screenshots/SalesforceUpsertSample/SFConnectionTokenAfterLogin.png)
 
 ### The Flow and Subflow activity
 If you open the app, you will see there are two flows in the Salesforce_UpsertSample app. The flow 'MainFlow_Upsert' and second flow 'Subflow_Upsert'.
-![The Flows](../../import-screenshots/SalesforceUpsertSample/Flows.png)
+![The Flows](../../../import-screenshots/SalesforceUpsertSample/Flows.png)
 
 The MainFlow_Upsert flow in the Salesforce_UpsertSample app have REST trigger(which can post multiple records at a time of execution) and subflow activity which iterates every record at a time coming from request schema and pass it to query activity used in subflow 'Subflow_Upsert'.
-![The Mainflow_Upsert Flows](../../import-screenshots/SalesforceUpsertSample/MainFlow_UpsertFlow.png)
+![The Mainflow_Upsert Flows](../../../import-screenshots/SalesforceUpsertSample/MainFlow_UpsertFlow.png)
 
 Now the subflow 'Subflow_Upsert' will starts from query activity in which using equals to condition on Name using which user can check if record exists or not in Salesforce. Here you can modify the query according to your own matching criteria. After that there are two conditional branches, in the first branch, condition is if records are getting from record[] array in query activity then update those records else (here used second branch with Success with no matching condition) create new records and then update those.
 
-![The Subflow_Upsert Flows](../../import-screenshots/SalesforceUpsertSample/Subflow_Upsert.png)
-![The Branch condition](../../import-screenshots/SalesforceUpsertSample/branchconditions.png)
+![The Subflow_Upsert Flows](../../../import-screenshots/SalesforceUpsertSample/Subflow_Upsert.png)
+![The Branch condition](../../../import-screenshots/SalesforceUpsertSample/branchconditions.png)
 
 ### Run the application
 For running the application, first you have to push the app and then scale up the app. Then after sometime you can see your app in running status.
-![After Push App](../../import-screenshots/SalesforceUpsertSample/AfterPushAppRunningState.png)
+![After Push App](../../../import-screenshots/SalesforceUpsertSample/AfterPushAppRunningState.png)
 
 Once it reaches to Running state, go to Endpoints, click on Test under Actions and for POST/salesforce/{upsert}, select 'Try it out'
 You will have to pass value for the path parameter 'upsert'. You can provide any string type value for 'upsert' parameter.
 You will have to pass the values for the request body parameter.
 Now click Execute button.
-![Runtime Execution](../../import-screenshots/SalesforceUpsertSample/RESTRequest.png)
+![Runtime Execution](../../../import-screenshots/SalesforceUpsertSample/RESTRequest.png)
 
 If you want to test the sample in the Flow tester then follow below instructions:
 Click on the MainFlowWithSFCreateCheckStatusJob flow, click on Test Button -> create Launch configuration -> provide request schema in body parameter -> click Next button -> click on Run
-![FlowTester](../../import-screenshots/SalesforceUpsertSample/Flowtester.png)
+![FlowTester](../../../import-screenshots/SalesforceUpsertSample/Flowtester.png)
 
 ## Outputs
 
 1. Sample Response when hit the endpoints
-![Sample Response](../../import-screenshots/SalesforceUpsertSample/RuntimeExecution.png)
+![Sample Response](../../../import-screenshots/SalesforceUpsertSample/RuntimeExecution.png)
 
 2. Sample Logs
-![Sample Logs](../../import-screenshots/SalesforceUpsertSample/SampleLogs.png)
+![Sample Logs](../../../import-screenshots/SalesforceUpsertSample/SampleLogs.png)
 
 3. Flow Tester Logs
-![FlowTester Logs](../../import-screenshots/SalesforceUpsertSample/FlowTesterLogs.png)
+![FlowTester Logs](../../../import-screenshots/SalesforceUpsertSample/FlowTesterLogs.png)
 
 
 ## Troubleshooting

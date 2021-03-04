@@ -20,16 +20,16 @@ The SalesforceTrigger flow in the Salesforce_GeneralSample app have ReceiveSales
 1. Download the sample's .json file 'Salesforce_GeneralSample.json'
 
 2. Create a new empty app.
-![Create an app](../../import-screenshots/2.png)
+![Create an app](../../../import-screenshots/2.png)
 
 3. On the app details page, select Import app.
-![Select import](../../import-screenshots/3.png)
+![Select import](../../../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json file for the app that you want to import.
-![Import your sample](../../import-screenshots/SalesforceGeneralSample/ImportSFApp.png)
+![Import your sample](../../../import-screenshots/SalesforceGeneralSample/ImportSFApp.png)
 
 5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
-![The Import app dialog](../../import-screenshots/SalesforceGeneralSample/ImportDialog.png)
+![The Import app dialog](../../../import-screenshots/SalesforceGeneralSample/ImportDialog.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
@@ -42,7 +42,7 @@ The SalesforceTrigger flow in the Salesforce_GeneralSample app have ReceiveSales
 ### The Connection
 When you import this app, you need to configure the 'Salesforce' connection in Connections page. It has pre-filled values except Client Secret. You also need to change Client Id with yours.
 
-![The connection](../../import-screenshots/SalesforceGeneralSample/ImportSFConnection.png)
+![The connection](../../../import-screenshots/SalesforceGeneralSample/ImportSFConnection.png)
 
 Note: After imported an app, in the imported connection under Connection tab,
 * Client ID has prefilled value which is the Consumer Key in the Salesforce Account (get it from the Connected Apps section in Salesforce Account).
@@ -51,44 +51,44 @@ Note: After imported an app, in the imported connection under Connection tab,
 
 Once you provide both the values then login to your salesforce account and allow access in user consent screen, a Base64 encoded access token string will get populated in OAuth2 Token field. This is the access token which will be send as Authorization Header while invoking the API to get the access to the API.
 
-![The connection](../../import-screenshots/SalesforceGeneralSample/SFConnectionTokenAfterLogin.png)
+![The connection](../../../import-screenshots/SalesforceGeneralSample/SFConnectionTokenAfterLogin.png)
 
 ### The Flow and InvokeRestService activity
 If you open the app, you will see there are two flows in the Salesforce_GeneralSample app. The flow 'CRUD' and second flow 'SalesforceTrigger'.
-![The Flows](../../import-screenshots/SalesforceGeneralSample/Flows.png)
+![The Flows](../../../import-screenshots/SalesforceGeneralSample/Flows.png)
 
 The CRUD flow in the Salesforce_GeneralSample app basically creates new record for Account object in Salesforce using SalesforceCreate activity and then fetch that record details using SalesforceQuery activity. Then it updates the name of the newly created account using SalesforceUpdate activity. Finally deletes that account using SalesforceDelete activity. All these operation will be done when execute the REST trigger with valid input schema provided in ReceiveHTTPMessage trigger. REST trigger have method POST with path parameter 'account'.
-![The CRUD Flows](../../import-screenshots/SalesforceGeneralSample/CRUDFlow.png)
+![The CRUD Flows](../../../import-screenshots/SalesforceGeneralSample/CRUDFlow.png)
 
 The SalesforceTrigger flow in the Salesforce_GeneralSample app have ReceiveSalesforceMessage trigger which starts whenever a change occurs in Salesforce.com and activates the flow. So in this case when CRUD flow executes, the salesforce trigger will start and provide respective output in the logs.
-![The SFTrigger Flows](../../import-screenshots/SalesforceGeneralSample/SFTriggerFlow.png)
+![The SFTrigger Flows](../../../import-screenshots/SalesforceGeneralSample/SFTriggerFlow.png)
 
 ### Run the application
 For running the application, first you have to push the app and then scale up the app. Then after sometime you can see your app in running status.
-![Before Push App](../../import-screenshots/SalesforceGeneralSample/NotDeployedState.png)
-![Scale App](../../import-screenshots/SalesforceGeneralSample/ScaleApp.png)
-![After Push App](../../import-screenshots/SalesforceGeneralSample/AfterPushAppRunningState.png)
+![Before Push App](../../../import-screenshots/SalesforceGeneralSample/NotDeployedState.png)
+![Scale App](../../../import-screenshots/SalesforceGeneralSample/ScaleApp.png)
+![After Push App](../../../import-screenshots/SalesforceGeneralSample/AfterPushAppRunningState.png)
 
 Once it reaches to Running state, go to Endpoints, click on Test under Actions and for POST//Salesforce/{account}, select 'Try it out'
 You will have to pass value for the path parameter 'account'. You can provide any string type value for 'account' parameter.
 You will have to pass the values for the request body parameter.
 Now click Execute button.
-![Runtime Execution](../../import-screenshots/SalesforceGeneralSample/RESTRequest.png)
+![Runtime Execution](../../../import-screenshots/SalesforceGeneralSample/RESTRequest.png)
 
 If you want to test the sample in the Flow tester then follow below instructions:
 Click on the MainFlowWithSFCreateCheckStatusJob flow, click on Test Button -> create Launch configuration -> provide request schema in body parameter -> click Next button -> click on Run
-![FlowTester](../../import-screenshots/SalesforceGeneralSample/Flowtester.png)
+![FlowTester](../../../import-screenshots/SalesforceGeneralSample/Flowtester.png)
 
 ## Outputs
 
 1. Sample Response when hit the endpoints
-![Sample Response](../../import-screenshots/SalesforceGeneralSample/RuntimeExecution.png)
+![Sample Response](../../../import-screenshots/SalesforceGeneralSample/RuntimeExecution.png)
 
 2. Sample Logs
-![Sample Logs](../../import-screenshots/SalesforceGeneralSample/SampleLogs.png)
+![Sample Logs](../../../import-screenshots/SalesforceGeneralSample/SampleLogs.png)
 
 3. Flow Tester Logs
-![FlowTester Logs](../../import-screenshots/SalesforceGeneralSample/FlowTesterLogs.png)
+![FlowTester Logs](../../../import-screenshots/SalesforceGeneralSample/FlowTesterLogs.png)
 
 
 ## Troubleshooting
