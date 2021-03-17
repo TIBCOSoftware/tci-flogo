@@ -14,145 +14,126 @@ Every trigger contribution must define its model in `trigger.json` file.This mod
 1. `contrib: display/wizard`- A UI grouping which defines the Step(Names) in a Wizard dialog step view of Trigger
 ```json
 {
-    // Identifier for the trigger. It should be unique and must not contain spaces or special characters.
-    "name": "Demo",
- 
-    //Author of this trigger
-    "author": "TIBCO Software Inc.",
-     
-    // Indicates that it is a trigger model
-    "type": "flogo:trigger",
- 
-    // Version of the trigger
-    "version": "1.0.0",
- 
-    // Display Title
-    "title": "Demo Trigger",
-    // trigger display configuration
-    "display": {
- 
-       // trigger description
-       "description": "This is demo trigger",
-        
-       //Unique trigger ID without spaces
-       "uid": "tibco-demo",
- 
- 
-       // Category under which this trigger will be displayed
-       "category": "DEMO",
- 
-       // Make this trigger visible/invisible under given category
-       "visible": true,
- 
- 
-       //  A UI grouping which defines the Tabs(Names) in a property sheet view of a Trigger/Activity
-        "sections": [ "Tab 1 Name", "Tab 2 Name"],
- 
- 
-       // A UI grouping which defines the Step(Names) in a Wizard dialog step view of Trigger
-       // A Wizard  will show the text below to inform the step it is showing for input.
-        "wizard": [ "Step 1", "Step 2" ],
-        
-       // Path to the small icon file.
-       // Size Limit:1KB
-       // Format: PNG
-       "smallIcon": "demo-small-icon.png",
- 
- 
-       // Path to the small icon file.
-       // Size Limit: 2KB
-       // Format: PNG
-       "largeIcon": "demo-large-icon.png"
-    },
- 
-    // If trigger expects a reply from the flow through Reply activity, this must be set to true.
-    "useReplyHandler": false
- 
-    "ref": "git.tibco.com/demo-trigger/trigger/<CATEGORY>/<LOWER CASE TRIGGER NAME>",
-     
-    // trigger configuration.
-    // It is common configuration for all handlers. e.g. HTTP path
-    "settings": [
-           {
-            // Name of the field that would be set in the trigger configuration.
-            "name": "path",
- 
-            // Runtime datatype of the field. 
-            "type": "string",
- 
- 
-            // Is required field.
-            "required": true,
-             
-            // Optional field display configuration.
-            “display”: {
-              ....
-            },
-            // Wizard is only applicable when in trigger input wizard mode.
-            "wizard" : {
-                "step" : "Step -1 string",
-                "name" : "Field display name in wizard string"
-                "type" : "selectButtons",
-                "css" : {
-                          // event:regex match -> CSS string
-                          "IDEAL:GET*" : "{ color: blue;}",
-                          "SELECTED:PUT*" : ""
-                        }
-            }
-          }
-          .....
-    ],
- 
-    // Event handler.
-    "handler": {
-      // Handler specific configuration.
-      // A configuration that should be unique to the handler. e.g. HTTP method name must be unique for REST trigger handler.
-      "settings": [
-           {
-            // Name of the field that would be set in the trigger configuration.
-            "name": "method",
-            // Runtime datatype of the field. 
-            "type": "string",
-            // Is required field.
-            "required": true,
-             
-            // Optional field display configuration.
-            “display”: {
-              ....
-            }
-          }
-          .....
-     ]
+  "name": "sqsreceivemessage",
+  "title": "Receive SQS Message",
+  "version": "1.0.0",
+  "author": "TIBCO Software Inc.",
+  "type": "flogo:trigger",
+  "display": {
+    "category": "AWSSQS",
+    "visible": true,
+    "smallIcon": "sqsreceivemessage.png",
+    "description": "This trigger receives a message from the standard queue",
+    "wizard": ["Choose Connection"]
+  },
+  "ref": "github.com/TIBCOSoftware/tci-flogo/samples/extensions/AWSSQS/trigger/sqsreceivemessage",
+  "settings": [
+    {
+      "name": "sqsConnection",
+      "type": "connection",
+      "required": true,
+      "display": {
+        "name": "SQS Connection",
+        "description": "Select SQS Connection",
+        "type": "connection"
+      },
+      "wizard": {
+        "type": "dropdown",
+        "selection": "single",
+        "step": "Choose Connection"
+      },
+      "allowed": []
     }
- 
-    // trigger output
-    "outputs": [
-           {
-            // Name of the field that would be set in the trigger output.
-            "name": "field1",
- 
- 
-            // Runtime datatype of the field. 
-            "type": "string",
-             
-            // Optional field display configuration.
-            “display”: {
-              ....
-            }
-          }
-          .....
+  ],
+  "handler": {
+    "settings": [
+      {
+        "name": "queueUrl",
+        "type": "string",
+        "required": true,
+        "display": {
+          "name": "Queue URL",
+          "description": "Select Queue URL"
+        },
+        "allowed": []
+      },
+      {
+        "name": "MaxNumberOfMessages",
+        "type": "integer",
+        "required": false,
+        "display": {
+          "name": "Max Number of Messages",
+          "description": "Max Number of Messages Description"
+        },
+        "value": 1
+      },
+      {
+        "name": "VisibilityTimeout",
+        "type": "integer",
+        "required": false,
+        "display": {
+          "name": "Visibility Timeout",
+          "description": "Visibility Timeout Description"
+        },
+        "value": 0
+      },
+      {
+        "name": "WaitTimeSeconds",
+        "type": "integer",
+        "required": false,
+        "display": {
+          "name": "WaitTime(Seconds)",
+          "description": "Wait time Description"
+        },
+        "value": 0
+      },
+      {
+        "name": "deleteMessage",
+        "type": "boolean",
+        "required": false,
+        "display": {
+          "name": "Delete Received Message",
+          "description": "Delete received message(s)"
+        },
+        "value": false
+      },
+      {
+        "name": "AttributeNames",
+        "type": "array",
+        "required": false,
+        "display": {
+          "name": "Attribute Names",
+          "description": "Name and type of attributes that you wish to receive",
+          "type": "table",
+          "schema": "{\r\n    \"$schema\": \"http:\/\/json-schema.org\/draft-04\/schema#\",\r\n    \"definitions\": {},\r\n    \"id\": \"http:\/\/example.com\/example.json\",\r\n    \"items\": {\r\n        \"id\": \"\/items\",\r\n        \"properties\": {\r\n            \"Name\": {\r\n                \"id\": \"\/items\/properties\/Name\",\r\n                \"type\": \"string\"\r\n            },\r\n            \"Type\": {\r\n                \"id\": \"\/items\/properties\/Type\",\r\n                \"type\": {\"enum\":[\"String\", \"Integer\"]}\r\n            }\r\n        },\r\n        \"type\": \"object\"\r\n    },\r\n    \"type\": \"array\"\r\n}",
+          "inputSettingsOnly":true
+        }
+      },
+      {
+        "name": "MessageAttributeNames",
+        "type": "array",
+        "required": false,
+        "display": {
+          "name": "Message Attributes",
+          "description": "Name and type of message attributes that you wish to receive",
+          "type": "table",
+          "schema": "{\r\n    \"$schema\": \"http:\/\/json-schema.org\/draft-04\/schema#\",\r\n    \"definitions\": {},\r\n    \"id\": \"http:\/\/example.com\/example.json\",\r\n    \"items\": {\r\n        \"id\": \"\/items\",\r\n        \"properties\": {\r\n            \"Name\": {\r\n                \"id\": \"\/items\/properties\/Name\",\r\n                \"type\": \"string\"\r\n            },\r\n            \"Type\": {\r\n                \"id\": \"\/items\/properties\/Type\",\r\n                \"type\": {\"enum\":[\"String\", \"Number\"]}\r\n            }\r\n        },\r\n        \"type\": \"object\"\r\n    },\r\n    \"type\": \"array\"\r\n}",
+          "inputSettingsOnly":true
+        }
+      }
     ]
-    // Clickable buttons to be displayed on UI
-    // Upon click, WiServiceHandlerContribution.handleAction(<<ActionId>, <<Connector Configuration>>) would be called.
-    "actions": [
-          {
-            // Label of the button
-            "name": "Finish"
-          },
-  
-          .....
-    ]
+  },
+  "outputs": [
+    {
+      "name": "Message",
+      "type": "object"
+    }
+  ],
+  "actions": [{
+    "name": "Finish"
+  }]
 }
+
 ```
 ## Validation
 When creating the `trigger.json` file, there are a few validation rules that you need take into account:

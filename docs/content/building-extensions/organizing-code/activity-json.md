@@ -7,56 +7,87 @@ weight: 54
 The `activity.json` describes the model, the metadata, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using. The below code explains which fields are in the JSON document as well as what kind of values are allowed. For more samples, check out the samples section!
 ```json
 {
-    "name": "webhook",
-    "title": "Send IFTTT WebHook",
-    "version": "0.1.0",
-    "type": "flogo:activity",
-    "author": "retgits",
-    "display": {
-        "category": "IFTTT",
-        "visible": true,
-        "smallIcon": "ifttt.png",
-        "description": "This activity sends a message to an IFTTT WebHook"
+  "name": "sqssendmessage",
+  "version": "1.0.0",
+  "author": "TIBCO Software Inc.",
+  "type": "flogo:activity",
+  "title": "Send SQS Message",
+
+  "display": {
+    "category": "AWSSQS",
+    "visible": true,
+    "smallIcon": "sqssendmessage.png",
+    "description": "This activity sends a message to the standard queue"
+  },
+
+  "ref": "github.com/TIBCOSoftware/tci-flogo/samples/extensions/AWSSQS/activity/sqssendmessage",
+  "settings": [
+    {
+      "name": "sqsConnection",
+      "type": "connection",
+      "required": true,
+      "display":{
+        "name": "SQS Connection",
+        "description": "Select SQS Connection",
+        "type": "connection"
+      },
+      "allowed":[]
     },
-    "ref": "IFTTT/activity/webhook",
-    "inputs": [
-        {
-            "name": "iftttConnection",
-            "type": "object",
-            "required": true,
-            "display":{
-              "name": "IFTTT Connection",
-              "description": "Select your IFTTT Connection",
-              "type": "connection"
-            },
-            "allowed":[]
-        },
-        {
-            "name": "value1",
-            "type": "string",
-            "required": true
-        },
-        {
-            "name": "value2",
-            "type": "string",
-            "required": true
-        },
-        {
-            "name": "value3",
-            "type": "string",
-            "required": true
-        }
-    ],
-    "outputs": [
-        {
-            "name": "result",
-            "type": "string"
-        }
-    ]
+    {
+      "name": "queueUrl",
+      "type": "string",
+      "required": true,
+      "display":{
+        "name": "Queue URL",
+        "description": "Select Queue URL"
+      },
+      "allowed":[]
+    },
+    {
+      "name": "DelaySeconds",
+      "type": "integer",
+      "display":{
+        "name":"Delay",
+        "description":"Delay Description"
+      },
+      "value" : 0
+    }
+  ],
+  "inputs": [
+    {
+      "name": "MessageAttributeNames",
+      "type": "array",
+      "required": false,
+      "display": {
+        "name": "Message Attributes",
+        "description": "Set message attributes",
+        "type": "table",
+        "schema": "{\r\n    \"$schema\": \"http:\/\/json-schema.org\/draft-04\/schema#\",\r\n    \"definitions\": {},\r\n    \"id\": \"http:\/\/example.com\/example.json\",\r\n    \"items\": {\r\n        \"id\": \"\/items\",\r\n        \"properties\": {\r\n            \"Name\": {\r\n                \"id\": \"\/items\/properties\/Name\",\r\n                \"type\": \"string\"\r\n            },\r\n            \"Type\": {\r\n                \"id\": \"\/items\/properties\/Type\",\r\n                \"type\": {\"enum\":[\"String\", \"Number\"]}\r\n            }\r\n        },\r\n        \"type\": \"object\"\r\n    },\r\n    \"type\": \"array\"\r\n}",
+        "inputSettingsOnly":true
+      }
+    },
+    {
+      "name": "MessageAttributes",
+      "type": "object",
+      "required": false
+    },
+    {
+      "name": "MessageBody",
+      "type": "string",
+      "required": true
+    }
+  ],
+
+  "outputs": [
+    {
+      "name": "MessageId",
+      "type": "string"
+    }
+  ]
 }
 ```
 ## Validation
-When creating the `activity.json` file, there are a few validation rules that you need take into account:
+When creating the `descriptor.json` file, there are a few validation rules that you need take into account:
 
 * **name**: The name cannot start with "tibco-" and should only contain alphanumeric chararcters and underscores
 * **title**: The title of your activity (which also shows up on your activity) should only contain alphanumeric characters and spaces
@@ -75,18 +106,18 @@ The user interface is divided into five main sections and these sections are pop
 * Output settings
 
 ### Configuration
-Any element in the **inputs** section of your `activity.json` that has a **display** element associated with it will be shown in the configuration section:
+Any element in the **settings** or **Input**section of your activity `descriptor.json` that has a **display** element associated with it will be shown in the configuration section:
 ```json
 {
-    "name": "iftttConnection",
-    "type": "object",
-    "required": true,
-    "display":{
-        "name": "IFTTT Connection",
-        "description": "Select your IFTTT Connection",
-        "type": "connection"
-    },
-    "allowed":[]
+  "name": "sqsConnection",
+  "type": "connection",
+  "required": true,
+  "display":{
+    "name": "SQS Connection",
+    "description": "Select SQS Connection",
+    "type": "connection"
+  },
+  "allowed":[]
 }
 ```
 
@@ -103,7 +134,18 @@ Any element in the **inputs** section of your `activity.json` that doesn't have 
 ### Input settings
 Any element in the **inputs** section of your `activity.json` that has a **display** element associated with it and has a schema associated with it will be shown in the Input settings section. Note that you also need to set the **mappable** element to true.
 ```json
-
+    {
+      "name": "MessageAttributeNames",
+      "type": "array",
+      "required": false,
+      "display": {
+        "name": "Message Attributes",
+        "description": "Set message attributes",
+        "type": "table",
+        "schema": "{\r\n    \"$schema\": \"http:\/\/json-schema.org\/draft-04\/schema#\",\r\n    \"definitions\": {},\r\n    \"id\": \"http:\/\/example.com\/example.json\",\r\n    \"items\": {\r\n        \"id\": \"\/items\",\r\n        \"properties\": {\r\n            \"Name\": {\r\n                \"id\": \"\/items\/properties\/Name\",\r\n                \"type\": \"string\"\r\n            },\r\n            \"Type\": {\r\n                \"id\": \"\/items\/properties\/Type\",\r\n                \"type\": {\"enum\":[\"String\", \"Number\"]}\r\n            }\r\n        },\r\n        \"type\": \"object\"\r\n    },\r\n    \"type\": \"array\"\r\n}",
+        "inputSettingsOnly":true
+      }
+    }
 ```
 
 ### Output
