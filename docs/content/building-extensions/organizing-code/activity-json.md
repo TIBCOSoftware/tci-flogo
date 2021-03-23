@@ -1,10 +1,10 @@
 ---
 date: 2016-04-09T16:50:16+02:00
-title: activity.json
+title: Activity Model
 weight: 54
 ---
 
-The `activity.json` describes the model, the metadata, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using. The below code explains which fields are in the JSON document as well as what kind of values are allowed. For more samples, check out the samples section!
+The `descriptor.json` describes the model, the metadata, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using. The below code explains which fields are in the JSON document as well as what kind of values are allowed. For more samples, check out the samples section!
 ```json
 {
   "name": "sqssendmessage",

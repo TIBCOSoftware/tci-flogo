@@ -17,26 +17,27 @@ If you follow along with the steps your layout at the end should be:
 ```
 AWSSQS
 ├───activity
-│   ├───sqsreceivemessage
-│   |   ├───activity.json
-│   |   |───activity.go
-│   |   |───activity_test.go
-│   |   |───activity.ts
-│   |   |───activity.module.ts
-│   |   └───sqsreceivemessage.png
 │   └───sqssendmessage
-│       ├───activity.json
+│       ├───descriptor.json
 │       |───activity.go
 │       |───activity_test.go
 │       |───activity.ts
 │       |───activity.module.ts
 │       └───sqssendmessage.png
-└───connector
-    └───sqs
-        ├───connector.json
-        |───connector.ts
-        |───connector.module.ts
-        └───sqs.png
+│───connector
+│    └───sqs
+│        ├───descriptor.json
+│        |───connector.ts
+│        |───connector.module.ts
+│        └───sqs.png
+│        └───connector
+│───trigger
+│    └───sqsreceivemessage
+│        ├───descriptor.json
+│        |───trigger.ts
+│        |───trigger.module.ts
+│        └───sqsreceivemessage.png
+│───contribution.json
 ```
 
 The complete code of this connector and the two activities can be found in our [GitHub](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/extensions/AWSSQS) repo too.

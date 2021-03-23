@@ -1,6 +1,6 @@
 ---
 date: 2016-04-09T16:50:16+02:00
-title: Display settings
+title: Supporting types and widgets
 weight: 60
 ---
 
@@ -15,28 +15,39 @@ Each display element has a type associated with it. The below table displays the
 | integer        | int64                    | A 64-bit integer
 | boolean        | bool                     | A boolean
 | number         | float64                  | A 64-bit float
-| complex_object | [data.ComplexObject](https://godoc.org/github.com/TIBCOSoftware/flogo-lib/core/data#ComplexObject) | It has two parts: 1. Metadata - A `stringified` JSON schema that can be used for the data validation 2. Value - A JSON data that is being passed to the runtime Use this type when you need schema and data together for given field. To use this type, import package [github.com/TIBCOSoftware/flogo-lib/core/data](http://github.com/TIBCOSoftware/flogo-lib/core/data) into your code.
-| array          | []map[string]interface{} | A JSON array value like `'[{"a":"1", "b":"2"},{"a":"2", "b":"3"},{"a":"4", "b":"5"}]'` can be set to array field.
+| array          | []interface | A JSON array value like `'[{"a":"1", "b":"2"},{"a":"2", "b":"3"},{"a":"4", "b":"5"}]'` can be set to array field.
 | object         | map[string]interface{}   | A JSON object
+| connection         | connection   | Flogo Connection Object
 
 ## Special types
 There are a few special types that you can use in your `activity.json` and `connector.json` files to enhance the user experience even further. These special types drive the user interface and are "translated" to the type you selected for it during runtime.
 
-| Type         | Description                                                                              | Example 
-| ------------ | ---------------------------------------------------------------------------------------- | --------
-| TextField    | Renders a text field on the screen (the type must be string)                             | <pre>{ &quot;name&quot;: &quot;url&quot;, &quot;type&quot;: &quot;string&quot;, &quot;display&quot;: {&quot;name&quot;: &quot;URL&quot;, &quot;description&quot;: &quot;Select service URL&quot; }, &quot;required&quot;: true}</pre>
-| Choice       | Renders true and false radio buttons (the type must be bool)                             | <pre>{ &quot;name&quot;: &quot;logheaders&quot;, &quot;type&quot;: &quot;boolean&quot;, &quot;required&quot;: true, &quot;display&quot;: { &quot;name&quot;:&quot;Log Incoming headers &quot;, &quot;description&quot;: &quot;Log incoming headers&quot; } &quot;value&quot;: false }</pre>
-| Dropdown     | Renders a dropdown list (the type must be string)                                        | <pre>{ &quot;name&quot;: &quot;method&quot;, &quot;type&quot;: &quot;string&quot;, &quot;required&quot;: true, &quot;display&quot;: { &quot;name&quot;:&quot;Method&quot;, &quot;description&quot;: &quot;The REST method used for the requests&quot;, &quot;type&quot;:&quot;dropdown&quot;, “selection”:”single” }, &quot;allowed&quot;: [&quot;GET&quot;,&quot;POST&quot;,&quot;PUT&quot;,&quot;DELETE&quot;], &quot;value&quot;: &quot;GET&quot; }</pre> or <pre> { &quot;name&quot;: &quot;businessobjects&quot;, &quot;type&quot;: &quot;string&quot;, &quot;required&quot;: true, &quot;display&quot;: { &quot;name&quot;:&quot;Business Objects&quot;, &quot;description&quot;: &quot;The Salesforce Business Objects for given connection&quot;, &quot;type&quot;:&quot;dropdown&quot;, &quot;selection&quot;:&quot;single&quot; }, &quot;allowed&quot;: [] }</pre>
-| FileSelector | Renders a file selector (the type must be string)                                        | <pre>{ &quot;name&quot;: &quot;certificate&quot;, &quot;type&quot;: &quot;string&quot;, &quot;display&quot;: { &quot;name&quot;: &quot;Server Certificate&quot; &quot;description&quot;: &quot;Self-signed PEM certificate for secure connection&quot;, “type”: &quot;fileselector&quot;, &quot;fileExtensions&quot;: [&quot;.pem&quot;,&quot;.cert&quot;,&quot;.cer&quot;,&quot;.crt&quot;] } &quot;required&quot;: true }</pre>
-| Connector    | Renders a dropdown which only picks connectors (the type must be object)                 | <pre>{ &quot;name&quot;: &quot;connection&quot;, &quot;type&quot;: &quot;object&quot;, &quot;display&quot;: { &quot;type&quot;:&quot;connection&quot;, &quot;name&quot;: &quot;Connection Name&quot;, &quot;description&quot;: &quot;Select a Marketo connection&quot; }, &quot;allowed&quot;:[] &quot;required&quot;: true }</pre>
-| Table        | Renders a table (the type must be array)                                                 | <pre>{ &quot;name&quot;: &quot;books&quot;, &quot;type&quot;: &quot;array&quot;, &quot;display&quot;: { &quot;type&quot;: &quot;table&quot;, &quot;name&quot;:&quot;Pick Books&quot;, &quot;description&quot;: &quot;The headers you want to send&quot;, &quot;schema&quot;: &quot;{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"BookName\":{\"type\":{\"enum\":[\"X\",\"Y\",\"Z\"]}},\"Quantity\":{\"type\":\"number\"}}}&quot;}, &quot;value&quot;: [{\"BookName\":\"X\",\"Quantity\":0},{\"BookName\":\"Z\",\"Quantity\":0}] }</pre>
-| Password     | Renders a password field (the type must be string)                                       | <pre>{ &quot;name&quot;: &quot;userpassword&quot;, &quot;type&quot;: &quot;string&quot;, &quot;required&quot;: true, &quot;display&quot;: { &quot;name&quot;:&quot;Enter Password&quot;, &quot;description&quot;: &quot;Enter Salesforce password&quot;, &quot;type&quot;:&quot;password&quot; } }</pre>
-| TextEditor   | Renders a text editor to paste JSON schemas or objects (the type must be complex_object) | <pre>{ &quot;name&quot;: &quot;responseBody&quot;, &quot;type&quot;: &quot;complex_object&quot;, &quot;display&quot;: { &quot;type&quot;: &quot;texteditor&quot;, &quot;description&quot;: &quot;An example JSON data that you expect back from the REST service&quot;, &quot;name&quot;:&quot;Response Schema&quot;, &quot;syntax&quot;:&quot;json&quot; } }</pre>
 
-## Other settings
-Apart from the type, you can also set a two other elements in the display setting of your `activity.json` and `connector.json` files:
+UI supported widgets
 
-| Element  | Explanation                                                           | Example 
-| -------- | --------------------------------------------------------------------- | ----------- 
-| visible  | Toggles the visibility of the field (default sets visibility to true) | `"display": { "visible": false }`
-| readonly | Toggles the editability of the field (default sets readonly to false) | `"display": { "readonly": true }`
+| Widget | Description | Model Configuration | Example(s)|
+|-----|-----|-----|-----|
+|Text|Render as text box field|x|{<br>"name":"host",<br>"type":"string"<br>}|
+|Integer|Render as number field|x|{<br>"name":"host",<br>"type":"integer"<br>}|
+|Dropdown|Render field as a dropdown list.<br>The field type must be a string.|{<br>"display": {<br>"name": <DISPLAY LABEL>,<br>"description":<DESCRIPTION>,<br>"type": "dropdown"<br>},<br>"allowed":["one or more items"]<br>}|{<br>"name":"method",<br>"type":"string",<br>"required":true,<br>"display":{<br>"name":"Method",<br>"description":"The REST method used for the requests",<br>"type":"dropdown",<br>"selection":"single"<br>},<br>"allowed":[<br>"GET",<br>"POST",<br>"PUT",<br>"DELETE"<br>],<br>"value":"GET"<br>}|
+|File Selector|Render field as a file selector.<br>The field type must be a string.|{<br>"display": {<br>"name": <DISPLAY LABEL>,<br>"description":<DESCRIPTION>,<br>"type": "fileselector", "fileExtensions":[<ONE OR MORE FILE EXTENSIONS>]<br>}|{<br>"name": "certificate",<br>"type": "string",<br>"required": true,<br>"display": {<br>"name": "Server Certificate",<br>"description": "Self-signed PEM certificate for secure connection",<br>"type": "fileselector",<br>"selection": "single",<br>"fileExtensions": [<br>".pem",<br>".cert",<br>".cer",<br>".crt"<br>]<br>}<br>}|
+|Table|Render field as a table.<br>The field type must be array or param or object.|{<br>"display": {<br>"name": <DISPLAY LABEL>,<br>"description":<DESCRIPTION>,<br>"type": "table", "schema":<tableSchema>, "value":<DEFAULT Values for Table><br>}|{<br>"name": "headers",<br>"type": "param",<br>"display": {<br>"name": "Request Headers",<br>"description": "The headers you want to send",<br>"type": "params",<br>"schema": "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"parameterName\":{\"type\":\"string\"},\"type\":{\"type\":{\"enum\":[\"string\",\"number\",\"boolean\"]}},\"repeating\":{\"type\":{\"enum\":[\"true\",\"false\"]}},\"required\":{\"type\":{\"enum\":[\"true\",\"false\"]}}}}}",<br>"mappable": true<br>},<br>"value": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"<br>}|
+|Password|Render field as a password type.<br>The field type must be a string.|{<br>"display": {<br>"name": <DISPLAY LABEL>,<br>"description":<DESCRIPTION>,<br>"type": "password",<br>}|{<br>"name": "password",<br>"type": "string",<br>"required": true,<br>"display": {<br>"name": "Password",<br>"description": "Password for xxxxx",<br>"type": "password"<br>}<br>}|
+|Text Editor|Render field as a text editor with given syntax.<br>The field type must be object |{<br>"display": {<br>"name": <DISPLAY LABEL>,<br>"description":<DESCRIPTION>,<br>"type": "texteditor", "syntax":"json"<br>}|{<br>"name": "body",<br>"type": "object",<br>"required": true,<br>"display": {<br>"name": "Schema",<br>"description": "An example JSON data or schema",<br>"type": "texteditor",<br>"syntax": "json"<br>}<br>}|
+|Checkbox|Render field as a checkbox field.<br>The field type must be string.<br>Update: The field value will be a stringified array, with each value enclosed by escaped double-quotes.|{<br>"display": {<br>"name": <DISPLAY LABEL>,<br>"description":<DESCRIPTION>,<br>"type": "checkbox"}|{<br>"name": "ssl",<br>"type": "boolean",<br>"required": true,<br>"display": {<br>"name": "Enable SSL",<br>"description": "Enable SSL xxxxxxx",<br>}<br>}|
+
+**Note**
+All fields value can be overwritten or set through TypeScript UI contribution code base on UI logic.
+
+For each field it has display section to set visibility/Readability etc
+
+| AttributeName | Description | Model Configuration | Example(s)|
+|-----|-----|-----|-----|
+|visibility|Setting visibility in UI|<code>"display": { </br>&nbsp;&nbsp;&nbsp;"visible": false</br>}</code>|<code>{<br>"name":"method",<br>"type":"string",<br>"required":true,<br>"display":{<br>&nbsp;&nbsp;&nbsp;"visible":false<br>}, <br>"value":"GET"<br>}</code>|
+|Readonly|Make field readonly in UI|<code>"display": { </br>&nbsp;&nbsp;&nbsp;"readonly": true</br>}</code>|<code>{<br>"name":"method",<br>"type":"string",<br>"required":true,<br>"display":{<br>&nbsp;&nbsp;&nbsp;"readonly”:true<br>}, <br>"value":"GET"<br>}</code>|
+|Exportable|Make field exportable in UI.<br> This flag is to determine if this field can be exported to flogo.json and app.json.<br> Mainly the fields which are also not visible i.e. Access Tokens.|<code>"display": { </br>&nbsp;&nbsp;&nbsp;"exportable": true</br>}</code>|<code>{<br>"name":"method",<br>"type":"string",<br>"required":true,<br>"display":{<br>&nbsp;&nbsp;&nbsp;"exportable”:true<br>}, <br>"value":"GET"<br>}</code>|
+|Encryptable|Make field encrypt able in UI.<br> This flag is to determine if a field needs to be encrypted.<br> Mostly fields which are of type password are encrypted by default,<br> however invisible fields which are text fields holding access token data needs to be protected also.|<code>"display": { </br>&nbsp;&nbsp;&nbsp;"encryptable": true</br>}</code>|<code>{<br>"name":"method",<br>"type":"string",<br>"required":true,<br>"display":{<br>&nbsp;&nbsp;&nbsp;"encryptable”:true<br>}, <br>"value":"GET"<br>}</code>|
+
+
+**Note**
+All field's visibility, readability can be set through UI contribution TypeScript code.

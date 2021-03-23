@@ -31,7 +31,7 @@ You will need to configure the EMS Connection used in the app. You can either us
 In order to use on-prem EMS server in TCI, you will either have to attach VPN Connection to your app or attach Access Key to use Hybrid Connectivity.
 
 
-For more details on how to use *Hybrid Connectivity/tibtunnel/Proxy Agent*, please refer [TCI documentation]( https://integration.cloud.tibco.com/docs/index.html#tci/using/hybrid-agent/hybrid-proxy/using-tunneling.html%3FTocPath%3DUsing%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%7CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%7CHybrid%2520Proxy%2520Connections%7C_____2)
+For more details on how to use *Hybrid Connectivity/tibtunnel/Proxy Agent*, please refer this TCI documentation - https://integration.cloud.tibco.com/docs/using/hybrid-connectivity/proxy-agent/using-proxy-agent.html
 
 ## Import a sample
 

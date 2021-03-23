@@ -58,7 +58,7 @@ builder-linux_amd64 build -f <exported_flogo_ems_app>
 # Using connector in TIBCO Cloud Integration(TCI)
 #### Installation:
 <li> Download/Checkout this repository and zip *samples/extensions/EMS* folder</li>
-<li> Upload above zip to TCI(https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/uploading-extensions2.html?Highlight=flogo%20extension) </li>
+<li> Upload above zip to TCI(https://integration.cloud.tibco.com/docs/flogo/GUID-9E82EF1A-6C6E-4FBB-BF31-753460CF58AF.html)</li>
 
 #### EMS Supplement
 For connector to work in TCI, Linux EMS native libraries must be uploaded. To upload required libraries, we will be using TCI supplement mechanism.
@@ -75,7 +75,7 @@ zip --symlinks -r ems.zip include/ lib/
 #### Upload Supplement
 > Only org admin can upload supplements. Contact your org admin in case your are not the admin.
 
-<li> Download tibcli(https://integration.cloud.tibco.com/docs/index.html#tci/getstarted/installation/download-tools.html) from your TCI account and add it to system PATH</li>
+<li> Download tibcli(https://integration.cloud.tibco.com/docs/getstarted/installation/download-tools.html) from your TCI account and add it to system PATH</li>
 <li> Create temporary folder and copy supplement (ems.zip) into it </li>
 <li> Change directory to above folder and run below command: </li>
 
