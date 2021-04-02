@@ -5,6 +5,7 @@
 In this folder, you will find below samples - 
 
 * [HelloWorld](/samples/app-dev/hello-world)
+* [Array Manipulations Samples](/samples/app-dev/Array-Operations)
 * [Bookstore REST API](/samples/app-dev/rest-api)
 * [Branching & Error Handling](/samples/app-dev/branching-errorhandling)
 * [Subflows](/samples/app-dev/subflows)
