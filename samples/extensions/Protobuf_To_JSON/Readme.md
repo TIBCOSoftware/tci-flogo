@@ -36,7 +36,8 @@ Now, the function will process the first 25 entities of the message without any 
 ![Usage of the coversion function](images/3.png)
 
 ## Sample Apps for demonstration
-Please refer to any of the below available sample apps
+Please refer to any of the below available sample apps ![Here](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/Array-Operations)
+
 * FindCommonArrayElement-UsingCustomExtension
 * FindCommonArrayElements
 * Find_NonCommonArrayElement-UsingCustomExtension
