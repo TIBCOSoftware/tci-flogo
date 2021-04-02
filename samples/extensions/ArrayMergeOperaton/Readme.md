@@ -21,7 +21,7 @@ arraymerge.unmatching($activity[GET_LivePositions].entity,$activity[GET_TripUpda
 This function will return all the unmatching elements from array1 (GET_LivePositions) where id from array1 is not-matching with array2 (GET_TripUpdates). 
 You need to make sure that you should place that array as a first parameter  from which you do not wish to lose the data. All the data from array2 will be ignored. 
 
-## Steps to use the Protobuf to JSON extension:
+## Steps to use the Array Merge extension:
 * Download the extension on your file system from here.
 * Login to TIBCO Cloud™ Integration with a valid subscription. 
 * Select Environment & Tools menu option.
