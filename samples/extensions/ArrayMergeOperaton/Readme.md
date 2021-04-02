@@ -40,6 +40,4 @@ We have two functions available here in this custom extension as shown below,
 
 Please refer to any of the available sample apps [Here](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/Array-Operations)
 * FindCommonArrayElement-UsingCustomExtension
-* FindCommonArrayElements
 * Find_NonCommonArrayElement-UsingCustomExtension
-* Find_NonCommonArrayElements
