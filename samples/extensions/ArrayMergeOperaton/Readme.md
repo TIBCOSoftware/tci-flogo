@@ -39,5 +39,5 @@ We have two functions available here in this custom extension as shown below,
 ## Sample Apps for Reference 
 
 Please refer to any of the available sample apps [Here](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/Array-Operations)
-* FindCommonArrayElement-UsingCustomExtension
+* Find_CommonArrayElement-UsingCustomExtension
 * Find_NonCommonArrayElement-UsingCustomExtension
