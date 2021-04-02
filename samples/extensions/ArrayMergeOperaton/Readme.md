@@ -11,11 +11,11 @@ We have two functions available here in this custom extension as shown below,
 
 ## Example:
 ### Syntax with input parameters: 
-    arraymerge.merge($activity[GET_TripUpdates].entity, $activity[GET_LivePositions].entity, "id","==", "id")
+    arraymerge.merge($array1, $array2, "id","==", "id")
    This function will merge both arrays where id is matching and create a new output array that has elements from both arrays. 
    The unmatching elements from both arrays will be ignored.
 
-    arraymerge.unmatching($activity[GET_LivePositions].entity,$activity[GET_TripUpdates].entity, "id","==", "id")
+    arraymerge.unmatching($array1,$array2, "id","==", "id")
   This function will return all the unmatching elements from array1 (GET_LivePositions) where id from array1 is not-matching with array2 (GET_TripUpdates). 
   You need to make sure that you should place that array as a first parameter  from which you do not wish to lose the data. All the data from array2 will be ignored. 
 
