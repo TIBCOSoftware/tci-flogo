@@ -29,3 +29,16 @@ Now, the function will process the first 25 entities of the message without any 
 * Select “From a Zip File” tab and navigate to the zip file on your file system as shown in the snapshot below. (from step #1) This step will upload the extension and make it available to use in the Flogo flows. 
 * You can now access the function (as shown below) under the Functions section by the name, cl_utils.
 
+![Select the extension](images/1.png)
+
+![Upload & Compile the extension](images/2.png)
+
+![Usage of the coversion function](images/3.png)
+
+## Sample Apps for reference 
+
+Please refer to any of the available sample apps [Here](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/Array-Operations)
+* FindCommonArrayElement-UsingCustomExtension
+* FindCommonArrayElements
+* Find_NonCommonArrayElement-UsingCustomExtension
+* Find_NonCommonArrayElements
