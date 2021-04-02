@@ -34,3 +34,10 @@ Now, the function will process the first 25 entities of the message without any 
 ![Upload & Compile the extension](images/2.png)
 
 ![Usage of the coversion function](images/3.png)
+
+## Sample Apps for demonstration
+Please refer to any of the below available sample apps
+* FindCommonArrayElement-UsingCustomExtension
+* FindCommonArrayElements
+* Find_NonCommonArrayElement-UsingCustomExtension
+* Find_NonCommonArrayElements
