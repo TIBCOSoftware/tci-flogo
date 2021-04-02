@@ -1,4 +1,5 @@
-# Protobuf to JSON Extension
+# Merge Object arrays based on mapping condition Extension
+
 
 ## Overview
 Custom extension function to merge the two arrays based on common elements or based on the condition that you want pass-in. You can use any conditional operator with these functions.
@@ -32,8 +33,6 @@ You need to make sure that you should place that array as a first parameter  fro
 ![Select the extension](images/1.png)
 
 ![Upload & Compile the extension](images/2.png)
-
-![Usage of the coversion function](images/3.png)
 
 ![Usage of the merge function](images/4.png)
 
