@@ -13,8 +13,5 @@ Publisher flow uses the Timer trigger for publishing events and the Subscriber f
 ## Steps to use the Flogo application: 
 1. Download the Flogo application (JSON file) from [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/TCM/TCM_Pub_Sub_UsingConnector/TCM_PubSub_UsingConnector.json)
 2. Login to TIBCO Cloud™ Integration with a valid subscription.
-3. Create a new Flogo app as shown in the snapshot below. 
-4. On the app details page, select Import app option. 
-5. Upload the JSON file of the app to be imported (from step #1) and Click Upload. 
-6. Once the app is imported, some generic errors and warnings pertaining to the app are listed. This step validates whether all the activities and triggers used in the app are available in the Extensions tab.
-7. Either selectively import flows or import all flows using the options and move forward to import the flow. 
+3. Steps to import the Flogo application is listed [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/readme.md)
+4. The imported Flogo app should look like shown below. 
