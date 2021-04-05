@@ -18,7 +18,7 @@ Below is a list of steps to import the Flogo application/sample. Every sample al
 
 1. Download the JSON file. (Sample Flogo app)
 
-2. Create a new app.
+2. Create a new Flogo app.
 ![Create an app](import-screenshots/2.png)
 
 3. On the app details page, select Import app option. 
