@@ -15,9 +15,9 @@ Publisher flow uses the Timer trigger for publishing events and the Subscriber f
 2. Login to TIBCO Cloud™ Integration with a valid subscription.
 3. Steps to import the Flogo application (from step #1) is listed [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/readme.md)
 4. The imported Flogo app should look like shown below. 
-<img width="1680" alt="TCM-Pub-Sub-Connector" src="https://user-images.githubusercontent.com/17696107/113563325-242fc980-9625-11eb-9c1b-19b6f93e994d.png">
 5. Publisher flow leverages TCMMessagePublisher activity to publish messages to a destination called "sub".
 6. Subscriber flow leverages MessageSubscriber trigger to subscribe to messages on the destination called "sub".
 7. Users need a valid subscription to TIBCO Cloud Messaging to configure the TIBCO Cloud Messaging Connector appropriately as shown below. 
-<img width="557" alt="TCMConnector" src="https://user-images.githubusercontent.com/17696107/113564107-64437c00-9626-11eb-8cae-72fac07a1d8f.png">
 8. For any additional information, please raise your queries or issues via the Issues section. 
+<img width="1680" alt="TCM-Pub-Sub-Connector" src="https://user-images.githubusercontent.com/17696107/113564618-4cb8c300-9627-11eb-8df5-aad897d87418.png">
+<img width="557" alt="TCMConnector" src="https://user-images.githubusercontent.com/17696107/113564638-56dac180-9627-11eb-824b-98199cd388a8.png">
