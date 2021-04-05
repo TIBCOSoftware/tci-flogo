@@ -24,7 +24,7 @@ This is a custom extension (function) to convert General Transit Feed Specificat
 Now, the function will process the first 25 entities of the message without any transformation and will return the JSON string in the output.
 
 ## Steps to use the Protobuf to JSON extension:
-1. Download the extension on your file system from [here] (https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/extensions/Protobuf_To_JSON/cl_utils_2.0.zip)
+1. Download the extension on your file system from [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/extensions/Protobuf_To_JSON/cl_utils_2.0.zip)
 2. Login to TIBCO Cloud™ Integration with a valid subscription. 
 3. Select Environment & Tools menu option.
 4. Under Connector Management & Extensions section, choose Extensions option. 
