@@ -30,7 +30,7 @@ Below is a list of steps to import the Flogo application/sample. Every sample al
 5. Once the app is imported, some generic errors and warnings pertaining to the app are listed. This step validates whether all the activities and triggers used in the app are available in the Extensions tab.
 ![The Import app dialog](import-screenshots/5.png)
 
-6. Users have an option to either selectively import specific flows or import all flows from the source app.
+6. Users have an option to either selectively import specific flows or import all flows from the source app. Rename the app once it is imported successfully. 
 
 7. If a trigger in the previous dialog is not selected, the flows associated with that trigger are displayed. Users have an option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Uncheck the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow.
 
