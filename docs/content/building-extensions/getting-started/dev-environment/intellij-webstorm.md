@@ -13,3 +13,7 @@ To use IntelliJ WebStorm as your IDE to develop extensions for TIBCO Cloud<sup>&
 * Next you need to set up Go Plugin from the **Preferences** dialog to make sure it knows about the environment variables for **GOAPTH** and **GOROOT**
 
 ![Intellij Go language plugin configuration](../../images/goplugin-webstorm-settings.png)
+
+
+
+* Go to [prerequisites](../../prerequisites)
