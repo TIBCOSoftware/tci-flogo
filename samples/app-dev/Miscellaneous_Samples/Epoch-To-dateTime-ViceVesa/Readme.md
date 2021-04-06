@@ -13,7 +13,7 @@ The application itself contains single flow to demonstrate both the conversions 
 2. Login to TIBCO Cloud™ Integration with a valid subscription.
 3. Steps to import the Flogo application (from step #1) is listed [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/readme.md)
 4. The imported Flogo app should look like shown below. 
-5. The logic to generate Epoch is in the Mapper activity called GenerateEpoch and similarly to generate DateTime from Epoch logic is in the Mapper activity called DateTimeFromEpoch. 
+5. The logic to generate Epoch is in the Mapper activity called GenerateEpoch and similarly to generate DateTime from Epoch logic is in the Mapper activity called DateTimeFromEpoch. (ignore the validation error - it’s a known issue in the current version)
 6. For any additional information, please raise your queries or issues via the Issues section.
 <img width="1680" alt="Epoch-DateTime-Conversion" src="https://user-images.githubusercontent.com/17696107/113614806-9974bc00-9670-11eb-9534-b39f8c93619d.png">
 
