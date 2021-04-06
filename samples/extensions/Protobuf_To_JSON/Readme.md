@@ -26,15 +26,8 @@ Now, the function will process the first 25 entities of the message without any 
 ## Steps to use the Protobuf to JSON extension:
 1. Download the extension on your file system from [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/extensions/Protobuf_To_JSON/cl_utils_2.0.zip)
 2. Login to TIBCO Cloud™ Integration with a valid subscription. 
-3. Select Environment & Tools menu option.
-4. Under Connector Management & Extensions section, choose Extensions option. 
-5. Under Extensions, select the Upload button. 
-6. Select “From a Zip File” tab and navigate to the zip file on your file system as shown in the snapshot below. (from step #1) This step will upload the extension and make it available to use in the Flogo flows. 
-7. You can now access the function (as shown below) under the Functions section by the name, cl_utils.
-
-![Select the extension](images/1.png)
-
-![Upload & Compile the extension](images/2.png)
+3. Upload the extension following the instructions from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/extensions/Readme.md) 
+4. You can now access the function (as shown below) under the Functions section by the name, cl_utils.
 
 ![Usage of the coversion function](images/3.png)
 
