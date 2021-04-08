@@ -23,22 +23,9 @@ Assuming that you want to test your extensions, and as a good developer you real
 * [test](https://github.com/project-flogo/contrib/blob/master/activity/rest/activity_test.go) is a simple mechanism to test activity, the Go parts of your extensions
 
 ## The TypeScript part
-The user interface for your activities can either be generated from the **activity.json** files of your extension, or you have the ability to enhance them with a bit of TypeScript.
+The user interface for your activities can either be generated from the **descriptor.json** files of your extension, or you have the ability to enhance them with a bit of TypeScript.
 
 {{% notice tip %}}
 The latest release of the SDK can be found in the **releases** section of the [repository] (https://github.com/TIBCOSoftware/tci-flogo/releases).
 {{% /notice %}}
 
-
-## The Tooling Part
-
-The [Tooling](https://github.com/TIBCOSoftware/tci-flogo/blob/master/tools/readme.md) helps the user to generate a project scaffolding code for the User interface and then the user can proceed with adding the runtime GOLANG code incrementally. The tooling is built as a docker image which is downloadable from the [releases section](https://github.com/TIBCOSoftware/tci-flogo/releases) of this Github repository for individual releases. The Docker image contains both the User Interface and the Run Time SDK and the tooling command line. 
-
-The tooling currently supports :
-
-  1. User Interface Scaffolding code generation.
-  1. User Interface code compilation.
-  1. User Interface code testing.
-{{% notice tip%}}
-More Information for the tooling can be found [here](../../tooling/tooling) and on [Github Readme documentaion](https://github.com/TIBCOSoftware/tci-flogo/blob/master/tools/readme.md).
-{{% /notice %}}

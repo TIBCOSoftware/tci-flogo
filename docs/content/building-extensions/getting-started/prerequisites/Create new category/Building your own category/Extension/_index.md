@@ -13,4 +13,5 @@ Before we started be sure to have below ready
 
 * Install [Golang](https://golang.org/)
 * Setting up an GOPATH directory. such as: /User/root/gopath_dev
+* One SDE installed.  VS code or Goland.
 

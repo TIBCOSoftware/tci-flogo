@@ -30,11 +30,13 @@ git clone https://github.com/project-flogo/core.git
 * Extract the wi-studio.zip and put wi-studio folder under template directory(${GOPATH/src/github.com/tibco/Template/node_modules/})
 
 
-Now you are ready to go with your development. Let's try to edit exist Connection/Activity/Connector
+Now you are ready to go with your development. Let's try to edit exist Connection/Activity/Trigger
 
 * Connection [here](../changes-connection)
 * Activity [here](../changes-activity)
 * Trigger [here](../changes-trigger)
 
-Or you can just follow [Here](../../../../../../upload) to upload to Flogo Enterprise or TIBCO Cloud Integration to play.
+## Upload 
+  * Compress Template folder under `${GOPATH/src/github.com/tibco/Template/src/app` to `Template.zip`
+  * Follow [Here](../../../../../../upload) to upload to Flogo Enterprise or TIBCO Cloud Integration to play.
 

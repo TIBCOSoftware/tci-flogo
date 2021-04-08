@@ -18,6 +18,7 @@ Now let's go to activity folder ${GOPATH}/src/github.com/tibco/Template/src/app/
 
 ## Edit
 
-* Add/Edit/Delete fields in activity.json to show on activity ui page.
+* Add/Edit/Delete fields in activity.json
 * If #1 fields requires for runtime, you have to added them in metadata.go for runtime.
 * If you need add validation or new added field, please add into `activity.handle.ts`
+

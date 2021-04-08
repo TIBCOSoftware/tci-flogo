@@ -88,4 +88,4 @@ The layout of your folder has to follow a specific structure.
 * For local Go code testing purpose, please create ref dir under your ${GOPATH}/src/${ref}, such as: github.com/project-flogo/contrib/activity/log/
 
 ## Upload
-* Compress activity, trigger or function folder into zip and upload to [FLOGO Enterprise or TIBCO Cloud Integration](./../../upload)
+* Compress activity, trigger or function folder into zip and upload to [FLOGO Enterprise or TIBCO Cloud Integration](./../../../upload)

@@ -17,7 +17,9 @@ Now let's go to connection folder ${GOPATH}/src/github.com/tibco/Template/src/ap
 
 ## Edit
 
-* Add/Edit/Delete fields in connector.json to show on connection ui page base on connection requirements.
-* If #1 fields requires for runtime, you have to added them in connection.go connection struct. 
-* If you need add validation or new added field, please add into `connection.handle.ts`
-* The action code with template just verify to see if there is duplicate connection name already exist.
+* Add/Edit/Delete fields in connector.json base on connection requirements.
+* If #1 fields requires for runtime, you have to expose connection struct. 
+* If you need add fields validation or dynamically change the field value, please add to `connection.handle.ts`
+* The action code with the template just verify to see if there is duplicate connection already exist.
+
+

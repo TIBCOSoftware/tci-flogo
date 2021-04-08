@@ -1,19 +1,13 @@
 ---
 date: 2016-04-09T16:50:16+02:00
-title: Using IntelliJ WebStorm
+title: Using Goland
 weight: 7
 ---
 
-To use IntelliJ WebStorm as your IDE to develop extensions for TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> or TIBCO Flogo<sup>&reg;</sup> Enterprise, you can install a few extensions to make your life easier.
+To use Golandas your IDE to develop extensions for TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> or TIBCO Flogo<sup>&reg;</sup> Enterprise, you can install a few extensions to make your life easier.
 
-* First you need to install the **Go Plugin**. This plugin can be downloaded from the **Preferences** dialog
+* Goland native supports Go.
 
-![Intellij Go language plugin installation](../../images/goplugin-webstorm-install.png)
+* Install plugins for typescript.  You can install `Angular and Angular JS` plugins from Goland Marketpace.
 
-* Next you need to set up Go Plugin from the **Preferences** dialog to make sure it knows about the environment variables for **GOAPTH** and **GOROOT**
-
-![Intellij Go language plugin configuration](../../images/goplugin-webstorm-settings.png)
-
-
-
-* Go to [prerequisites](../../prerequisites)
+![img.png](../img.png)
