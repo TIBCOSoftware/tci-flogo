@@ -9,8 +9,8 @@ This is a custom extension (function) to merge two arrays based on matching or n
 ## Usage details:
 
 ## Syntax:
-merge(array1, array2, fieldInArray1, operator, fieldInArray2)
-unmatching(array1, array2, fieldInArray1, operator, fieldInArray2)
+- merge(array1, array2, fieldInArray1, operator, fieldInArray2)
+- unmatching(array1, array2, fieldInArray1, operator, fieldInArray2)
 
 ## Example:
 arraymerge.merge($activity[GET_TripUpdates].entity, $activity[GET_LivePositions].entity, "id","==", "id")
