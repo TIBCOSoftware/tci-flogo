@@ -30,5 +30,6 @@ Unmatching elements from only array 1 are returned as output array.
 3. Upload the extension following the instructions from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/extensions/Readme.md)
 4. You can now access the function (as shown below) under the Functions section by the name, arraymerge.
 ![Merge](https://user-images.githubusercontent.com/17696107/114054736-bf3ad480-98ad-11eb-95e9-fda67a34eb24.png)
-![Unmatching](https://user-images.githubusercontent.com/17696107/114054769-c661e280-98ad-11eb-8af5-6ad05090349b.png)
+![UNmatching](https://user-images.githubusercontent.com/17696107/114054966-f315fa00-98ad-11eb-8960-fd08f76b40a1.png)
+
 
