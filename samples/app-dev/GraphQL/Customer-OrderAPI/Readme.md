@@ -31,7 +31,7 @@ The flow also leverages the shared data feature to store the Order Information. 
 ![G5](https://user-images.githubusercontent.com/17696107/114091711-9e3aa980-98d6-11eb-81f8-cb43314d7221.png)
 7. Once the skeletons are ready, users can add the implementation logic per their business needs. In this example, the auto-generated flow from above steps is updated per the Customer Order use-case and looks as shown below. 
 ![G6](https://user-images.githubusercontent.com/17696107/114091754-b0b4e300-98d6-11eb-8389-7d88e7b08d9d.png)
-8. Test the GraphQL service via any browser extensions or clients like POSTMAN.
+8. Test the GraphQL service via any browser extensions or clients like Postman.
 ![G7](https://user-images.githubusercontent.com/17696107/114091798-be6a6880-98d6-11eb-8ff9-2c7b0d2c6128.png)
 
 ## Steps to use the Flogo application (Customer Order API): 
