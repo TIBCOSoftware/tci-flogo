@@ -1,43 +1,38 @@
-# Merge Object arrays based on mapping condition Extension
+# Merge arrays based on matching and non-matching elements
 
+## Prerequisites
+TIBCO Cloud™ Integration - latest version. 
 
 ## Overview
-Custom extension function to merge the two arrays based on common elements or based on the condition that you want pass-in. You can use any conditional operator with these functions.
-We have two functions available here in this custom extension as shown below,
-## Usage details
+This is a custom extension (function) to merge two arrays based on matching or non-matching identifiers. The identifier in this application is an ID but can be a different field which is common across both arrays. Two different functions are available as part of this custom extension. The extension is optimized for enterprise usage and from a scalability perspective.
 
-### Syntax: merge(array1, array2, fieldInArray1, operator, fieldInArray2)
-### Syntax: unmatching(array1, array2, fieldInArray1, operator, fieldInArray2)
+## Usage details:
+
+## Syntax:
+- merge(array1, array2, fieldInArray1, operator, fieldInArray2)
+- unmatching(array1, array2, fieldInArray1, operator, fieldInArray2)
 
 ## Example:
-### Syntax with input parameters: 
-    arraymerge.merge($array1, $array2, "id","==", "id")
-   This function will merge both arrays where id is matching and create a new output array that has elements from both arrays. 
-   The unmatching elements from both arrays will be ignored.
+arraymerge.merge($activity[GET_TripUpdates].entity, $activity[GET_LivePositions].entity, "id","==", "id")
 
-    arraymerge.unmatching($array1,$array2, "id","==", "id")
-  This function will return all the unmatching elements from array1 (GET_LivePositions) where id from array1 is not-matching with array2 (GET_TripUpdates). 
-  You need to make sure that you should place that array as a first parameter  from which you do not wish to lose the data. All the data from array2 will be ignored. 
+This function merges both arrays based on the matching ID (common field) across both arrays and creates a new output array containing elements from both arrays. The unmatching elements from both arrays will be ignored.
+
+arraymerge.unmatching($activity[GET_LivePositions].entity,$activity[GET_TripUpdates].entity, "id","==", "id")
+
+This function returns all the unmatching elements from array1 only (GET_LivePositions) where ID (common field) from array1 is not-matching with array2 (GET_TripUpdates). 
+
+## Note: 
+Unmatching elements from only array 1 are returned as output array. 
 
 ## Steps to use the Array Merge extension:
-* Download the extension on your file system from here.
-* Login to TIBCO Cloud™ Integration with a valid subscription. 
-* Select Environment & Tools menu option.
-* Under Connector Management & Extensions section, choose Extensions option. 
-* Under Extensions, select the Upload button. 
-* Select “From a Zip File” tab and navigate to the zip file on your file system as shown in the snapshot below. (from step #1) This step will upload the extension and make it available to use in the Flogo flows. 
-* You can access the custom functions within functions sections with name arraymerge category
+1. Download the extension on your file system from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/extensions/ArrayMergeOperaton/array_merge.zip)
+2. Login to TIBCO Cloud™ Integration with a valid subscription. 
+3. Upload the extension following the instructions from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/extensions/Readme.md)
+4. You can now access the function (as shown below) under the Functions section by the name, arraymerge.
+![Merge](https://user-images.githubusercontent.com/17696107/114054736-bf3ad480-98ad-11eb-95e9-fda67a34eb24.png)
+![UNmatching](https://user-images.githubusercontent.com/17696107/114054966-f315fa00-98ad-11eb-8960-fd08f76b40a1.png)
 
-![Select the extension](images/1.png)
-
-![Upload & Compile the extension](images/2.png)
-
-![Usage of the merge function](images/4.png)
-
-![Usage of the unmatch function](images/5.png)
-
-## Sample Apps for Reference 
-
-Please refer to any of the available sample apps [here](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/Array-Operations)
-* Find_CommonArrayElement-UsingCustomExtension
-* Find_NonCommonArrayElement-UsingCustomExtension
+## Reference applications 
+1. Flogo application to demonstrate the usage of unmatching() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/Array-Operations/Find_NonCommonArrayElement-UsingCustomExtension/FindNonCommon_ArrayElement_UsingCustomExtension.json)
+2. Flogo application to demonstrate the usage of merge() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/Array-Operations/FindCommonArrayElement-UsingCustomExtension/FindCommon_ArrayElement-UsingCustomExtension.json)
+3. Steps to import Flogo application can be found [here.](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev)
