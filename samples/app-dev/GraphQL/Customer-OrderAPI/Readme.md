@@ -1,7 +1,7 @@
 # Customer Order GraphQL API
 
 ## Prerequisites
-TIBCO Cloud™ Integration, TIBCO Cloud™ Messaging - latest version. 
+TIBCO Cloud™ Integration. 
 
 ## Overview
 This flow demonstrates a simplified Customer Order API implementation leveraging out-of-the-box GraphQL capabilities. The API has two methods implemented - GET to fetch the Order Information and POST - to create a new order request.
