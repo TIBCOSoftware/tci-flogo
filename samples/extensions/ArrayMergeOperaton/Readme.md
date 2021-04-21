@@ -9,15 +9,21 @@ This is a custom extension (function) to merge two arrays based on matching or n
 ## Usage details:
 
 ## Syntax:
-- merge(array1, array2, fieldInArray1, operator, fieldInArray2)
-- unmatching(array1, array2, fieldInArray1, operator, fieldInArray2)
+- Merge Array Operation
+
+      merge(array1, array2, fieldInArray1, operator, fieldInArray2)
+      
+- Unmatching Array Operation
+        
+      unmatching(array1, array2, fieldInArray1, operator, fieldInArray2)
 
 ## Example:
-arraymerge.merge($activity[GET_TripUpdates].entity, $activity[GET_LivePositions].entity, "id","==", "id")
+    
+    arraymerge.merge($activity[GET_TripUpdates].entity, $activity[GET_LivePositions].entity, "id","==", "id")
 
 This function merges both arrays based on the matching ID (common field) across both arrays and creates a new output array containing elements from both arrays. The unmatching elements from both arrays will be ignored.
 
-arraymerge.unmatching($activity[GET_LivePositions].entity,$activity[GET_TripUpdates].entity, "id","==", "id")
+    arraymerge.unmatching($activity[GET_LivePositions].entity,$activity[GET_TripUpdates].entity, "id","==", "id")
 
 This function returns all the unmatching elements from array1 only (GET_LivePositions) where ID (common field) from array1 is not-matching with array2 (GET_TripUpdates). 
 
