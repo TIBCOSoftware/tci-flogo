@@ -1,7 +1,8 @@
 # Integrate TCI & TCM via REST API
 
 ## Prerequisites
-TIBCO Cloud™ Integration, TIBCO Cloud™ Messaging - latest version. 
+- TIBCO Cloud™ Integration
+- TIBCO Cloud™ Messaging - latest version. 
 
 ## Overview
 This application demonstrates an easy way to integrate TCI (Flogo) and TCM (eFTL) using the REST APIs for any publisher and subscriber messaging patterns. This is an alternate solution to using the OOTB connector solution listed [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/TCM/TCM_Pub_Sub_UsingConnector/Readme.md)
