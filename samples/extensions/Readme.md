@@ -1,4 +1,4 @@
-## Steps to upload an extension.
+## Steps to upload or use an extension.
 
 Users can upload an extension either via a GitHub repository or a ZIP file from the local file system. Steps to upload an extension from a ZIP file are listed below. 
 
