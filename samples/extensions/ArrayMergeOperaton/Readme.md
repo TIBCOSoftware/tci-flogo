@@ -9,11 +9,11 @@ This is a custom extension (function) to merge two arrays based on matching or n
 ## Usage details:
 
 ## Syntax:
-- Merge Array Operation
+- Merge Array 
 
       merge(array1, array2, fieldInArray1, operator, fieldInArray2)
       
-- Unmatching Array Operation
+- Unmatching Array 
         
       unmatching(array1, array2, fieldInArray1, operator, fieldInArray2)
 
