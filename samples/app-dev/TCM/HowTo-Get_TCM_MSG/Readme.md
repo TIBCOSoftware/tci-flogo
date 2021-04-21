@@ -1,7 +1,8 @@
 # Get TCM Message
 
 ## Prerequisites
-TIBCO Cloud™ Integration, TIBCO Cloud™ Messaging - latest version. 
+- TIBCO Cloud™ Integration
+- TIBCO Cloud™ Messaging - latest version. 
 
 ## Overview
 This application demonstrates the behavior of Get JMS Message - typically used to fetch a message from JMS destination. Currently, there is no such activity within the TCM connector. The flow leverages TCM REST APIs to fetch messages from a TCM durable and REST Invoke TCI (Flogo) activity to mimic a similar behavior. 
