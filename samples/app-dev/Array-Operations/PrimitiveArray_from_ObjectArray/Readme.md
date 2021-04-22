@@ -5,6 +5,7 @@
 
 ## Overview
 This application will demonstrate you how quickly users can use/leverage the built-in functions & features to convert or create a new primitive type array from an array of objects. 
+
 Usually, almost every system (databases, ERP, CRM) provides the array of objects for processing and sometimes it's required to convert those array of objects into primitive array types.
 
 ## Steps to use the Flogo application
