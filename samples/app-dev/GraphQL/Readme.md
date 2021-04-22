@@ -1,5 +1,5 @@
 # GraphQL Samples
 
-## Customer Order API
+- [Customer Order API](/samples/app-dev/GraphQL/Customer-OrderAPI)
 
 ##
