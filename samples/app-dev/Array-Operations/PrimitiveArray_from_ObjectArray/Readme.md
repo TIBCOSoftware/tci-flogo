@@ -1,4 +1,4 @@
-#  Create Primitive Array from Object Array
+#  Creating Primitive Array from Object Array
 
 ## Prerequisites
 - TIBCO Cloud™ Integration
