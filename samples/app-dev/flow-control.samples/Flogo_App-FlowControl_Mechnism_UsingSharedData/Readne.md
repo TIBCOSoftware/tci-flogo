@@ -16,5 +16,5 @@ The Shared Data design is useful for Timer based triggers where users want one j
 1. Download the Flogo application (JSON file) from [here.](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/flow-control.samples/Flogo_App-FlowControl_Mechnism_UsingSharedData)
 2. Login to TIBCO Cloud™ Integration with a valid subscription.
 3. Steps to import the Flogo application (from step #1) is listed [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/readme.md).
-4. The imported Flogo app should look like shown below.
-5. For any additional information, please raise your queries or issues via the Issues section.
+4. The imported Flogo app should look like shown below. ![](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/import-screenshots/flow-controller_sharedData.png)
+6. For any additional information, please raise your queries or issues via the Issues section.
