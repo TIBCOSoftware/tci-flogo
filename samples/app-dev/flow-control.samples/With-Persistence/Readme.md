@@ -20,7 +20,12 @@ Timer based trigger monitors the database queue for stored requests. As soon as 
 4. Database (MySQL) structure used for the flow is as follows. 
     
      -- gtfscontroldb.flowcontroller definition
-     CREATE TABLE `flowcontroller` (r_id` int(11) NOT NULL AUTO_INCREMENT, request` varchar(5000) NOT NULL, PRIMARY KEY (`r_id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+     CREATE TABLE `flowcontroller` (
+     r_id` int(11) NOT NULL AUTO_INCREMENT, 
+     request` varchar(5000) NOT NULL, 
+     PRIMARY KEY (`r_id`)
+     ) 
+     ENGINE=InnoDB DEFAULT CHARSET=utf8;
       
 5. Any other database can also be leveraged with this application. 
 6. The imported Flogo app should look like shown below. ![flow](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/import-screenshots/flow-controller_withPersistence.png)
