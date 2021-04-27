@@ -44,6 +44,9 @@ Below is a list of steps to import the Flogo application/sample. Every sample al
 
 7. If a trigger in the previous dialog is not selected, the flows associated with that trigger are displayed. Users have an option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Uncheck the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow.
 
+## Testing the Flogo flows. 
+Please follow the documentation [here](https://integration.cloud.tibco.com/docs/#Subsystems/flogo/flogo-all/flow-tester2.html?TocPath=TIBCO%2520Flogo%25C2%25AE%2520Apps%257CApp%2520Development%257CFlow%2520Tester%257C_____0) to test the Flogo flows imported using the above steps. 
+
 ## Help
 
 Please refer [TIBCO Cloud<sup>&trade;</sup> Integration documentation](https://integration.cloud.tibco.com/docs/) and TIBCO Flogo® Enterprise documentation on [docs.tibco.com](https://docs.tibco.com/) for additional information.
