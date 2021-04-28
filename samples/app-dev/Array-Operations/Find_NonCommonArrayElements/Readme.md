@@ -12,7 +12,7 @@ The application leverages the different built-in activities and functions to ide
 
 The only drawback of this approach, performance degrades if the array size is too large. Sometimes, it will cause the slowness and sometimes app crashes if memory accumulation goes beyond available.
 
-You can look to the custom extension build to handle the huge array size with best performance. It is available [here.]()
+You can look to the custom extension build to handle the huge array size with best performance. It is available [here.](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/Array-Operations/Find_NonCommonArrayElement-UsingCustomExtension)
 
 
 ## Steps to use the Flogo application:
