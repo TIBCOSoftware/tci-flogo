@@ -1,4 +1,4 @@
-# Integation of TCI & TCE via TCM
+# Integation between TCI & TCE via TCM
 
 **Note**: Before you start the labs, download the repo (**Clone or download** > **Download ZIP**), and unzip it to a local directory.
 
