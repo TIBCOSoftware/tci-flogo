@@ -4,7 +4,8 @@
 - TIBCO Cloud™ Integration 
 
 ## Overview
-This application flow will demonstrate, how quickly one can use built-in features (ex. loops & conditions) to identify the common elements from arrays. Furthermore, it will generate a new array of common elements.
+This application flow will demonstrate, how quickly one can use built-in features (ex. loops & conditions) to identify the common elements from arrays. 
+Furthermore, it will generate a new array of common elements.
 
 The major drawback of this approach is, it's not performant if the array size too large. It will cause the application to perform slowly & sometimes crashes.
 
