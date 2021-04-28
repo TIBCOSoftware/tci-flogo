@@ -17,4 +17,4 @@ You can look for the custom extension build to handle the huge array size with b
 2. Login to TIBCO Cloud™ Integration with a valid subscription.
 3. Steps to import the Flogo application (from step #1) is listed [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/readme.md)
 4. The imported Flogo app should look like shown below.![common-array](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/import-screenshots/common_Elementarray.png)
-5. The imported Flogo app should look like shown below. For any additional information, please raise your queries or issues via the Issues section.
+5. For any additional information, please raise your queries or issues via the Issues section.
