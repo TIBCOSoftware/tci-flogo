@@ -1,7 +1,7 @@
 ---
 date: 2016-04-09T16:50:16+02:00
 title: Set up your environment
-weight: 6
+weight: 3
 ---
 
 Let's get started with the setup of your development environment!

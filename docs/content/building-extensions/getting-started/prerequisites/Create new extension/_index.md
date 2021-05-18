@@ -12,7 +12,7 @@ This page describe how to develop single independent Project Flogo contribution
 
 The contribution includes `activity`, `trigger`, `function`,
 
-I will take [Log](https://github.com/project-flogo/contrib/blob/master/activity/log) activity, [REST](https://github.com/project-flogo/contrib/tree/master/trigger/rest) Trigger and [math](../create-new-category/understanding-of-category/function/) function as example below.
+I will take [Log](https://github.com/project-flogo/contrib/blob/master/activity/log) activity, [REST](https://github.com/project-flogo/contrib/tree/master/trigger/rest) Trigger and [json](../create-new-category/understanding-of-category/function/) function as example below.
 
 ## Activity
 | Component       | Technology | Filename                           | Description
@@ -24,8 +24,8 @@ I will take [Log](https://github.com/project-flogo/contrib/blob/master/activity/
 ## Trigger
 | Component       | Technology | Filename                           | Description
 | --------------- | ---------- | ---------------------------------- | -----------
-| Model           | JSON       | [descriptor.json](https://github.com/project-flogo/contrib/blob/master/trigger/rest/descriptor.json)                    | The `descriptor.json` describes the model, the meta data, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using.
-| Runtime         | Go         | [activity.go](https://github.com/project-flogo/contrib/blob/master/trigger/rest/trigger.go)   | Every extension must write the runtime code in Go (`trigger.go`). You can, and really should, leverage the Go testing framework for writing unit test cases (`trigger.go`) for your extension.
+| Model           | JSON       | [descriptor.json](https://github.com/project-flogo/contrib/blob/master/trigger/rest/descriptor.json)                    | The `descriptor.json` describes the model, the meta data, of the trigger. It describes, among other things, what the trigger settings, handlers andoutputs are, who built it and which version you're using.
+| Runtime         | Go         | [trigger.go](https://github.com/project-flogo/contrib/blob/master/trigger/rest/trigger.go)   | Every extension must write the runtime code in Go (`trigger.go`). You can, and really should, leverage the Go testing framework for writing unit test cases (`trigger_test.go`) for your extension.
 | Runtime dependence | go.mod | [go.mod](https://github.com/project-flogo/contrib/blob/master/trigger/rest/go.mod) | The `go.mod` file describes all dependencies requires for this trigger and the contribution model name. Note here: The module name should be the ref of the contribution.
 
 
@@ -35,7 +35,7 @@ I will take [Log](https://github.com/project-flogo/contrib/blob/master/activity/
 ## Function
 | Component       | Technology | Filename                           | Description
 | --------------- | ---------- | ---------------------------------- | -----------
-| Model           | JSON       | [descriptor.json](https://github.com/project-flogo/contrib/tree/master/function/json/descriptor.json)     | The `descriptor.json` describes the model, the meta data, of the activity. It describes, among other things, what the input and outputs are, who built it and which version you're using.
+| Model           | JSON       | [descriptor.json](https://github.com/project-flogo/contrib/tree/master/function/json/descriptor.json)     | The `descriptor.json` describes the model, the meta data, of the function. it describe function name, argument and output which expected type.
 | Runtime         | Go         | [functioName.go](https://github.com/project-flogo/contrib/tree/master/function/json/path.go)   | Every extension must write the runtime code in Go (`functionName.go`). You can, and really should, leverage the Go testing framework for writing unit test cases (`functionName_test.go`) for your extension.
 | Runtime dependence  | go.mod | [go.mod](https://github.com/project-flogo/contrib/tree/master/function/json/go.mod) | The `go.mod` file describes all dependencies requires for this function and the function model name. Note here: The module name should be the ref of the contribution.
 

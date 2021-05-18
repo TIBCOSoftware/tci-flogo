@@ -4,8 +4,6 @@ title: Create New Extensions
 weight: 2
 ---
 
-# Create New Extensions
-
 Flogo have 2 kinds of contributions
 
 * [Single Extension](../create-new-extension) -> Most case is Project Flogo contributions which just have single activity, trigger or function. You can go to [Example](https://github.com/project-flogo/contrib)

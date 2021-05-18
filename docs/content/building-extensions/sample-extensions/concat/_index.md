@@ -16,7 +16,7 @@ TIBCO
 │       |───activity_test.go
 │       |───activity.ts
 │       |───activity.module.ts
-│       └───sqssendmessage.png
+│       └───concat.png
 │───contribution.json
 ```
 

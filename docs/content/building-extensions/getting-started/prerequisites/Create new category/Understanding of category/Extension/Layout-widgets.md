@@ -18,7 +18,7 @@ The layout of your folder has to follow a specific structure.
 └───contribution.json
    
 ```
-The category you want your activities to be in should be the name of your top level folder. Your activities will be in separate folders under the **activity** folder and your connectors will be subfolders of the **connector** folder and the triggers will be under the **trigger** folder. Please note that names of activities connectors and triggers should be in lowercase
+The category you want your activities to be in should be the name of your top level folder. Your activities will be in separate folders under the **activity** folder and your connectors will be subfolders of the **connector** folder and the triggers will be under the **trigger** folder.
 
 ```
 Please note that names of activities, triggers and connectors should be in lowercase
@@ -39,6 +39,7 @@ AWSSQS
 │───connector
 │    └───sqs
 │        ├───descriptor.json
+│        ├───connection.go
 │        |───connector.ts
 │        |───connector.module.ts
 │        └───sqs.png
@@ -46,6 +47,8 @@ AWSSQS
 │───trigger
 │    └───sqsreceivemessage
 │        ├───descriptor.json
+│        ├───trigger.go
+│        ├───metadata.go
 │        |───trigger.ts
 │        |───trigger.module.ts
 │        └───sqsreceivemessage.png

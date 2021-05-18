@@ -4,8 +4,6 @@ title: Layout
 weight: 1
 ---
 
-# Layout
-
 Function layout as simple as below
 
 ## Function

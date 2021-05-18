@@ -4,7 +4,7 @@ title: Amazon SQS
 weight: 255
 ---
 
-Let's develop a connector for [Amazon Simple Queue Service](https://aws.amazon.com/sqs/), also known as SQS and create two activities that will use the SQS connector to send and receive messages. 
+Let's develop a connector for [Amazon Simple Queue Service](https://aws.amazon.com/sqs/), also known as SQS by creating one activity and one trigger that will use the SQS connector to send and receive messages. 
 
 To follow along, please make sure you have:
 
@@ -27,6 +27,7 @@ AWSSQS
 │───connector
 │    └───sqs
 │        ├───descriptor.json
+│        ├───connection.go
 │        |───connector.ts
 │        |───connector.module.ts
 │        └───sqs.png
@@ -35,6 +36,8 @@ AWSSQS
 │    └───sqsreceivemessage
 │        ├───descriptor.json
 │        |───trigger.ts
+│        |───trigger.go
+│        |───metadata.go
 │        |───trigger.module.ts
 │        └───sqsreceivemessage.png
 │───contribution.json

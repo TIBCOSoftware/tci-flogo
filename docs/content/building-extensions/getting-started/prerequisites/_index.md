@@ -1,7 +1,7 @@
 ---
 date: 2016-04-09T16:50:16+02:00
 title: Prerequisites
-weight: 3
+weight: 6
 ---
 
 We are as excited as you to help you develop new cool contributions that will enable application developers do better integration with hundreds of services.
