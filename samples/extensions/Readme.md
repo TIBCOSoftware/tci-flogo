@@ -2,7 +2,7 @@
 
 Users can upload an extension either via a GitHub repository or a ZIP file from the local file system. Steps to upload an extension from a ZIP file are listed below. 
 
-1. Download and save the extension as a ZIP file on the local file system. 
+1. Download and save the extension as a ZIP file on the local file system. Alternatively, you can provide a Github link also to the zip file. 
 2. Login to TIBCO Cloud™ Integration with a valid subscription.
 3. Select Environment & Tools menu option.
 4. Under Connector Management & Extensions section, choose Extensions option.
