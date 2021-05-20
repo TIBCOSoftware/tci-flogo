@@ -135,7 +135,7 @@ The `descriptor.json` describes the model, the metadata of the connector's conne
 ## Validation
 When creating the `descriptor.json` file for connection, there are a few validation rules that you need take into account:
 
-* **name**: The name always start with "tibco-" and should only contain alphanumeric chararcters and underscores
+* **name**: The name should only contain alphanumeric chararcters and underscores
 * **title**: The title of your connector (which also shows up on your activity) should only contain alphanumeric chararcters and spaces
 * **version**: The version of your activity follows the semver notation (x.y.z), with numeric characters separated by dots
 * **type**: The type must always be **flogo:connector**

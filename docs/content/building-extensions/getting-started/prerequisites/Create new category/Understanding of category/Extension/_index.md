@@ -27,7 +27,7 @@ Now Let's take for more details
 | --------- | ---------- | ------------------------------------ | -----------
 | Model     | JSON       | [descriptor.json](./connection-model-runtime/#model)                       | The `connector.json ` file describes the model, the meta data, of the connector. It describes which fields are displayed and what kind of actions are supported in the connector UI.
 | UI        | TypeScript | [connector.ts & connector.module.ts](./connection-model-runtime/#ui-contribution) | The `connector.ts` file handles the validation and actions for the fields described in the model. For example it validates that values have been entered in the text boxes or what to do when you click _connect_
-| Runtime   | Go | [connection.go](./connection-model-runtime/#runtime) | The `connector.ts` file handles the validation and actions for the fields described in the model. For example it validates that values have been entered in the text boxes or what to do when you click _connect_
+| Runtime   | Go | [connection.go](./connection-model-runtime/#runtime) | Every extension must write the runtime code in Go (`connection.go`). You can, and really should, leverage the Go testing framework for writing unit test cases (`connection_test.go`) for your extension.
 
 ## Activity
 
@@ -47,7 +47,7 @@ Now Let's take for more details
 
 ## Contribution.json
 
-* The contributon.json place under category name and it contains `name` ,`version` and `description` of this contributions.
+* The contributon.json is placed under category name and it contains `name` ,`version` and `description` of these contributions.
 
 ## Layout and Widgets
 * Check out [Here](./layout-widgets) for extension Layout, supporting types and widgets

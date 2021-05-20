@@ -12,7 +12,7 @@ This page describe how to develop single independent Project Flogo contribution
 
 The contribution includes `activity`, `trigger`, `function`,
 
-I will take [Log](https://github.com/project-flogo/contrib/blob/master/activity/log) activity, [REST](https://github.com/project-flogo/contrib/tree/master/trigger/rest) Trigger and [json](../create-new-category/understanding-of-category/function/) function as example below.
+I will take [Log](https://github.com/project-flogo/contrib/blob/master/activity/log) activity, [REST](https://github.com/project-flogo/contrib/tree/master/trigger/rest) Trigger and [json](https://github.com/project-flogo/contrib/tree/master/function/json) function as example below.
 
 ## Activity
 | Component       | Technology | Filename                           | Description
@@ -70,7 +70,7 @@ The layout of your folder has to follow a specific structure.
 
 ```
 │ <trigger name>
-│        └───activity.go
+│        └───trigger.go
 │        └───descriptor.json
 │        └───go.mod
 
@@ -78,8 +78,8 @@ The layout of your folder has to follow a specific structure.
 
 ```
 |───functionCategoryName
-│   └───descriptor.json
 │   └───function.go
+│   └───descriptor.json
 │   └───go.mod
 ```
 

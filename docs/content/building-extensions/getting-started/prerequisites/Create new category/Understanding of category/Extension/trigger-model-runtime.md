@@ -140,7 +140,7 @@ Every trigger contribution must define its model in `trigger.json` file.This mod
 ## Validation
 When creating the `trigger.json` file, there are a few validation rules that you need take into account:
 
-* **name**: The name cannot start with "tibco-" and should only contain alphanumeric chararcters and underscores
+* **name**: The name should only contain alphanumeric chararcters and underscores
 * **title**: The title of your trigger (which also shows up on your trigger palette) should only contain alphanumeric chararcters and spaces
 * **version**: The version of your trigger follows the semver notation (x.y.z), with numeric characters separated by dots
 * **type**: The type must always be **flogo:trigger**

@@ -25,7 +25,7 @@ Please note that names of activities, triggers and connectors should be in lower
 ```
 
 ****
-So an example, where we create an [AWSSQS](https://aws.amazon.com/sqs/) category, with both an activity and a connector called **AWSSQS** would have a complete structure like below
+So an example, where we create a [AWSSQS](https://aws.amazon.com/sqs/) category, with activity,trigger and a connector called **AWSSQS** would have a complete structure like below
 ```
 AWSSQS
 ├───activity
