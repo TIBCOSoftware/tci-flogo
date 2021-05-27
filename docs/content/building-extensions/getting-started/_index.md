@@ -8,3 +8,6 @@ pre: "<i class=\"fa fa-bolt\" aria-hidden=\"true\"></i> "
 # Getting started
 
 Set up your development environment to get a flying start to develop new awesome extensions to TIBCO Cloud<sup>&trade;</sup> Integration - Flogo<sup>&reg;</sup> or TIBCO Flogo<sup>&reg;</sup>
+
+* [Setup environment](./dev-environment/)
+* [Prerequisites](prerequisites)

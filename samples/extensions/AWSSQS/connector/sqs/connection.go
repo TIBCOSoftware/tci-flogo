@@ -3,7 +3,6 @@ package sqs
 import (
 	"time"
 
-	"github.com/TIBCOSoftware/flogo-lib/logger"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
@@ -84,7 +83,7 @@ func (k *SQSConfigManager) Stop() error {
 func (k *SQSConfigManager) NewSession() *session.Session {
 	sess := session.Must(session.NewSession(k.GetConfig()))
 	if k.config.AssumeRole {
-		logger.Infof("Enabled Assume Role for connection [%s]", k.config.Name)
+		logCache.Infof("Enabled Assume Role for connection [%s]", k.config.Name)
 		sess.Config.Credentials = stscreds.NewCredentials(sess, k.config.RoleArn, func(p *stscreds.AssumeRoleProvider) {
 			if len(k.config.ExternalID) > 0 {
 				p.ExternalID = aws.String(k.config.ExternalID)

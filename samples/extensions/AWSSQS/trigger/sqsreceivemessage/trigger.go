@@ -64,7 +64,6 @@ type SQSHandler struct {
 }
 
 func (t *Trigger) Initialize(ctx trigger.InitContext) error {
-
 	var err error
 	t.SQSHandlers = make(map[string]*SQSHandler)
 	for _, handler := range ctx.GetHandlers() {
