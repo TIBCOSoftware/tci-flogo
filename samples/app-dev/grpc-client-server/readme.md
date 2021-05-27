@@ -1,4 +1,4 @@
-# gRPC Client Server Sample - Enable creating a gRPC server via gRPC trigger and invoking the service via gRPC client activity
+# gRPC Client Server Sample - Enable creating a gRPC server(tirgger) and client(activity)
 
 # Description
 
