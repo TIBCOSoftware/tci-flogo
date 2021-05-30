@@ -1,10 +1,10 @@
-# gRPC Client Server Sample - Enable creating a gRPC server(tirgger) and client(activity)
+# gRPC Client Server Sample - Enable creating a gRPC server(trigger) and client(activity)
 
 # Description
 
-This is gRPC client and server sample. gRPC is a popular framework that enables procedure calls to request a service from a remote server the same way you would request a local system via direct actions to the server. Flogo Enterprise enables to create the gRPC server with the help of gRPC trigger and invoking the same service via gRPC activity which acts as a gRPC client. 
+This is gRPC client and server sample. gRPC enables procedure calls to request a service from a remote server via protobuffers.Flogo Enterprise enables to create the gRPC client server with the help of proto files. gRPC trigger in Flogo acts as gRPC server and gRPC activity acts as a gRPC client. 
 Note- Flogo Enterpise supports both gRPC trigger and activity while Flogo on TCI supports only gRPC activity.
-
+If you want to read more about gRPC, please refer [here](https://grpc.io/docs/what-is-grpc/introduction/)
 
 ## Import the sample
 1. Download the sample json file i.e., *grpcPetStoreClientServer*.
@@ -35,72 +35,80 @@ Note- Flogo Enterpise supports both gRPC trigger and activity while Flogo on TCI
 
 In the attached sample *grpcPetStoreClientServer.json*, The server and client are created with petstore.proto file attached with the sample. there are 8 flows, The first 4 flows are attached to gRPC trigger which acts as the gRPC Server. The next 4 flows are attached to the rest trigger and includes the gRPC activity which acts as the gRPC client. 
 
-![The Import app dialog](../import-screenshots/1_AllThreeFlows.png)
+![The Import app dialog](../import-screenshots/grpc_4.png)
 
-First flow which is *Set_Get_User1_Set_User2* sets the information about User1 in *flow* level scope with key *user1*.  
+First 4 flows which are attached to the gRPC trigger are the server flows and have been created with the option *gRPC Protobuff* on Create new app screen as shown below. 
 
-![The Import app dialog](../import-screenshots/setUser1Info.png)
-![The Import app dialog](../import-screenshots/inputInUser1Info.png)
+![The Import app dialog](../import-screenshots/grpc_protobuf_option.png)
 
-To get the User1 information in the same flow, the Get operation is used with the same key (*user1*).
+The flows are generated upon successful upload of the .proto file based upon the no. of service and rpc request in the .proto file. Since, in the given *petstore.proto* file, there were one service and four rpc requests, so 1 flow for each rpc request has been generated.
 
-![The Import app dialog](../import-screenshots/getUser1InfoSameFlow.png)
+The 1st gRPC Server flow name is *GRPC2RestPetStoreService_PetById*. It is returning the pet name upon providing the id from the flow parameter.
 
-The flow also sets the User2 information with the *application* level scope with key *user2* and call a subflow *Get_User1_User2_Delete_User2*.
+![The Import app dialog](../import-screenshots/grpc_getPetById.png)
 
-![The Import app dialog](../import-screenshots/SetUser2Info.png)
-![The Import app dialog](../import-screenshots/InputUser2Info.png)
-![The Import app dialog](../import-screenshots/SubflowInFlow1.png)
+The 2nd gRPC Sever flow name is *GRPC2RestPetStoreService_UserByName*. It is returning the user id, email and phone no. upon providing the username from the flow parameter.
 
-The flow *Get_User2* is another flow which gets the User2 information set in flow *Set_Get_User1_Set_User2*.
-![The Import app dialog](../import-screenshots/GetUser2InfoFlow2.png)
-![The Import app dialog](../import-screenshots/InputInUser2Info.png)
+![The Import app dialog](../import-screenshots/grpcGetUserByName.png)
 
-The flow *Get_User1_User2_Delete_User2* is a subflow to the main flow *Set_Get_User1_Set_User2* and gets the User1 information as well as User2 information based upon the input provided to the subflow. The input to the subflow is the same key which was set for user1 and user2 information.
+The 3rd gRPC server flow name is *GRPC2RestPetStoreService_PetPUT*. it is updating the pet name with a specific id with the values provided from the flow parameter.
 
-![The Import app dialog](../import-screenshots/User1BranchingCondition.png)
-![The Import app dialog](../import-screenshots/GetUser1InfoInSubflow.png)
-![The Import app dialog](../import-screenshots/User2BranchingCondition.png)
-![The Import app dialog](../import-screenshots/GetUser2InfoInSubflow.png)
- 
-The flow also includes *Delete* operation for the User2 information which is  set at the *application* level scope. Based upon the *keyInput* and *isDelete* parameters from user, the respective user's information and operation will be performed.
-For example, If user gives *keyInput* as "user2" and *isDelete* as true. The operation Delete will be performed on the User2 information. The same will be returned by the subflow *Get_User1_User2_Delete_User2* to the main flow *Set_Get_User1_Set_User2*.
+![The Import app dialog](../import-screenshots/grpcPetPut.png)
 
-![The Import app dialog](../import-screenshots/DeleteBRanchingCondition.png)
-![The Import app dialog](../import-screenshots/DeleteOperation.png)
+The 4th gRPC server flow name is *GRPC2RestPetStoreService_UserPUT*. it is updating the user's details with the values provided from the flow paramter.
 
+![The Import app dialog](../import-screenshots/grpc_userPut.png)
 
+The next four flows which are attached with the Rest trigger are the gRPC client flows, the client flows contain the gRPC invoke activity which acts as the client for a gRPC service. each flow is client of their respective gRPC trigger flow. Let us see the configuration of each flow.
+
+The 1st gRPC client flow is *flow1*. it is invoking the gRPC server flow *GRPC2RestPetStoreService_PetById*. The *id* is provided and the server flow returns the *id* as well as the *name* of the pet.
+
+![The Import app dialog](../import-screenshots/grpc_client_flow1.png)
+
+The 2nd gRPC client flow is *flow2*. it is invoking the gRPC server flow *GRPC2RestPetStoreService_UserByName*. The *username* is provided and the server flow returns the *id*,*username*,*email* as well as the *phone* of the user.
+
+![The Import app dialog](../import-screenshots/grpc_client_flow2.png)
+
+The 3rd gRPC client flow is *flow3*. it is invoking the gRPC server flow *GRPC2RestPetStoreService_PetPUT*. The *id* and *name* are provided and the server flow returns the updated *id* and *name* of the pet.
+
+![The Import app dialog](../import-screenshots/grpc_client_flow3.png)
+
+The 4th gRPC client flow is *flow4*. it is invoking the gRPC server flow *GRPC2RestPetStoreService_UserPUT*. The *id*,*username*,*email* and *phone* are provided and the server flow returns the updated values of the user.
+
+![The Import app dialog](../import-screenshots/grpc_client_flow4.png)
 
 ### Run the application
 
-To run the application, push the app to TIBCO Cloud and then scale up to 1 instance. Once your app is scaled, you can see your app in running status.
+To run the application, generate the app binary according to the platform you are going to run. 
 
-![Sample Response](../import-screenshots/ScaleInstance.png)
+![Sample Response](../import-screenshots/grpc_app_binary_generate.png)
 
+Once your app is running, use a rest client to invoke the rest endpoints which are further invoking the gRPC client activities.
 
-Once your app reaches to Running state, go to Endpoints and for GET/user/{key} option, select 'Try it Out’ option and then give "user1" as value in key and false in isDelete dropdown. Then click on execute.
-
-![sample Response](../import-screenshots/1_Execute.png)
+![Sample Response](../import-screenshots/grpc_app_running.png)
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
-in flow, click on Test Button -> create Launch configuration -> provide values in path params and query params -> click Next button -> click on Run
+In the flow, click on Test Button -> create Launch configuration -> provide values in path params and query params -> click Next button -> click on Run
+*Note:-In Host URL of gRPC invoke activity, give IP of the machine where gRPC service is running while using the flow tester.*
 
-![Sample Response](../import-screenshots/1_launchconfig.png)
-![Sample Response](../import-screenshots/2_launchconfig.png)
-![Sample Response](../import-screenshots/3_valuesLaunchConfig.png)
-
+![Sample Response](../import-screenshots/grpc_invoke_localIpflowtester.png)
 
 ## Outputs
 
 1. Flow Tester
 
-![Sample Response](../import-screenshots/4_testeroutput.png)
-
+![Sample Response](../import-screenshots/flow1_tester_response.png)
+![Sample Response](../import-screenshots/flow2_tester_response.png)
+![Sample Response](../import-screenshots/flow3_tester_response.png)
+![Sample Response](../import-screenshots/flow4_tester_response.png)
 
 2. When hit endpoints
 
-![Sample Response](../import-screenshots/2_user1Info.png)
+![Sample Response](../import-screenshots/grpc_flow1_response.png)
+![Sample Response](../import-screenshots/grpc_flow2_response.png)
+![Sample Response](../import-screenshots/grpc_flow3_response.png)
+![Sample Response](../import-screenshots/grpc_flow4_respone.png)
 
 
 ## Troubleshooting
