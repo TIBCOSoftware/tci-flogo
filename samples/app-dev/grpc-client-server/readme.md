@@ -3,7 +3,9 @@
 # Description
 
 This is gRPC client and server sample. gRPC enables procedure calls to request a service from a remote server via protobuffers.Flogo Enterprise enables to create the gRPC client server with the help of proto files. gRPC trigger in Flogo acts as gRPC server and gRPC activity acts as a gRPC client. 
+
 Note- Flogo Enterpise supports both gRPC trigger and activity while Flogo on TCI supports only gRPC activity.
+
 If you want to read more about gRPC, please refer [here](https://grpc.io/docs/what-is-grpc/introduction/)
 
 ## Import the sample
@@ -90,6 +92,7 @@ Once your app is running, use a rest client to invoke the rest endpoints which a
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
 In the flow, click on Test Button -> create Launch configuration -> provide values in path params and query params -> click Next button -> click on Run
+
 *Note:-In Host URL of gRPC invoke activity, give IP of the machine where gRPC service is running while using the flow tester.*
 
 ![Sample Response](../import-screenshots/grpc_invoke_localIpflowtester.png)
