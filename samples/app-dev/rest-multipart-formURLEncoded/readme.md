@@ -1,6 +1,6 @@
 # REST service with request types as multipart/form-data and x-www-form-urlencoded Sample
 
-
+## Description
 This sample demonstrates the support of the multipart/form-data and x-www-form-urlencoded request type in the FLOGO ReceiveHTTPMessage trigger and InvokeRestService activity. Features which are covered in these sample apps are:
 ## ReceiveHTTPMessage trigger
 1. A Request type drop-down to select application/json, multipart/form-data and x-www-form-urlencoded for Post and Put methods. 
@@ -19,6 +19,11 @@ This sample demonstrates the support of the multipart/form-data and x-www-form-u
 4. InvokeRest activity configured manually to invoke the x-www-form-urlencoded service.
 5. Branching from the InvokeRest activity based on the response code received from the service.
 4. App property for the URL field which can be overridden at runtime as per the request URL. 
+
+## Prerequisites
+
+* These apps use AmazonS3 activities and AWS connection for uploading files to S3 Bucket and getting the file content. Please make sure you have a valid AWS Access ID and Access Keys. 
+* You need to have access to Amazon S3 services and created a bucket where a file can be uploaded.
 
 ## Import the sample apps
  
@@ -107,8 +112,8 @@ As the consumer app is also a multiple response code service ConfigureHTTPRespon
 Once you have imported both the apps, push the 'MultipartUrlEncodedService' app first and scale the app to 1. Now we need to get the endpoint of the producer service, go to the 'Endpoint' tab of the app and click on 'Copy URL' to get the endpoint URL.
 ![Copy URL from Endpoint tab](./import-screenshots/copyURL.png)
 
-Now push the 'InvokeMultipartUrlEncodedService' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'InvokeRestURL' application property to point to the endpoint URL of the producer Rest service app.
-![Application property on Endpoint tab](./import-screenshots/InvokeRestURLAppProperty.png)
+Now push the 'InvokeMultipartUrlEncodedService' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'InvokeRestURLPostMultipartFormData' and 'InvokeRestURLPutFormEncoded' application properties to point to the endpoint URL of the producer Rest service app.
+![Application property on Endpoint tab](./import-screenshots/InvokeRestURLAppProperties.png)
 
 Since we are using AmazonS3 activities it needs AWS connection to connect to the AWS S3 services, when app is imported please make sure to update the AWS credentials in the AWS Connection which got imported with both the apps and save the connection. 
 ![AWS Connector settings](./import-screenshots/AWSConnectorSettings.png)
@@ -117,7 +122,8 @@ Since we are using AmazonS3 activities it needs AWS connection to connect to the
 To run the app in Flogo Enterprise, create appropriate binaries for both the apps and run both the binaries. Export the URL of the Service app in the 'InvokeMultipartUrlEncodedService' app before running the invoking app like this:
  $ ./MultipartUrlEncodedService-linux_amd64 
 
- $ export InvokeRestURL="http://localhost:9998"
+ $ export InvokeRestURLPostMultipartFormData="http://localhost:9998"
+ $ export InvokeRestURLPutFormEncoded="http://localhost:9998/putformurlencoded"
 
  $ FLOGO_APP_PROPS_ENV=auto ./InvokeMultipartUrlEncodedService-linux_amd64 
 
