@@ -1,1 +1,1 @@
-# TIBCO Cloud<sup>&trade;</sup> Integration - Develop / TIBCO Flogo® Enterprise Samples published in TCI Marketplace<sup>&reg;</sup>
+# TIBCO Cloud<sup>&trade;</sup> Integration - Develop published on TCI Marketplace<sup>&reg;</sup>
