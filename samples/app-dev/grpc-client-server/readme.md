@@ -89,7 +89,7 @@ Once your app is running, use a rest client to invoke the rest endpoints which a
 
 ![Sample Response](../import-screenshots/grpc_app_running.png)
 
-Another option, If you want to test the sample in the Flow tester then follow below instructions:
+Another option, Once your gRPC service is running, you can also test the sample in the Flow tester then follow below instructions:
  
 In the flow, click on Test Button -> create Launch configuration -> provide values in path params and query params -> click Next button -> click on Run
 
