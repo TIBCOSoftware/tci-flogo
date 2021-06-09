@@ -73,15 +73,27 @@ Once your app reaches to Running state, use a rest client to hit the endpoints.
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
 In the flow, click on Test Button -> create Launch configuration -> provide values in path params and query params -> click Next button -> click on Run
-*Note:- The graphql queries are not supported in the flow tester since the trigger acts as the graphql server and the trigger is excluded in the flow tester*
+
+*Note:- The graphql queries are not supported in the flow tester since the trigger acts as the graphql server and the trigger is excluded in the flow tester.In the flow tester you can test the values you are returning to the trigger from Return activity*
 
 
-Graphql services can also be invoked from the *invokeRESTService* activity. Below screenshots depicts, how to invoke a graphql service from the *invokeRESTService* activity:-
 
+### Graphql services can also be invoked from the *invokeRESTService* activity.
+
+1. Provide the URL where the graphql service is running. The graphql parameter is mandatory to be added.
 
 ![Sample Response](../import-screenshots/Graphql-InvokeRest-Settings.png)
+
+2. Provide the query as a string or use the function *string.concat()* to concat multiple queries in the *queryParams*
+
 ![Sample Response](../import-screenshots/Graphql-InvokeRest-graphql.png)
+
+3. Provide the Content header as *application/graphql*
+
 ![Sample Response](../import-screenshots/Graphql-invokeRest-Headers.png)
+
+4. Run the flow tester for *invokeRESTService* activity and the response will look like this:-
+
 ![Sample Response](../import-screenshots/Graphql-restinvoke-flow3-response.png)
 
 
