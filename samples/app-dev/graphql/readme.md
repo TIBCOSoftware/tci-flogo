@@ -41,7 +41,7 @@ The flows are  created with the option *GraphQL Schema* on Create new app screen
 
 ![The Import app dialog](../import-screenshots/graphql_create_flow.png)
 
-The flows are generated upon successful upload of the .gql file based upon the no. of *queries* and *mutation* in the .gql file. Each flow acts as a resolver function. Since, in the given *StarWarsSchema.gql* file, there were three *query* and one *mutation*, so 1 flow for each *query* and *mutation* has been generated.
+The flows are generated upon successful upload of the .gql file based upon the no. of *queries* and *mutation* in the .gql file. Each flow acts as a resolver function. Since, in the given *StarWarsSchema.gql* file, there were three *queries* and one *mutation*, so 1 flow for each *query* and *mutation* has been generated.
 
 The 1st flow name is *Query_hero*. It is returning the hero details upon providing the arguments from the trigger via flow parameter.
 
