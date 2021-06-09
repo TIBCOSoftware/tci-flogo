@@ -5,10 +5,10 @@
 
 This example demonstrate how we can create and use SQLServer CRUD activities.
 SQLServer CRUD app bascially contains 4 activities. The main purpose of these activities are:
-a. To fetch data using Query activity.
-b. To insert data using Insert activity. In this sample we will be inserting data via iterator(First, it reads the input rows which is the data from query activity in this case.Then, it does some processing to the rows if required.And finally, it returns the output.)
-c. Update the data using Update activity
-d. Delete the data  using Delete activityfrom SQLServer database.
+a) To fetch data using Query activity.
+b) To insert data using Insert activity. In this sample we will be inserting data via iterator(First, it reads the input rows which is the data from query activity in this case.Then, it does some processing to the rows if required.And finally, it returns the output.)
+c) Update the data using Update activity
+d) Delete the data using Delete activity from SQLServer database.
 
 ## Prerequisites
 
