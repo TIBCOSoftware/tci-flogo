@@ -6,6 +6,8 @@ This is Graphql service sample. GraphQL provides a complete and understandable d
 
 To know more about Graphql, please refer [here](https://graphql.org/)
 
+*Note:- As of now, Flogo supports only Query and Mutation type in Graphql. Currently, Subscription type is not supported.*
+
 ## Import the sample
 1. Download the sample json file i.e., *GraphqlStarWars*.
 
@@ -39,7 +41,7 @@ The flows are  created with the option *GraphQL Schema* on Create new app screen
 
 ![The Import app dialog](../import-screenshots/graphql_create_flow.png)
 
-The flows are generated upon successful upload of the .gql file based upon the no. of *queries* and *mutation* in the .gql file. Since, in the given *StarWarsSchema.gql* file, there were three *query* and one *mutation*, so 1 flow for each *query* and *mutation* has been generated.
+The flows are generated upon successful upload of the .gql file based upon the no. of *queries* and *mutation* in the .gql file. Each flow acts as a resolver function. Since, in the given *StarWarsSchema.gql* file, there were three *query* and one *mutation*, so 1 flow for each *query* and *mutation* has been generated.
 
 The 1st flow name is *Query_hero*. It is returning the hero details upon providing the arguments from the trigger via flow parameter.
 
@@ -74,6 +76,15 @@ In the flow, click on Test Button -> create Launch configuration -> provide valu
 *Note:- The graphql queries are not supported in the flow tester since the trigger acts as the graphql server and the trigger is excluded in the flow tester*
 
 
+Graphql services can also be invoked from the *invokeRESTService* activity. Below screenshots depicts, how to invoke a graphql service from the *invokeRESTService* activity:-
+
+
+![Sample Response](../import-screenshots/Graphql-InvokeRest-Settings.png)
+![Sample Response](../import-screenshots/Graphql-InvokeRest-graphql.png)
+![Sample Response](../import-screenshots/Graphql-invokeRest-Headers.png)
+![Sample Response](../import-screenshots/Graphql-restinvoke-flow3-response.png)
+
+
 ## Outputs
 
 1. Flow Tester
@@ -87,6 +98,7 @@ In the flow, click on Test Button -> create Launch configuration -> provide valu
 
 ![Sample Response](../import-screenshots/graphql-flow1-response.png)
 ![Sample Response](../import-screenshots/graphql-flow2-response.png)
+![Sample Response](../import-screenshots/graphql-flow3-response.png)
 ![Sample Response](../import-screenshots/graphql-flow4-response.png)
 
 
