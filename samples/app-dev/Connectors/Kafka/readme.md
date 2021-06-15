@@ -1,23 +1,22 @@
-# Kafka Publisher and Consumer in one App
+# Publishing and Consuming message using Kafka.
 
 
 ## Description
 
-This example demonstrate how we can create single record, fetch it using query, update and delete that record in Salesforce using Salesforce activities and connection in flogo.
-The main purpose of Salesforce activities used in the Salesforce_GeneralSample app are to insert new account, fetch the details of the created account, update the data for that account and then delete accountfrom Salesforce. Also receives messages whenever a change occurs in Salesforce.com and activates the flow using Salesforce trigger.
+This example demonstrate how we can send message using the Kafka producer activity and recieve the same message using Kafka consumer activity.
 
-The CRUD flow in the Salesforce_GeneralSample app basically creates new record for Account object in Salesforce and then fetch that record details using query. Then it updates the name of the newly created account. Finally deletes that account. All these operation will be done when execute the REST trigger with valid input schema provided in ReceiveHTTPMessage trigger.
-The SalesforceTrigger flow in the Salesforce_GeneralSample app have ReceiveSalesforceMessage trigger which starts when new record is created in the salesforce. So in this case when CRUD flow executes, the salesforce trigger will start and provide respective output in the logs.
+The Producer flow produces a message on the mentioned topic, whenever the rest enpoint is triggered.
+The Consumer flow has the consumer trigger which is listening to the mentioned topic and recieves the message whenever it is sent. Further, the 'commit offset' activity notifies the consumer to commit the offset as soon as the message is recieved and lastly the 'Log' activity is printing the recieved message. 
+
 
 ## Prerequisites
 
-* Ensure that Flogo Connector for Salesforce.com must be install.
-* Ensure that you have an active Salesforce.com account.
-* Ensure that you have set up the OAuth permissions in Salesforce.com before installing the connector which will be used in the Salesforce connection for Client ID and Client Secret parameters. To set up OAuth permissions, follow the steps mentioned in 'Creating a Salesforce.com Connection' topic in the TIBCO Cloud Integration documentation.
+* Ensure that Apache Kafka Connector is already installed being an OOTB connector.
+* Ensure that you have an active Kafka broker.
 
 ## Import the sample
 
-1. Download the sample's .json file 'Salesforce_GeneralSample.json'
+1. Download the sample's .json file 'KafkaAppSample.json'
 
 2. Create a new empty app.
 ![Create an app](../../import-screenshots/2.png)
@@ -40,23 +39,18 @@ The SalesforceTrigger flow in the Salesforce_GeneralSample app have ReceiveSales
 ## Understanding the configuration
 
 ### The Connection
-When you import this app, you need to configure the 'Salesforce' connection in Connections page. It has pre-filled values except Client Secret. You also need to change Client Id with yours.
+When you import this app, you need to configure the 'Kafkasample' connection in Connections page. It has pre-filled values. You need to change 'Brokers' url with yours.
 
 ![The connection](../../import-screenshots/Kafka/Connection.png)
 
-Note: After imported an app, in the imported connection under Connection tab,
-* Client ID has prefilled value which is the Consumer Key in the Salesforce Account (get it from the Connected Apps section in Salesforce Account).
-* Client secret is blank and you have to provide the Consumer Secret in the Salesforce Account (get it from the Connected Apps section in Salesforce Account).
-* For both Client ID and Client Secret values ensure that you have set up the OAuth permissions in Salesforce.com. 
-
-### The Flow and InvokeRestService activity
-If you open the app, you will see there are two flows in the Salesforce_GeneralSample app. The flow 'CRUD' and second flow 'SalesforceTrigger'.
+### The Flows and Commit offset activity
+If you open the app, you will see there are two flows in the KafkaAppSample app. The flow 'producer' and second flow 'consumer'.
 ![The Flows](../../import-screenshots/Kafka/FlowList.png)
 
-The CRUD flow in the Salesforce_GeneralSample app basically creates new record for Account object in Salesforce using SalesforceCreate activity and then fetch that record details using SalesforceQuery activity. Then it updates the name of the newly created account using SalesforceUpdate activity. Finally deletes that account using SalesforceDelete activity. All these operation will be done when execute the REST trigger with valid input schema provided in ReceiveHTTPMessage trigger. REST trigger have method POST with path parameter 'account'.
+The Producer flow produces a message on the mentioned topic, whenever the rest enpoint is triggered. REST trigger has method GET with path parameter 'pub'.
 ![The CRUD Flows](../../import-screenshots/Kafka/Producer.png)
 
-The SalesforceTrigger flow in the Salesforce_GeneralSample app have ReceiveSalesforceMessage trigger which starts whenever a change occurs in Salesforce.com and activates the flow. So in this case when CRUD flow executes, the salesforce trigger will start and provide respective output in the logs.
+The Consumer flow has the consumer trigger which is listening to the mentioned topic and recieves the message whenever it is sent. Further, the 'commit offset' activity notifies the consumer to commit the offset as soon as the message is recieved and lastly the 'Log' activity is printing the recieved message.
 ![The SFTrigger Flows](../../import-screenshots/Kafka/Consumer.png)
 
 ### Run the application
@@ -65,14 +59,12 @@ For running the application, first you have to push the app and then scale up th
 ![Scale App](../../import-screenshots/Kafka/AppScale.png)
 ![After Push App](../../import-screenshots/Kafka/AppRunning.png)
 
-Once it reaches to Running state, go to Endpoints, click on Test under Actions and for POST//Salesforce/{account}, select 'Try it out'
-You will have to pass value for the path parameter 'account'. You can provide any string type value for 'account' parameter.
-You will have to pass the values for the request body parameter.
-Now click Execute button.
+Once it reaches to Running state, go to Endpoints, click on Test under Actions and for GET//pub, select 'Try it out'
+YNow click Execute button.
 ![Runtime Execution](../../import-screenshots/Kafka/EndPoint.png)
 
 If you want to test the sample in the Flow tester then follow below instructions:
-Click on the MainFlowWithSFCreateCheckStatusJob flow, click on Test Button -> create Launch configuration -> provide request schema in body parameter -> click Next button -> click on Run
+Click on the MainFlowWithSFCreateCheckStatusJob flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
 ![FlowTester](../../import-screenshots/Kafka/LaunchConfig.png)
 
 ## Outputs
