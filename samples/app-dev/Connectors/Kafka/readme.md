@@ -6,7 +6,7 @@
 This example demonstrate how we can send message using the Kafka producer activity and recieve the same message using Kafka consumer activity.
 
 The Producer flow produces a message on the mentioned topic, whenever the rest enpoint is triggered.
-The Consumer flow has the consumer trigger which is listening to the mentioned topic and recieves the message whenever it is sent. Further, the 'commit offset' activity notifies the consumer to commit the offset as soon as the message is recieved and lastly the 'Log' activity is printing the recieved message. 
+The Consumer flow has the consumer trigger which is listening to the mentioned topic and recieves the message whenever it is sent. Further, the 'commit offset' activity notifies the consumer to commit the offset and lastly the 'Log' activity is printing the recieved message. 
 
 
 ## Prerequisites
@@ -50,7 +50,8 @@ If you open the app, you will see there are two flows in the KafkaAppSample app.
 The Producer flow produces a message on the mentioned topic, whenever the rest enpoint is triggered. REST trigger has method GET with path parameter 'pub'.
 ![The CRUD Flows](../../import-screenshots/Kafka/Producer.png)
 
-The Consumer flow has the consumer trigger which is listening to the mentioned topic and recieves the message whenever it is sent. Further, the 'commit offset' activity notifies the consumer to commit the offset as soon as the message is recieved and lastly the 'Log' activity is printing the recieved message.
+The Consumer flow has the consumer trigger which is listening to the mentioned topic and recieves the message whenever it is sent. Further, the 'commit offset' activity notifies the consumer to commit the offset and lastly the 'Log' activity is printing the recieved message.
+Note: If 'commit offset' activity is not used the consumer commits the offset at the end of the flow.
 ![The SFTrigger Flows](../../import-screenshots/Kafka/Consumer.png)
 
 ### Run the application
