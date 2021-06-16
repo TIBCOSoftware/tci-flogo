@@ -35,7 +35,7 @@ In this sample we will first clear contents of the excel sheet, get the data, up
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../../import-screenshots/sqlserver_screenshot/3.png)
+![Import your sample](../../../import-screenshots/google_sheets_screenshots/3.png)
 
 5. Click on Upload Button. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 

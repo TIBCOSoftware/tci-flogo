@@ -29,7 +29,7 @@ In this sample we will first create a copy of existing document, get contents of
 
 2. Create a new empty app.
 
-![Create an app](../../../import-screenshots/sqlserver_screenshot/1.png)
+![Create an app](../../../import-screenshots/google_docs_screenshots/1.png)
 
 3. On the app details page, select import app option.
 
@@ -37,7 +37,7 @@ In this sample we will first create a copy of existing document, get contents of
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../../import-screenshots/sqlserver_screenshot/3.png)
+![Import your sample](../../../import-screenshots/google_docs_screenshots/3.png)
 
 5. Click on Upload Button. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
