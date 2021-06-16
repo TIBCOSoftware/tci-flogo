@@ -1,22 +1,20 @@
-# Producing and Consuming message using Kafka connector.
+# Publishing and Recieving message using TIBCO Cloud Messaging connector.
 
 
 ## Description
 
-This example demonstrate how we can send message using the Kafka producer activity and recieve the same message using Kafka consumer trigger.
+This example demonstrate how we can send message using the TCM publisher activity and recieve the same message using TCM subscriber triger.
 
-The Producer flow produces a message on the mentioned topic, whenever the rest enpoint is triggered.
-The Consumer flow has the consumer trigger which is listening to the mentioned topic and recieves the message whenever it is sent. Further, the 'commit offset' activity notifies the consumer to commit the offset and lastly the 'Log' activity is printing the recieved message. 
+The Publisher flow publishes a message on the mentioned destination, whenever the rest enpoint is triggered.
+The Subscriber flow has the subscriber trigger which is listening to the mentioned destination and recieves the message whenever it is sent. Further, the TCMMessageAck activity notifies the TCM Message Subscriber trigger to acknowledge the message received and lastly the 'Log' activity is printing the recieved message. 
 
 
 ## Prerequisites
 
-* Ensure that Apache Kafka Connector is already installed being an OOTB connector.
-* Ensure that you have an active Kafka broker.
+* Ensure that Tibco Cloud Messaging Connector is already installed being an OOTB connector.
+* Ensure that you have an active Tibco Cloud Messaging server.
 
-## Import the sample
-
-1. Download the sample's .json file 'KafkaAppSample.json'
+1. Download the sample's .json file 'TCMAppSample.json'
 
 2. Create a new empty app.
 ![Create an app](../../import-screenshots/2.png)
@@ -25,10 +23,10 @@ The Consumer flow has the consumer trigger which is listening to the mentioned t
 ![Select import](../../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json file for the app that you want to import.
-![Import your sample](../../import-screenshots/Kafka/ImportApp.png)
+![Import your sample](../../import-screenshots/TCM/ImportApp.png)
 
 5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
-![The Import app dialog](../../import-screenshots/Kafka/ImportWarn.png)
+![The Import app dialog](../../import-screenshots/TCM/ImportWarn.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
@@ -39,45 +37,45 @@ The Consumer flow has the consumer trigger which is listening to the mentioned t
 ## Understanding the configuration
 
 ### The Connection
-When you import this app, you need to configure the 'Kafkasample' connection in Connections page. It has pre-filled values. You need to change 'Brokers' url with yours.
+When you import this app, you need to configure the 'TCMsample' connection in Connections page. It has pre-filled values. You need to change 'Connection url' and 'authentication key' with yours.
 
-![The connection](../../import-screenshots/Kafka/Connection.png)
+![The connection](../../import-screenshots/TCM/Connection.png)
 
-### The Flows and Commit offset activity
-If you open the app, you will see there are two flows in the KafkaAppSample app. The flow 'producer' and second flow 'consumer'.
-![The Flows](../../import-screenshots/Kafka/FlowList.png)
+### The Flows and TCMMessageAck activity
+If you open the app, you will see there are two flows in the TCMAppSample app. The flow 'publisher' and second flow 'subscriber'.
+![The Flows](../../import-screenshots/TCM/FlowList.png)
 
-The Producer flow produces a message on the mentioned topic, whenever the rest enpoint is triggered. REST trigger has method GET with path parameter 'pub'.
-![The Producer flow](../../import-screenshots/Kafka/Producer.png)
+The Publisher flow publishes a message on the mentioned destination, whenever the rest enpoint is triggered. REST trigger has method GET with path parameter 'pub'.
+![The Publisher flow](../../import-screenshots/TCM/Publisher.png)
 
-The Consumer flow has the consumer trigger which is listening to the mentioned topic and recieves the message whenever it is sent. Further, the 'commit offset' activity notifies the consumer to commit the offset and lastly the 'Log' activity is printing the recieved message.
-Note: If 'commit offset' activity is not used the consumer commits the offset at the end of the flow.
-![The Consumer flow](../../import-screenshots/Kafka/Consumer.png)
+The Subscriber flow has the subscriber trigger which is listening to the mentioned destination and recieves the message whenever it is sent. Further, the TCMMessageAck activity notifies the TCM Message Subscriber trigger to acknowledge the message received and lastly the 'Log' activity is printing the recieved message.
+Note: If 'TCMMessageAck' activity is not used, the subscriber acknowledges the message revieved at the end of the flow.
+![The Subscriber flow](../../import-screenshots/TCM/Subscriber.png)
 
 ### Run the application
 For running the application, first you have to push the app and then scale up the app. Then after sometime you can see your app in running status.
-![Before Push App](../../import-screenshots/Kafka/AppNotDeployed.png)
-![Scale App](../../import-screenshots/Kafka/AppScale.png)
-![After Push App](../../import-screenshots/Kafka/AppRunning.png)
+![Before Push App](../../import-screenshots/TCM/AppNotDeployed.png)
+![Scale App](../../import-screenshots/TCM/AppScale.png)
+![After Push App](../../import-screenshots/TCM/AppRunning.png)
 
 Once it reaches to Running state, go to Endpoints, click on Test under Actions and for GET//pub, select 'Try it out'
 YNow click Execute button.
-![Runtime Execution](../../import-screenshots/Kafka/EndPoint.png)
+![Runtime Execution](../../import-screenshots/TCM/EndPoint.png)
 
 If you want to test the sample in the Flow tester then follow below instructions:
 Click on the MainFlowWithSFCreateCheckStatusJob flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
-![FlowTester](../../import-screenshots/Kafka/LaunchConfig.png)
+![FlowTester](../../import-screenshots/TCM/LaunchConfig.png)
 
 ## Outputs
 
 1. Sample Response when hit the endpoints
-![Sample Response](../../import-screenshots/Kafka/Response.png)
+![Sample Response](../../import-screenshots/TCM/Response.png)
 
 2. Sample Logs
-![Sample Logs](../../import-screenshots/Kafka/AppLogs.png)
+![Sample Logs](../../import-screenshots/TCM/AppLogs.png)
 
 3. Flow Tester Logs
-![FlowTester Logs](../../import-screenshots/Kafka/FlowTesterLogs.png)
+![FlowTester Logs](../../import-screenshots/TCM/FlowTesterLogs.png)
 
 
 ## Troubleshooting
