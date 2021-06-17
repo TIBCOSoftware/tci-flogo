@@ -14,6 +14,8 @@ The Subscriber flow has the subscriber trigger which is listening to the mention
 * Ensure that Tibco Cloud Messaging Connector is already installed being an OOTB connector.
 * Ensure that you have an active Tibco Cloud Messaging server.
 
+## Import the sample
+
 1. Download the sample's .json file 'TCMAppSample.json'
 
 2. Create a new empty app.

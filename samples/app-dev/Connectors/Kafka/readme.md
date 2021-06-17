@@ -43,6 +43,9 @@ When you import this app, you need to configure the 'Kafkasample' connection in 
 
 ![The connection](../../import-screenshots/Kafka/Connection.png)
 
+Note: If you want to use the TIBCO Cloud Messaging - Kafka instance hosted on TCI-US, you can refer to the following doc for configuring the connection
+DOC: https://integration.cloud.tibco.com/docs/#Subsystems/flogo-kafka/connector-users-guide/kafka-Connecting-to-TIBCO-Cloud-Messaging.html?TocPath=TIBCO%2520Flogo%25C2%25AE%2520Connectors%257CTIBCO%2520Flogo%25C2%25AE%2520Connector%2520for%2520Apache%2520Kafka%257CConfiguring%2520a%2520Kafka%2520Client%2520Connection%257C_____2
+
 ### The Flows and Commit offset activity
 If you open the app, you will see there are two flows in the KafkaAppSample app. The flow 'producer' and second flow 'consumer'.
 ![The Flows](../../import-screenshots/Kafka/FlowList.png)
