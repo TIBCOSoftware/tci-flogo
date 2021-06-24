@@ -1,0 +1,366 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "github.com/tibco/flogo-google-pubsub/src/app/GoogleCloudPubSub/activity/publisher",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/log",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/rest",
+        "github.com/tibco/flogo-google-pubsub/src/app/GoogleCloudPubSub/trigger/subscriber",
+        "github.com/project-flogo/contrib/function/string",
+        "github.com/tibco/flogo-google-pubsub/src/app/GoogleCloudPubSub/connector/pubsub"
+    ],
+    "name": "Google-PubSub-App",
+    "description": "",
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9999,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage",
+            "handlers": [
+                {
+                    "description": "Purpose of this flow is to override topicid from Publisher Activity Input tab and then publish message to override topic.",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/googlepubsub",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:Publisher"
+                        },
+                        "output": {
+                            "message": "=$.message"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}"
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "Publisher"
+                }
+            ]
+        },
+        {
+            "ref": "#subscriber",
+            "name": "gcp-pubsub-message-subscriber",
+            "description": "This trigger receives messages from the Google Pub/Sub Service",
+            "settings": {
+                "googleConnection": "conn://5fa27f30-c9c4-11eb-b4f4-dd6f5cf7357d"
+            },
+            "id": "GooglePubSubMessageSubscriber",
+            "handlers": [
+                {
+                    "description": "Purpose of this flow is to receives messages on a specified topic",
+                    "settings": {
+                        "subscriptionId": "Topic_BookSub",
+                        "maxOutstandingMessages": 1000,
+                        "flowControlMode": false,
+                        "messageDataFormat": "JSON"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:Subscriber"
+                        },
+                        "input": {
+                            "message": "=$.message",
+                            "metadata": "=$.metadata"
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "jsonSchema": "schema://Person",
+                            "messageAttributes": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"City\":{\"type\":\"string\"}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"City\",\"type\":\"string\"}]"
+                            },
+                            "message": {
+                                "type": "json",
+                                "value": "{\n    \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n    \"type\": \"object\",\n    \"properties\": {\n        \"U_Id\": {\n            \"type\": \"number\"\n        },\n        \"FirstName\": {\n            \"type\": \"string\"\n        },\n        \"LastName\": {\n            \"type\": \"string\"\n        },\n        \"Age\": {\n            \"type\": \"number\"\n        }\n    }\n}",
+                                "fe_metadata": "{\n    \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n    \"type\": \"object\",\n    \"properties\": {\n        \"U_Id\": {\n            \"type\": \"number\"\n        },\n        \"FirstName\": {\n            \"type\": \"string\"\n        },\n        \"LastName\": {\n            \"type\": \"string\"\n        },\n        \"Age\": {\n            \"type\": \"number\"\n        }\n    }\n}"
+                            },
+                            "metadata": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"messageAttributes\":{\"type\":\"object\",\"properties\":{\"City\":{\"type\":\"string\"}}},\"messageId\":{\"type\":\"string\"},\"deliveryAttempt\":{\"type\":\"number\"}}}",
+                                "fe_metadata": "{\"messageAttributes\":{\"City\":\"\"},\"messageId\":\"\",\"deliveryAttempt\":0}"
+                            }
+                        }
+                    },
+                    "name": "Subscriber"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:Publisher",
+            "data": {
+                "name": "Publisher",
+                "description": "Purpose of this flow is to override topicid from Publisher Activity Input tab and then publish message to override topic.",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "MessagePublisherActivity",
+                        "to": "LogMessage",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "LogMessage",
+                        "to": "Return",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "MessagePublisherActivity",
+                        "name": "MessagePublisherActivity",
+                        "description": "This activity sends a message to Google Cloud Pub/Sub Messaging Service",
+                        "type": "iterator",
+                        "settings": {
+                            "iterate": 5,
+                            "accumulate": false,
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#publisher",
+                            "settings": {
+                                "googleConnection": "conn://5fa27f30-c9c4-11eb-b4f4-dd6f5cf7357d",
+                                "topicName": "Test_topic1",
+                                "messageOrdering": true,
+                                "messageDataFormat": "JSON"
+                            },
+                            "input": {
+                                "topicId": "Topic_Book",
+                                "messageOrderingKey": "Order",
+                                "message": {
+                                    "mapping": {
+                                        "U_Id": 8734,
+                                        "FirstName": "Andrew",
+                                        "LastName": "Thomas",
+                                        "Age": 34
+                                    }
+                                },
+                                "messageAttributes": {
+                                    "mapping": {
+                                        "City": "London"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "jsonSchema": "schema://Person",
+                                    "message": {
+                                        "type": "json",
+                                        "value": "{\n    \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n    \"type\": \"object\",\n    \"properties\": {\n        \"U_Id\": {\n            \"type\": \"number\"\n        },\n        \"FirstName\": {\n            \"type\": \"string\"\n        },\n        \"LastName\": {\n            \"type\": \"string\"\n        },\n        \"Age\": {\n            \"type\": \"number\"\n        }\n    }\n}",
+                                        "fe_metadata": "{\n    \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n    \"type\": \"object\",\n    \"properties\": {\n        \"U_Id\": {\n            \"type\": \"number\"\n        },\n        \"FirstName\": {\n            \"type\": \"string\"\n        },\n        \"LastName\": {\n            \"type\": \"string\"\n        },\n        \"Age\": {\n            \"type\": \"number\"\n        }\n    }\n}"
+                                    },
+                                    "messageAttributes": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"City\":{\"type\":\"string\"}},\"required\":[]}",
+                                        "fe_metadata": "[{\"parameterName\":\"City\",\"type\":\"string\"}]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[MessagePublisherActivity].messageId)"
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "message": "=string.concat(\" Message Published Successfully \",\" [Message Id is] : \",string.tostring($activity[MessagePublisherActivity].messageId))"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "message",
+                            "type": "string"
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"message\":{\"type\":\"string\",\"required\":false}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:Subscriber",
+            "data": {
+                "name": "Subscriber",
+                "description": "Purpose of this flow is to receives messages on a specified topic",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "LogMessage",
+                        "to": "LogMessage1",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($flow.message)"
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage1",
+                        "name": "LogMessage1",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($flow.metadata.messageAttributes)"
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "message",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"U_Id\":{\"type\":\"number\"},\"FirstName\":{\"type\":\"string\"},\"LastName\":{\"type\":\"string\"},\"Age\":{\"type\":\"number\"}}"
+                            }
+                        },
+                        {
+                            "name": "metadata",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"messageAttributes\":{\"type\":\"object\",\"properties\":{\"City\":{\"type\":\"string\"}}},\"messageId\":{\"type\":\"string\"},\"deliveryAttempt\":{\"type\":\"number\"}}"
+                            }
+                        }
+                    ],
+                    "output": [],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"GooglePubSubMessageSubscriber\",\"properties\":{\"message\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"U_Id\":{\"type\":\"number\"},\"FirstName\":{\"type\":\"string\"},\"LastName\":{\"type\":\"string\"},\"Age\":{\"type\":\"number\"}}},\"metadata\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"messageAttributes\":{\"type\":\"object\",\"properties\":{\"City\":{\"type\":\"string\"}}},\"messageId\":{\"type\":\"string\"},\"deliveryAttempt\":{\"type\":\"number\"}}}}}"
+                    }
+                }
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "GoogleCloudPubSub.GooglePubSub.Project_ID",
+            "type": "string",
+            "value": "tci-flogo"
+        },
+        {
+            "name": "GoogleCloudPubSub.GooglePubSub.Service_Account_Key",
+            "type": "string",
+            "value": {
+                "filename": "file.json",
+                "content": "data:application/json;base64,ewoiYmxhbmsgZmlsZSIKfQo="
+            }
+        }
+    ],
+    "schemas": {
+        "Person": {
+            "type": "json",
+            "value": "{\n    \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n    \"type\": \"object\",\n    \"properties\": {\n        \"U_Id\": {\n            \"type\": \"number\"\n        },\n        \"FirstName\": {\n            \"type\": \"string\"\n        },\n        \"LastName\": {\n            \"type\": \"string\"\n        },\n        \"Age\": {\n            \"type\": \"number\"\n        }\n    }\n}",
+            "fe_metadata": "{\n    \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n    \"type\": \"object\",\n    \"properties\": {\n        \"U_Id\": {\n            \"type\": \"number\"\n        },\n        \"FirstName\": {\n            \"type\": \"string\"\n        },\n        \"LastName\": {\n            \"type\": \"string\"\n        },\n        \"Age\": {\n            \"type\": \"number\"\n        }\n    }\n}"
+        }
+    },
+    "connections": {
+        "5fa27f30-c9c4-11eb-b4f4-dd6f5cf7357d": {
+            "id": "5fa27f30-c9c4-11eb-b4f4-dd6f5cf7357d",
+            "name": "GooglePubSub",
+            "ref": "#pubsub",
+            "isGlobal": false,
+            "settings": {
+                "name": "GooglePubSub",
+                "description": "",
+                "projectId": "=$property[\"GoogleCloudPubSub.GooglePubSub.Project_ID\"]",
+                "serviceAccountKey": "=$property[\"GoogleCloudPubSub.GooglePubSub.Service_Account_Key\"]"
+            }
+        }
+    },
+    "contrib": "W3sicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0aHViLmNvbS90aWJjby9mbG9nby1nb29nbGUtcHVic3ViL3NyYy9hcHAvR29vZ2xlQ2xvdWRQdWJTdWIiLCJzM2xvY2F0aW9uIjoiVGliY28vR29vZ2xlQ2xvdWRQdWJTdWIifV0=",
+    "fe_metadata": "UEsDBAoAAAAIAE9DylKrqSRGFQAAABMAAAAIAAAAYXBwLmpzb26rViopykxPTy1yy8kvL1ayio6tBQBQSwECFAAKAAAACABPQ8pSq6kkRhUAAAATAAAACAAAAAAAAAAAAAAAAAAAAAAAYXBwLmpzb25QSwUGAAAAAAEAAQA2AAAAOwAAAAAA"
+}

@@ -1,0 +1,597 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/log",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "github.com/tibco/flogo-aws-sqs/src/app/AmazonSQS/activity/sqssendmessage",
+        "github.com/tibco/flogo-aws-sqs/src/app/AmazonSQS/trigger/sqsreceivemessage",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/rest",
+        "github.com/project-flogo/contrib/function/array",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/function/boolean",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/function/utility",
+        "github.com/project-flogo/contrib/function/string",
+        "git.tibco.com/git/product/ipaas/wi-plugins.git/contributions/AWS/connector"
+    ],
+    "name": "AmazonSQSSample",
+    "description": "AmazonSQS app to send and receive messages to Amazon SQS queue",
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#sqsreceivemessage",
+            "name": "sqsreceivemessage",
+            "description": "This trigger receives messages from the Amazon queue Service",
+            "settings": {
+                "awsConnection": "conn://66d40a50-7bed-11eb-bf53-15cd2f6383ac"
+            },
+            "id": "ReceiveSQSMessage",
+            "handlers": [
+                {
+                    "description": "This flow have ReceiveSQSMessage trigger to receives messages from the Amazon FIFO queue Service",
+                    "settings": {
+                        "queueUrl": "https://sqs.us-west-1.amazonaws.com/777281022645/FifoAutomation.fifo",
+                        "MaxNumberOfMessages": 5,
+                        "VisibilityTimeout": 0,
+                        "WaitTimeSeconds": 0,
+                        "ReceiveRequestAttemptId": "",
+                        "deleteMessage": true,
+                        "MessageAttributeNames": [
+                            {
+                                "Name": "TestFifoString",
+                                "Type": "Number"
+                            },
+                            {
+                                "Name": "TestNumber",
+                                "Type": "String"
+                            },
+                            {
+                                "Name": "teststring",
+                                "Type": "String"
+                            }
+                        ]
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:SQSReceiveFIFO"
+                        },
+                        "input": {
+                            "Message": {
+                                "mapping": {
+                                    "@foreach($.Message,Message)": {
+                                        "=": "$loop"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "Message": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"MessageAttributes\":{\"type\":\"object\",\"properties\":{\"TestFifoString\":{\"type\":\"number\"},\"TestNumber\":{\"type\":\"string\"},\"teststring\":{\"type\":\"string\"}}},\"Body\":{\"type\":\"string\"},\"MD5OfBody\":{\"type\":\"string\"},\"MD5OfMessageAttributes\":{\"type\":\"string\"},\"MessageId\":{\"type\":\"string\"},\"ReceiptHandle\":{\"type\":\"string\"}}}}",
+                                "fe_metadata": "[{\"MessageAttributes\":{\"TestFifoString\":0,\"TestNumber\":\"abc\",\"teststring\":\"abc\"},\"Body\":\"\",\"MD5OfBody\":\"\",\"MD5OfMessageAttributes\":\"\",\"MessageId\":\"\",\"ReceiptHandle\":\"\"}]"
+                            }
+                        }
+                    },
+                    "name": "SQSReceiveFIFO"
+                }
+            ]
+        },
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9999,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage",
+            "handlers": [
+                {
+                    "description": "This flow having SendSQSMessage activity to send a message to the Amazon FIFO and Standard Queue Service",
+                    "settings": {
+                        "Method": "POST",
+                        "reqType": "application/json",
+                        "Path": "/sqssend/output",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:SQSSend"
+                        },
+                        "input": {
+                            "data": "=$.body.data"
+                        },
+                        "output": {
+                            "data": {
+                                "mapping": {
+                                    "SendFIFOLogs": "=$.SendFIFOLogs",
+                                    "SendSTDLogs": "=$.SendSTDLogs"
+                                }
+                            }
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"SendFIFOLogs\":{\"type\":\"string\"},\"SendSTDLogs\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\"SendFIFOLogs\":\"\",\n    \"SendSTDLogs\":\"\"\n}"
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}"
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            },
+                            "body": {
+                                "type": "json",
+                                "value": "{\n    \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n    \"type\": \"object\",\n    \"properties\": {\n        \"data\": {\n            \"type\": \"object\",\n            \"properties\": {\n                \"str\": {\n                    \"type\": \"string\"\n                },\n                \"num\": {\n                    \"type\": \"number\"\n                },\n                \"bool\": {\n                    \"type\": \"boolean\"\n                }\n            }\n        }\n    }\n}",
+                                "fe_metadata": "{\n    \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n    \"type\": \"object\",\n    \"properties\": {\n        \"data\": {\n            \"type\": \"object\",\n            \"properties\": {\n                \"str\": {\n                    \"type\": \"string\"\n                },\n                \"num\": {\n                    \"type\": \"number\"\n                },\n                \"bool\": {\n                    \"type\": \"boolean\"\n                }\n            }\n        }\n    }\n}"
+                            }
+                        }
+                    },
+                    "name": "SQSSend"
+                }
+            ]
+        },
+        {
+            "ref": "#sqsreceivemessage",
+            "name": "sqsreceivemessage",
+            "description": "This trigger receives messages from the Amazon queue Service",
+            "settings": {
+                "awsConnection": "conn://66d40a50-7bed-11eb-bf53-15cd2f6383ac"
+            },
+            "id": "ReceiveSQSMessage1",
+            "handlers": [
+                {
+                    "description": "This flow have ReceiveSQSMessage trigger to receives messages from the Amazon Standard type queue Service",
+                    "settings": {
+                        "queueUrl": "https://sqs.us-west-1.amazonaws.com/777281022645/STDAutomation",
+                        "MaxNumberOfMessages": 1,
+                        "VisibilityTimeout": 0,
+                        "WaitTimeSeconds": 20,
+                        "ReceiveRequestAttemptId": "",
+                        "deleteMessage": true
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:SQSReceiveSTD"
+                        },
+                        "input": {
+                            "Message": {
+                                "mapping": {
+                                    "@foreach($.Message,Message)": {
+                                        "=": "$loop"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "Message": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"MessageAttributes\":{\"type\":\"object\",\"properties\":{}},\"Body\":{\"type\":\"string\"},\"MD5OfBody\":{\"type\":\"string\"},\"MD5OfMessageAttributes\":{\"type\":\"string\"},\"MessageId\":{\"type\":\"string\"},\"ReceiptHandle\":{\"type\":\"string\"}}}}",
+                                "fe_metadata": "[{\"MessageAttributes\":{},\"Body\":\"\",\"MD5OfBody\":\"\",\"MD5OfMessageAttributes\":\"\",\"MessageId\":\"\",\"ReceiptHandle\":\"\"}]"
+                            }
+                        }
+                    },
+                    "name": "SQSReceiveSTD"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:SQSReceiveFIFO",
+            "data": {
+                "name": "SQSReceiveFIFO",
+                "description": "This flow have ReceiveSQSMessage trigger to receives messages from the Amazon FIFO queue Service",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "LogMessageFIFO",
+                        "to": "Return",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "LogMessageFIFO",
+                        "name": "LogMessageFIFO",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=utility.renderJSON($flow.Message, boolean.false())"
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "ReceiveFifoLog": "=utility.renderJSON($flow.Message, boolean.false())"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "Message",
+                            "type": "array",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"MessageAttributes\":{\"type\":\"object\",\"properties\":{\"TestString\":{\"type\":\"number\"},\"TestNumber\":{\"type\":\"string\"},\"teststring\":{\"type\":\"string\"}}},\"Body\":{\"type\":\"string\"},\"MD5OfBody\":{\"type\":\"string\"},\"MD5OfMessageAttributes\":{\"type\":\"string\"},\"MessageId\":{\"type\":\"string\"},\"ReceiptHandle\":{\"type\":\"string\"}}}"
+                            }
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "ReceiveFifoLog",
+                            "type": "string"
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveSQSMessage\",\"properties\":{\"Message\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"MessageAttributes\":{\"type\":\"object\",\"properties\":{\"TestString\":{\"type\":\"number\"},\"TestNumber\":{\"type\":\"string\"},\"teststring\":{\"type\":\"string\"}}},\"Body\":{\"type\":\"string\"},\"MD5OfBody\":{\"type\":\"string\"},\"MD5OfMessageAttributes\":{\"type\":\"string\"},\"MessageId\":{\"type\":\"string\"},\"ReceiptHandle\":{\"type\":\"string\"}}}}}}",
+                        "output": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"ReceiveFifoLog\":{\"type\":\"string\"}}}"
+                    }
+                }
+            }
+        },
+        {
+            "id": "flow:SQSSend",
+            "data": {
+                "name": "SQSSend",
+                "description": "This flow having SendSQSMessage activity to send a message to the Amazon FIFO and Standard Queue Service",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "SendSQSMessageFifo",
+                        "to": "SendSQSMessageStd",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "SendSQSMessageStd",
+                        "to": "LogMessageFifo",
+                        "type": "default"
+                    },
+                    {
+                        "id": 3,
+                        "from": "LogMessageFifo",
+                        "to": "LogMessageSTD",
+                        "type": "default"
+                    },
+                    {
+                        "id": 4,
+                        "from": "LogMessageSTD",
+                        "to": "Return",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "SendSQSMessageFifo",
+                        "name": "SendSQSMessageFifo",
+                        "description": "This activity sends a message to the Amazon Queue Service",
+                        "type": "iterator",
+                        "settings": {
+                            "iterate": 20,
+                            "accumulate": true
+                        },
+                        "activity": {
+                            "ref": "#sqssendmessage",
+                            "settings": {
+                                "awsConnection": "conn://66d40a50-7bed-11eb-bf53-15cd2f6383ac",
+                                "queueUrl": "https://sqs.us-west-1.amazonaws.com/777281022645/FifoAutomation.fifo",
+                                "DelaySeconds": 60
+                            },
+                            "input": {
+                                "MessageAttributeNames": [
+                                    {
+                                        "Name": "TestFifoString",
+                                        "Type": "String"
+                                    },
+                                    {
+                                        "Name": "TestNumber",
+                                        "Type": "Number"
+                                    }
+                                ],
+                                "MessageBody": "=string.concat(string.tostring($flow.data), \" \", string.tostring($iteration[index]))",
+                                "MessageDeduplicationId": "=string.concat(\"DDID\", string.tostring($iteration[index]))",
+                                "MessageGroupId": "GroupID1",
+                                "MessageAttributes": {
+                                    "mapping": {
+                                        "TestNumber": 111,
+                                        "TestFifoString": "TestFifoAttr"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "MessageAttributes": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"TestFifoString\":{\"type\":\"string\"},\"TestNumber\":{\"type\":\"number\"}}}",
+                                        "fe_metadata": "{\"TestFifoString\":\"abc\",\"TestNumber\":0}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"MessageId\":{\"type\":\"string\"},\"SequenceNumber\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"MessageId\":\"\",\"SequenceNumber\":\"\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "SendSQSMessageStd",
+                        "name": "SendSQSMessageStd",
+                        "description": "This activity sends a message to the Amazon Queue Service",
+                        "activity": {
+                            "ref": "#sqssendmessage",
+                            "settings": {
+                                "awsConnection": "conn://66d40a50-7bed-11eb-bf53-15cd2f6383ac",
+                                "queueUrl": "https://sqs.us-west-1.amazonaws.com/777281022645/STDAutomation",
+                                "DelaySeconds": 0
+                            },
+                            "input": {
+                                "MessageAttributeNames": "",
+                                "MessageBody": "TestStringValueForMessage",
+                                "MessageDeduplicationId": "",
+                                "MessageGroupId": ""
+                            },
+                            "schemas": {
+                                "input": {
+                                    "MessageAttributes": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{}}",
+                                        "fe_metadata": "{}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"MessageId\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"MessageId\":\"\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessageFifo",
+                        "name": "LogMessageFifo",
+                        "description": "Simple Log Message Activity",
+                        "type": "iterator",
+                        "settings": {
+                            "iterate": "=$activity[SendSQSMessageFifo]",
+                            "accumulate": true
+                        },
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($iteration[value].output)"
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessageSTD",
+                        "name": "LogMessageSTD",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[SendSQSMessageStd].output)"
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "SendFIFOLogs": "SentFIFO Messages successfully",
+                                    "SendSTDLogs": "SentSTD Messages successfully"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"str\":{\"type\":\"string\"},\"num\":{\"type\":\"number\"},\"bool\":{\"type\":\"boolean\"}}"
+                            }
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "SendFIFOLogs",
+                            "type": "string"
+                        },
+                        {
+                            "name": "SendSTDLogs",
+                            "type": "string"
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"data\":{\"type\":\"object\",\"properties\":{\"str\":{\"type\":\"string\"},\"num\":{\"type\":\"number\"},\"bool\":{\"type\":\"boolean\"}}}}}",
+                        "output": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"SendFIFOLogs\":{\"type\":\"string\"},\"SendSTDLogs\":{\"type\":\"string\"}}}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:SQSReceiveSTD",
+            "data": {
+                "name": "SQSReceiveSTD",
+                "description": "This flow have ReceiveSQSMessage trigger to receives messages from the Amazon Standard type queue Service",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "LogMessageSTD",
+                        "to": "Return",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "LogMessageSTD",
+                        "name": "LogMessageSTD",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=utility.renderJSON($flow.Message,boolean.false())"
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "ReceiveSTDLog": "=utility.renderJSON($flow.Message, boolean.false())"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "Message",
+                            "type": "array",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"MessageAttributes\":{\"type\":\"object\",\"properties\":{}},\"Body\":{\"type\":\"string\"},\"MD5OfBody\":{\"type\":\"string\"},\"MD5OfMessageAttributes\":{\"type\":\"string\"},\"MessageId\":{\"type\":\"string\"},\"ReceiptHandle\":{\"type\":\"string\"}}}"
+                            }
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "ReceiveSTDLog",
+                            "type": "string"
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveSQSMessage1\",\"properties\":{\"Message\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"MessageAttributes\":{\"type\":\"object\",\"properties\":{}},\"Body\":{\"type\":\"string\"},\"MD5OfBody\":{\"type\":\"string\"},\"MD5OfMessageAttributes\":{\"type\":\"string\"},\"MessageId\":{\"type\":\"string\"},\"ReceiptHandle\":{\"type\":\"string\"}}}}}}",
+                        "output": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"ReceiveSTDLog\":{\"type\":\"string\"}}}"
+                    }
+                }
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "AWS.AmazonSQS.Region",
+            "type": "string",
+            "value": "us-west-1"
+        },
+        {
+            "name": "AWS.AmazonSQS.Access_key_ID",
+            "type": "string",
+            "value": "AKIAXARHWZM433U4LAJZ"
+        },
+        {
+            "name": "AWS.AmazonSQS.Secret_access_key",
+            "type": "string",
+            "value": "SECRET:BDb9lF6Jmq1IvKB4kBfGUO9g+CRUyywPZH6Tus0nEQzxCPzy8rDQFZt30Ppw+A06jQ1LmyqTpyE="
+        },
+        {
+            "name": "AWS.AmazonSQS.Role_ARN",
+            "type": "string",
+            "value": "arn:aws:iam::777281022645:role/AWS_Automation_Role"
+        },
+        {
+            "name": "AWS.AmazonSQS.Role_Session_Name",
+            "type": "string",
+            "value": "Admin"
+        },
+        {
+            "name": "AWS.AmazonSQS.External_ID",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "AWS.AmazonSQS.Expiration_Duration(secs)_",
+            "type": "float64",
+            "value": 900
+        }
+    ],
+    "connections": {
+        "66d40a50-7bed-11eb-bf53-15cd2f6383ac": {
+            "id": "66d40a50-7bed-11eb-bf53-15cd2f6383ac",
+            "name": "AmazonSQS",
+            "ref": "#connector",
+            "isGlobal": false,
+            "settings": {
+                "name": "AmazonSQS",
+                "description": "",
+                "customEndpoint": false,
+                "endpoint": "",
+                "region": "=$property[\"AWS.AmazonSQS.Region\"]",
+                "accessKey": "=$property[\"AWS.AmazonSQS.Access_key_ID\"]",
+                "secretKey": "=$property[\"AWS.AmazonSQS.Secret_access_key\"]",
+                "assumeRole": true,
+                "roleArn": "=$property[\"AWS.AmazonSQS.Role_ARN\"]",
+                "roleSessionName": "=$property[\"AWS.AmazonSQS.Role_Session_Name\"]",
+                "externalId": "=$property[\"AWS.AmazonSQS.External_ID\"]",
+                "expirationDuration": "=$property[\"AWS.AmazonSQS.Expiration_Duration(secs)_\"]",
+                "LAMBDA_CONNECTION_INFO": ""
+            }
+        }
+    },
+    "contrib": "W3sicmVmIjoiZ2l0aHViLmNvbS90aWJjby9mbG9nby1hd3Mtc3FzL3NyYy9hcHAvQW1hem9uU1FTIiwiczNsb2NhdGlvbiI6IlRpYmNvL0FtYXpvblNRUyJ9LHsicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1wbHVnaW5zLmdpdC9jb250cmlidXRpb25zL0FXUyIsInMzbG9jYXRpb24iOiJUaWJjby9BV1MifV0=",
+    "fe_metadata": "UEsDBAoAAAAIAGk9Y1KrqSRGFQAAABMAAAAIAAAAYXBwLmpzb26rViopykxPTy1yy8kvL1ayio6tBQBQSwECFAAKAAAACABpPWNSq6kkRhUAAAATAAAACAAAAAAAAAAAAAAAAAAAAAAAYXBwLmpzb25QSwUGAAAAAAEAAQA2AAAAOwAAAAAA"
+}
