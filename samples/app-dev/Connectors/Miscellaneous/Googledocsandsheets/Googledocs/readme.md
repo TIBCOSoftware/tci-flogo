@@ -96,7 +96,7 @@ in flow, click on Test Button -> create Launch configuration -> click Next butto
 
 1. Flow Tester
 
-![Sample Response](../../../../import-screenshots/google_docs_screenshots/17png)
+![Sample Response](../../../../import-screenshots/google_docs_screenshots/17.png)
 
 2. When hit endpoints
 
