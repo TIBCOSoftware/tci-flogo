@@ -59,10 +59,15 @@ In the connection, note that,
 2. Maximum Connection Retry Attempts - Maximum number of attempts to reconnect with a database server in case connection failure. Default value is 3
 3. Connection Retry Delay - Number of seconds to wait between connection retry attempts. Default value is 5 sec.
 4. Secure Connection - Establishes the secure connection when set to True.
+
 TLS: Select the TLS mode from the list.
+
 The following certificates for each TLS mode:
+
 CA Certificate: Certificate Authority (CA) certificate.
+
 Client Certificate: Not required. Client Certificate file for connections requiring client authentication.
+
 Client Key: Not required. Client key file used for connections requiring client authentication.
  
 
