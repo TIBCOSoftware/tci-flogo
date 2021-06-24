@@ -4,10 +4,10 @@
 ## Description
 TIBCO Flogo® Connector for Google Sheets allows you to edit spreadsheets in real-time.
 
-This example demonstrate how we can create and use Google Sheet activities.
+This example demonstrates how we can create and use Google Sheet activities.
 Google Sheets bascially contains 4 activities. The main purpose of these activities are:
 
-a) Get Google Sheet Data :  To retrieve data from your Google Sheets and make it available in the output(You can get data from a particular row or coloumn). You can specify a cell range from which to retrieve data.
+a) Get Google Sheet Data :  To retrieve data from your Google Sheets and make it available in the output(You can get data from a particular row or column). You can specify a cell range from which to retrieve data.
 
 b) Copy Sheet: To copy data from one tab in a source Google Sheet to another tab in a destination Google Sheet. This activity will copy the data from the named sheet to the destination Google sheet. Make sure that the destination sheet already exists.
 
@@ -15,13 +15,13 @@ c) Update Google Sheet Data : To update an area of the Google sheet with the dat
 
 d) Clear Google Sheet Data :  To erase data from a whole Google Sheet or a part of the sheet.
  
-
-In this sample we will first clear contents of the excel sheet, get the data, update the data , get the updated data, copy the content of one sheet to the other, update the coloumn without defining a schema.
+In this sample we will first clear a part of the excel sheet, get the data, update the data , get the updated data, copy the content of one sheet to the other, update the coloumn without defining a schema.
 
 ## Prerequisites
 
 1. TIBCO Cloud™ Integration 
-2. If you run any of these samples locally using TIBCO Flogo® Enterprise -Ensure that connector is installed.
+2. You must have access to any Sheet that needs to be accessed by the connection.
+3. If you run any of these samples locally using TIBCO Flogo® Enterprise -Ensure that connector is installed.
 
 ## Import the sample
 
@@ -55,16 +55,16 @@ In this sample we will first clear contents of the excel sheet, get the data, up
 
 ### The Connection
 
-You must create a Google connection before you can use the TIBCO Flogo® Connector for Google Sheets connector. The Google connection contains all the parameters required to connect to your Google account. The Google connection is used by all the activities in the Google Sheets category.
+The Google connection contains all the parameters required to connect to your Google account. The Google connection is used by all the activities in the Google Sheets category.
 
-When you import the app you need to provide the Service Account Key and click on save button to establish the connection.
+When you import the app, click on save button to establish the connection.
 
 ![The connection](../../../../import-screenshots/google_sheets_screenshots/5.png)
 
 
 ### The Flow
 
-If you go inside the app, you can see in flow we have 5 activities (Copy,Create,Get,Delete and Update) that perform some operations.
+If you go inside the app, you can see in flow we have 4 activities (Copy,Get,Clear and Update) that perform some operations.
 Also in flow we have Log Message and Return Activity for getting the output.
 
 ![Sample Response](../../../../import-screenshots/google_sheets_screenshots/6.png)

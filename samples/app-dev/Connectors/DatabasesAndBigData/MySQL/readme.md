@@ -3,8 +3,8 @@
 
 ## Description
 
-This example demonstrate how we can create and use MySQL CRUD activities.
-MySQL CRUD app bascially contains 4 activities. The main purpose of these activities are:
+This example demonstrates how we can create and use MySQL CRUD activities.
+MySQL CRUD app bascially contain 4 activities. The main purpose of these activities are:
 a) To fetch data using Query activity.
 b) To insert data using Insert activity.
 c) Update the data using Update activity.

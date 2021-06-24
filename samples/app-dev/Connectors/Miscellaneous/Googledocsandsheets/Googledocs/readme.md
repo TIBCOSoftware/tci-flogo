@@ -5,7 +5,7 @@
 
 Google Docs allows you to store the output of any activity in a Google Document. The Google Document can then be shared with multiple users. The content of the document can be retrieved and transformed to a MIME type and used as an input by the subsequent activities.
 
-This example demonstrate how we can create and use Google Docs activities.
+This example demonstrates how we can create and use Google Docs activities.
 Google Docs bascially contains 5 activities. The main purpose of these activities are:
 
 a) Google Docs Create: To create a new Google document.
@@ -18,12 +18,13 @@ d) Google Docs Delete: To permanently delete a document.
 
 e) Google Docs Copy: To copy a document to one or more new folders.
 
-In this sample we will first create a copy of existing document, get contents of that document, create a new document, update the document (You can update the metadata as well as the content) and finally we will delete the newly created document. we will perform these functions using Google Docs activities mentioned above.
+In this sample we will first create a copy of existing document, get it's contents, create a new document, update it (You can update the metadata as well as the content) and finally we will delete the newly created document. we will perform these functions using Google Docs activities mentioned above.
 
 ## Prerequisites
 
-1. TIBCO Cloud™ Integration 
-2. If you run any of these samples locally using TIBCO Flogo® Enterprise -Ensure that the connector is installed.
+1. TIBCO Cloud™ Integration.
+2. You must have access to any document that needs to be accessed by the connection. Documents created will be owned by the service account.
+3. If you run any of these samples locally using TIBCO Flogo® Enterprise -Ensure that the connector is installed.
 
 ## Import the sample
 
@@ -56,11 +57,9 @@ In this sample we will first create a copy of existing document, get contents of
 ## Understanding the configuration
 
 ### The Connection
-To use Google Docs, you must first create a TIBCO Flogo® Connector for Google Docs connection. The Google connection contains all the parameters required to connect to your Google service account. The Google connection is used by all the activities in the Google Docs category.
+The Google connection contains all the parameters required to connect to your Google service account. The Google connection is used by all the activities in the Google Docs category.
 
-You must have access to any document that needs to be accessed by the connection. Documents created will be owned by the service account.
-
-When you import the app you need to provide the Service Account Key and click on save button to establish the connection.
+When you import the app, click on save button to establish the connection.
 
 ![The connection](../../../../import-screenshots/google_docs_screenshots/5.png)
 
