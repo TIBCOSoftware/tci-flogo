@@ -2,25 +2,11 @@
 
 [This](https://github.com/TIBCOSoftware/tci-flogo) repository contains docs, samples and tools to build Flogo applications as well as build extensions. In this repository, you will find below samples - 
 
-* [HelloWorld](/samples/app-dev/hello-world)
-* [Bookstore REST API](/samples/app-dev/rest-api)
-* [Branching & Error Handling](/samples/app-dev/branching-errorhandling)
-* [Subflows](/samples/app-dev/subflows)
-* [Loops](/samples/app-dev/loops.sample)
-* [JSON Path](/samples/app-dev/json.path.sample)
-* [Array Filtering](/samples/app-dev/array.forEach.sample)
-* [EMS](/samples/app-dev/ems.sample)
-* [Snowflake](/samples/app-dev/Connectors/SnowFlake/SnowFlake-Operations)
-* [TIBCO Cloud Messaging](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/TCM)
-* [GraphQL API's](/samples/app-dev/GraphQL)
-* [Basic Array Operations](/samples/app-dev/Array-Operations/Basic_Manipulations)
-* [Creating Primitive Array](/samples/app-dev/Array-Operations/PrimitiveArray_from_ObjectArray)
-* [Array Manipulation](/samples/app-dev/Array-Operations)
-* [Epoch To DateTime & vice versa](/Miscellaneous_Samples/Epoch-To-dateTime-ViceVesa)
-* [Random number (4 digit) generator](/samples/app-dev/Miscellaneous_Samples/Strict_xx-Digit-random-number)
-* [Error Handling of null or empty JSON objects within condition paths](/samples/app-dev/branching-errorhandling/flogo.sample.error_handling_emptyNullObjects)
-* [Flow Controller Samples](/samples/app-dev/flow-control.samples)
-* [Get TCM Message](/samples/app-dev/TCM/HowTo-Get_TCM_MSG)
+* [Basic-Concepts](/samples/app-dev/Basic-Concepts) - Includes Hello-World, Branching, Error Handling, Loops, Subflows, Shared Data samples 
+* [API-Development](/samples/app-dev/API-Development) - Includes REST, graphQL, gRPC samples
+* [Array Mapping/Filtering](/samples/app-dev/Mapping-Arrays) - Includes array.forEach, json.path, JavaScript Activity samples
+* [Connectors](/samples/app-dev/Connectors) - Includes samples for various connectors like Salesforce, Salesforce Pardot, PostgreSQL, Microsoft SQL Server, Snowflake, Amazon SNS, SQS, Google Pub Sub, MQTT, Apache Kafka, TCM, EMS, Apache Pulsar, Slack, Twilio, Websocket, Marketo, Stripe
+
 
 Below is a list of steps to import the Flogo application/sample. Every sample also has separate readme instructions after importing the app. 
 
