@@ -1,14 +1,14 @@
-# SQLServer CRUD Example
+# MySQL CRUD Example
 
 
 ## Description
 
-This example demonstrate how we can create and use SQLServer CRUD activities.
-SQLServer CRUD app bascially contains 4 activities. The main purpose of these activities are:
+This example demonstrate how we can create and use MySQL CRUD activities.
+MySQL CRUD app bascially contains 4 activities. The main purpose of these activities are:
 a) To fetch data using Query activity.
-b) To insert data using Insert activity. In this sample we will be inserting data via iterator(First, it reads the input rows which is the data from query activity in this case.Then, it does some processing to the rows if required.And finally, it returns the output.)
-c) Update the data using Update activity
-d) Delete the data using Delete activity from SQLServer database.
+b) To insert data using Insert activity.
+c) Update the data using Update activity.
+d) Delete the data using Delete activity from MySQL database.
 
 ## Prerequisites
 
@@ -18,23 +18,23 @@ d) Delete the data using Delete activity from SQLServer database.
 
 ## Import the sample
 
-1. Download the sample json file i.e., SQLServerCRUD.json.
+1. Download the sample json file i.e., MySQLSSLCRUD.json.
 
 2. Create a new empty app
 
-![Create an app](../../import-screenshots/sqlserver_screenshot/1.png)
+![Create an app](../../import-screenshots/mysql_docs_screenshot/1.png)
 
 3. On the app details page, select import app option.
 
-![Select import](../../import-screenshots/sqlserver_screenshot/2.png)
+![Select import](../../import-screenshots/mysql_docs_screenshot/2.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../import-screenshots/sqlserver_screenshot/3.png)
+![Import your sample](../../import-screenshots/mysql_docs_screenshot/3.png)
 
 5. Click on Upload Button. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
-![The Import app dialog](../../import-screenshots/sqlserver_screenshot/4.png)
+![The Import app dialog](../../import-screenshots/mysql_docs_screenshot/4.png)
 
 6. In Import App dialog, there are 2 options to import:
 
@@ -50,49 +50,55 @@ d) Delete the data using Delete activity from SQLServer database.
 
 When you import the app you need to re-enter the password and establish the connection.
 
-![The connection](../../import-screenshots/sqlserver_screenshot/5.png)
-![The connection](../../import-screenshots/sqlserver_screenshot/6.png)
-![The connection](../../import-screenshots/sqlserver_screenshot/7.png)
+![The connection](../../import-screenshots/mysql_docs_screenshot/6.png)
+![The connection](../../import-screenshots/mysql_docs_screenshot/7.png)
+![The connection](../../import-screenshots/mysql_docs_screenshot/8.png)
 
 In the connection, note that,
 1. Host - In this field we give public ip/public DNS of EC2 instance on which database is hosted.
-2. Maximum Connection Retry Attempts - maximum number of attempts to reconnect with a database server in case connection failure. Default value is 3
-3. Connection Retry Delay - number of seconds to wait between connection retry attempts. Default value is 5 sec.
+2. Maximum Connection Retry Attempts - Maximum number of attempts to reconnect with a database server in case connection failure. Default value is 3
+3. Connection Retry Delay - Number of seconds to wait between connection retry attempts. Default value is 5 sec.
+4. Secure Connection - Establishes the secure connection when set to True.
+TLS: Select the TLS mode from the list.
+The following certificates for each TLS mode:
+CA Certificate: Certificate Authority (CA) certificate.
+Client Certificate: Not required. Client Certificate file for connections requiring client authentication.
+Client Key: Not required. Client key file used for connections requiring client authentication.
+ 
 
 ### The Flow
 
 If you go inside the app, you can see in flow we have 4 activities (Query,Insert, Update and Delete) that perform some operations.
 Also in flow we have Log Message and Return Activity for getting the output.
 
-![Sample Response](../../import-screenshots/sqlserver_screenshot/8.png)
-![Sample Response](../../import-screenshots/sqlserver_screenshot/16.png)
-![Sample Response](../../import-screenshots/sqlserver_screenshot/17.png)
+![Sample Response](../../import-screenshots/mysql_docs_screenshot/9.png)
 
 ### Run the application
 For running the application, first you have to push the app and then scale up the app.
 Then after sometime you can see your app in running status.
 
-![Sample Response](../../import-screenshots/sqlserver_screenshot/9.png)
-![Sample Response](../../import-screenshots/sqlserver_screenshot/10.png)
-![Sample Response](../../import-screenshots/sqlserver_screenshot/11.png)
+![Sample Response](../../import-screenshots/mysql_docs_screenshot/10.png)
+![Sample Response](../../import-screenshots/mysql_docs_screenshot/11.png)
+![Sample Response](../../import-screenshots/mysql_docs_screenshot/12.png)
 Once your app reaches to Running state, go to Endpoints and for GET/tasks, select 'Try it Out’ option and then click on execute.
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
 in flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
 
-![sample Response](../../import-screenshots/sqlserver_screenshot/12.png)
-![Sample Response](../../import-screenshots/sqlserver_screenshot/13.png)
+![sample Response](../../import-screenshots/mysql_docs_screenshot/13.png)
+![Sample Response](../../import-screenshots/mysql_docs_screenshot/14.png)
+![Sample Response](../../import-screenshots/mysql_docs_screenshot/15.png)
 
 ## Outputs
 
 1. Flow Tester
 
-![Sample Response](../../import-screenshots/sqlserver_screenshot/14.png)
+![Sample Response](../../import-screenshots/mysql_docs_screenshot/16.png)
 
 2. When hit endpoints
 
-![Sample Response](../../import-screenshots/sqlserver_screenshot/15.png)
+![Sample Response](../../import-screenshots/mysql_docs_screenshot/17.png)
 
 
 ## Troubleshooting

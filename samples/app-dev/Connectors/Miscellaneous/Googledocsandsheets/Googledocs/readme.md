@@ -3,18 +3,20 @@
 
 ## Description
 
+Google Docs allows you to store the output of any activity in a Google Document. The Google Document can then be shared with multiple users. The content of the document can be retrieved and transformed to a MIME type and used as an input by the subsequent activities.
+
 This example demonstrate how we can create and use Google Docs activities.
 Google Docs bascially contains 5 activities. The main purpose of these activities are:
 
-a) Google Docs Copy: To copy the already present document.
+a) Google Docs Create: To create a new Google document.
 
-b) Google Docs Get: To get the content of the document.
+b) Google Docs Get: To get the content of the document.The data is formatted according to the mimetype selected. 
 
-c) Google Docs Create: To create a new document.
+c) Google Docs Update: To update the data and metadata of Google documents.
 
-d) Google Docs Delete: To delete the document.
+d) Google Docs Delete: To permanently delete a document.
 
-e) Google Docs Update: The documnent which were created can be updated using the Google Docs Update activity.
+e) Google Docs Copy: To copy a document to one or more new folders.
 
 In this sample we will first create a copy of existing document, get contents of that document, create a new document, update the document (You can update the metadata as well as the content) and finally we will delete the newly created document. we will perform these functions using Google Docs activities mentioned above.
 
@@ -54,6 +56,9 @@ In this sample we will first create a copy of existing document, get contents of
 ## Understanding the configuration
 
 ### The Connection
+To use Google Docs, you must first create a TIBCO Flogo® Connector for Google Docs connection. The Google connection contains all the parameters required to connect to your Google service account. The Google connection is used by all the activities in the Google Docs category.
+
+You must have access to any document that needs to be accessed by the connection. Documents created will be owned by the service account.
 
 When you import the app you need to provide the Service Account Key and click on save button to establish the connection.
 

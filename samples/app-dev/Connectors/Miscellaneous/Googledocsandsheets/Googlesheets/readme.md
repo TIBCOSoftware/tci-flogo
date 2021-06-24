@@ -2,17 +2,19 @@
 
 
 ## Description
+TIBCO Flogo® Connector for Google Sheets allows you to edit spreadsheets in real-time.
 
-This example demonstrate how we can create and use Google Sheets activities.
+This example demonstrate how we can create and use Google Sheet activities.
 Google Sheets bascially contains 4 activities. The main purpose of these activities are:
 
-a) Clear Google Sheet Data : It is going to clear contents of the excel sheet.
+a) Get Google Sheet Data :  To retrieve data from your Google Sheets and make it available in the output(You can get data from a particular row or coloumn). You can specify a cell range from which to retrieve data.
 
-b) Get Google Sheet Data : Get the data and make it available in the output(You can get data from a particular group or coloumn)
+b) Copy Sheet: To copy data from one tab in a source Google Sheet to another tab in a destination Google Sheet. This activity will copy the data from the named sheet to the destination Google sheet. Make sure that the destination sheet already exists.
 
-c) Update Google Sheet Data : To update the data in the excel sheet.
+c) Update Google Sheet Data : To update an area of the Google sheet with the data you provide in the input schema of this activity.
 
-d) Copy Sheet: To copy the content of one sheet to the other.
+d) Clear Google Sheet Data :  To erase data from a whole Google Sheet or a part of the sheet.
+ 
 
 In this sample we will first clear contents of the excel sheet, get the data, update the data , get the updated data, copy the content of one sheet to the other, update the coloumn without defining a schema.
 
@@ -27,19 +29,19 @@ In this sample we will first clear contents of the excel sheet, get the data, up
 
 2. Create a new empty app
 
-![Create an app](../../../import-screenshots/google_sheets_screenshots/1.png)
+![Create an app](../../import-screenshots/google_sheets_screenshots/1.png)
 
 3. On the app details page, select import app option.
 
-![Select import](../../../import-screenshots/google_sheets_screenshots/2.png)
+![Select import](../../import-screenshots/google_sheets_screenshots/2.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../../import-screenshots/google_sheets_screenshots/3.png)
+![Import your sample](../../import-screenshots/sqlserver_screenshot/3.png)
 
 5. Click on Upload Button. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
-![The Import app dialog](../../../import-screenshots/google_sheets_screenshots/4.png)
+![The Import app dialog](../../import-screenshots/google_sheets_screenshots/4.png)
 
 6. In Import App dialog, there are 2 options to import:
 
@@ -53,9 +55,11 @@ In this sample we will first clear contents of the excel sheet, get the data, up
 
 ### The Connection
 
+You must create a Google connection before you can use the TIBCO Flogo® Connector for Google Sheets connector. The Google connection contains all the parameters required to connect to your Google account. The Google connection is used by all the activities in the Google Sheets category.
+
 When you import the app you need to provide the Service Account Key and click on save button to establish the connection.
 
-![The connection](../../../import-screenshots/google_sheets_screenshots/5.png)
+![The connection](../../import-screenshots/google_sheets_screenshots/5.png)
 
 
 ### The Flow
@@ -63,37 +67,37 @@ When you import the app you need to provide the Service Account Key and click on
 If you go inside the app, you can see in flow we have 5 activities (Copy,Create,Get,Delete and Update) that perform some operations.
 Also in flow we have Log Message and Return Activity for getting the output.
 
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/6.png)
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/7.png)
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/8.png)
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/9.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/6.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/7.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/8.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/9.png)
 
 ### Run the application
 For running the application, first you have to push the app and then scale up the app.
 Then after sometime you can see your app in running status.
 
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/10.png)
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/11.png)
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/12.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/10.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/11.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/12.png)
 Once your app reaches to Running state, go to Endpoints and for GET/tasks, select 'Try it Out’ option and then click on execute.
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
 in flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
 
-![sample Response](../../../import-screenshots/google_sheets_screenshots/13.png)
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/14.png)
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/15.png)
+![sample Response](../../import-screenshots/google_sheets_screenshots/13.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/14.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/15.png)
 
 ## Outputs
 
 1. Flow Tester
 
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/16.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/16.png)
 
 2. When hit endpoints
 
-![Sample Response](../../../import-screenshots/google_sheets_screenshots/17.png)
+![Sample Response](../../import-screenshots/google_sheets_screenshots/17.png)
 
 
 ## Troubleshooting
