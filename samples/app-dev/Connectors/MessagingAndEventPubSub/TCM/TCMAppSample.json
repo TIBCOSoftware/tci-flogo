@@ -1,0 +1,327 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "git.tibco.com/git/product/flogo-messaging.git/Messaging/activity/tcmpublisher",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "git.tibco.com/git/product/flogo-messaging.git/Messaging/activity/tcmmessageack",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/log",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/rest",
+        "git.tibco.com/git/product/flogo-messaging.git/Messaging/trigger/tcmtrigger",
+        "git.tibco.com/git/product/flogo-messaging.git/Messaging/connector/tcm"
+    ],
+    "name": "TCMAppSample",
+    "description": " ",
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9999,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/pub",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:publisher"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}"
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "publisher"
+                }
+            ]
+        },
+        {
+            "ref": "#tcmtrigger",
+            "name": "tibco-messaging-tcm-trigger",
+            "description": "This trigger receives a message from TIBCO Cloud Messaging service",
+            "settings": {},
+            "id": "MessageSubscriber",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "tcmConnection": "conn://6f633db0-cd98-11eb-81c5-e31e6ce7810c",
+                        "durableSub": true,
+                        "durableName": "sampledurable",
+                        "durableType": "Shared",
+                        "ackMode": "Explicit",
+                        "destination": "sampledest",
+                        "processingMode": "Sync"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:subscriber"
+                        },
+                        "input": {
+                            "message": "=$.message",
+                            "metadata": "=$.metadata"
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "message": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"bname\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\"bname\":\"\"}"
+                            },
+                            "metadata": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"messageId\":{\"type\":\"number\"},\"deliveryAttempt\":{\"type\":\"number\"}}}",
+                                "fe_metadata": "{\"messageId\":0,\"deliveryAttempt\":0}"
+                            }
+                        }
+                    },
+                    "name": "subscriber"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:publisher",
+            "data": {
+                "name": "publisher",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "TCMMessagePublisher",
+                        "to": "Return",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "TCMMessagePublisher",
+                        "name": "TCMMessagePublisher",
+                        "description": "This activity sends a message to TIBCO Cloud Messaging service",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#tcmpublisher",
+                            "input": {
+                                "tcmConnection": "conn://6f633db0-cd98-11eb-81c5-e31e6ce7810c",
+                                "destination": "sampledest",
+                                "url": "",
+                                "authKey": "",
+                                "message": {
+                                    "mapping": {
+                                        "bname": "abc123"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "message": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"bname\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"bname\":\"\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "message",
+                            "type": "string"
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"message\":{\"type\":\"string\",\"required\":false}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:subscriber",
+            "data": {
+                "name": "subscriber",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "TCMMessageAck",
+                        "to": "LogMessage",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "TCMMessageAck",
+                        "name": "TCMMessageAck",
+                        "description": "This activity acknowledges TCM message received by the subscriber trigger. This to be used only when Subscriber trigger is configured with Explicit message ack mode.",
+                        "activity": {
+                            "ref": "#tcmmessageack"
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=$flow.message.bname"
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "message",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"bname\":{\"type\":\"string\"}}"
+                            }
+                        },
+                        {
+                            "name": "metadata",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"messageId\":{\"type\":\"number\"},\"deliveryAttempt\":{\"type\":\"number\"}}"
+                            }
+                        }
+                    ],
+                    "output": [],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"MessageSubscriber\",\"properties\":{\"message\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"bname\":{\"type\":\"string\"}}},\"metadata\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"messageId\":{\"type\":\"number\"},\"deliveryAttempt\":{\"type\":\"number\"}}}}}"
+                    }
+                }
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "Messaging.TCMsample.Connection_URL",
+            "type": "string",
+            "value": "wss://messaging.cloud.tibco.com/tcm/TIB_SUB_01BB7E5SFX751976Y04C56VXC8/channel"
+        },
+        {
+            "name": "Messaging.TCMsample.Authentication_Key",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "Messaging.TCMsample.Timeout",
+            "type": "float64",
+            "value": 10
+        },
+        {
+            "name": "Messaging.TCMsample.AutoReconnectAttempts",
+            "type": "float64",
+            "value": 256
+        },
+        {
+            "name": "Messaging.TCMsample.AutoReconnectMaxDelay",
+            "type": "float64",
+            "value": 30
+        }
+    ],
+    "connections": {
+        "6f633db0-cd98-11eb-81c5-e31e6ce7810c": {
+            "id": "6f633db0-cd98-11eb-81c5-e31e6ce7810c",
+            "name": "TCMsample",
+            "ref": "#tcm",
+            "isGlobal": false,
+            "settings": {
+                "name": "TCMsample",
+                "description": "",
+                "url": "=$property[\"Messaging.TCMsample.Connection_URL\"]",
+                "authKey": "",
+                "timeout": "=$property[\"Messaging.TCMsample.Timeout\"]",
+                "autoReconnectAttempts": "=$property[\"Messaging.TCMsample.AutoReconnectAttempts\"]",
+                "autoReconnectMaxDelay": "=$property[\"Messaging.TCMsample.AutoReconnectMaxDelay\"]"
+            }
+        }
+    },
+    "contrib": "W3sicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9mbG9nby1tZXNzYWdpbmcuZ2l0L01lc3NhZ2luZyIsInMzbG9jYXRpb24iOiJUaWJjby9NZXNzYWdpbmcifV0=",
+    "fe_metadata": "UEsDBAoAAAAIAFpW0FKrqSRGFQAAABMAAAAIAAAAYXBwLmpzb26rViopykxPTy1yy8kvL1ayio6tBQBQSwECFAAKAAAACABaVtBSq6kkRhUAAAATAAAACAAAAAAAAAAAAAAAAAAAAAAAYXBwLmpzb25QSwUGAAAAAAEAAQA2AAAAOwAAAAAA"
+}
