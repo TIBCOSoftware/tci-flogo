@@ -89,6 +89,8 @@ This solution contains the following components:
 4. Upon successful login, the dashboard fetches the data for visualization.
 5. Users can edit, update and enhance the current dashboard per specific requirement(s).
 
+![image](https://user-images.githubusercontent.com/17696107/128910889-9f854834-4445-466c-9dea-14bcdfb97f23.png)
+
 # Testing the Solution
 
 1. Click the Endpoints tab of the ApplicationWatcher_Alerts application.
