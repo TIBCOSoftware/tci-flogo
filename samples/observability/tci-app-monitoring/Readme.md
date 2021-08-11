@@ -100,3 +100,9 @@ This solution contains the following components:
 5. For use-case # 3, at the end of each job cycle, you will see a list of apps updated and scale action status as shown below
 
 ![image](https://user-images.githubusercontent.com/17696107/128909989-100d2ff6-ae7e-4ee5-8359-9055faf3574a.png)
+
+# Demo Video 
+
+https://user-images.githubusercontent.com/17696107/129003005-1c0033a6-99e0-4625-91ee-b4da09d0a92e.mp4
+
+
