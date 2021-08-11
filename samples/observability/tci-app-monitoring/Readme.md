@@ -64,7 +64,7 @@ This solution contains the following components:
 
 # Steps to setup Flogo apps
 
-1. Download MonitoringTCIApps.zip file, unzip it in /tmp/ directory. 
+1. Download TCI-Monitoring-Solution.zip file, unzip it in /tmp/ directory. 
 2. Flogo applications are under /src/flogo/ 
     * ApplicationWatcher_Alerts.json
     * ApplicationWatcher_SubscriberApp.json
