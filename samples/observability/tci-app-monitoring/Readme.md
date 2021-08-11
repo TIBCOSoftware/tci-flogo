@@ -52,6 +52,10 @@ Minimum active app instances should be at least 01.
 - API leveraged to Get App Instance metrics --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/monitoring/metrics/resource
 - API leveraged to Scale an app --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/scale
 
+# Demo 
+
+https://user-images.githubusercontent.com/17696107/129003005-1c0033a6-99e0-4625-91ee-b4da09d0a92e.mp4
+
 # Solution Architecture
 
 ![image](https://user-images.githubusercontent.com/17696107/128907813-76904195-8f2f-456f-ba23-2d0434ae1724.png)
@@ -101,8 +105,5 @@ This solution contains the following components:
 
 ![image](https://user-images.githubusercontent.com/17696107/128909989-100d2ff6-ae7e-4ee5-8359-9055faf3574a.png)
 
-# Demo Video 
-
-https://user-images.githubusercontent.com/17696107/129003005-1c0033a6-99e0-4625-91ee-b4da09d0a92e.mp4
 
 
