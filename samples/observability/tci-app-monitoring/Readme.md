@@ -46,6 +46,8 @@ Minimum active app instances should be at least 01.
 # Additional Notes: 
 
 - Allows users to set SubscriptionLocator and OAuth token - enables them to monitor the apps deployed in any organization. 
+- Steps to get the OAuth token is [here.](https://integration.cloud.tibco.com/docs/Subsystems/tci-api/getstarted/basics/authentication.html)
+- Steps to enable the API access is [here.](https://integration.cloud.tibco.com/docs/Subsystems/tci-api/getstarted/basics/enable-api-access.html)
 - Alerts are email notifications and can be customized to any other alerts. 
 - API leveraged to Get Apps from Organization --> /v1/subscriptions/{subscriptionLocator}/apps
 - API leveraged to Get App Status --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/status
