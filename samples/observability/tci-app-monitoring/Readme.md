@@ -6,7 +6,7 @@ Each region has its own API URL and more information can be found in the [produc
 
 # <span style="text-decoration:underline;">Use-cases</span> 
 
-The current solution demonstrates the below 03 monitoring use-cases.
+The current solution demonstrates the below three monitoring use-cases.
 
 1. Email alerts based on Status of Apps. (Stopped & Error states)
 2. Email alerts based on Faulted instances. 
@@ -18,7 +18,7 @@ The current solution demonstrates the below 03 monitoring use-cases.
 * PostgreSQL DB instance (_optional_)
 * Valid subscription to TIBCO Cloud Spotfire (_optional for visualization purpose_)
 
-This solution is built using TIBCO Cloud™ Integration - Flogo® and leverages platform APIs to monitor TCI applications.
+This solution is built using TIBCO Cloud™ Integration - Develop (Flogo) and leverages TCI Platform APIs to monitor TCI applications.
 
 # <span style="text-decoration:underline;">Solution Description</span>
 
@@ -65,7 +65,7 @@ https://user-images.githubusercontent.com/17696107/129003005-1c0033a6-99e0-4625-
 # Solution Setup
 This solution contains the following components:
 
-- TIBCO Cloud Integration - Flogo artifacts - ApplicationWatcher_Alerts & ApplicationWatcher_SubscriberApp applications. 
+- TIBCO Cloud Integration - Develop (Flogo) applications: ApplicationWatcher_Alerts & ApplicationWatcher_SubscriberApp. 
 - TIBCO Cloud Spotfire artifacts - AppStatus-dashboard. 
 
 # Steps to setup Flogo apps
