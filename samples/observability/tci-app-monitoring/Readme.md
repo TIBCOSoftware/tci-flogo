@@ -85,7 +85,7 @@ This solution contains the following components:
 10. If a trigger in the previous dialog is not selected, the flows associated with that trigger are displayed. Users have an option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Uncheck the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow.
 11. Once the import process is completed, you will see different flows and triggers in the application. 
 12. Validate the application to see if there are any pending validations/errors. Ensure no errors/validations, push the application (click on push) for deployment and scale up the app instance (from 0 to 1)
-13. Repeat the steps from 4 to 10 for ApplicationWatcher_SubscriberApp and ApplicationWatcher_AutoScale apps. 
+13. Repeat the steps from 4 to 12 for ApplicationWatcher_SubscriberApp and ApplicationWatcher_AutoScale apps. 
 
 # Steps to setup Spotfire Dashboard
 
