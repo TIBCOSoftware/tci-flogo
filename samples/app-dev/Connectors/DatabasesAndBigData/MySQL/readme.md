@@ -12,8 +12,9 @@ d) Delete the data using Delete activity from MySQL database.
 
 ## Prerequisites
 
-1. You need to make sure that your public ip is whitelisted (If you are using database hosted on AWS EC2 instance).
-2. In order to use on-prem database server in TCI, you will either have to attach VPN Connection to your app or attach Access Key to use Hybrid Connectivity.
+1. Ensure that MySQL database must be install either on local computer or on AWS EC2 instance.
+2. You need to make sure that your public ip is whitelisted (If you are using database hosted on AWS EC2 instance).
+3. In order to use on-prem database server in TCI, you will attach Access Key to use Hybrid Connectivity.
    For more details on how to use Hybrid Connectivity/tibtunnel/Proxy Agent, please refer this TCI documentation - [Link](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html%3FTocPath%3DUsing%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%7CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%7C_____4)
 
 ## Import the sample
