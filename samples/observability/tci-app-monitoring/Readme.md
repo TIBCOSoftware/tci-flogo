@@ -91,11 +91,17 @@ This solution contains the following components:
 
 For each of the application user needs to update the highlighted application variables in **Environment Section**.
 
-* **ApplicationWatcher_Alerts** ![appWatcher_1](https://user-images.githubusercontent.com/79621490/131295572-ad74590f-9aa2-4f10-9811-12e1fa25d13f.png)
+* **ApplicationWatcher_Alerts** 
 
-* **ApplicationWatcher_SubscriberApp**  ![appSubscriber](https://user-images.githubusercontent.com/79621490/131296008-3b7c00f6-a3dd-4188-8447-cbc0adc8e9a5.png)
+![appWatcher_1](https://user-images.githubusercontent.com/79621490/131295572-ad74590f-9aa2-4f10-9811-12e1fa25d13f.png)
 
-* **ApplicationWatcher_AutoScale**  ![auto-scale](https://user-images.githubusercontent.com/79621490/131296048-babbb33a-0890-4e69-baeb-ca8fcc0e6a21.png)
+* **ApplicationWatcher_SubscriberApp**  
+
+![appSubscriber](https://user-images.githubusercontent.com/79621490/131296008-3b7c00f6-a3dd-4188-8447-cbc0adc8e9a5.png)
+
+* **ApplicationWatcher_AutoScale**  
+
+![auto-scale](https://user-images.githubusercontent.com/79621490/131296048-babbb33a-0890-4e69-baeb-ca8fcc0e6a21.png)
 
 
 # Steps to setup Spotfire Dashboard
