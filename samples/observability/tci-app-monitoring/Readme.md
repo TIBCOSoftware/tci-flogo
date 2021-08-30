@@ -87,6 +87,17 @@ This solution contains the following components:
 12. Validate the application to see if there are any pending validations/errors. Ensure no errors/validations, push the application (click on push) for deployment and scale up the app instance (from 0 to 1)
 13. Repeat the steps from 4 to 12 for ApplicationWatcher_SubscriberApp and ApplicationWatcher_AutoScale apps. 
 
+## Updating Env Variables
+
+For each of the application user needs to update the highlighted application variables in **Environment Section**.
+
+* **ApplicationWatcher_Alerts** ![appWatcher_1](https://user-images.githubusercontent.com/79621490/131295572-ad74590f-9aa2-4f10-9811-12e1fa25d13f.png)
+
+* **ApplicationWatcher_SubscriberApp**  ![appSubscriber](https://user-images.githubusercontent.com/79621490/131296008-3b7c00f6-a3dd-4188-8447-cbc0adc8e9a5.png)
+
+* **ApplicationWatcher_AutoScale**  ![auto-scale](https://user-images.githubusercontent.com/79621490/131296048-babbb33a-0890-4e69-baeb-ca8fcc0e6a21.png)
+
+
 # Steps to setup Spotfire Dashboard
 
 1. A pre-configured Spotfire dashboard (AppStatus-dashboard.dxp) is provided under ../src/spotfire/ directory of the zip file. 
