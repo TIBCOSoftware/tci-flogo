@@ -16,10 +16,10 @@ This sample demonstates an example of accessing and mapping each element of prim
 ![Select import](../../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json file for the app that you want to import.
-![Import your sample](../../import-screenshots/LoopIndex.Import1.png)
+![Import your sample](../../import-screenshots/LoopIndex/Import1.png)
 
 5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
-![The Import app dialog](../../import-screenshots/LoopIndex.Import2.png)
+![The Import app dialog](../../import-screenshots/LoopIndex/Import2.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
