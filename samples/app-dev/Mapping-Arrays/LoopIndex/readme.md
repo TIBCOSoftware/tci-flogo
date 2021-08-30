@@ -16,10 +16,10 @@ This sample demonstates an example of accessing and mapping each element of prim
 ![Select import](../../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json file for the app that you want to import.
-![Import your sample](../../import-screenshots/js-activity/import_json.png)
+![Import your sample](../../import-screenshots/LoopIndex.Import1.png)
 
 5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
-![The Import app dialog](../../import-screenshots/js-activity/import_dialog.png)
+![The Import app dialog](../../import-screenshots/LoopIndex.Import2.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
@@ -35,6 +35,7 @@ This sample demonstates an example of accessing and mapping each element of prim
 3. For the child element of the object array, we are accessing and mapping each element of primitive array using $loop.index as index.
 ![Child Element](../../import-screenshots/LoopIndex/ChildElement.png)
 
+4. The Log message simply prints the output of the previous mapper activity.
 
 ### Run the application
 Once you are ready to run the application, you can use Push option and later run this app.
