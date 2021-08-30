@@ -27,7 +27,7 @@ This sample demonstates an example of accessing and mapping each element of prim
 
 ## Understanding the configuration
 
-1. The first mapper activity has in the flow has the integer primitive array.
+1. The first mapper activity in the flow has the integer primitive array.
 
 2. The second mapper activity has the mapping of Object array to primitive array using array.foreach().
 ![Mapper Activity](../../import-screenshots/LoopIndex/ObjArray.png)
