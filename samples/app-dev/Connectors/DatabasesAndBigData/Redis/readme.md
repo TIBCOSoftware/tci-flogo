@@ -21,15 +21,15 @@ Flogo Redis app contain single activity i.e. Redis Command. In this activity we 
 
 3. On the app details page, select import app option.
 
-![Select import](../../import-screenshots/Redis_screenshot/2.png)
+![Select import](../../../import-screenshots/Redis_screenshot/2.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../import-screenshots/Redis_screenshot/3.png)
+![Import your sample](../../../import-screenshots/Redis_screenshot/3.png)
 
 5. Click on Upload Button. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
-![The Import app dialog](../../import-screenshots/Redis_screenshot/4.png)
+![The Import app dialog](../../../import-screenshots/Redis_screenshot/4.png)
 
 6. In Import App dialog, there are 2 options to import:
 
@@ -45,9 +45,9 @@ Flogo Redis app contain single activity i.e. Redis Command. In this activity we 
 
 When you import the app you need to re-enter the password and establish the connection.
 
-![The connection](../../import-screenshots/Redis_screenshot/5.png)
+![The connection](../../../import-screenshots/Redis_screenshot/5.png)
 
-![The connection](../../import-screenshots/Redis_screenshot/6.png)
+![The connection](../../../import-screenshots/Redis_screenshot/6.png)
 
 In the connection, note that,
 1. Host - In this field we give public DNS of EC2 instance on which database is hosted.
@@ -60,9 +60,9 @@ Also it is mandatory to pass PEM encoded file of Client Certificate, Client Key 
 
 If you go inside the app, you can see in flow we have created multiple activities which indicate different commands of Redis Group Sets that perform some operations.
 
-![Sample Response](../../import-screenshots/Redis_screenshot/7.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/7.png)
 
-![Sample Response](../../import-screenshots/Redis_screenshot/8.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/8.png)
 
 Redis Command Activity has different tabs below are the description:
 Settings tab - In this we need to select connection name, Group and respective command.
@@ -70,46 +70,46 @@ Input tab - Input tab fields changes according to Group and command selection. G
 If we pass DatabaseIndex value in activity then it means that this Redis Database partition select during run-time (DatabaseIndex value is optional here).
 Also in flow we have Log Message and Return Activity for getting the output.
 
-![Sample Response](../../import-screenshots/Redis_screenshot/9.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/9.png)
 
-![Sample Response](../../import-screenshots/Redis_screenshot/10.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/10.png)
 
 ### Run the application
 
 For running the application, first you have to push the app and then scale up the app.
 Then after sometime you can see your app in running status.
 
-![Sample Response](../../import-screenshots/Redis_screenshot/11.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/11.png)
 
-![Sample Response](../../import-screenshots/Redis_screenshot/12.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/12.png)
 
 Once your app reaches to Running state, go to Endpoints and for GET/tasks, select 'Try it Out’ option and then click on execute.
 
-![Sample Response](../../import-screenshots/Redis_screenshot/13.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/13.png)
 
-![Sample Response](../../import-screenshots/Redis_screenshot/14.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/14.png)
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
 in flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
 
-![sample Response](../../import-screenshots/Redis_screenshot/15.png)
+![sample Response](../../../import-screenshots/Redis_screenshot/15.png)
 
-![Sample Response](../../import-screenshots/Redis_screenshot/16.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/16.png)
 
-![Sample Response](../../import-screenshots/Redis_screenshot/17.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/17.png)
 
 ## Outputs
 
 1. Flow Tester
 
-![Sample Response](../../import-screenshots/Redis_screenshot/18.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/18.png)
 
 2. When hit endpoints
 
-![Sample Response](../../import-screenshots/Redis_screenshot/19.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/19.png)
 
-![Sample Response](../../import-screenshots/Redis_screenshot/20.png)
+![Sample Response](../../../import-screenshots/Redis_screenshot/20.png)
 
 
 ## Troubleshooting
