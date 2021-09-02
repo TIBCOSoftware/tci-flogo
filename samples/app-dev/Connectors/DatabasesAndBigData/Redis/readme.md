@@ -65,9 +65,12 @@ If you go inside the app, you can see in flow we have created multiple activitie
 ![Sample Response](../../../import-screenshots/Redis_screenshot/8.png)
 
 Redis Command Activity has different tabs below are the description:
+
 Settings tab - In this we need to select connection name, Group and respective command.
-Input tab - Input tab fields changes according to Group and command selection. Generally in this tab we pass Key name and its value (Value can be array or string).
+
+Input tab - Input tab fields change according to Group and command selection. Generally in this tab we pass Key name and its value (Value can be array or string).
 If we pass DatabaseIndex value in activity then it means that this Redis Database partition select during run-time (DatabaseIndex value is optional here).
+
 Also in flow we have Log Message and Return Activity for getting the output.
 
 ![Sample Response](../../../import-screenshots/Redis_screenshot/9.png)
