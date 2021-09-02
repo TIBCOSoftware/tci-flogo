@@ -17,7 +17,7 @@ Flogo Redis app contain single activity i.e. Redis Command. In this activity we 
 
 2. Create a new empty app
 
-![Create an app](../../import-screenshots/Redis_screenshot/1.png)
+![Create an app](../../../import-screenshots/Redis_screenshot/1.png)
 
 3. On the app details page, select import app option.
 
