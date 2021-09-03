@@ -9,7 +9,8 @@ Flogo Redis app contain single activity i.e. Redis Command. In this activity we 
 ## Prerequisites
 
 1. TIBCO Flogo Connector for Redis must be installed.
-2. You need to make sure that your public ip is whitelisted (If you are using database hosted on AWS EC2 instance).
+2. Make sure Redis database is up and running on AWS EC2 isntance/ local machine.
+3. You need to make sure that your public ip is whitelisted (If you are using database hosted on AWS EC2 instance).
 
 ## Import the sample
 
@@ -58,7 +59,21 @@ Also it is mandatory to pass PEM encoded file of Client Certificate, Client Key 
 
 ### The Flow
 
-If you go inside the app, you can see in flow we have created multiple activities which indicate different commands of Redis Group Sets that perform some operations.
+If you go inside the app, you can see in flow we have created multiple activities which indicate different commands of Redis Group Sets that perform some operations.Below is the description of each activity having different commands:
+
+1. Activity having Command "SADD" - This is used to add single/multiple members to set stored at key.
+
+2. Activity having command "SMEMBERS" - Returns all the members of the set stored at key.
+
+3. Activity having command "SISMEMBER" - Check whether element is member of the set or not.
+
+4. Activity having command "SCARD" - Returns the set cardinality (number of elements) of the set stored at key.
+
+5. Activity having command "SREM" - Remove the specified member(s) from the set stored at key.
+
+6. Activity having command "SPOP" - Removes and returns one or more random members from the set  store at key.
+
+7. Activity having command "SMOVE" - Move member from the set at source to the set at destination.
 
 ![Sample Response](../../../import-screenshots/Redis_screenshot/7.png)
 
