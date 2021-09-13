@@ -32,8 +32,9 @@ Alerts users if any of the application(s) in a specified organization goes into 
 Alerts users when there are faulted instances within TCI apps. 
 
 # Use-case #3 
-Scales up the instances when the CPU threshold goes beyond 70% and scales down the instances when the CPU threshold goes below 40%. 
+Scales up the instances when the CPU threshold goes beyond 70% (user configurable) and scales down the instances when the CPU threshold goes below 40% (user configurable). 
 These threshold values are configurable via app properties. 
+**These theshold values are configurable and you can change them as per business need **
 
 # Scaling UP conditions:
 If CPU > 70% 
