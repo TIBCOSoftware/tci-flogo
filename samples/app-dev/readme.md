@@ -5,7 +5,7 @@
 * [Flow-Design-Concepts](/samples/app-dev/Flow-Design-Concepts) - Includes Hello-World, Branching, Error Handling, Loops, Subflows, Shared Data samples 
 * [API-Development](/samples/app-dev/API-Development) - Includes REST, graphQL, gRPC samples
 * [Array Mapping/Filtering](/samples/app-dev/Mapping-Arrays) - Includes array.forEach, json.path, JavaScript Activity samples
-* [Connectors](/samples/app-dev/Connectors) - Includes samples for various connectors like Salesforce, Salesforce Pardot, PostgreSQL, Microsoft SQL Server, Snowflake, Amazon SNS, SQS, Google Pub Sub, MQTT, Apache Kafka, TCM, EMS, Apache Pulsar, Slack, Twilio, Websocket, Marketo, Stripe
+* [Connectors](/samples/app-dev/Connectors) - Includes samples for various connectors like Salesforce, Salesforce Pardot, PostgreSQL, Microsoft SQL Server, MySQL, Redis, Snowflake, Amazon SNS, SQS, Google Pub Sub, Azure Service Bus, MQTT, Apache Kafka, TCM, EMS, Apache Pulsar, Slack, Twilio, Websocket, Marketo, Stripe, Hubspot, Google Docs, Google Sheets
 * [Serverless](/samples/app-dev/Serverless/Azure-Functions) - Sample showing how to deploy Flogo app as Azure Function
 
 
