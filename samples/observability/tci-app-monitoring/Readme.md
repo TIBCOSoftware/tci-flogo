@@ -51,12 +51,12 @@ Provides the list of applications with public endpoints visibility. Optionally, 
 
 **For Use-case #3**
 
-**Scaling UP condition:**
-If CPU > 70% 
+**Scaling UP conditions:**
+If CPU > 70% (default configuration)
 Maximum scale up to 03 instances only even if CPU > 70%
 
-**Scaling Down conditions**
-If CPU < 40%, scale down the instances. 
+**Scaling Down conditions.**
+If CPU < 40% (default configuration), scale down the instances. 
 Minimum active app instances should be at least 01.
 
 **Additional Notes**
