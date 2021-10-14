@@ -79,6 +79,8 @@ https://user-images.githubusercontent.com/17696107/129003005-1c0033a6-99e0-4625-
 
 ![image](https://user-images.githubusercontent.com/17696107/128907813-76904195-8f2f-456f-ba23-2d0434ae1724.png)
 
+**NOTE**: *This illustrates the design of the first use-case in the solution, provided that all other use-cases follow a similar pattern and operate with TCI platform APIs.* 
+
 # Solution Setup
 This solution contains the following components:
 
