@@ -45,20 +45,21 @@ Alerts users about the list of failed (or not running) hybrid agents from a spec
 Alerts users about the list of unused or inactive applications (based on the application instance metircs) for over a certain period of time. (default is 30 days but configurable via App Properties) Optionally, users can also scale down these unused or inactive applications via a configurable parameter. 
 
 # Use-case #6
-Provides the list of public endpoints across applications within an Org. Optionally, users can update the endpoint visibility to private for one or more applications via a configurable parameter. 
+Provides the list of applications with public endpoints visibility. Optionally, users can update the application visibility to TIBCO Cloud Mesh (previously known as private endpoints) for one or more applications via a configurable parameter.
 
 **NOTE: These theshold values are configurable and you can change them as per user business requirement.**
 
-# For Use-case #3
-# Scaling UP conditions:
+**For Use-case #3
+
+**Scaling UP conditions:
 If CPU > 70% 
 Maximum scale up to 03 instances only even if CPU > 70%
 
-# Scaling Down conditions:
+**Scaling Down conditions:
 If CPU < 40%, scale down the instances. 
 Minimum active app instances should be at least 01.
 
-# Additional Notes: 
+**Additional Notes: 
 
 - Allows users to set SubscriptionLocator and OAuth token - enables them to monitor the apps deployed in any organization. 
 - Steps to get the OAuth token is [here.](https://integration.cloud.tibco.com/docs/Subsystems/tci-api/getstarted/basics/authentication.html)
