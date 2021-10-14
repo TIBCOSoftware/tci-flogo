@@ -123,6 +123,12 @@ For each of the application user needs to update the highlighted application var
 
 ![auto-scale](https://user-images.githubusercontent.com/79621490/131296048-babbb33a-0890-4e69-baeb-ca8fcc0e6a21.png)
 
+* **ApplicationWatcher_HybridAgents**  
+
+* **ApplicationWatcher_InactiveAppLocator**  
+
+* **ApplicationWatcher_LocateUpdateAppEndpointVisibility**  
+
 
 # Steps to setup Spotfire Dashboard
 
