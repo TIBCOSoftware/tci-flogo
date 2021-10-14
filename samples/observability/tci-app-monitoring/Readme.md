@@ -41,10 +41,10 @@ These threshold values are configurable via app properties.
 # Use-case #4 - Monitoring the health of Hybrid Agents 
 Alerts users about the list of failed (or not running) hybrid agents from a specific org.  
 
-# Use-case #5 - Idenitfy unused or inactive applications over a period of time. 
+# Use-case #5 - Identify unused or inactive applications over a period of time. 
 Alerts users about the list of unused or inactive applications (based on the application instance metircs) for over a certain period of time. (default is 30 days but configurable via App Properties) Optionally, users can also scale down these unused or inactive applications via a configurable parameter. 
 
-# Use-case #6 - Idenitfy the applications with public endpoints visibility. 
+# Use-case #6 - Identify the applications with public endpoints visibility. 
 Provides the list of applications with public endpoints visibility. Optionally, users can update the application visibility to TIBCO Cloud Mesh (previously known as private endpoints) for one or more applications via a configurable parameter.
 
 **NOTE: These theshold values are configurable and you can change them as per user business requirement.**
