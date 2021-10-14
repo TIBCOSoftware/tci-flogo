@@ -28,23 +28,23 @@ This solution is built using TIBCO Cloud™ Integration - Develop (Flogo) and le
 This solution provides an end-to-end solution - from subscribing to TCI APIs, generating events/alerts/notifications to taking appropriate actions and 
 a very powerful visual analytics dashboard. (optional) 
 
-# Use-case # 1
+# Use-case # 1 - Identify Stopped or Error state applications.
 Alerts users if any of the application(s) in a specified organization goes into a Stopped or an Error state. 
 
-# Use-case #2 
+# Use-case #2 - Identify Faulted Application instances.
 Alerts users when there are faulted instances within TCI apps. 
 
-# Use-case #3 
+# Use-case #3 - Auto-Scaling of applications based on CPU threshold. 
 Scales up the instances when the CPU threshold goes beyond 70% (user configurable) and scales down the instances when the CPU threshold goes below 40% (user configurable). 
 These threshold values are configurable via app properties. 
 
-# Use-case #4
+# Use-case #4 - Monitoring the health of Hybrid Agents 
 Alerts users about the list of failed (or not running) hybrid agents from a specific org.  
 
-# Use-case #5
+# Use-case #5 - Idenitfy unused or inactive applications over a period of time. 
 Alerts users about the list of unused or inactive applications (based on the application instance metircs) for over a certain period of time. (default is 30 days but configurable via App Properties) Optionally, users can also scale down these unused or inactive applications via a configurable parameter. 
 
-# Use-case #6
+# Use-case #6 - Idenitfy the applications with public endpoints visibility. 
 Provides the list of applications with public endpoints visibility. Optionally, users can update the application visibility to TIBCO Cloud Mesh (previously known as private endpoints) for one or more applications via a configurable parameter.
 
 **NOTE: These theshold values are configurable and you can change them as per user business requirement.**
@@ -52,12 +52,10 @@ Provides the list of applications with public endpoints visibility. Optionally, 
 **For Use-case #3**
 
 **Scaling UP conditions:**
-If CPU > 70% (default configuration)
-Maximum scale up to 03 instances only even if CPU > 70%
+If CPU > 70% (default configuration), scale up to 03 instances. 
 
 **Scaling Down conditions.**
-If CPU < 40% (default configuration), scale down the instances. 
-Minimum active app instances should be at least 01.
+If CPU < 40% (default configuration), scale down the instances. Minimum active app instance should be at least 01.
 
 **Additional Notes**
 
@@ -65,10 +63,13 @@ Minimum active app instances should be at least 01.
 - Steps to get the OAuth token is [here.](https://integration.cloud.tibco.com/docs/Subsystems/tci-api/getstarted/basics/authentication.html)
 - Steps to enable the API access is [here.](https://integration.cloud.tibco.com/docs/Subsystems/tci-api/getstarted/basics/enable-api-access.html)
 - Alerts are email notifications and can be customized to any other alerts. 
-- API leveraged to Get Apps from Organization --> /v1/subscriptions/{subscriptionLocator}/apps
-- API leveraged to Get App Status --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/status
-- API leveraged to Get App Instance metrics --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/monitoring/metrics/resource
-- API leveraged to Scale an app --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/scale
+- API leveraged to Get Applications from Organization --> /v1/subscriptions/{subscriptionLocator}/apps
+- API leveraged to Get Application Status --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/status
+- API leveraged to Get Application Instance metrics --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/monitoring/metrics/resource
+- API leveraged to Scale an Application --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/scale
+- API leveraged to Get registered Hybrid Agents from an Organization --> /v1/subscriptions/{subscriptionLocator}/hybridAgents
+- API leveraged to Get Application Metrics --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/monitoring/metrics
+- API leveraged to Update Application attributes --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}
 
 # Demo 
 
@@ -91,6 +92,9 @@ This solution contains the following components:
     * ApplicationWatcher_Alerts.json
     * ApplicationWatcher_SubscriberApp.json
     * ApplicationWatcher_AutoScale
+    * ApplicationWatcher_HybridAgnets
+    * ApplicationWatcher_InactiveAppLocator
+    * ApplicationWatcher_LocateUpdateAppEndpointVisibility
 3. SubscriberApp has dependency on PostgreSQL database for visualization purposes. Execute the create table script under /src/db/create.sql to create these tables before running the solution. This is an optional step needed only if you need Spotfire visualization. 
 4. Login to your TIBCO Cloud Integration subscription 
 5. Select Create/Import a new Flogo app and click on Create New App.
@@ -101,7 +105,7 @@ This solution contains the following components:
 10. If a trigger in the previous dialog is not selected, the flows associated with that trigger are displayed. Users have an option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Uncheck the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow.
 11. Once the import process is completed, you will see different flows and triggers in the application. 
 12. Validate the application to see if there are any pending validations/errors. Ensure no errors/validations, push the application (click on push) for deployment and scale up the app instance (from 0 to 1)
-13. Repeat the steps from 4 to 12 for ApplicationWatcher_SubscriberApp and ApplicationWatcher_AutoScale apps. 
+13. Repeat the steps from 4 to 12 to import other Flogo applications for the other use-cases. (2 to 6)
 
 ## Updating Env Variables
 
