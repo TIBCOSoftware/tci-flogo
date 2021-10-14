@@ -123,13 +123,19 @@ For each of the application user needs to update the highlighted application var
 
 ![auto-scale](https://user-images.githubusercontent.com/79621490/131296048-babbb33a-0890-4e69-baeb-ca8fcc0e6a21.png)
 
-* **ApplicationWatcher_HybridAgents** <img width="1792" alt="hybarid_agents" src="https://user-images.githubusercontent.com/79621490/137324776-c44d7ce5-ab78-4567-8845-e9ad9bd3513a.png">
+* **ApplicationWatcher_HybridAgents** 
+
+<img width="1792" alt="hybarid_agents" src="https://user-images.githubusercontent.com/79621490/137324776-c44d7ce5-ab78-4567-8845-e9ad9bd3513a.png">
 
 
-* **ApplicationWatcher_InactiveAppLocator**  <img width="1792" alt="Inactive_apps" src="https://user-images.githubusercontent.com/79621490/137324984-98f2cc11-e68e-4468-901f-d563806b985a.png">
+* **ApplicationWatcher_InactiveAppLocator** 
+
+<img width="1792" alt="Inactive_apps" src="https://user-images.githubusercontent.com/79621490/137324984-98f2cc11-e68e-4468-901f-d563806b985a.png">
 
 
-* **ApplicationWatcher_LocateUpdateAppEndpointVisibility**  <img width="1792" alt="update_endpoints" src="https://user-images.githubusercontent.com/79621490/137325042-245efdc0-e553-42f5-9331-b9ce41b1898f.png">
+* **ApplicationWatcher_LocateUpdateAppEndpointVisibility**  
+
+<img width="1792" alt="update_endpoints" src="https://user-images.githubusercontent.com/79621490/137325042-245efdc0-e553-42f5-9331-b9ce41b1898f.png">
 
 
 # Steps to setup Spotfire Dashboard
