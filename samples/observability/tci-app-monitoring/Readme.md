@@ -6,11 +6,14 @@ Each region has its own API URL and more information can be found in the [produc
 
 # <span style="text-decoration:underline;">Use-cases</span> 
 
-The current solution demonstrates the below three monitoring use-cases.
+The current solution demonstrates the below mentioned use-cases.
 
 1. Email alerts based on Status of Apps. (Stopped & Error states)
 2. Email alerts based on Faulted instances. 
 3. Scaling up and down apps based on CPU threshold per instance. 
+4. Hybrid Agent Monitoring 
+5. Idenitfy the list of unused or inactive applications for a certain (X) number of days. 
+6. Identify the public visibility endpoint applications and configure them as private. (optional).
 
 # <span style="text-decoration:underline;">Pre-requisites </span> 
 
@@ -35,8 +38,18 @@ Alerts users when there are faulted instances within TCI apps.
 Scales up the instances when the CPU threshold goes beyond 70% (user configurable) and scales down the instances when the CPU threshold goes below 40% (user configurable). 
 These threshold values are configurable via app properties. 
 
+# Use-case #4
+Alerts users about the list of failed (or not running) hybrid agents from a specific org.  
+
+# Use-case #5
+Alerts users about the list of unused or inactive applications (based on the application instance metircs) for over a certain period of time. (default is 30 days but configurable via App Properties) Optionally, users can also scale down these unused or inactive applications via a configurable parameter. 
+
+# Use-case #6
+Provides the list of public endpoints across applications within an Org. Optionally, users can update the endpoint visibility to private for one or more applications via a configurable parameter. 
+
 **NOTE: These theshold values are configurable and you can change them as per user business requirement.**
 
+# For Use-case #3
 # Scaling UP conditions:
 If CPU > 70% 
 Maximum scale up to 03 instances only even if CPU > 70%
