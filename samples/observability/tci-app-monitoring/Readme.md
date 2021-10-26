@@ -71,9 +71,13 @@ If CPU < 40% (default configuration), scale down the instances. Minimum active a
 - API leveraged to Get Application Metrics --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}/monitoring/metrics
 - API leveraged to Update Application attributes --> /v1/subscriptions/{subscriptionLocator}/apps/{appId}
 
-# Demo 
+# Demos 
 
+# Usecase 1-3
 https://user-images.githubusercontent.com/17696107/129003005-1c0033a6-99e0-4625-91ee-b4da09d0a92e.mp4
+
+# Usecase 4-6
+https://user-images.githubusercontent.com/17696107/138812272-c8dbf6dc-f370-45d7-b9e3-e7bdd672c255.mp4
 
 # Solution Architecture
 
