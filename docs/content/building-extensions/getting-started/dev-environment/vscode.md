@@ -11,3 +11,6 @@ To use Microsoft Visual Studio Code as your IDE to develop extensions for TIBCO 
 ![VSCode Go language Extension installation](../../images/goextension-vscode-install.png)
 
 * Visual Studio Code uses the variables set on your machine and will ask you to install an additional set of **analysis tools**. These tools make developing Go projects in VSCode a lot easier.
+
+
+* Go to [prerequisites](../../prerequisites)

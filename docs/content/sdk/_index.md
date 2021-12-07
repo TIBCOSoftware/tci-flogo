@@ -16,7 +16,7 @@ TIBCO Cloud Integration - Flogo and TIBCO Flogo Enterprise provide two types of 
 
 | Version | Download URL | Designtime Documentation URL | Runtime Documentation URL 
 | ------- | ------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------
-| v1.0.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.0.0) | [Designtime API](../wi-studio/v1.0.0/) | [Runtime API](../wi-runtime/v1.0.0/pkg/github.com/index.html)        
-| v1.1.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.1.0) | [Designtime API](../wi-studio/v1.1.0/) | [Runtime API](../wi-runtime/v1.1.0/pkg/github.com/index.html)
-| v1.2.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.2.0) | [Designtime API](../wi-studio/v1.2.0/) | [Runtime API](../wi-runtime/v1.2.0/pkg/github.com/index.html)
-| v1.3.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.3.0) | [Designtime API](../wi-studio/v1.3.0/) | [Runtime API](../wi-runtime/v1.3.0/pkg/github.com/index.html)
+| v1.0.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.0.0) | [Designtime API](../wi-studio/v1.0.0/) | [Runtime API](https://pkg.go.dev/github.com/project-flogo/core@v1.0.0)        
+| v1.1.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.1.0) | [Designtime API](../wi-studio/v1.1.0/) | [Runtime API](https://pkg.go.dev/github.com/project-flogo/core@v1.1.0)
+| v1.2.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.2.0) | [Designtime API](../wi-studio/v1.2.0/) | [Runtime API](https://pkg.go.dev/github.com/project-flogo/core@v1.2.0)
+| v1.3.0  | [Download](https://github.com/TIBCOSoftware/tci-flogo/releases/tag/1.3.0) | [Designtime API](../wi-studio/v1.3.0/) | [Runtime API](https://pkg.go.dev/github.com/project-flogo/core@v1.3.0)
