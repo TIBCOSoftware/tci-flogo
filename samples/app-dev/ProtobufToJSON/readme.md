@@ -37,17 +37,17 @@ In the attached sample *ProtobufToJSONDemo.json*, there is 1 flow *flow1* which 
 
 ![The Import app dialog](../import-screenshots/protobufToJSON/1_flowdetails.png)
 
-The Settings tab of the activity shows the *.proto* file and *Message Type Name*. There is an *Include Default Values* radio button. If we select it as true, the output JSON will contain the default values for the fields which are having blank or null values in the proto message.  
+The Settings tab of the *protobufToJSON* activity shows the *.proto* file and *Message Type Name* fields. The user need to upload the proto file in the *.proto* file field in order to get the respective JSON format in the output tab. User can selet different message type from the *Message Type Name* dropdown. There is an *Include Default Values* radio button. If we select it as *true*, the output JSON will contain the default values for the fields which are having blank or null values in the proto message.  
 
 ![The Import app dialog](../import-screenshots/protobufToJSON/2_settingstab.png)
 
 
-The Input tab of the activity contains the *protoMessage* field which takes the encoded proto message as input in the mapper. If any rest service is giving a proto message response then we can map the output from invokeRest activity with the *protoMessage* field.
+The Input tab of the *protobufToJSON* activity contains the *protoMessage* field that takes the encoded proto message as a string input in the mapper. If any rest service which we are invoking via *invokeRest* activity is giving a proto message response then we can also map the output from *invokeRest* activity with the *protoMessage* field.
 
 ![The Import app dialog](../import-screenshots/protobufToJSON/3_inputtab.png)
 
 
-The output tab shows the respective JSON fields of the message once user uploads the proto file.
+The output tab of the *protobufToJSON* activity shows the respective JSON fields of the message once user uploads the proto file.
 
 ![The Import app dialog](../import-screenshots/protobufToJSON/4_outputTab.png)
 
@@ -63,32 +63,32 @@ The *LogMessage* activity logs the output of the *ProtobufToJSON* activity.
 
 To run the application, push the app to TIBCO Cloud and then scale up to 1 instance. Once your app is scaled, you can see your app in running status.
 
-![Sample Response](../import-screenshots/ScaleInstance.png)
+![The Import app dialog](../import-screenshots/protobufToJSON/6-Running.png)
 
 
-Once your app reaches to Running state, go to Endpoints and for GET/user/{key} option, select 'Try it Out’ option and then give "user1" as value in key and false in isDelete dropdown. Then click on execute.
+Once your app reaches to Running state, go to Endpoints and for GET/protobuffers option, select 'Try it Out’ option and then click on execute.
 
-![The Import app dialog](../import-screenshots/protobufToJSON/5-logmessage.png)
+![The Import app dialog](../import-screenshots/protobufToJSON/7_Endpointtab.png)
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
 in flow, click on Test Button -> create Launch configuration -> provide values in flow input (if any) -> click Next button -> click on Run
 
 ![Sample Response](../import-screenshots/1_launchconfig.png)
-![Sample Response](../import-screenshots/2_launchconfig.png)
-![Sample Response](../import-screenshots/3_valuesLaunchConfig.png)
+![The Import app dialog](../import-screenshots/protobufToJSON/2-launchConfig.png)
+![The Import app dialog](../import-screenshots/protobufToJSON/3-flowtestruntime.png)
 
 
 ## Outputs
 
 1. Flow Tester
 
-![Sample Response](../import-screenshots/4_testeroutput.png)
+![The Import app dialog](../import-screenshots/protobufToJSON/4-ActivityOutputFlowtester.png)
 
 
 2. When hit endpoints
 
-![Sample Response](../import-screenshots/2_user1Info.png)
+![The Import app dialog](../import-screenshots/protobufToJSON/7-runtime-response.png)
 
 
 ## Troubleshooting
