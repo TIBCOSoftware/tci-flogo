@@ -1,13 +1,21 @@
-# Shared Data Sample - Enable sharing of data within or across flows in the application
+# Flogo Enterprise Monitoring and Execution History Sample
 
 # Description
 
-This is Shared Data activity sample.The SharedData activity enables sharing of runtime data within a flow or across flows in an app.The advantage of using this feature is that you can set data anywhere in the main flow, subflow, or error handler and the data can be shared across the entire flow or app.
+This is Flogo Enterpsie Monitoring and Execution History Sample.The Flogo Enteprise Monitoring is a licensed tool which can be used to monitor the Flogo apps running on-prem or in a Kubernetes cluster running on any cloud platform. Similarly Flogo Flow State Manager is used to capture the execution history for flows inside an app. We can use the postgres DB as persistent layer and store the execution history records inside the DB. The Flogo Flow state manager provides the re-run feature as well which will allow to re-run a flow from the Execution History screen.
 
+
+## Pre-Requisite
+1. Should have Flogo Enterprise Monitoring
+2. Should have Flogo Flow State Manager
+3. Should have Postgres DB running and configured with the Flow State Manager to store the execution records.
+4. Should have TCI subscription to generate the Flogo Binary locally.
+
+For more information on the configuration of Flogo Enterprise Monitoring, Flogo Flow Satate Manager and Postgres, Please refer [here](https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/monitoring.html?TocPath=TIBCO%2520Flogo%25C2%25AE%2520Apps%257CDeployment%2520and%2520Configuration%257CBuilding%2520an%2520App%2520Executable%257CMonitoring%257C_____0)
 
 
 ## Import the sample
-1. Download the sample json file i.e., *GetUsersInfo.json*.
+1. Download the sample json file i.e., *fe-mon-execution-history-demo-app.json*.
 
 2. Create a new empty app
 
@@ -33,7 +41,7 @@ This is Shared Data activity sample.The SharedData activity enables sharing of r
 
 ## Understanding the configuration
 
-In the attached sample *GetUsersInfo.json*, there are 3 flows *Set_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*.
+In the attached sample *fe-mon-execution-history-demo-app.json*, there are 3 flows *Sx`et_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*.
 
 ![The Import app dialog](../import-screenshots/1_AllThreeFlows.png)
 
