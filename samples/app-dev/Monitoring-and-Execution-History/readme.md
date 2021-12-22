@@ -2,16 +2,16 @@
 
 # Description
 
-This is Flogo Enterpsie Monitoring and Execution History Sample.The Flogo Enteprise Monitoring is a licensed tool which can be used to monitor the Flogo apps running on-prem or in a Kubernetes cluster running on any cloud platform. Similarly Flogo Flow State Manager is used to capture the execution history for flows inside an app. We can use the postgres DB as persistent layer and store the execution history records inside the DB. The Flogo Flow state manager provides the re-run feature as well which will allow to re-run a flow from the Execution History screen.
+This is Flogo Enterpsie Monitoring and Execution History Sample.The Flogo Enteprise Monitoring is a licensed tool which can be used to monitor the Flogo apps running on-prem or apps running inside a Kubernetes cluster. Similarly Flogo Flow State Manager is used to capture the execution history for flows inside an app. We can use the postgres DB as persistent layer and store the execution history records inside the DB. The Flogo Flow state manager provides the re-run feature as well which will allow to re-run a flow from the Execution History screen.
 
 
 ## Pre-Requisite
 1. Should have Flogo Enterprise Monitoring
 2. Should have Flogo Flow State Manager
-3. Should have Postgres DB running and configured with the Flow State Manager to store the execution records.
-4. Should have TCI subscription to generate the Flogo Binary locally.
+3. Should have TCI subscription to generate the Flogo Binary locally.
+4.Should have Postgres DB running and configured with the Flow State Manager to store the execution records.
 
-For more information on the configuration of Flogo Enterprise Monitoring, Flogo Flow Satate Manager and Postgres, Please refer [here](https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/monitoring.html?TocPath=TIBCO%2520Flogo%25C2%25AE%2520Apps%257CDeployment%2520and%2520Configuration%257CBuilding%2520an%2520App%2520Executable%257CMonitoring%257C_____0)
+For more information on the configuration of Flogo Enterprise Monitoring, Flogo Flow State Manager and Postgres, Please refer [here](https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/monitoring.html?TocPath=TIBCO%2520Flogo%25C2%25AE%2520Apps%257CDeployment%2520and%2520Configuration%257CBuilding%2520an%2520App%2520Executable%257CMonitoring%257C_____0)
 
 
 ## Import the sample
@@ -36,7 +36,6 @@ For more information on the configuration of Flogo Enterprise Monitoring, Flogo 
 6. You have the option to import all flows from the source app or selectively import flows.
 
 7.  Click Next. If you had not selected a trigger in the previous dialog, the flows associated with that trigger are displayed. You have the option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Clear the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow. Click Next.
-
 
 
 ## Understanding the configuration
@@ -79,22 +78,23 @@ For example, If user gives *keyInput* as "user2" and *isDelete* as true. The ope
 
 
 
-### Run the application
+### Generate and Run the Application Binary
 
-To run the application, push the app to TIBCO Cloud and then scale up to 1 instance. Once your app is scaled, you can see your app in running status.
+To generate the application binary, click on the hamburger menu option beside the push button and click on the *Build app* option. Select the Platform for which you want to generate the app binary and your app binary will be downloaded locally.
 
-![Sample Response](../import-screenshots/ScaleInstance.png)
+![Sample binary generation](../import-screenshots/ScaleInstance.png)
 
-
-Once your app reaches to Running state, go to Endpoints and for GET/user/{key} option, select 'Try it Out’ option and then give "user1" as value in key and false in isDelete dropdown. Then click on execute.
+Once your app binary is generated and downloaded locally, Configure the app binary with the Flogo Monitoring app and Flogo Flow state manager app and run it.
+For more information on the configuration, please refer the documentation link given above.
 
 ![sample Response](../import-screenshots/1_Execute.png)
 
-Another option, If you want to test the sample in the Flow tester then follow below instructions:
- 
-in flow, click on Test Button -> create Launch configuration -> provide values in path params and query params -> click Next button -> click on Run
+Once the binary is configured and running, open the Flogo Monitoring app in the browser and you will see the app name in the app list.
+On App list page, click on app name -> Monitoring -> Flow -> Trigger
 
 ![Sample Response](../import-screenshots/1_launchconfig.png)
+
+To watch the e
 ![Sample Response](../import-screenshots/2_launchconfig.png)
 ![Sample Response](../import-screenshots/3_valuesLaunchConfig.png)
 
