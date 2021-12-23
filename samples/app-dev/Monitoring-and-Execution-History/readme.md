@@ -60,37 +60,40 @@ To generate the application binary, click on the hamburger menu option beside th
 Once your app binary is generated and downloaded locally, Configure the app binary with the Flogo Monitoring app and Flogo Flow state manager app and run it.
 For more information on the configuration, please refer the documentation link given above.
 
-![App binary run console](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
+
+![Flogo flow state manager console](../import-screenshots/fe-mon-eh/flowStateManagerConsole.png)
+![flogo monitoring console](../import-screenshots/fe-mon-eh/fe-mon-console.png)
+![App binary run console](../import-screenshots/fe-mon-eh/app-binary-run-console.png)
+
 
 Once the binary is configured and running, Hit the app endpoint and open the Flogo Monitoring app in the browser and you will see the app name in the app list.
 On App list page, click on app name -> Monitoring -> Flow -> Trigger
 
-![app list page on fe-mon](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
+![app list page on fe-mon](../import-screenshots/fe-mon-eh/fe-mon-applist.png)
 
 For Execution History, Click in the *Executions* tab on the Flogo Enterprise Monitoring UI. You will see a list of the execution record and their start and end time. To capture the Executions record, one must enable the *Persist Execution Data* toggle. 
 
-![Execution History Sample Response](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
+![Execution History Sample Response](../import-screenshots/fe-mon-eh/EH-sample-response.png)
 
 To re-run a flow from the Executions tab. Click on the Kebab Menu option beside an execution record and click on the *View Details* button. There will be a pop-up With the name Activities List and Execution id for a specific flow. Select an activity from which you want to re-run the flow. This feature works the same way as a Flow tester feature and does not include the app trigger in the re-run process.
 
-![Sample Response](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
+![Re-run feature](../import-screenshots/fe-mon-eh/Re-run-popup.png)
 
 
 ## Outputs
 
 1. App Monitoring
 
-![App monitoring Record](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
-
+![monitoring Sample Response](../import-screenshots/fe-mon-eh/Monitoring-sample-response.png)
 
 2. Execution Record
 
-![Execution History Record](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
+![Execution History Record](../import-screenshots/fe-mon-eh/EH-sample-response.png)
 
 
 3. Re-run Feature
-![Re-run feature screenshot](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
-
+![Re-run response feature screenshot](../import-screenshots/fe-mon-eh/run-flow-from-this-actovity.png)
+![Re-run response feature screenshot](../import-screenshots/fe-mon-eh/after-re-run.png)
 
 ## Troubleshooting
 
