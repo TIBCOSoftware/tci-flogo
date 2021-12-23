@@ -40,75 +40,56 @@ For more information on the configuration of Flogo Enterprise Monitoring, Flogo 
 
 ## Understanding the configuration
 
-In the attached sample *fe-mon-execution-history-demo-app.json*, there are 3 flows *Sx`et_Get_User1_Set_User2*, *Get_User2* and *Get_User1_User2_Delete_User2*.
+In the attached sample *fe-mon-execution-history-demo-app.json*, there are 3 flows *MainFlow*, *Subflow1* and *Subflow2*.
 
-![The Import app dialog](../import-screenshots/1_AllThreeFlows.png)
+![flow details page](../import-screenshots/fe-mon-eh/1-FlowDeatails.png)
 
-First flow which is *Set_Get_User1_Set_User2* sets the information about User1 in *flow* level scope with key *user1*.  
+First flow which is *MainFlow* calls the *Subflow1*  via call subflow activity. *Subflow1* further calls the *Subflow2* and *Subflow2* returns the output of the service which it is invoking to the *Subflow1*. *Subflow1* takes the output from the *Subflow2* and return this to *MainFlow*. *MainFlow* returns the output which it get from the *Subflow1*. 
 
-![The Import app dialog](../import-screenshots/setUser1Info.png)
-![The Import app dialog](../import-screenshots/inputInUser1Info.png)
-
-To get the User1 information in the same flow, the Get operation is used with the same key (*user1*).
-
-![The Import app dialog](../import-screenshots/getUser1InfoSameFlow.png)
-
-The flow also sets the User2 information with the *application* level scope with key *user2* and call a subflow *Get_User1_User2_Delete_User2*.
-
-![The Import app dialog](../import-screenshots/SetUser2Info.png)
-![The Import app dialog](../import-screenshots/InputUser2Info.png)
-![The Import app dialog](../import-screenshots/SubflowInFlow1.png)
-
-The flow *Get_User2* is another flow which gets the User2 information set in flow *Set_Get_User1_Set_User2*.
-![The Import app dialog](../import-screenshots/GetUser2InfoFlow2.png)
-![The Import app dialog](../import-screenshots/InputInUser2Info.png)
-
-The flow *Get_User1_User2_Delete_User2* is a subflow to the main flow *Set_Get_User1_Set_User2* and gets the User1 information as well as User2 information based upon the input provided to the subflow. The input to the subflow is the same key which was set for user1 and user2 information.
-
-![The Import app dialog](../import-screenshots/User1BranchingCondition.png)
-![The Import app dialog](../import-screenshots/GetUser1InfoInSubflow.png)
-![The Import app dialog](../import-screenshots/User2BranchingCondition.png)
-![The Import app dialog](../import-screenshots/GetUser2InfoInSubflow.png)
- 
-The flow also includes *Delete* operation for the User2 information which is  set at the *application* level scope. Based upon the *keyInput* and *isDelete* parameters from user, the respective user's information and operation will be performed.
-For example, If user gives *keyInput* as "user2" and *isDelete* as true. The operation Delete will be performed on the User2 information. The same will be returned by the subflow *Get_User1_User2_Delete_User2* to the main flow *Set_Get_User1_Set_User2*.
-
-![The Import app dialog](../import-screenshots/DeleteBRanchingCondition.png)
-![The Import app dialog](../import-screenshots/DeleteOperation.png)
-
+![MainFlow](../import-screenshots/fe-mon-eh/MainFlow.png)
+![Subflow1](../import-screenshots/fe-mon-eh/Subflow1.png)
+![Subflow2](../import-screenshots/fe-mon-eh/Subflow2.png)
 
 
 ### Generate and Run the Application Binary
 
 To generate the application binary, click on the hamburger menu option beside the push button and click on the *Build app* option. Select the Platform for which you want to generate the app binary and your app binary will be downloaded locally.
 
-![Sample binary generation](../import-screenshots/ScaleInstance.png)
+![Sample binary generation](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
 
 Once your app binary is generated and downloaded locally, Configure the app binary with the Flogo Monitoring app and Flogo Flow state manager app and run it.
 For more information on the configuration, please refer the documentation link given above.
 
-![sample Response](../import-screenshots/1_Execute.png)
+![App binary run console](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
 
-Once the binary is configured and running, open the Flogo Monitoring app in the browser and you will see the app name in the app list.
+Once the binary is configured and running, Hit the app endpoint and open the Flogo Monitoring app in the browser and you will see the app name in the app list.
 On App list page, click on app name -> Monitoring -> Flow -> Trigger
 
-![Sample Response](../import-screenshots/1_launchconfig.png)
+![app list page on fe-mon](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
 
-To watch the e
-![Sample Response](../import-screenshots/2_launchconfig.png)
-![Sample Response](../import-screenshots/3_valuesLaunchConfig.png)
+For Execution History, Click in the *Executions* tab on the Flogo Enterprise Monitoring UI. You will see a list of the execution record and their start and end time. To capture the Executions record, one must enable the *Persist Execution Data* toggle. 
+
+![Execution History Sample Response](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
+
+To re-run a flow from the Executions tab. Click on the Kebab Menu option beside an execution record and click on the *View Details* button. There will be a pop-up With the name Activities List and Execution id for a specific flow. Select an activity from which you want to re-run the flow. This feature works the same way as a Flow tester feature and does not include the app trigger in the re-run process.
+
+![Sample Response](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
 
 
 ## Outputs
 
-1. Flow Tester
+1. App Monitoring
 
-![Sample Response](../import-screenshots/4_testeroutput.png)
+![App monitoring Record](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
 
 
-2. When hit endpoints
+2. Execution Record
 
-![Sample Response](../import-screenshots/2_user1Info.png)
+![Execution History Record](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
+
+
+3. Re-run Feature
+![Re-run feature screenshot](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
 
 
 ## Troubleshooting
