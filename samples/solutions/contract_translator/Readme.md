@@ -10,11 +10,10 @@
 ## Introduction
 The Smart Contract Automation is a 100% Cloud solution with a simple yet efficient conversational bot interface offering endless benefits, especially the less-tapped legal departments that are looking to streamline the contract management process.
 Some of the benefits includes:
-● A one-stop 100% Cloud-based solution for the lifecycle of a Contract
-Management process.
-● Artificial Intelligence (AI) based approach to identify and assign the contract type.
-● Simplified User-experience through a Slack bot responding to anyone, anywhere.
-● Powerful Visual Analytics empowered by Data Science.
+- A one-stop 100% Cloud-based solution for the lifecycle of a Contract Management process.
+- Artificial Intelligence (AI) based approach to identify and assign the contract type.
+- Simplified User-experience through a Slack bot responding to anyone, anywhere.
+- Powerful Visual Analytics empowered by Data Science.
 
 ## Overview
 
@@ -22,7 +21,9 @@ To begin, this solution offers a conversational Slack Bot interactive experience
 
 The user will upload the contract document to Slack along with selecting the appropriate target translation language in which the document will be translated. Once a document is uploaded, TIBCO CloudTM Integration will detect the event and it will send the Contract to translation. With TIBCO CloudTM LiveApps - it will manage the document translation lifecycle. TIBCO CloudTM Spotfire generates the real-time visualizations of all these correlated events seen below,
 ![image]()
+
 ![image]()
+
 ![image]()
 
 # Solution Design
