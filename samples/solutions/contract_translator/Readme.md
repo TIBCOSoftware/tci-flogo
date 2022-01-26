@@ -29,11 +29,6 @@ The user will upload the contract document to Slack along with selecting the app
 
 <img width="1200" alt="TC_Spotfire_DS" src="https://user-images.githubusercontent.com/79621490/151149180-a9a30d1a-2031-45cc-8df2-465e80526a0c.png">
 
-# Solution Demo
-
-https://user-images.githubusercontent.com/79621490/151146889-49d04a63-1691-45b3-9048-a2762a8c4b26.mov
-
-
 
 # Solution Design
 This solution demonstrates end-to-end real-time data integration between interactive Slack Bot, TIBCO cloud automate - managing contract lifecycle, AI/ML modules and visual analytics features using TIBCO's Connect and Predict capabilities.
@@ -50,6 +45,12 @@ As illustrated in the Architecture Diagram (above), this solution:
 - The Automate (previously known as Liveapps) capability of TIBCO CloudTM Integration comes into picture as soon as the contract is sent for translation. The various stages of the contract translation process are managed and maintained here.
 - TIBCO CloudTM Spotfire which displays visual analytics based on the data fetched from Automate APIs which manages the contract translation lifecycle.
 - The Case Manager Workflow - our custom tailored UX solution for the seamless interaction with contract translation process to review and approve the translated contract.
+
+
+# Solution Demo
+
+https://user-images.githubusercontent.com/79621490/151146889-49d04a63-1691-45b3-9048-a2762a8c4b26.mov
+
 
 
 
