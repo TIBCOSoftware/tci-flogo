@@ -33,15 +33,15 @@ This solution demonstrates end-to-end real-time data integration between interac
 ![image]()
 
 As illustrated in the Architecture Diagram (above), this solution:
-● Offers the Interactive Slack Bot interface to interact with the end user.
-● Uses the Develop capability, powered by Flogo, of TIBCO CloudTM Integration (TCI Flogo) to interact with users using slack apis (acts as backend for slack), extract the user choices, files & contents and pass them for further processing - Ex. retrieve the contract from slack interaction, send that to translation, store &
-retrieve it pre & post translation on secured location (Gdrive), etc.
-● The Automate (previously known as Liveapps) capability of TIBCO CloudTM Integration comes into picture as soon as the contract is sent for translation. The various stages of the contract translation process are managed and maintained here.
-● TIBCO CloudTM Spotfire which displays visual analytics based on the data fetched from Automate APIs which manages the contract translation lifecycle.
-● The Case Manager Workflow - our custom tailored UX solution for the seamless interaction with contract translation process to review and approve the translated contract.
+- Offers the Interactive Slack Bot interface to interact with the end user.
+- Uses the Develop capability, powered by Flogo, of TIBCO CloudTM Integration (TCI Flogo) to interact with users using slack apis (acts as backend for slack), extract the user choices, files & contents and pass them for further processing - Ex. retrieve the contract from slack interaction, send that to translation, store & retrieve it pre & post translation on secured location (Gdrive), etc.
+- The Automate (previously known as Liveapps) capability of TIBCO CloudTM Integration comes into picture as soon as the contract is sent for translation. The various stages of the contract translation process are managed and maintained here.
+- TIBCO CloudTM Spotfire which displays visual analytics based on the data fetched from Automate APIs which manages the contract translation lifecycle.
+- The Case Manager Workflow - our custom tailored UX solution for the seamless interaction with contract translation process to review and approve the translated contract.
 
 # Solution Demo
 ![image]()
+
 
 # Steps to setup the Solution
 Let's Get Started
