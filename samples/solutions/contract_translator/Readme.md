@@ -10,7 +10,7 @@
 * Valid subscription to Slack workspace
 * Valid subscription to Heroku platform _(optional, required if you want to use AI/ML contract classifer API)_
 
-## Introduction
+# Introduction
 The Smart Contract Automation is a 100% Cloud solution with a simple yet efficient conversational bot interface offering endless benefits, especially the less-tapped legal departments that are looking to streamline the contract management process.
 Some of the benefits includes:
 - A one-stop 100% Cloud-based solution for the lifecycle of a Contract Management process.
