@@ -54,7 +54,7 @@ As illustrated in the Architecture Diagram (above), this solution:
 
 
 # Steps to setup the Solution
-Let's Get Started
+[Let's Get Started](docs/00.md)
 
 
 
