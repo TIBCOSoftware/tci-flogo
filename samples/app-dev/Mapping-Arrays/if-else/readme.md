@@ -2,7 +2,8 @@
 
 ## Description
 
-This sample demonstate an example of conditional data mappings using if-else blocks.
+This sample demonstate an example of conditional data mappings using if-else blocks. To add a new condition on any input node, click on Kebab meny and select 'Add Condition'.
+![Add Condition](../../import-screenshots/ifelse/add_condition.png)
 The app contains a subflow which post the shopping order details (values not persisted between the calls) using InvokeRestService activity and returns the created object containing shopping order details. The objective is to display these order details based on the following two conditions-
 1. if the order status is delivered or completed then display the feedback link to user othewise feedback link should not be displayed in the output
 2. if the input json (POST body) does not contain item array then we do not want to display certain attributes or json tags in the output (remove null value for the non-existing json keys)
