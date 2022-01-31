@@ -74,7 +74,7 @@ For more information on the configuration, please refer the documentation link g
 ![App binary run console](../import-screenshots/fe-mon-eh/app-binary-run-console.png)
 
 
-Once the executable is configured and running, Hit the app endpoint and open the Flogo Monitoring app in the browser with the url "*http://localhost:7337*" and you will see the app name in the app list.
+Once the executable is configured and running, Hit the app endpoint and open the Flogo Monitoring app in the browser with the url *http://localhost:7337* and you will see the app name in the app list.
 On App list page, click on app name -> Monitoring -> Flow -> Trigger
 
 ![app list page on fe-mon](../import-screenshots/fe-mon-eh/fe-mon-applist.png)
