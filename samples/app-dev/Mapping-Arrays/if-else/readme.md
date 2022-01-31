@@ -16,16 +16,16 @@ The app contains a subflow which post the shopping order details (values not per
 1. Download the sample's .json file 'conditional_mappings_ifelse.json'
 
 2. Create a new empty app.
-![Create an app](../../../import-screenshots/2.png)
+![Create an app](../../import-screenshots/2.png)
 
 3. On the app details page, select Import app.
-![Select import](../../../import-screenshots/3.png)
+![Select import](../../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json file for the app that you want to import.
-![Import your sample](../../../import-screenshots/ifelse/import_ifelse_app.png)
+![Import your sample](../../import-screenshots/ifelse/import_ifelse_app.png)
 
 5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
-![The Import app dialog](../../../import-screenshots/ifelse/import_dialog_ifelse.png)
+![The Import app dialog](../../import-screenshots/ifelse/import_dialog_ifelse.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
@@ -39,10 +39,10 @@ If the condition matches, we show all attributes in output json along with feedb
 
 Similarly, to acheive the second objective to remove an attribute from output which is not present in POST body, we can use isdefined() function in if condition. In second flow 'removeJsonTags_orderDetails', we are checking if item[] attribute is present in POST body using the if condition 'isdefined( $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Item)'. If presnt or defined then display all order details else do not display item[], sheipment[] and feedback attributes in the output.
 
-![The flows](../../../import-screenshots/ifelse/app_flows.png)
-![If Condition First Flow](../../../import-screenshots/ifelse/books_flow1_ifCondition.png)
-![Else Block Mappings First Flow](../../../import-screenshots/ifelse/flow1_elseMappings.png)
-![If Conditions Second Flow](../../../import-screenshots/ifelse/flow2_ifCondition.png)
+![The flows](../../import-screenshots/ifelse/app_flows.png)
+![If Condition First Flow](../../import-screenshots/ifelse/books_flow1_ifCondition.png)
+![Else Block Mappings First Flow](../../import-screenshots/ifelse/flow1_elseMappings.png)
+![If Conditions Second Flow](../../import-screenshots/ifelse/flow2_ifCondition.png)
 
 ### Run the application
 Once you are ready to run the application, you can use Push option and later run this app.
@@ -75,7 +75,7 @@ Once it reaches to Running state, go to API tester and hit tryout the first endo
     ]
   }
 }
-![POST Body API Tester First Flow](../../../import-screenshots/ifelse/POST_body_flow1.png)
+![POST Body API Tester First Flow](../../import-screenshots/ifelse/POST_body_flow1.png)
 
 For second endpoint, you can use the below input JSON (Note that there is no Item[]):
 {
@@ -98,18 +98,18 @@ For second endpoint, you can use the below input JSON (Note that there is no Ite
     ]
   }
 }
-![POST Body API Tester Second Flow](../../../import-screenshots/ifelse/POST_body_flow2.png)
+![POST Body API Tester Second Flow](../../import-screenshots/ifelse/POST_body_flow2.png)
 
 ## Outputs
 
 1. Output of first flow:
-[Output Logs First Flow](../../../import-screenshots/ifelse/output_flow1.png)
+[Output Logs First Flow](../../import-screenshots/ifelse/output_flow1.png)
 
 2. Endpoint Response for second flow
-![Endpoint Response Second Flow](../../../import-screenshots/ifelse/output_endpoint_flow2.png)
+![Endpoint Response Second Flow](../../import-screenshots/ifelse/output_endpoint_flow2.png)
 
 3. Application Logs for second flow
-![Output Logs Second Flow](../../../import-screenshots/ifelse/output_flow2.png)
+![Output Logs Second Flow](../../import-screenshots/ifelse/output_flow2.png)
 
 
 ## Contributing
