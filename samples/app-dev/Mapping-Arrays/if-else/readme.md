@@ -3,7 +3,7 @@
 ## Description
 
 This sample demonstate an example of conditional data mappings using if-else blocks.
-The app contains a subflow which post the shopping order details (values not persisted between the calls) and then invokes this rest service that returns the object containing shopping order details. The objective is to display these order details based on the following two conditions-
+The app contains a subflow which post the shopping order details (values not persisted between the calls) using InvokeRestService activity and returns the created object containing shopping order details. The objective is to display these order details based on the following two conditions-
 1. if the order status is delivered or completed then display the feedback link to user othewise feedback link should not be displayed in the output
 2. if the input json (POST body) does not contain item array then we do not want to display certain attributes or json tags in the output (remove null value for the non-existing json keys)
 
@@ -33,21 +33,21 @@ The app contains a subflow which post the shopping order details (values not per
 
 ## Understanding the configuration
 
-The app has two flows and one subflow. The subflow 'post_orderDetails' contains a invokeRestService activity to POST order details and returns the created data.
-The flow display_orderDetails calls this subflow to create an order with certain details. To acheive the first objective of displaying feedback link based on the order status, we have added a condition on ShoppingCartOrder object using kebab menu in its input field in a mapper activity. The if condition is defined as '$activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" || $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "completed"'.
+* The app has two flows and one subflow. The subflow 'post_orderDetails' contains a invokeRestService activity to POST order details and returns the created data.
+* The flow display_orderDetails calls this subflow to create an order with order details. To acheive the first objective of displaying feedback link based on the order status, we have added a condition on ShoppingCartOrder object using kebab menu in its input field in a mapper activity. The if condition is defined as '$activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" || $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "completed"'.
 If the condition matches, we show all attributes in output json along with feedback link. To remove 'feedback' attribute in output json we do not map it in else block.
 
-Similarly, to acheive the second objective to remove an attribute from output which is not present in POST body, we can use isdefined() function in if condition. In second flow 'removeJsonTags_orderDetails', we are checking if item[] attribute is present in POST body using the if condition 'isdefined( $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Item)'. If presnt or defined then display all order details else do not display item[], sheipment[] and feedback attributes in the output.
+* Similarly, to acheive the second objective to remove an attribute from output which is not present in POST body, we can use isdefined() function in if condition. In second flow 'removeJsonTags_orderDetails', we are checking if item[] attribute is present in POST body using the if condition 'isdefined( $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Item)'. If presnt or defined then display all order details else do not display item[], sheipment[] and feedback attributes in the output.
 
 ![The flows](../../import-screenshots/ifelse/app_flows.png)
-![If Condition First Flow](../../import-screenshots/ifelse/books_flow1_ifCondition.png)
+![If Condition First Flow](../../import-screenshots/ifelse/flow1_ifCondition.png)
 ![Else Block Mappings First Flow](../../import-screenshots/ifelse/flow1_elseMappings.png)
 ![If Conditions Second Flow](../../import-screenshots/ifelse/flow2_ifCondition.png)
 
 ### Run the application
-Once you are ready to run the application, you can use Push option and later run this app.
+Once you are ready to run the application, you can use Push option and then run this app.
 Once it reaches to Running state, go to API tester and hit tryout the first endoint. You can use below input JSON (Note that Status is 'pending'. You can also try with 'delivered' or 'completed'):
-{
+* {
   "ShoppingCartOrder": {
     "Order": "D01-8127020-6200600",
     "PlacedOn": "2017-10-21",
@@ -78,7 +78,7 @@ Once it reaches to Running state, go to API tester and hit tryout the first endo
 ![POST Body API Tester First Flow](../../import-screenshots/ifelse/POST_body_flow1.png)
 
 For second endpoint, you can use the below input JSON (Note that there is no Item[]):
-{
+* {
   "ShoppingCartOrder": {
     "Order": "D01-8127020-6200600",
     "PlacedOn": "2017-10-21",
@@ -103,7 +103,7 @@ For second endpoint, you can use the below input JSON (Note that there is no Ite
 ## Outputs
 
 1. Output of first flow:
-[Output Logs First Flow](../../import-screenshots/ifelse/output_flow1.png)
+![Output Logs First Flow](../../import-screenshots/ifelse/output_flow1.png)
 
 2. Endpoint Response for second flow
 ![Endpoint Response Second Flow](../../import-screenshots/ifelse/output_endpoint_flow2.png)
