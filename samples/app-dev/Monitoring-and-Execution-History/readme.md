@@ -6,10 +6,10 @@ This is Flogo Enterpsie Monitoring and Execution History Sample.The Flogo Entepr
 
 
 ## Pre-Requisite
-1. Should have Flogo Enterprise Monitoring
-2. Should have Flogo Flow State Manager
-3. Should have TCI subscription to generate the Flogo Binary locally.
-4.Should have Postgres DB running and configured with the Flow State Manager to store the execution records.
+1. Flogo Enterprise Monitoring app should be configured.
+2. Flogo Flow State Manager app should be configured.
+3. TCI subscription to generate the Flogo app executable locally.
+4. Postgres DB running and configured with the Flow State Manager to store the execution records.
 
 For more information on the configuration of Flogo Enterprise Monitoring, Flogo Flow State Manager and Postgres, Please refer [here](https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/monitoring.html?TocPath=TIBCO%2520Flogo%25C2%25AE%2520Apps%257CDeployment%2520and%2520Configuration%257CBuilding%2520an%2520App%2520Executable%257CMonitoring%257C_____0)
 
@@ -51,14 +51,22 @@ First flow which is *MainFlow* calls the *Subflow1*  via call subflow activity. 
 ![Subflow2](../import-screenshots/fe-mon-eh/Subflow2.png)
 
 
-### Generate and Run the Application Binary
+### Generate and Run the App Executable
 
-To generate the application binary, click on the hamburger menu option beside the push button and click on the *Build app* option. Select the Platform for which you want to generate the app binary and your app binary will be downloaded locally.
+To generate the app executable, click on the hamburger menu option beside the push button and click on the *Build app* option. Select the supported Platform type and your app executable will be downloaded locally.
 
 ![Sample binary generation](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
 
-Once your app binary is generated and downloaded locally, Configure the app binary with the Flogo Monitoring app and Flogo Flow state manager app and run it.
-For more information on the configuration, please refer the documentation link given above.
+Once your app executable is generated and downloaded locally, Configure the app executable with the Flogo Monitoring app and Flogo Flow state manager app and run it.
+For more information on the configuration, please refer the documentation link given below:-
+
+1. To configure and run Flogo Enterprise Monitoring app, refer [here](https://au.integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/running-the-flogo-en2.html)
+
+2. To configure and run Flogo Flow State Manager app, refer [here](https://au.integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/flowstatemgr-standalone.html)
+
+3. To configure and run the Postgres DB Service with Flow state manager, refer [here](https://au.integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/flowstatemgr-configure-postgresql.html?TocPath=Deployment%2520and%2520Configuration%257CBuilding%2520an%2520App%2520Executable%257CMonitoring%257CAbout%2520TIBCO%2520Flogo%25C2%25AE%2520Flow%2520State%2520Manager%257C_____2)
+
+4. To configure and run the app executable with the Flogo Enterprise Monitoring and Flogo Flow State Manager app, refer [here](https://au.integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/flowstatemgr-starting-flogo-app-binary.html?TocPath=Deployment%2520and%2520Configuration%257CBuilding%2520an%2520App%2520Executable%257CMonitoring%257CAbout%2520TIBCO%2520Flogo%25C2%25AE%2520Flow%2520State%2520Manager%257C_____8)
 
 
 ![Flogo flow state manager console](../import-screenshots/fe-mon-eh/flowStateManagerConsole.png)
@@ -66,7 +74,7 @@ For more information on the configuration, please refer the documentation link g
 ![App binary run console](../import-screenshots/fe-mon-eh/app-binary-run-console.png)
 
 
-Once the binary is configured and running, Hit the app endpoint and open the Flogo Monitoring app in the browser and you will see the app name in the app list.
+Once the executable is configured and running, Hit the app endpoint and open the Flogo Monitoring app in the browser with the url "*http://localhost:7337*" and you will see the app name in the app list.
 On App list page, click on app name -> Monitoring -> Flow -> Trigger
 
 ![app list page on fe-mon](../import-screenshots/fe-mon-eh/fe-mon-applist.png)
