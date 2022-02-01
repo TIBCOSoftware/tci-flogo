@@ -43,8 +43,8 @@ If the condition matches, we show all attributes in output json along with feedb
 ![Else Block Mappings First Flow](../../import-screenshots/ifelse/flow1_elseMappings.png)
 ![If Conditions Second Flow](../../import-screenshots/ifelse/flow2_ifCondition.png)
 
-* We might think of ternary operator to achieve this but that would end up setting null or empty value "". So Feedback cannot be removed from output using this approach. It would should null or "". 
-* $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" ?  $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Feedback : null
+* We might think of ternary operator to achieve this but that would end up setting null or empty value "". So Feedback cannot be removed from output using this approach. It would show null or "". 
+** $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" ?  $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Feedback : null
 
 ## Run the application
 
