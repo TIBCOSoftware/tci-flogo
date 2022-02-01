@@ -33,7 +33,8 @@ This sample demonstrates an example of conditional data mappings using if-else b
 ## Understanding the configuration
 
 * The app has two flows and one subflow. The subflow 'post_orderDetails' contains a invokeRestService activity to POST order details and returns the created data.
-* The flow display_orderDetails calls this subflow to create an order with order details. To acheive the first objective of displaying feedback link based on the order status, we have added a condition on ShoppingCartOrder object using kebab menu in its input field in a mapper activity. The if condition is defined as '$activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" || $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "completed"'.
+* The flow display_orderDetails calls this subflow to create an order with order details. To acheive the first objective of displaying feedback link based on the order status, we have added a condition on ShoppingCartOrder object using kebab menu in its input field in a mapper activity.  
+The if condition is defined as '$activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" || $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "completed"'.  
 If the condition matches, we show all attributes in output json along with feedback link. To remove 'feedback' attribute in output json we do not map it in else block.
 
 * Similarly, to achieve the second objective to remove an attribute from output which is not present in POST body, we can use isdefined() function in if condition. In second flow 'removeJsonTags_orderDetails', we are checking if item[] attribute is present in POST body using the if condition 'isdefined( $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Item)'. If present or defined then display all order details else do not display item[], sheipment[] and feedback attributes in the output.
@@ -43,8 +44,8 @@ If the condition matches, we show all attributes in output json along with feedb
 ![Else Block Mappings First Flow](../../import-screenshots/ifelse/flow1_elseMappings.png)
 ![If Conditions Second Flow](../../import-screenshots/ifelse/flow2_ifCondition.png)
 
-* We might think of ternary operator to achieve this but that would end up setting null or empty value "". So Feedback cannot be removed from output using this approach. It would show null or "". 
-** $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" ?  $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Feedback : null
+* We might think of ternary operator to achieve this but that would end up setting null or empty value "". So Feedback cannot be removed from output using this approach. It would show null or "".  
+For example, $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" ?  $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Feedback : null
 
 ## Run the application
 
