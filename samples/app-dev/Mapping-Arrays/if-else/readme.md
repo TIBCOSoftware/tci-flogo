@@ -2,9 +2,7 @@
 
 ## Description
 
-This sample demonstate an example of conditional data mappings using if-else blocks. To add a new condition on any input node, click on Kebab meny and select 'Add Condition'.
-![Add Condition](../../import-screenshots/ifelse/add_condition.png)
-The app contains a subflow which post the shopping order details (values not persisted between the calls) using InvokeRestService activity and returns the created object containing shopping order details. The objective is to display these order details based on the following two conditions-
+This sample demonstates an example of conditional data mappings using if-else blocks. The app contains a subflow which post the shopping order details (values not persisted between the calls) using InvokeRestService activity and returns the created object containing shopping order details. The objective is to display these order details based on the following two conditions-
 1. if the order status is delivered or completed then display the feedback link to user othewise feedback link should not be displayed in the output
 2. if the input json (POST body) does not contain item array then we do not want to display certain attributes or json tags in the output (remove null value for the non-existing json keys)
 
@@ -45,7 +43,11 @@ If the condition matches, we show all attributes in output json along with feedb
 ![Else Block Mappings First Flow](../../import-screenshots/ifelse/flow1_elseMappings.png)
 ![If Conditions Second Flow](../../import-screenshots/ifelse/flow2_ifCondition.png)
 
+If you want to add new condition in any input node, click on the kebab menu and select the 'Add Condition'
+![Add Condition](../../import-screenshots/ifelse/add_condition.png)
+
 ### Run the application
+
 Once you are ready to run the application, you can use Push option and then run this app.
 Once it reaches to Running state, go to API tester and hit tryout the first endoint. You can use below input JSON (Note that Status is 'pending'. You can also try with 'delivered' or 'completed'):
 * {
@@ -128,7 +130,7 @@ If you have feedback, don't hesitate to talk to us!
 * Send us a note at `tci@tibco.com`
 
 ## Help
-Please visit our [TIBCO Cloud<sup>&trade;</sup> Integration documentation](https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/conditional-mapping.html) for additional information.
+Please visit our [TIBCO Cloud<sup>&trade;</sup> Integration documentation-Conditional Mappings](https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/conditional-mapping.html) for additional information.
 
 ## License
 This TCI Flogo SDK and Samples project is licensed under a BSD-type license. See [license.txt](license.txt).
