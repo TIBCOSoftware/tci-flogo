@@ -43,8 +43,8 @@ If the condition matches, we show all attributes in output json along with feedb
 ![Else Block Mappings First Flow](../../import-screenshots/ifelse/flow1_elseMappings.png)
 ![If Conditions Second Flow](../../import-screenshots/ifelse/flow2_ifCondition.png)
 
-If you want to add new condition in any input node, click on the kebab menu and select the 'Add Condition'
-![Add Condition](../../import-screenshots/ifelse/add_condition.png)
+We might think of ternary operator to achieve this but that would end up setting null or empty value "". So Feedback cannot be removed from output using this approach. It would should null or "". 
+$activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" ?  $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Feedback : null
 
 ### Run the application
 
@@ -113,7 +113,6 @@ For second endpoint, you can use the below input JSON (Note that there is no Ite
 
 3. Application Logs for second flow
 ![Output Logs Second Flow](../../import-screenshots/ifelse/output_flow2.png)
-
 
 ## Contributing
 If you want to build your own activities for Flogo please read the docs here.
