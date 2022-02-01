@@ -2,7 +2,7 @@
 
 ## Description
 
-This sample demonstrates an example of conditional data mappings using if-else blocks. The app contains a subflow which post the shopping order details (values not persisted between the calls) using InvokeRestService activity and returns the created object containing shopping order details. The objective is to display these order details based on the following two conditions-
+This sample demonstrates an example of conditional data mappings using if-else blocks. The app contains a subflow which post the shopping order details (values not persisted between the calls) using InvokeRestService activity and returns the created object containing shopping order details and two flows to display these order details based on the following conditions-
 1. if the order status is delivered or completed then display the feedback link to user otherwise feedback link should not be displayed in the output
 2. if the input JSON (POST body) does not contain item array then we do not want to display certain attributes or json tags in the output (remove null value for the non-existing JSON keys)
 
