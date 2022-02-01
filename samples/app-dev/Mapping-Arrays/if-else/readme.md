@@ -43,10 +43,10 @@ If the condition matches, we show all attributes in output json along with feedb
 ![Else Block Mappings First Flow](../../import-screenshots/ifelse/flow1_elseMappings.png)
 ![If Conditions Second Flow](../../import-screenshots/ifelse/flow2_ifCondition.png)
 
-We might think of ternary operator to achieve this but that would end up setting null or empty value "". So Feedback cannot be removed from output using this approach. It would should null or "". 
-$activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" ?  $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Feedback : null
+* We might think of ternary operator to achieve this but that would end up setting null or empty value "". So Feedback cannot be removed from output using this approach. It would should null or "". 
+* $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Status == "delivered" ?  $activity[call_postOrderDetails].ShoppingCartOrder.ShoppingCartOrder.Feedback : null
 
-### Run the application
+## Run the application
 
 Once you are ready to run the application, you can use Push option and then run this app.
 Once it reaches to Running state, go to API tester and hit tryout the first endpoint. You can use below input JSON (Note that Status is 'pending'. You can also try with 'delivered' or 'completed'):
