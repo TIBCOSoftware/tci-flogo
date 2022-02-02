@@ -6,7 +6,10 @@ This is app *Startup* and *Shutdown* trigger's sample.The app *Startup* trigger 
 
 ![Flow details page](../../import-screenshots/appHooks/1-flowdetails.png)
 
-### *Note:-The app startup and shutdown triggers does not require any configurations.*
+### **Note:-The app startup and shutdown triggers does not require any configurations.**
+
+## Pre-Requisite
+MySQL DB Service is up and running.
 
 ## Import the sample
 1. Download the sample json file i.e., *appStartupAndShutdownTriggers-demo.json*.
