@@ -4,7 +4,7 @@
 
 This is ProtobufToJSON activity sample.The ProtobufToJSON activity helps to convert the proto messages from an API or a gRPC service to respective JSON format.You can use the converted JSON data in any other supported activity like mapper or invokeRest activity. The activity requires a .proto file for the proto message format and a proto message in base64 encoded format as input. The current supported version for proto file is proto3. 
 
-
+**Note:- ProtobufToJSON activity supports Proto3 syntax for Proto files.**
 
 ## Import the sample
 1. Download the sample json file i.e., *ProtobufToJSONDemo.json*.
