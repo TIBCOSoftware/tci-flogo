@@ -2,12 +2,12 @@
 
 ## Description
 
-This sample demonstrates how flogo app using PostgreSQL Connection and Activities connect to PostgreSQL database running on-premise using flow tester.
+This sample demonstrates how to test flogo app having PostgreSQL on-premise connection using flow tester.
 
-## Prerequisites
+## Pre-requisites
 
-1. Ensure that PostgreSQL database must be install and running on on-premise system.
-2. User must have Admin access to enable/disable the services through API.
+1. Ensure that PostgreSQL DB is up and running on-premise.
+2. User must have Admin access to enable/disable services via TCI Platform API.
 3. Ensure that OAUTH Token is generated in order to use API.
 4. User must download the latest tibagent.
 5. Ensure that hybrid proxy must be enabled in your organization before (To enable the Hybrid proxy user just need to create agent in the current organization. This step should only perform when user see error message "Please enable hybrid proxy first" while enabling/disabling the serivce through Platform API.)
@@ -15,31 +15,31 @@ This sample demonstrates how flogo app using PostgreSQL Connection and Activitie
 ## Enable the dbservice
 
 There are 2 ways to enable dbservice. One way is from UI using custom access key and another way is from Platform API using custom or system access key.
-In this sample we are enabling dbservice from Platfrom API because we want to use the system access key so that single agent can be use with multiple services.
-Below is the API that we need to enable without passing the tunnelKey. 
+In this sample we are enabling dbservice from Platfrom API because we want to use the system access key so that single agent can be used with multiple services. 
+Below is the API that we should invoke to enable the db service without passing the tunnelKey.
 
-​/v1/subscriptions/{subscriptionLocator}/dbservice 
+​## /v1/subscriptions/{subscriptionLocator}/dbservice 
 
 ![Enable dbservice](../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
  
 ## Enable the Flogotester
 
 In order to check on-premise app using flow tester user first need to enable the flogotester service.
-Below is the API that we need to hit:
+Below is the API that we should invoke to enable the flogotester
 
-​/v1/subscriptions/{subscriptionLocator}/flogotester
+​​## /v1/subscriptions/{subscriptionLocator}/flogotester
 
 ![Enable flogotester](../../import-screenshots/Onpremise_Postgresql/enable_flogotester.png)
 
 ## Create and Start the tibagent
 
-Follow below commands in order to create and start the agent:
+Below are the steps to create and start an agent:
 
 ./tibagent configure agent <agent_name> 
 
 ./tibagent start agent --spec container_port:onpremise_host:onpremise_port <agent_name>
 
-Follow this link to know more about [Hybrid agents] (https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/agent-command-reference.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____5)
+To know more about Hybrid agents. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/agent-command-reference.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____5)
 
 ## Import the sample
 
