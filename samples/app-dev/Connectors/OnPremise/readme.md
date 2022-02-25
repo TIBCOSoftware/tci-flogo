@@ -24,8 +24,8 @@ Below is the API that we should invoke to enable the db service without passing 
  
 ## Enable the Flogotester
 
-In order to check on-premise app using flow tester user first need to enable the flogotester service.
-Below is the API that we should invoke to enable the flogotester.
+In order to test on-premise services using flow tester user first need to enable the flogotester service TCI Platform API.
+Hit below API to enable the flogotester.
 
 **/v1/subscriptions/{subscriptionLocator}/flogotester**
 
@@ -77,7 +77,7 @@ When you import the app you need to re-enter the password and establish the conn
 
 In the connection, note that,
 1. Host - In this field we give private ip of the on-premise system on which database is hosted.
-2. On-premise "True" means that it establish connection to on-premise system.
+2. On-premise "True" means that it establishes connection to on-premise database.
 
 ### The Flow
 
@@ -88,9 +88,9 @@ Also in flow we have Log Message for getting the output.
 
 ### Run the application
 
-In order to test the DBConnector on-premise app in flow tester we need to select the "Using on-premise services" checkbox in Flogo Launch configuration.
+In order to test the on-premise DBConnector service in flow tester we need to select the "*Using on-premise services*" checkbox in Flogo Launch configuration.
  
-in flow, click on Test Button -> create Launch configuration -> Select "Using on-premise services" checkbox -> click Next button -> click on Run
+In flow, click on Test Button -> create Launch configuration -> Select "Using on-premise services" checkbox -> click Next button -> click on Run
 
 ![sample Response](../../import-screenshots/Onpremise_Postgresql/10.png)
 
@@ -109,7 +109,7 @@ Flow Tester
 
 ## Troubleshooting
 
-* If PostgreSQL database is not up and running on on-premise system then we should see error while creating connection.
+* If PostgreSQL database is not up and running then we should see error while creating connection.
 * If user don't have admin right and try to enable/disable service through Platform API then error "No permission to enable Flogo Tester" should appear.
 * If there are no Hybrid Agents configured for the Organization before and you attempt to enable the service using the API, the following warning message is generated "Please enable hybrid proxy first". To solve this issue create Hybrid agent first.
 * If flogotester service is not enabled using the API and we try to click "Using on-premise services" checkbox in flogo Launch Configuartion then we should see error "Flow tester service unreachable. To use this feature, Flow tester service must be enabled and running for your organization. Refer 'Flow Tester' documentation for more details."
