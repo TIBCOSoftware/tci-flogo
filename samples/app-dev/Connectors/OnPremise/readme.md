@@ -27,7 +27,7 @@ Below is the API that we should invoke to enable the db service without passing 
 In order to check on-premise app using flow tester user first need to enable the flogotester service.
 Below is the API that we should invoke to enable the flogotester.
 
-​​**/v1/subscriptions/{subscriptionLocator}/flogotester**
+**/v1/subscriptions/{subscriptionLocator}/flogotester**
 
 ![Enable flogotester](../../import-screenshots/Onpremise_Postgresql/enable_flogotester.png)
 
