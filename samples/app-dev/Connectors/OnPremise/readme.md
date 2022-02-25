@@ -20,7 +20,7 @@ Below is the API that we need to enable without passing the tunnelKey.
 
 ​/v1/subscriptions/{subscriptionLocator}/dbservice 
 
-![Enable dbservice](../../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
+![Enable dbservice](../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
  
 ## Enable the Flogotester
 
@@ -29,7 +29,7 @@ Below is the API that we need to hit:
 
 ​/v1/subscriptions/{subscriptionLocator}/flogotester
 
-![Enable flogotester](../../../import-screenshots/Onpremise_Postgresql/enable_flogotester.png)
+![Enable flogotester](../../import-screenshots/Onpremise_Postgresql/enable_flogotester.png)
 
 ## Create and Start the tibagent
 
@@ -47,21 +47,21 @@ Follow this link to know more about [Hybrid agents] (https://integration.cloud.t
 
 2. Create a new empty app
 
-![Create an app](../../../import-screenshots/sqlserver_screenshot/1.png)
+![Create an app](../../import-screenshots/sqlserver_screenshot/1.png)
 
 3. On the app details page, select import app option.
 
-![Select import](../../../import-screenshots/sqlserver_screenshot/2.png)
+![Select import](../../import-screenshots/sqlserver_screenshot/2.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../../import-screenshots/Onpremise_Postgresql/3.png)
+![Import your sample](../../import-screenshots/Onpremise_Postgresql/3.png)
 
 5. Click on Upload Button. The Import app dialog displays shows what Triggers is using, Flow name, Connection and some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
-![The Import app dialog](../../../import-screenshots/Onpremise_Postgresql/4.png)
+![The Import app dialog](../../import-screenshots/Onpremise_Postgresql/4.png)
 
-![The Import app dialog](../../../import-screenshots/Onpremise_Postgresql/5.png)
+![The Import app dialog](../../import-screenshots/Onpremise_Postgresql/5.png)
 
 6. After importing app is done, in connection tab make sure to re-enter the password and click on connect button to establish the connection.
 
@@ -71,9 +71,9 @@ Follow this link to know more about [Hybrid agents] (https://integration.cloud.t
 
 When you import the app you need to re-enter the password and establish the connection.
 
-![The connection](../../../import-screenshots/Onpremise_Postgresql/6.png)
-![The connection](../../../import-screenshots/Onpremise_Postgresql/7.png)
-![The connection](../../../import-screenshots/Onpremise_Postgresql/8.png)
+![The connection](../../import-screenshots/Onpremise_Postgresql/6.png)
+![The connection](../../import-screenshots/Onpremise_Postgresql/7.png)
+![The connection](../../import-screenshots/Onpremise_Postgresql/8.png)
 
 In the connection, note that,
 1. Host - In this field we give private ip of the on-premise system on which database is hosted.
@@ -84,7 +84,7 @@ In the connection, note that,
 If you go inside the app, you can see in flow we have 4 activities (Query,Insert, Update and Delete) that perform some operations.
 Also in flow we have Log Message for getting the output.
 
-![Sample Response](../../../import-screenshots/Onpremise_Postgresql/9.png)
+![Sample Response](../../import-screenshots/Onpremise_Postgresql/9.png)
 
 ### Run the application
 
@@ -92,19 +92,19 @@ In order to test the DBConnector on-premise app in flow tester we need to select
  
 in flow, click on Test Button -> create Launch configuration -> Select "Using on-premise services" checkbox -> click Next button -> click on Run
 
-![sample Response](../../../import-screenshots/Onpremise_Postgresql/10.png)
+![sample Response](../../import-screenshots/Onpremise_Postgresql/10.png)
 
-![Sample Response](../../../import-screenshots/Onpremise_Postgresql/11.png)
+![Sample Response](../../import-screenshots/Onpremise_Postgresql/11.png)
 
-![Sample Response](../../../import-screenshots/Onpremise_Postgresql/12.png)
+![Sample Response](../../import-screenshots/Onpremise_Postgresql/12.png)
 
 ## Outputs
 
 Flow Tester
 
-![Sample Response](../../../import-screenshots/Onpremise_Postgresql/13.png)
+![Sample Response](../../import-screenshots/Onpremise_Postgresql/13.png)
 
-![Sample Response](../../../import-screenshots/Onpremise_Postgresql/14.png)
+![Sample Response](../../import-screenshots/Onpremise_Postgresql/14.png)
 
 
 ## Troubleshooting
