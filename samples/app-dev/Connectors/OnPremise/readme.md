@@ -18,7 +18,7 @@ There are 2 ways to enable dbservice. One way is from UI using custom access key
 In this sample we are enabling dbservice from Platfrom API because we want to use the system access key so that single agent can be used with multiple services. 
 Below is the API that we should invoke to enable the db service without passing the tunnelKey.
 
-*/v1/subscriptions/{subscriptionLocator}/dbservice*
+**/v1/subscriptions/{subscriptionLocator}/dbservice**
 
 ![Enable dbservice](../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
  
@@ -27,7 +27,7 @@ Below is the API that we should invoke to enable the db service without passing 
 In order to check on-premise app using flow tester user first need to enable the flogotester service.
 Below is the API that we should invoke to enable the flogotester.
 
-​​*/v1/subscriptions/{subscriptionLocator}/flogotester*
+​​**/v1/subscriptions/{subscriptionLocator}/flogotester**
 
 ![Enable flogotester](../../import-screenshots/Onpremise_Postgresql/enable_flogotester.png)
 
