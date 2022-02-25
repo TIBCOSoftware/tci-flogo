@@ -37,7 +37,7 @@ Follow below commands in order to create and start the agent:
 
 ./tibagent configure agent <agent_name> 
 
-./tibagent start agent --spec <containerPort>:<onPremiseHost>:<onPremisePort> <agent_name>
+./tibagent start agent --spec container_port:onpremise_host:onpremise_port <agent_name>
 
 Follow this link to know more about [Hybrid agents] (https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/agent-command-reference.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____5)
 
