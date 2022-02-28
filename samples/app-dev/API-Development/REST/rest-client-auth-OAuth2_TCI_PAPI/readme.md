@@ -5,7 +5,7 @@
 
 This example demonstrates how to create and use HTTP Client Authorization connection in flogo apps to enable authorization for TCI platform APIs using Auth type OAuth 2.0 and grant type Client Credentials.
 
-The app is desined to access TCI's userinfo API using InvokeRestService activity which is configured with a HTTP Client Authorization connection named 'TCI_OauthClient'.
+The app is designed to access TCI's userinfo API using InvokeRestService activity which is configured with a HTTP Client Authorization connection named 'TCI_OauthClient'.
 
 ## Prerequisites
 
@@ -44,8 +44,8 @@ When you import this app, you need to configure the 'TCI_OauthClient' connection
 In the connection, note that,
 * Authorization type is set to 'OAuth2'
 * Grant type is set to 'Client Credentials' which is the only way to get access using Tibco OAuth Client that you've registered.
-* Scope 'TCI' is mandatory.
-* Client Authentication as 'Header' (if you register the oAuth Client with 'Body' then please select 'Body')
+* Scope is set to 'TCI' that is required in case of Tibco OAuth Client.
+* Client Authentication as 'Header' (if you register the OAuth Client with 'Body' then please select 'Body')
 
 Once you login, a Base64 encoded access token string will get populated in Token field.
 
@@ -53,7 +53,7 @@ Once you login, a Base64 encoded access token string will get populated in Token
 When you open the app, you will see there is InvokeRestService activity which is authentication enabled and configured with the 'TCI_OauthClient' connection.
 ![Sample Response](../../../import-screenshots/rest-auth/16.png)
 You can enable/disable the Authentication by setting 'Enable Authentication' to 'True' or 'False'. For this sample, we need it to be 'True'.
-If you enable the authentication, you will have to select one of the existing HTTP Client Authorization connections from the drop-down.
+If you enable the authentication, you need to select one of the existing HTTP Client Authorization connections from the drop-down.
 The method selected is GET and the URL is configured with 'https://eu.api.cloud.tibco.com/tci/v1/userinfo' which is userinfo API.
 
 ### Run the application
