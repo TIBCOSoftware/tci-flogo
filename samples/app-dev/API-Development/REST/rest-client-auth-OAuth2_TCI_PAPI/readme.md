@@ -39,7 +39,7 @@ The app is desined to access TCI's userinfo API using InvokeRestService activity
 ### The Connection
 When you import this app, you need to configure the 'TCI_OauthClient' connection in Connections page. It has pre-filled values except Client Secret. You also need to change Client Id with yours.
 
-![The connection](../../../import-screenshots/rest-auth/6.png)
+![The connection](../../../import-screenshots/rest-auth/15.png)
 
 In the connection, note that,
 * Authorization type is set to 'OAuth2'
@@ -51,7 +51,7 @@ Once you login, a Base64 encoded access token string will get populated in Token
 
 ### The Flow and InvokeRestService activity
 When you open the app, you will see there is InvokeRestService activity which is authentication enabled and configured with the 'TCI_OauthClient' connection.
-![Sample Response](../../../import-screenshots/rest-auth/10.png)
+![Sample Response](../../../import-screenshots/rest-auth/16.png)
 You can enable/disable the Authentication by setting 'Enable Authentication' to 'True' or 'False'. For this sample, we need it to be 'True'.
 If you enable the authentication, you will have to select one of the existing HTTP Client Authorization connections from the drop-down.
 The method selected is GET and the URL is configured with 'https://eu.api.cloud.tibco.com/tci/v1/userinfo' which is userinfo API.
@@ -63,7 +63,7 @@ Now click Execute button.
 ![Sample Response](../../../import-screenshots/rest-auth/17.png)
 If you want to test the sample in the Flow tester, just open the flow and hit Test button. It will show the response in log message.
 
-### Note about Refresh Token
+### Access Token Refresh
 You don't need to be worry about the access token refresh flow. If you have a long running app for Tibco OAuth Client, after the expiry of the active access token it will be auto refreshed.
 ![Sample Response](../../../import-screenshots/rest-auth/18.png)
 
