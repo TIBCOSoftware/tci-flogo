@@ -1,4 +1,4 @@
-# App connecting to database running On-premise using flow tester
+# Sample demonstrating Flow Tester using on-premise DB services
 
 ## Description
 
@@ -8,15 +8,16 @@ This sample demonstrates how to use flow tester for the apps using on-premise Po
 
 1. Ensure that PostgreSQL DB is up and running on-premise.
 2. User must have Admin access to enable/disable services via TCI Platform API.
-3. Ensure that OAUTH Token is generated in order to use API.
-4. User must download the latest tibagent.
-5. Ensure that hybrid proxy must be enabled in your organization before (To enable the Hybrid proxy user just need to create agent in the current organization. This step should only perform when user see error message "Please enable hybrid proxy first" while enabling/disabling the serivce through Platform API.)
+3. Ensure that OAUTH Token is generated in order to use API. Please refer [here](https://integration.cloud.tibco.com/docs/#Subsystems/tci-api/getstarted/basics/enable-api-access.html?Highlight=OAUTH%20Token)
+4. User must download the latest tibagent. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____4)
+5. Ensure that hybrid proxy must be enabled in your organization before (To enable the Hybrid proxy user just need to create agent in the current organization. This step should only perform when user see error message "Please enable hybrid proxy first" while enabling/disabling the serivce through Platform API. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____4))
 
 ## Enable the dbservice
 
 There are 2 ways to enable dbservice. One way is from UI using custom access key and another way is from Platform API using custom or system access key.
-In this sample we are enabling dbservice from Platfrom API because we want to use the system access key so that single agent can be used with multiple services. 
-Below is the API that we should invoke to enable the db service without passing the tunnelKey.
+In this sample we are enabling dbservice from Platfrom API because we want to use the system access key so that single agent can be used with multiple services.To know more,please refer [here](https://integration.cloud.tibco.com/docs/#Subsystems/tci-api/organization/enable-dbservice.html?TocPath=TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520API%257CManaging%2520an%2520Organization%2520with%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520API%257C_____4)
+
+Below is the API that we should invoke to enable the db service without passing the tunnelKey. 
 
 **/v1/subscriptions/{subscriptionLocator}/dbservice**
 
@@ -24,7 +25,8 @@ Below is the API that we should invoke to enable the db service without passing 
  
 ## Enable the Flogotester
 
-In order to test on-premise services using flow tester user first need to enable the flogotester service TCI Platform API.
+In order to test on-premise services using flow tester user first need to enable the flogotester service TCI Platform API.To know more, please refer [here](https://integration.cloud.tibco.com/docs/#Subsystems/tci-api/organization/flogo-tester-access.html?TocPath=TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520API%257CManaging%2520an%2520Organization%2520with%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520API%257C_____11)
+
 Hit below API to enable the flogotester.
 
 **/v1/subscriptions/{subscriptionLocator}/flogotester**
