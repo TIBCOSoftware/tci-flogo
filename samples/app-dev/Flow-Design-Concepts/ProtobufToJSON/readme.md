@@ -11,7 +11,7 @@ This is ProtobufToJSON activity sample.The ProtobufToJSON activity helps to conv
 
 2. Create a new empty app
 
-![Create a new empty app](../import-screenshots/2.png)
+![Create a new empty app](../../import-screenshots/2.png)
 
 3. On the app details page, select import app option.
 
