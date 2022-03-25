@@ -13,8 +13,8 @@
         "rest_1 git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/rest",
         "create_1 github.com/tibco/wi-gdocs/src/app/GoogleDocs/activity/create",
         "rest_2 git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/rest",
-        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/startuphook",
         "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/timer",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/startuphook",
         "github.com/project-flogo/contrib/function/string",
         "github.com/project-flogo/contrib/function/array",
         "github.com/project-flogo/contrib/function/utils",
@@ -104,25 +104,6 @@
             ]
         },
         {
-            "ref": "#startuphook",
-            "name": "tibco-appstartup",
-            "description": "This trigger allows you to execute flows before other triggers in the application are started. This is useful in initializing application specific tasks.",
-            "settings": {},
-            "id": "AppStartupTrigger",
-            "handlers": [
-                {
-                    "description": "This will periodically refresh the auth token used to connect with TC platform",
-                    "action": {
-                        "ref": "github.com/project-flogo/flow",
-                        "settings": {
-                            "flowURI": "res://flow:Get_AuthToken"
-                        }
-                    },
-                    "name": "Get_AuthToken"
-                }
-            ]
-        },
-        {
             "ref": "#timer",
             "name": "tibco-wi-timer",
             "description": "Simple Timer trigger",
@@ -136,7 +117,7 @@
                         "Start Time": "",
                         "Repeating": true,
                         "Delayed Start": true,
-                        "Time Interval": 8,
+                        "Time Interval": 7,
                         "Interval Unit": "Hour",
                         "Cron Expression": "CRON_TZ=Asia/Calcutta * * * * *"
                     },
@@ -147,6 +128,25 @@
                         }
                     },
                     "name": "Get_AuthToken"
+                }
+            ]
+        },
+        {
+            "ref": "#startuphook",
+            "name": "tibco-appstartup",
+            "description": "This trigger allows you to execute flows before other triggers in the application are started. This is useful in initializing application specific tasks.",
+            "settings": {},
+            "id": "AppStartupTrigger",
+            "handlers": [
+                {
+                    "description": "This will periodically refresh the auth token used to connect with TC platform",
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:OnStartup_GetSet_AuthToken"
+                        }
+                    },
+                    "name": "OnStartup_GetSet_AuthToken"
                 }
             ]
         }
@@ -2163,6 +2163,222 @@
                 "links": [
                     {
                         "id": 1,
+                        "from": "get_OauthToken",
+                        "to": "call_RefreshToken",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "call_RefreshToken",
+                        "to": "set_Oauth_Token",
+                        "type": "expression",
+                        "label": "call_RefreshToken to set_Oauth_Token",
+                        "value": "$activity[call_RefreshToken].statusCode==200"
+                    },
+                    {
+                        "id": 3,
+                        "from": "call_RefreshToken",
+                        "to": "LogError",
+                        "type": "exprOtherwise",
+                        "label": "call_RefreshToken to LogMessage"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "get_OauthToken",
+                        "name": "get_OauthToken",
+                        "description": "Enable sharing of data within or across flows in the application",
+                        "activity": {
+                            "ref": "#shareddata",
+                            "settings": {
+                                "scope": "Application",
+                                "operation": "GET",
+                                "type": "object",
+                                "objectSchema": "{\n\"access_token\" : \"CIC~qzNjDIKRsopj_SAMPLE_SAMPLE\",\n\"expires_in\" : 28800,\n\"refresh_token\" : \"rt.K7KAL_QxtYnY_SAMPLE_SAMPLE\",\n\"refresh_token_expires_in\": 7776000,\n\"token_type\" : \"Bearer\"\n}"
+                            },
+                            "input": {
+                                "key": "oauth_token"
+                            },
+                            "schemas": {
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"exist\":{\"type\":\"boolean\"},\"data\":{\"type\":\"object\",\"properties\":{\"access_token\":{\"type\":\"string\"},\"expires_in\":{\"type\":\"number\"},\"refresh_token\":{\"type\":\"string\"},\"refresh_token_expires_in\":{\"type\":\"number\"},\"token_type\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{ \"exist\":false, \"data\":{\n\"access_token\" : \"CIC~qzNjDIKRsopj_SAMPLE_SAMPLE\",\n\"expires_in\" : 28800,\n\"refresh_token\" : \"rt.K7KAL_QxtYnY_SAMPLE_SAMPLE\",\n\"refresh_token_expires_in\": 7776000,\n\"token_type\" : \"Bearer\"\n}}"
+                                    }
+                                },
+                                "settings": {
+                                    "objectSchema": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"access_token\":{\"type\":\"string\"},\"expires_in\":{\"type\":\"number\"},\"refresh_token\":{\"type\":\"string\"},\"refresh_token_expires_in\":{\"type\":\"number\"},\"token_type\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\n\"access_token\" : \"CIC~qzNjDIKRsopj_SAMPLE_SAMPLE\",\n\"expires_in\" : 28800,\n\"refresh_token\" : \"rt.K7KAL_QxtYnY_SAMPLE_SAMPLE\",\n\"refresh_token_expires_in\": 7776000,\n\"token_type\" : \"Bearer\"\n}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "call_RefreshToken",
+                        "name": "call_RefreshToken",
+                        "description": "Simple REST Activity",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#rest_1",
+                            "input": {
+                                "enableASR": false,
+                                "swagger": "",
+                                "authorization": true,
+                                "authorizationConn": "conn://dcbc6de0-aba6-11ec-aac5-c941321be07f",
+                                "serviceName": "",
+                                "resourcePath": "",
+                                "Method": "POST",
+                                "Uri": "=$property[\"OAuth_.token_url\"]",
+                                "requestType": "application/x-www-form-urlencoded",
+                                "Use certificate for verification": false,
+                                "mutualAuth": false,
+                                "Client Certificate": "",
+                                "Client Key": "",
+                                "Server Certificate": "",
+                                "Timeout": 0,
+                                "proxy": "",
+                                "host": "",
+                                "body": {
+                                    "mapping": {
+                                        "grant_type": "refresh_token",
+                                        "refresh_token": "=$activity[get_OauthToken].output.data.refresh_token"
+                                    }
+                                }
+                            },
+                            "output": {
+                                "configureResponseCodes": false,
+                                "responseType": "application/json",
+                                "responseOutput": "JSON Object"
+                            },
+                            "schemas": {
+                                "input": {
+                                    "headers": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                        "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                                    },
+                                    "body": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"refresh_token\":{\"type\":\"string\"},\"grant_type\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\n    \"refresh_token\":\"\",\n    \"grant_type\":\"\"\n}"
+                                    }
+                                },
+                                "output": {
+                                    "responseBody": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"access_token\":{\"type\":\"string\"},\"expires_in\":{\"type\":\"number\"},\"refresh_token\":{\"type\":\"string\"},\"refresh_token_expires_in\":{\"type\":\"number\"},\"token_type\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\n\"access_token\" : \"CIC~qzNjDIKRsopj_SAMPLE_SAMPLE\",\n\"expires_in\" : 28800,\n\"refresh_token\" : \"rt.K7KAL_QxtYnY_SAMPLE_SAMPLE\",\n\"refresh_token_expires_in\": 7776000,\n\"token_type\" : \"Bearer\"\n}"
+                                    },
+                                    "headers": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false},\"Set-Cookie\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                        "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Set-Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "set_Oauth_Token",
+                        "name": "set_Oauth_Token",
+                        "description": "Enable sharing of data within or across flows in the application",
+                        "activity": {
+                            "ref": "#shareddata",
+                            "settings": {
+                                "scope": "Application",
+                                "operation": "SET",
+                                "type": "object",
+                                "objectSchema": "{\n\"access_token\" : \"CIC~qzNjDIKRsopj_SAMPLE_SAMPLE\",\n\"expires_in\" : 28800,\n\"refresh_token\" : \"rt.K7KAL_QxtYnY_SAMPLE_SAMPLE\",\n\"refresh_token_expires_in\": 7776000,\n\"token_type\" : \"Bearer\"\n}"
+                            },
+                            "input": {
+                                "key": "oauth_token",
+                                "input": {
+                                    "mapping": {
+                                        "data": "=$activity[call_RefreshToken].responseBody"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"data\":{\"type\":\"object\",\"properties\":{\"access_token\":{\"type\":\"string\"},\"expires_in\":{\"type\":\"number\"},\"refresh_token\":{\"type\":\"string\"},\"refresh_token_expires_in\":{\"type\":\"number\"},\"token_type\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{\"data\":{\n\"access_token\" : \"CIC~qzNjDIKRsopj_SAMPLE_SAMPLE\",\n\"expires_in\" : 28800,\n\"refresh_token\" : \"rt.K7KAL_QxtYnY_SAMPLE_SAMPLE\",\n\"refresh_token_expires_in\": 7776000,\n\"token_type\" : \"Bearer\"\n}}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"exist\":{\"type\":\"boolean\"},\"data\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"exist\":{\"type\":\"boolean\"},\"data\":{\"type\":\"string\"}}}"
+                                    }
+                                },
+                                "settings": {
+                                    "objectSchema": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"access_token\":{\"type\":\"string\"},\"expires_in\":{\"type\":\"number\"},\"refresh_token\":{\"type\":\"string\"},\"refresh_token_expires_in\":{\"type\":\"number\"},\"token_type\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\n\"access_token\" : \"CIC~qzNjDIKRsopj_SAMPLE_SAMPLE\",\n\"expires_in\" : 28800,\n\"refresh_token\" : \"rt.K7KAL_QxtYnY_SAMPLE_SAMPLE\",\n\"refresh_token_expires_in\": 7776000,\n\"token_type\" : \"Bearer\"\n}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogError",
+                        "name": "LogError",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.concat(\"### Error while refreshing Token  : \", string.tostring($activity[call_RefreshToken].responseBody))"
+                            }
+                        }
+                    }
+                ],
+                "errorHandler": {
+                    "tasks": [
+                        {
+                            "id": "LogMessage",
+                            "name": "LogMessage",
+                            "description": "Simple Log Message Activity",
+                            "activity": {
+                                "ref": "#log",
+                                "input": {
+                                    "Log Level": "INFO",
+                                    "flowInfo": false,
+                                    "message": "=string.concat(\"#### Error Reported : \", $error.activity, \" -- \", $error.message, \" -- \", $error.data)"
+                                }
+                            }
+                        }
+                    ],
+                    "links": []
+                },
+                "metadata": {
+                    "input": [],
+                    "output": [],
+                    "fe_metadata": {}
+                }
+            }
+        },
+        {
+            "id": "flow:OnStartup_GetSet_AuthToken",
+            "data": {
+                "name": "OnStartup_GetSet_AuthToken",
+                "description": "This will periodically refresh the auth token used to connect with TC platform",
+                "links": [
+                    {
+                        "id": 1,
                         "from": "call_RefreshToken",
                         "to": "set_Oauth_Token",
                         "type": "expression",
@@ -2210,8 +2426,8 @@
                                 "host": "",
                                 "body": {
                                     "mapping": {
-                                        "refresh_token": "=$property[\"OAuth_.refresh_token\"]",
-                                        "grant_type": "refresh_token"
+                                        "grant_type": "refresh_token",
+                                        "refresh_token": "=$property[\"OAuth_.refresh_token\"]"
                                     }
                                 }
                             },
@@ -2362,12 +2578,12 @@
         {
             "name": "liveapps_.Oauth_token",
             "type": "string",
-            "value": "CIC~VtNU-nORm7LA8TvgcJ-XDXBQ"
+            "value": ""
         },
         {
             "name": "liveapps_.sandbox_id",
             "type": "string",
-            "value": "6440"
+            "value": ""
         },
         {
             "name": "slack_.send_notify_api",
@@ -2377,7 +2593,7 @@
         {
             "name": "slack_.bot_token",
             "type": "string",
-            "value": "xoxb-2333324391905-2326896428788-iy6bohABhuWISHtB4grAHBW8"
+            "value": ""
         },
         {
             "name": "slack_.send_caseDetails_msg",
@@ -2432,18 +2648,18 @@
                 "type": "Basic",
                 "userName": "=$property[\"General.contract_translation_http_auth.User_Name\"]",
                 "password": "=$property[\"General.contract_translation_http_auth.Password\"]",
-                "token": "SECRET:mEz2nBNjTM80OyUxDHg6og==",
+                "token": "SECRET:yX0zLU5KQMFj05xFeyVBHQ==",
                 "grantType": "Authorization Code",
                 "callbackURL": "https://localdev-integration.cloud.tibco.com/wistudio/connectiondetails",
                 "authURL": "",
                 "authQueryParameters": "",
                 "accessTokenURL": "",
                 "clientId": "",
-                "clientSecret": "SECRET:6DzP/wkHRwoJYspsKyL88A==",
+                "clientSecret": "SECRET:LI1fX126yRtZXXqsWU9tCQ==",
                 "scope": "",
                 "clientAuthentication": "Body",
                 "method": "GET",
-                "WI_STUDIO_OAUTH_CONNECTOR_INFO": "SECRET:CP3kZ3gvRE4HF5Kk3llRJw=="
+                "WI_STUDIO_OAUTH_CONNECTOR_INFO": "SECRET:WAcuvP6VtSHU4LMjTGGoaQ=="
             }
         }
     },
