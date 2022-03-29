@@ -1,7 +1,5 @@
 # Contract Translator Bot (Slack Integration) - Powered By TIBCO
-<p align="center">
-<img width="560" alt="slack_integration_TIBCO" src="https://user-images.githubusercontent.com/79621490/151149485-e403c17d-06a3-4f1b-96fc-d26b01edde82.png">
-</p>
+The Contract Translator Bot is a 100% Cloud solution with a simple and efficient conversational bot interface offering endless benefits, especially the less-tapped legal departments that are looking to streamline the contract management process. 
 
 
 # Solution Demo
