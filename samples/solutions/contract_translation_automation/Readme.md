@@ -4,5 +4,4 @@ The Contract Translator Bot is a 100% Cloud solution with a simple and efficient
 
 # Solution Demo
 
-https://user-images.githubusercontent.com/79621490/151146889-49d04a63-1691-45b3-9048-a2762a8c4b26.mov
-
+https://user-images.githubusercontent.com/79621490/160594847-03280548-22c2-4304-ba68-18aab13222d2.mov
