@@ -31,7 +31,7 @@ Features which are covered in these sample apps are:
 flogo.rest.service application
 
 After importing the 'flogo.rest.service', we can see that the app has multiple response codes have been configured in the Rest trigger. Few Response codes have Response headers as well. While adding schema in Response header and Response body we need to make sure that both are in JSON data or JSON Schema format. This Rest service app has multiple query and header parameters as well.
-![MultipleResponseCode_configuration](./import-screenshots/MultipleResponseCode.png)
+![MultipleResponseCode_configuration](./import-screenshots/MultipleResponseCodes.png)
 
 This Rest service app has multiple query and header parameters as well.
 ![MultipleQueryParams](./import-screenshots/QueryParameters.png)
@@ -52,6 +52,7 @@ This flow has 2 branches and one error handler flow.
 ![InvokeTCIRestService_flow](./import-screenshots/InvokeTCIRestService_flow.png)
 
 The condition is based on the output of the 'Increment Counter Activity', when counter response is an odd number then success 200 response will be executed, for any other response like even number response it will execute the 'Throw Error' activity flow which will trigger the Error Handler flow.
+
 ![FlogoProxyBranchCondition](./import-screenshots/FlogoProxyBranchCondition.png)
 
 HTTP Client activity in the success condition branch has 'Service Endpoint' mapped to an URL defined as an app property. The 'Processing Mode' is set as 'Proxy'. In the Input, 'proxyData' is a mandatory field and must be mapped with the flow input as it is received from the HTTP Server trigger. The data received from the HTTP Server trigger is passed opaquely to the HTTP Client activity without any data conversion. We can pass the contextPath of the service as string or map it with an app property.
@@ -69,9 +70,6 @@ This application is also a Rest application having two flows each having InvokeR
 
 In the 'flogo.Invoke.http.proxy.service' we have similar branching like the service app, but here the condition is based on the response code received when the service is invoked, like for 200 response the success branch will be executed and corresponding response will be returned.
 
-App properties value:
-TCIServiceEndpoint: <proxy service TCI endpoint>/cont3xtpath/flogo
-ExternalServiceProxyEndpoint: <proxy service External endpoint>/users.xml	
 
 
 ## Run the application
@@ -84,6 +82,11 @@ Now push the 'flogo.http.proxy.service' app and scale the app to 1. Go to 'Envir
 FlogoRestServiceEnpointURL_AppProp
 
 Now push the 'Invoke.flogo.rest.service' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'ExternalServiceProxyEndpoint' and 'TCIServiceEndpoint' application properties to point to the endpoint URL of the proxy flogo service app.
+
+App properties value:
+TCIServiceEndpoint: <proxy service TCI endpoint>/cont3xtpath/flogo
+ExternalServiceProxyEndpoint: <proxy service External endpoint>/users.xml	
+
 ![FlogoProxyServiceEnpointURL_AppProp](./import-screenshots/FlogoProxyServiceEnpointURL_AppProp.png)
 
 
@@ -102,7 +105,7 @@ Success Response if the name is found in the records.
 ![InvokeProxyFlogoRestServiceInput](./import-screenshots/InvokeProxyFlogoRestServiceInput.png)
 
 Success Response for the odd number of endpoint execution and HPNum1 <= 500.
-![InvokeProxyServiceExternalSuccess](./import-screenshots/InvokeProxyServiceExternalSuccess.png)
+![InvokeProxyServiceExternalSuccess](./import-screenshots/InvokeProxyFlogoRestServiceSuccessResponse.png)
 
 Error response when endpoint is executed even number of times, execution goes into the Error Handler flow where we have excluded the required request header in the HTTP Client activity.
 ![InvokeProxyFlogoRestServiceErrorResponse](./import-screenshots/InvokeProxyFlogoRestServiceErrorResponse.png)
