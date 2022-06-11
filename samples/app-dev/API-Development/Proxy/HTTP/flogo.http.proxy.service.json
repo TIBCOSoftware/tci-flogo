@@ -1,0 +1,316 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "github.com/TIBCOSoftware/flogo-contrib/activity/counter",
+        "github.com/tibco/wi-plugins/contributions/http/src/app/HTTP/activity/client",
+        "github.com/project-flogo/contrib/activity/error",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/log",
+        "github.com/tibco/wi-plugins/contributions/http/src/app/HTTP/trigger/server",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/function/boolean",
+        "github.com/project-flogo/contrib/function/coerce",
+        "github.com/project-flogo/contrib/function/string"
+    ],
+    "name": "flogo.http.proxy.service",
+    "description": null,
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#server",
+            "name": "tibco-flogo-http-trigger",
+            "description": "A simple HTTP server",
+            "settings": {
+                "port": 9173
+            },
+            "id": "HTTPServerInvokeTCIService",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "contextPath": "=$property[\"contextpath\"]",
+                        "mode": "Proxy"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:InvokeTCIRestService"
+                        },
+                        "input": {
+                            "proxyData": "=$.proxyData"
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "proxyData": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{}}",
+                                "fe_metadata": "{}"
+                            }
+                        }
+                    },
+                    "name": "InvokeTCIRestService"
+                }
+            ]
+        },
+        {
+            "ref": "#server",
+            "name": "tibco-flogo-http-trigger",
+            "description": "A simple HTTP server",
+            "settings": {
+                "port": 9174
+            },
+            "id": "HTTPServerInvokingGoRest",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "contextPath": "/",
+                        "mode": "Proxy"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:InvokeExternalGoRestXMLService"
+                        },
+                        "input": {
+                            "proxyData": "=$.proxyData"
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "proxyData": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{}}",
+                                "fe_metadata": "{}"
+                            }
+                        }
+                    },
+                    "name": "InvokeExternalGoRestXMLService"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:InvokeTCIRestService",
+            "data": {
+                "name": "InvokeTCIRestService",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "IncrementCounter",
+                        "to": "HTTPClientTCIService",
+                        "type": "expression",
+                        "label": "SuccessConditionForOddNumberofExecution",
+                        "value": "string.regex(\"^\\d*[13579]$\", coerce.toString( $activity[IncrementCounter].value))    "
+                    },
+                    {
+                        "id": 2,
+                        "from": "IncrementCounter",
+                        "to": "ThrowError",
+                        "type": "exprOtherwise",
+                        "label": "IncrementCountertoThrowError"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "IncrementCounter",
+                        "name": "IncrementCounter",
+                        "description": "Simple Global Counter Activity",
+                        "activity": {
+                            "ref": "#counter",
+                            "input": {
+                                "counterName": "IncrementCounter",
+                                "increment": "=boolean.true()",
+                                "reset": "=boolean.false()"
+                            }
+                        }
+                    },
+                    {
+                        "id": "HTTPClientTCIService",
+                        "name": "HTTPClientTCIService",
+                        "description": "Invokes a HTTP Service",
+                        "activity": {
+                            "ref": "#client",
+                            "settings": {
+                                "host": "=$property[\"TCIServiceEndpoint\"]",
+                                "mode": "Proxy"
+                            },
+                            "input": {
+                                "contextPath": "=$property[\"TCIRestContextPath\"]",
+                                "excludeRequestHeaders": "",
+                                "excludeResponseHeaders": "",
+                                "proxyData": "=$flow.proxyData"
+                            },
+                            "schemas": {
+                                "input": {
+                                    "proxyData": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{}}",
+                                        "fe_metadata": "{}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "ThrowError",
+                        "name": "ThrowError",
+                        "description": "Throws an Error",
+                        "activity": {
+                            "ref": "#error",
+                            "input": {
+                                "message": "Go to Error Handler......."
+                            }
+                        }
+                    }
+                ],
+                "errorHandler": {
+                    "tasks": [
+                        {
+                            "id": "HTTPClientErrorHandler",
+                            "name": "HTTPClientErrorHandler",
+                            "description": "Invokes a HTTP Service",
+                            "activity": {
+                                "ref": "#client",
+                                "settings": {
+                                    "host": "=$property[\"TCIServiceEndpoint\"]",
+                                    "mode": "Proxy"
+                                },
+                                "input": {
+                                    "contextPath": "=$property[\"TCIRestContextPath\"]",
+                                    "excludeRequestHeaders": "HPNum1",
+                                    "excludeResponseHeaders": "",
+                                    "proxyData": "=$flow.proxyData"
+                                },
+                                "schemas": {
+                                    "input": {
+                                        "proxyData": {
+                                            "type": "json",
+                                            "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{}}",
+                                            "fe_metadata": "{}"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "LogMessage",
+                            "name": "LogMessage",
+                            "description": "Simple Log Message Activity",
+                            "activity": {
+                                "ref": "#log",
+                                "input": {
+                                    "Log Level": "INFO",
+                                    "flowInfo": false,
+                                    "message": "=$error.message"
+                                }
+                            }
+                        }
+                    ],
+                    "links": [
+                        {
+                            "id": 3,
+                            "from": "HTTPClientErrorHandler",
+                            "to": "LogMessage",
+                            "type": "default"
+                        }
+                    ]
+                },
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "proxyData",
+                            "type": "object"
+                        }
+                    ],
+                    "output": [],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"HTTPServer\",\"properties\":{\"proxyData\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{}}}}"
+                    }
+                }
+            }
+        },
+        {
+            "id": "flow:InvokeExternalGoRestXMLService",
+            "data": {
+                "name": "InvokeExternalGoRestXMLService",
+                "description": "",
+                "links": [],
+                "tasks": [
+                    {
+                        "id": "HTTPClient",
+                        "name": "HTTPClient",
+                        "description": "Invokes a HTTP Service",
+                        "activity": {
+                            "ref": "#client",
+                            "settings": {
+                                "host": "=$property[\"GoRestEndpoint\"]",
+                                "mode": "Proxy"
+                            },
+                            "input": {
+                                "contextPath": "=$property[\"GoRestContextpath\"]",
+                                "excludeRequestHeaders": "",
+                                "excludeResponseHeaders": "X-Links*",
+                                "proxyData": "=$flow.proxyData"
+                            },
+                            "schemas": {
+                                "input": {
+                                    "proxyData": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{}}",
+                                        "fe_metadata": "{}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "proxyData",
+                            "type": "object"
+                        }
+                    ],
+                    "output": [],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"HTTPServer\",\"properties\":{\"proxyData\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{}}}}"
+                    }
+                }
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "contextpath",
+            "type": "string",
+            "value": "cont3xtpath"
+        },
+        {
+            "name": "TCIServiceEndpoint",
+            "type": "string",
+            "value": "https://integration.cloud.tibcoapps.com/377vimcdve6w72yqh6serddqppe3fsk3"
+        },
+        {
+            "name": "TCIRestContextPath",
+            "type": "string",
+            "value": "restqueryparams"
+        },
+        {
+            "name": "GoRestContextpath",
+            "type": "string",
+            "value": "/public/v2"
+        },
+        {
+            "name": "GoRestEndpoint",
+            "type": "string",
+            "value": "https://gorest.co.in"
+        }
+    ],
+    "connections": {},
+    "contrib": "W3sicmVmIjoiZ2l0aHViLmNvbS90aWJjby93aS1wbHVnaW5zL2NvbnRyaWJ1dGlvbnMvaHR0cC9zcmMvYXBwL0hUVFAiLCJzM2xvY2F0aW9uIjoiVGliY28vSFRUUCJ9LHsicmVmIjoiZ2l0aHViLmNvbS9USUJDT1NvZnR3YXJlL2Zsb2dvLWNvbnRyaWIvYWN0aXZpdHkvY291bnRlciIsInMzbG9jYXRpb24iOiJ7VVNFUklEfS9EZWZhdWx0L2FjdGl2aXR5L2NvdW50ZXIifSx7InJlZiI6ImdpdC50aWJjby5jb20vZ2l0L3Byb2R1Y3QvaXBhYXMvd2ktY29udHJpYi5naXQvY29udHJpYnV0aW9ucy9HZW5lcmFsIiwiczNsb2NhdGlvbiI6IlRpYmNvL0dlbmVyYWwifV0="
+}
