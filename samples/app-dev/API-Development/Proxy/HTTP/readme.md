@@ -5,8 +5,11 @@ This sample demonstrates how to use HTTP Server trigger and HTTP Client activity
 
 ## Prerequisite
 'flogo.http.proxy.service' application uses two extensions, namely 'Counter' and 'Throw Error'. We can upload these extensions from the github using these links:
+
 Counter: github.com/project-flogo/contrib/activity/counter
+
 Throw Error: github.com/project-flogo/contrib/activity/error
+
 If these are not uploaded in the environment then a warning message for the missing extensions will be displayed while importing this application. We can still import the app and click on the missing extensions activity in the flow to upload these extensions and the extension will be uploaded from the above mentioned links.
 
 
@@ -91,7 +94,9 @@ FlogoRestServiceEnpointURL_AppProp
 Now push the 'Invoke.flogo.rest.service' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'ExternalServiceProxyEndpoint' and 'TCIServiceEndpoint' application properties to point to the endpoint URL of the proxy flogo service app.
 
 App properties value:
+
 TCIServiceEndpoint: <proxy service TCI endpoint>/cont3xtpath/flogo
+	
 ExternalServiceProxyEndpoint: <proxy service External endpoint>/users.xml	
 
 ![FlogoProxyServiceEnpointURL_AppProp](./import-screenshots/FlogoProxyServiceEnpointURL_AppProp.png)
