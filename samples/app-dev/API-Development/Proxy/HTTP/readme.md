@@ -3,6 +3,13 @@
 
 This sample demonstrates how to use HTTP Server trigger and HTTP Client activity to create a service as a proxy to another service. In this sample there are three flogo apps. One is a Rest service with the name 'flogo.rest.service' which will be used as a producer Rest service. Second app 'flogo.http.proxy.service' is the app which will act as a proxy to the flogo Rest service. Third app is the 'flogo.invoke.http.proxy.service' app which will call the proxy service and invoke the flogo rest service via the http proxy service.
 
+## Prerequisite
+'flogo.http.proxy.service' application uses two extensions, namely 'Counter' and 'Throw Error'. We can upload these extensions from the github using these links:
+Counter: github.com/project-flogo/contrib/activity/counter
+Throw Error: github.com/project-flogo/contrib/activity/error
+If these are not uploaded in the environment then a warning message for the missing extensions will be displayed while importing this application. We can still import the app and click on the missing extensions activity in the flow to upload these extensions and the extension will be uploaded from the above mentioned links.
+
+
 Features which are covered in these sample apps are:
 ## HTTP Server trigger
 1. Context Path, Processing Mode, Proxy data.
