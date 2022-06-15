@@ -1,0 +1,927 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "github.com/project-flogo/flow/activity/subflow",
+        "github.com/project-flogo/contrib/activity/rest",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/parsejson",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/mapper",
+        "git.tibco.com/git/product/ipaas/wi-mysql.git/src/app/MySQL/activity/insert",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/timer",
+        "github.com/project-flogo/contrib/function/string",
+        "github.com/project-flogo/contrib/function/coerce",
+        "github.com/project-flogo/contrib/function/array",
+        "git.tibco.com/git/product/ipaas/wi-mysql.git/src/app/MySQL/connector/connection"
+    ],
+    "name": "Contract_Sync_Data",
+    "description": "",
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#timer",
+            "name": "tibco-wi-timer",
+            "description": "Simple Timer trigger",
+            "settings": {},
+            "id": "TimerTrigger",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Repeating": true,
+                        "Start Date": "",
+                        "Time Interval": 30,
+                        "Interval Unit": "Second"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:OnSchedule"
+                        }
+                    },
+                    "name": "OnSchedule"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:OnSchedule",
+            "data": {
+                "name": "OnSchedule",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "CaseData",
+                        "to": "StateCount",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "StateCount",
+                        "to": "TotalCases",
+                        "type": "default"
+                    },
+                    {
+                        "id": 3,
+                        "from": "TotalCases",
+                        "to": "DailyCases",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "CaseData",
+                        "name": "CaseData",
+                        "description": "Simple SubFlow Activity",
+                        "activity": {
+                            "ref": "#subflow",
+                            "settings": {
+                                "flowURI": "res://flow:CaseData"
+                            }
+                        }
+                    },
+                    {
+                        "id": "StateCount",
+                        "name": "StateCount",
+                        "description": "Simple SubFlow Activity",
+                        "activity": {
+                            "ref": "#subflow",
+                            "settings": {
+                                "flowURI": "res://flow:StateCount"
+                            }
+                        }
+                    },
+                    {
+                        "id": "TotalCases",
+                        "name": "TotalCases",
+                        "description": "Simple SubFlow Activity",
+                        "activity": {
+                            "ref": "#subflow",
+                            "settings": {
+                                "flowURI": "res://flow:TotalCases"
+                            }
+                        }
+                    },
+                    {
+                        "id": "DailyCases",
+                        "name": "DailyCases",
+                        "description": "Simple SubFlow Activity",
+                        "activity": {
+                            "ref": "#subflow",
+                            "settings": {
+                                "flowURI": "res://flow:DailyCases"
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [],
+                    "output": [],
+                    "fe_metadata": {}
+                }
+            }
+        },
+        {
+            "id": "flow:CaseData",
+            "data": {
+                "name": "CaseData",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "RESTInvoke",
+                        "to": "ParseJSONActivity",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "ParseJSONActivity",
+                        "to": "Mapper",
+                        "type": "default"
+                    },
+                    {
+                        "id": 3,
+                        "from": "Mapper",
+                        "to": "ParseJSONActivity1",
+                        "type": "default"
+                    },
+                    {
+                        "id": 4,
+                        "from": "ParseJSONActivity1",
+                        "to": "Mapper1",
+                        "type": "default"
+                    },
+                    {
+                        "id": 5,
+                        "from": "Mapper1",
+                        "to": "MySQLInsert",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "RESTInvoke",
+                        "name": "RESTInvoke",
+                        "description": "Invokes a REST Service",
+                        "activity": {
+                            "ref": "#rest",
+                            "settings": {
+                                "method": "GET",
+                                "uri": "https://liveapps.cloud.tibco.com/case/v1/cases",
+                                "headers": "",
+                                "proxy": "",
+                                "timeout": 0,
+                                "sslConfig": ""
+                            },
+                            "input": {
+                                "queryParams": "=coerce.toParams(string.concat('{\"$sandbox\":\"',$property[\"sandbox\"],'\",\"$filter\":\"applicationId eq ',$property[\"application\"],' and typeId eq 1\",\"$top\":\"100\"}'))",
+                                "headers": "=coerce.toParams(string.concat('{\"Authorization\":\"Bearer ',$property[\"token\"],'\"}'))"
+                            }
+                        }
+                    },
+                    {
+                        "id": "ParseJSONActivity",
+                        "name": "ParseJSONActivity",
+                        "description": "Parses JSON string into JSON object",
+                        "activity": {
+                            "ref": "#parsejson",
+                            "input": {
+                                "validate": false,
+                                "jsonString": "=$activity[RESTInvoke].data"
+                            },
+                            "schemas": {
+                                "output": {
+                                    "jsonObject": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"caseReference\":{\"type\":\"string\"},\"casedata\":{\"type\":\"string\"},\"untaggedCasedata\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"},\"metadata\":{\"type\":\"object\",\"properties\":{\"creationTimestamp\":{\"type\":\"string\"},\"modifiedBy\":{\"type\":\"string\"},\"modificationTimestamp\":{\"type\":\"string\"},\"lockType\":{\"type\":\"string\"},\"msLockExpiry\":{\"type\":\"string\"},\"msSystemTime\":{\"type\":\"string\"},\"applicationId\":{\"type\":\"string\"},\"typeId\":{\"type\":\"string\"}}}}}}",
+                                        "fe_metadata": "[{\n    \"caseReference\": \"4611481\",\n    \"casedata\": \"{\\n  \\\"CompanyName\\\" : \\\"TIBCO Legal Ops\\\",\\n  \\\"DocID\\\" : \\\"16iqLuZ1vGZgbANyk0ZX3lvINzpAA8o8wv3ZGvqQAkRI\\\",\\n  \\\"srclang\\\" : \\\"EN\\\",\\n  \\\"targetlang\\\" : \\\"EN\\\",\\n  \\\"state\\\" : \\\"Approved\\\",\\n  \\\"TranslatedDocID\\\" : \\\"1bFQMGZ26qhw1fdFD2hEvGG6AACs7uGT0jalZa2_2q10\\\",\\n  \\\"ContractType\\\" : \\\"inbound\\\"\\n}\",\n    \"untaggedCasedata\": \"{\\\"CompanyName\\\":\\\"TIBCO Legal Ops\\\",\\\"DocID\\\":\\\"16iqLuZ1vGZgbANyk0ZX3lvINzpAA8o8wv3ZGvqQAkRI\\\",\\\"srclang\\\":\\\"EN\\\",\\\"targetlang\\\":\\\"EN\\\",\\\"state\\\":\\\"Approved\\\",\\\"TranslatedDocID\\\":\\\"1bFQMGZ26qhw1fdFD2hEvGG6AACs7uGT0jalZa2_2q10\\\",\\\"ContractType\\\":\\\"inbound\\\"}\",\n    \"summary\": \"{\\\"state\\\":\\\"Approved\\\",\\\"ContractType\\\":\\\"inbound\\\",\\\"CompanyName\\\":\\\"TIBCO Legal Ops\\\",\\\"DocID\\\":\\\"16iqLuZ1vGZgbANyk0ZX3lvINzpAA8o8wv3ZGvqQAkRI\\\"}\",\n    \"metadata\": {\n      \"creationTimestamp\": \"2021-08-02T03:36:52.224Z\",\n      \"modifiedBy\": \"31878\",\n      \"modificationTimestamp\": \"2021-08-02T04:16:51.778Z\",\n      \"lockType\": \"1\",\n      \"msLockExpiry\": \"1627877811834\",\n      \"msSystemTime\": \"1627904569267\",\n      \"applicationId\": \"5495\",\n      \"typeId\": \"1\"\n    }\n  }\n]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Mapper",
+                        "name": "Mapper",
+                        "description": "Mapper Activity",
+                        "type": "iterator",
+                        "settings": {
+                            "iterate": "=$activity[ParseJSONActivity].jsonObject",
+                            "accumulate": true
+                        },
+                        "activity": {
+                            "ref": "#mapper",
+                            "input": {
+                                "input": {
+                                    "mapping": {
+                                        "data": "=string.replaceAll(string.replaceAll($iteration[value].casedata,'\\n',\"\"), '\\\"', '\"')"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"data\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"data\":\"\"}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"data\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\n  \"data\": \"\"\n}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "ParseJSONActivity1",
+                        "name": "ParseJSONActivity1",
+                        "description": "Parses JSON string into JSON object",
+                        "type": "iterator",
+                        "settings": {
+                            "iterate": "=$activity[Mapper]",
+                            "accumulate": true
+                        },
+                        "activity": {
+                            "ref": "#parsejson",
+                            "input": {
+                                "validate": false,
+                                "jsonString": "=$iteration[value].output.data"
+                            },
+                            "schemas": {
+                                "output": {
+                                    "jsonObject": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"CompanyName\":{\"type\":\"string\"},\"DocID\":{\"type\":\"string\"},\"srclang\":{\"type\":\"string\"},\"targetlang\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"ContractType\":{\"type\":\"string\"},\"TranslatedDocID\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{  \"CompanyName\" : \"TIBCO Legal Ops\",  \"DocID\" : \"1YuPtq3-yTrtNbCLJVmRtnDY7JKYh38TX8221uK7GKaQ\",  \"srclang\" : \"EN\",  \"targetlang\" : \"EN\",  \"state\" : \"Under Review\",  \"ContractType\" : \"inbound\",  \"TranslatedDocID\" : \"1SwVrslG-GVvV8huSjgqH1UJdjqkP76P3G68qE5YTL2Y\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Mapper1",
+                        "name": "Mapper1",
+                        "description": "Mapper Activity",
+                        "type": "iterator",
+                        "settings": {
+                            "iterate": "=$activity[ParseJSONActivity1]",
+                            "accumulate": true
+                        },
+                        "activity": {
+                            "ref": "#mapper",
+                            "input": {
+                                "input": {
+                                    "mapping": {
+                                        "CompanyName": "=$iteration[value].jsonObject.CompanyName",
+                                        "ContractType": "=$iteration[value].jsonObject.ContractType",
+                                        "DocID": "=$iteration[value].jsonObject.DocID",
+                                        "TranslatedDocID": "=$iteration[value].jsonObject.TranslatedDocID",
+                                        "srclang": "=$iteration[value].jsonObject.srclang",
+                                        "state": "=$iteration[value].jsonObject.state",
+                                        "targetlang": "=$iteration[value].jsonObject.targetlang",
+                                        "caseId": "=coerce.toInt($activity[ParseJSONActivity].jsonObject[$iteration[index]].caseReference)",
+                                        "create": "=$activity[ParseJSONActivity].jsonObject[$iteration[index]].metadata.creationTimestamp",
+                                        "modified": "=$activity[ParseJSONActivity].jsonObject[$iteration[index]].metadata.modificationTimestamp"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"CompanyName\":{\"type\":\"string\"},\"ContractType\":{\"type\":\"string\"},\"DocID\":{\"type\":\"string\"},\"TranslatedDocID\":{\"type\":\"string\"},\"srclang\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"targetlang\":{\"type\":\"string\"},\"caseId\":{\"type\":\"number\"},\"create\":{\"type\":\"string\"},\"modified\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\n    \"CompanyName\": \"TIBCO Legal Ops\",\n    \"ContractType\": \"inbound\",\n    \"DocID\": \"1m7_0v-mAUcgzE1BSi2oCNbt8N72JFaNr-kTp6PmKBTY\",\n    \"TranslatedDocID\": \"1e-yET2a2E4VD4UVTAw4MiQZ_1VSmsZ697yQkL4SKJLQ\",\n    \"srclang\": \"EN\",\n    \"state\": \"Under Review\",\n    \"targetlang\": \"EN\",\n    \"caseId\":1,\n    \"create\":\"\",\n    \"modified\":\"\"\n  }"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"CompanyName\":{\"type\":\"string\"},\"ContractType\":{\"type\":\"string\"},\"DocID\":{\"type\":\"string\"},\"TranslatedDocID\":{\"type\":\"string\"},\"srclang\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"targetlang\":{\"type\":\"string\"},\"caseId\":{\"type\":\"number\"},\"create\":{\"type\":\"string\"},\"modified\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\n  \"CompanyName\": \"TIBCO Legal Ops\",\n  \"ContractType\": \"inbound\",\n  \"DocID\": \"1m7_0v-mAUcgzE1BSi2oCNbt8N72JFaNr-kTp6PmKBTY\",\n  \"TranslatedDocID\": \"1e-yET2a2E4VD4UVTAw4MiQZ_1VSmsZ697yQkL4SKJLQ\",\n  \"srclang\": \"EN\",\n  \"state\": \"Under Review\",\n  \"targetlang\": \"EN\",\n  \"caseId\": 1,\n  \"create\": \"\",\n  \"modified\": \"\"\n}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "MySQLInsert",
+                        "name": "MySQLInsert",
+                        "description": "This activity executes insert on a MySQL database",
+                        "type": "iterator",
+                        "settings": {
+                            "iterate": "=$activity[Mapper1]",
+                            "accumulate": false,
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#insert",
+                            "input": {
+                                "Connection": "conn://2d283150-f389-11eb-9d5d-ed7b07492b6f",
+                                "InsertStatement": "REPLACE INTO casedata\n(caseReference,\ncompanyName,\ndocId,\nsrclang,\ntranslatedDocID,\nstate,\ncreationTime,\nmodifiedTime,\ncontractType)\nVALUES\n(?caseReference,\n?companyName,\n?docId,\n?srclang,\n?translatedDocID,\n?state,\n?creationTime,\n?modifiedTime,\n?contractType);",
+                                "manualmode": true,
+                                "Fields": [
+                                    {
+                                        "FieldName": "contractType",
+                                        "Type": "VARCHAR",
+                                        "Selected": "",
+                                        "Parameter": "",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "caseReference",
+                                        "Type": "INT",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "companyName",
+                                        "Type": "VARCHAR",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "docId",
+                                        "Type": "VARCHAR",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "srclang",
+                                        "Type": "VARCHAR",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "translatedDocID",
+                                        "Type": "VARCHAR",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "state",
+                                        "Type": "VARCHAR",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "creationTime",
+                                        "Type": "DATETIME",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "modifiedTime",
+                                        "Type": "DATETIME",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    }
+                                ],
+                                "State": "b924cb36-672f-4349-92a1-1756c0316354",
+                                "input": {
+                                    "mapping": {
+                                        "values": [
+                                            {
+                                                "caseReference": "=$iteration[value].output.caseId",
+                                                "companyName": "=$iteration[value].output.CompanyName",
+                                                "docId": "=$iteration[value].output.DocID",
+                                                "srclang": "=$iteration[value].output.srclang",
+                                                "translatedDocID": "=$iteration[value].output.TranslatedDocID",
+                                                "state": "=$iteration[value].output.state",
+                                                "creationTime": "=$iteration[value].output.create",
+                                                "modifiedTime": "=$iteration[value].output.modified",
+                                                "contractType": "=$iteration[value].output.ContractType"
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"contractType\":{\"type\":\"string\"},\"caseReference\":{\"type\":\"integer\"},\"companyName\":{\"type\":\"string\"},\"docId\":{\"type\":\"string\"},\"srclang\":{\"type\":\"string\"},\"translatedDocID\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"creationTime\":{\"type\":\"string\"},\"modifiedTime\":{\"type\":\"string\"}}}},\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"contractType\":{\"type\":\"string\"},\"caseReference\":{\"type\":\"integer\"},\"companyName\":{\"type\":\"string\"},\"docId\":{\"type\":\"string\"},\"srclang\":{\"type\":\"string\"},\"translatedDocID\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"creationTime\":{\"type\":\"string\"},\"modifiedTime\":{\"type\":\"string\"}}}},\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}",
+                                        "fe_metadata": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [],
+                    "output": [],
+                    "fe_metadata": {}
+                }
+            }
+        },
+        {
+            "id": "flow:StateCount",
+            "data": {
+                "name": "StateCount",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "RESTInvoke",
+                        "to": "MySQLInsert",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "RESTInvoke",
+                        "name": "RESTInvoke",
+                        "description": "Invokes a REST Service",
+                        "activity": {
+                            "ref": "#rest",
+                            "settings": {
+                                "method": "GET",
+                                "uri": "https://liveapps.cloud.tibco.com/case/reports/v1/caseStatesReport",
+                                "headers": "",
+                                "proxy": "",
+                                "timeout": 0,
+                                "sslConfig": ""
+                            },
+                            "input": {
+                                "queryParams": "=coerce.toParams(string.concat('{\"$sandbox\":\"',$property[\"sandbox\"],'\",\"$filter\":\"applicationId eq ',$property[\"application\"],' and typeId eq 1 and includeTerminalStates eq TRUE\"}'))",
+                                "headers": "=coerce.toParams(string.concat('{\"Authorization\":\"Bearer ',$property[\"token\"],'\"}'))"
+                            },
+                            "schemas": {
+                                "output": {
+                                    "data": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"caseStates\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"stateInfo\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}}},\"caseCount\":{\"type\":\"number\"}},\"required\":[\"stateInfo\",\"caseCount\"]}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"caseStates\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"stateInfo\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}}},\"caseCount\":{\"type\":\"number\"}},\"required\":[\"stateInfo\",\"caseCount\"]}}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "MySQLInsert",
+                        "name": "MySQLInsert",
+                        "description": "This activity executes insert on a MySQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#insert",
+                            "input": {
+                                "Connection": "conn://2d283150-f389-11eb-9d5d-ed7b07492b6f",
+                                "InsertStatement": "REPLACE INTO casestates\n(id,\nstate,\ncount)\nVALUES\n(?id,\n?state,\n?count);",
+                                "manualmode": true,
+                                "Fields": [
+                                    {
+                                        "FieldName": "id",
+                                        "Type": "INT",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "state",
+                                        "Type": "VARCHAR",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "count",
+                                        "Type": "INT",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    }
+                                ],
+                                "State": "19621225-5cd8-47bc-ad4f-75c802613395",
+                                "input": {
+                                    "mapping": {
+                                        "values": {
+                                            "@foreach($activity[RESTInvoke].data.caseStates, values)": {
+                                                "count": "=$loop.caseCount",
+                                                "id": "=coerce.toInt($loop.stateInfo.id)",
+                                                "state": "=$loop.stateInfo.label"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"state\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\"}}}},\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"state\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\"}}}},\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}",
+                                        "fe_metadata": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "sandbox",
+                            "type": "string"
+                        },
+                        {
+                            "name": "filter",
+                            "type": "string"
+                        },
+                        {
+                            "name": "auth",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [],
+                    "fe_metadata": {
+                        "input": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"sandbox\":{\"type\":\"string\"},\"filter\":{\"type\":\"string\"},\"auth\":{\"type\":\"string\"}}}"
+                    }
+                }
+            }
+        },
+        {
+            "id": "flow:TotalCases",
+            "data": {
+                "name": "TotalCases",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "RESTInvoke",
+                        "to": "MySQLInsert",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "RESTInvoke",
+                        "name": "RESTInvoke",
+                        "description": "Invokes a REST Service",
+                        "activity": {
+                            "ref": "#rest",
+                            "settings": {
+                                "method": "GET",
+                                "uri": "https://liveapps.cloud.tibco.com/case/reports/v1/caseTypesReport",
+                                "headers": "",
+                                "proxy": "",
+                                "timeout": 0,
+                                "sslConfig": ""
+                            },
+                            "input": {
+                                "queryParams": "=coerce.toParams(string.concat('{\"$sandbox\":\"',$property[\"sandbox\"],'\"}'))",
+                                "headers": "=coerce.toParams(string.concat('{\"Authorization\":\"Bearer ',$property[\"token\"],'\"}'))"
+                            },
+                            "schemas": {
+                                "output": {
+                                    "data": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"caseTypes\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"applicationId\":{\"type\":\"string\"},\"caseTypeInfo\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"}}},\"activeStateCaseCount\":{\"type\":\"number\"},\"terminalStateCaseCount\":{\"type\":\"number\"}},\"required\":[\"applicationId\",\"caseTypeInfo\",\"activeStateCaseCount\",\"terminalStateCaseCount\"]}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"caseTypes\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"applicationId\":{\"type\":\"string\"},\"caseTypeInfo\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"}}},\"activeStateCaseCount\":{\"type\":\"number\"},\"terminalStateCaseCount\":{\"type\":\"number\"}},\"required\":[\"applicationId\",\"caseTypeInfo\",\"activeStateCaseCount\",\"terminalStateCaseCount\"]}}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "MySQLInsert",
+                        "name": "MySQLInsert",
+                        "description": "This activity executes insert on a MySQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#insert",
+                            "input": {
+                                "Connection": "conn://2d283150-f389-11eb-9d5d-ed7b07492b6f",
+                                "InsertStatement": "REPLACE INTO casestatecount\n(id,\nactive,\nterminal)\nVALUES\n(?id,\n?active,\n?terminal);",
+                                "manualmode": true,
+                                "Fields": [
+                                    {
+                                        "FieldName": "id",
+                                        "Type": "INT",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "active",
+                                        "Type": "INT",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "terminal",
+                                        "Type": "INT",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    }
+                                ],
+                                "State": "dd5874ef-21f9-42e6-a368-ff41711a4c83",
+                                "input": {
+                                    "mapping": {
+                                        "values": {
+                                            "@foreach($activity[RESTInvoke].data.caseTypes, values,$loop.applicationId==\"5495\")": {
+                                                "id": 1,
+                                                "active": "=$loop.activeStateCaseCount",
+                                                "terminal": "=$loop.terminalStateCaseCount"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"active\":{\"type\":\"integer\"},\"terminal\":{\"type\":\"integer\"}}}},\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"active\":{\"type\":\"integer\"},\"terminal\":{\"type\":\"integer\"}}}},\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}",
+                                        "fe_metadata": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [],
+                    "output": [],
+                    "fe_metadata": {}
+                }
+            }
+        },
+        {
+            "id": "flow:DailyCases",
+            "data": {
+                "name": "DailyCases",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "RESTInvoke",
+                        "to": "MySQLInsert",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "RESTInvoke",
+                        "name": "RESTInvoke",
+                        "description": "Invokes a REST Service",
+                        "activity": {
+                            "ref": "#rest",
+                            "settings": {
+                                "method": "GET",
+                                "uri": "https://liveapps.cloud.tibco.com/case/reports/v1/terminalStateCasesReport",
+                                "headers": "",
+                                "proxy": "",
+                                "timeout": 0,
+                                "sslConfig": ""
+                            },
+                            "input": {
+                                "queryParams": "=coerce.toParams(string.concat('{\"$sandbox\":\"',$property[\"sandbox\"],'\",\"$filter\":\"applicationId eq ',$property[\"application\"],' and typeId eq 1 and duration eq week\"}'))",
+                                "headers": "=coerce.toParams(string.concat('{\"Authorization\":\"Bearer ',$property[\"token\"],'\"}'))"
+                            },
+                            "schemas": {
+                                "output": {
+                                    "data": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"countPerDay\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"date\":{\"type\":\"string\"},\"caseCount\":{\"type\":\"number\"}},\"required\":[\"date\",\"caseCount\"]}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"countPerDay\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"date\":{\"type\":\"string\"},\"caseCount\":{\"type\":\"number\"}},\"required\":[\"date\",\"caseCount\"]}}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "MySQLInsert",
+                        "name": "MySQLInsert",
+                        "description": "This activity executes insert on a MySQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#insert",
+                            "input": {
+                                "Connection": "conn://2d283150-f389-11eb-9d5d-ed7b07492b6f",
+                                "InsertStatement": "REPLACE INTO casecount\n(date,\ncount)\nVALUES\n(?date,\n?caseCount);",
+                                "manualmode": true,
+                                "Fields": [
+                                    {
+                                        "FieldName": "date",
+                                        "Type": "DATETIME",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    },
+                                    {
+                                        "FieldName": "caseCount",
+                                        "Type": "INT",
+                                        "Selected": "false",
+                                        "Parameter": "false",
+                                        "isEditable": true,
+                                        "Value": "true"
+                                    }
+                                ],
+                                "State": "e88600df-668f-4f98-844c-0ee1c4b7c42d",
+                                "input": {
+                                    "mapping": {
+                                        "values": {
+                                            "@foreach($activity[RESTInvoke].data.countPerDay, values)": {
+                                                "date": "=$loop.date",
+                                                "caseCount": "=$loop.caseCount"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"date\":{\"type\":\"string\"},\"caseCount\":{\"type\":\"integer\"}}}},\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"date\":{\"type\":\"string\"},\"caseCount\":{\"type\":\"integer\"}}}},\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}",
+                                        "fe_metadata": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [],
+                    "output": [],
+                    "fe_metadata": {}
+                }
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "token",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "sandbox",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "application",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "MySQL.contract_demo.Host",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "MySQL.contract_demo.Port",
+            "type": "float64",
+            "value": 3306
+        },
+        {
+            "name": "MySQL.contract_demo.Database_Name",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "MySQL.contract_demo.User",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "MySQL.contract_demo.Password",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "MySQL.contract_demo.Maximum_Open_Connections",
+            "type": "float64",
+            "value": 0
+        },
+        {
+            "name": "MySQL.contract_demo.Maximum_Idle_Connections",
+            "type": "float64",
+            "value": 2
+        },
+        {
+            "name": "MySQL.contract_demo.Maximum_Connection_Lifetime",
+            "type": "string",
+            "value": 0
+        },
+        {
+            "name": "MySQL.contract_demo.Maximum_Connection_Retry_Attempts",
+            "type": "float64",
+            "value": 3
+        },
+        {
+            "name": "MySQL.contract_demo.Connection_Retry_Delay",
+            "type": "float64",
+            "value": 5
+        }
+    ],
+    "connections": {
+        "2d283150-f389-11eb-9d5d-ed7b07492b6f": {
+            "id": "2d283150-f389-11eb-9d5d-ed7b07492b6f",
+            "name": "contract_demo",
+            "ref": "#connection",
+            "isGlobal": false,
+            "settings": {
+                "name": "contract_demo",
+                "description": "",
+                "host": "=$property[\"MySQL.contract_demo.Host\"]",
+                "port": "=$property[\"MySQL.contract_demo.Port\"]",
+                "databaseName": "=$property[\"MySQL.contract_demo.Database_Name\"]",
+                "user": "=$property[\"MySQL.contract_demo.User\"]",
+                "password": "=$property[\"MySQL.contract_demo.Password\"]",
+                "maxopenconnection": "=$property[\"MySQL.contract_demo.Maximum_Open_Connections\"]",
+                "maxidleconnection": "=$property[\"MySQL.contract_demo.Maximum_Idle_Connections\"]",
+                "connmaxlifetime": "=$property[\"MySQL.contract_demo.Maximum_Connection_Lifetime\"]",
+                "maxconnectattempts": "=$property[\"MySQL.contract_demo.Maximum_Connection_Retry_Attempts\"]",
+                "connectionretrydelay": "=$property[\"MySQL.contract_demo.Connection_Retry_Delay\"]",
+                "onprem": false,
+                "tlsconfig": false,
+                "tlsparam": "Required",
+                "cacert": "",
+                "clientcert": "",
+                "clientkey": "",
+                "validatecert": false
+            }
+        }
+    },
+    "contrib": "W3sicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0aHViLmNvbS9wcm9qZWN0LWZsb2dvL2NvbnRyaWIvYWN0aXZpdHkvcmVzdCIsInMzbG9jYXRpb24iOiJ7VVNFUklEfS9EZWZhdWx0L2FjdGl2aXR5L3Jlc3QifSx7InJlZiI6ImdpdC50aWJjby5jb20vZ2l0L3Byb2R1Y3QvaXBhYXMvd2ktbXlzcWwuZ2l0L3NyYy9hcHAvTXlTUUwiLCJzM2xvY2F0aW9uIjoiVGliY28vTXlTUUwifV0="
+}
