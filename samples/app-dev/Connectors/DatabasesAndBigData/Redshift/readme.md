@@ -5,7 +5,11 @@
 
 This example demonstrate how we can create a Redshift connection using integrated PostgreSQL connector and use CRUD activities.The PostgreSQL connector provides the connection for Redshift.
 With TIBCO Flogo® Connector for PostgreSQL, you can run SQL queries on a PostgreSQL, Redshift, or Greenplum database by using the PostgreSQL activities.
-Redshift CRUD app using integrated PostgreSQL Coonector bascially contains 4 activities. The main purpose of these activities are to insert data, update the data, delete the data and then finally perform query to fetch data from postgresql database.
+Redshift CRUD app using integrated PostgreSQL Connector bascially contains 4 activities. 
+The main purpose of these activities are: 
+b) Update the data using Update activity.
+c) Delete the data using Delete activity.
+d) To fetch data using Query activity from PostgreSQL database.
 
 ## Prerequisites
 
@@ -15,11 +19,11 @@ Redshift CRUD app using integrated PostgreSQL Coonector bascially contains 4 act
 
 1. Download the sample json file i.e., Redshift_CRUD.json.
 
-2. Create a new empty app
+2. Click on Create/Import from the UI.
 
 ![Create an app](../../../import-screenshots/redshift_screenshot/1.png)
 
-3. From the same page, select import app option.
+3. From the same page, select import a Flogo app option.
 
 ![Select import](../../../import-screenshots/redshift_screenshot/01.png)
 
@@ -59,6 +63,8 @@ Then after sometime you can see your app in running status.
 ![Sample Response](../../../import-screenshots/redshift_screenshot/8.png)
 ![Sample Response](../../../import-screenshots/redshift_screenshot/9.png)
 Once your app reaches to Running state, go to Endpoints and for GET/tasks, select 'Try it Out’ option and then click on execute.
+![Sample Response](../../../import-screenshots/redshift_screenshot/09.png)
+
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
