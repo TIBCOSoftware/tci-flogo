@@ -69,7 +69,7 @@ Once your app reaches to Running state, go to Endpoints and for GET/tasks, selec
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
-in flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
+In flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
 
 ![sample Response](../../../import-screenshots/redshift_screenshot/10.png)
 ![Sample Response](../../../import-screenshots/redshift_screenshot/11.png)
