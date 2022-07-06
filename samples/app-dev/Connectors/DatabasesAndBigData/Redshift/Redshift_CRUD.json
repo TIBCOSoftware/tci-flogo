@@ -1,0 +1,510 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/activity/insert",
+        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/activity/update",
+        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/activity/query",
+        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/activity/delete",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/log",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/rest",
+        "github.com/project-flogo/contrib/function/string",
+        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/connector/connection"
+    ],
+    "name": "Redshift_CRUD",
+    "description": null,
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9999,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/resource",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:Redshift"
+                        },
+                        "output": {
+                            "data": {
+                                "mapping": {
+                                    "output": "=$.output"
+                                }
+                            }
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}"
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}"
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "Redshift"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:Redshift",
+            "data": {
+                "name": "Redshift",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "PostgreSQLInsert",
+                        "to": "PostgreSQLUpdate",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "PostgreSQLUpdate",
+                        "to": "PostgreSQLQuery",
+                        "type": "default"
+                    },
+                    {
+                        "id": 3,
+                        "from": "PostgreSQLQuery",
+                        "to": "PostgreSQLDelete",
+                        "type": "default"
+                    },
+                    {
+                        "id": 4,
+                        "from": "PostgreSQLDelete",
+                        "to": "LogMessage",
+                        "type": "default"
+                    },
+                    {
+                        "id": 5,
+                        "from": "LogMessage",
+                        "to": "Return",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "PostgreSQLInsert",
+                        "name": "PostgreSQLInsert",
+                        "description": "This activity executes insert on a PostgreSQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 5,
+                                "interval": 2000
+                            }
+                        },
+                        "activity": {
+                            "ref": "#insert",
+                            "input": {
+                                "Connection": "conn://6291c490-fb6d-11ec-a096-b5024ad2da5a",
+                                "QueryName": "",
+                                "Query": "INSERT INTO course (course_id, title, dept_name, credits)\nVALUES (?courseid1, ?title1, ?deptName1, ?credits1);",
+                                "manualmode": false,
+                                "Fields": [
+                                    {
+                                        "FieldName": "courseid1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "title1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "deptName1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "credits1",
+                                        "Type": "NUMERIC",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    }
+                                ],
+                                "RuntimeQuery": "",
+                                "State": "84c06d77-477f-48c3-8f49-e212e7857532INSERT INTO course (course_id, title, dept_name, credits)\nVALUES (?courseid1, ?title1, ?deptName1, ?credits1);",
+                                "input": {
+                                    "mapping": {
+                                        "parameters": {
+                                            "credits1": 2,
+                                            "deptName1": "Maths",
+                                            "courseid1": "MTH-101",
+                                            "title1": "Mathematics-1"
+                                        }
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}},\"parameters\":{\"type\":\"object\",\"properties\":{\"courseid1\":{\"type\":\"string\"},\"title1\":{\"type\":\"string\"},\"deptName1\":{\"type\":\"string\"},\"credits1\":{\"type\":\"number\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}},\"parameters\":{\"type\":\"object\",\"properties\":{\"courseid1\":{\"type\":\"string\"},\"title1\":{\"type\":\"string\"},\"deptName1\":{\"type\":\"string\"},\"credits1\":{\"type\":\"number\"}}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "PostgreSQLUpdate",
+                        "name": "PostgreSQLUpdate",
+                        "description": "This activity executes update on a PostgreSQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 5,
+                                "interval": 5000
+                            }
+                        },
+                        "activity": {
+                            "ref": "#update",
+                            "input": {
+                                "Connection": "conn://6291c490-fb6d-11ec-a096-b5024ad2da5a",
+                                "UpdateName": "",
+                                "Query": "UPDATE course\nSET course_id = ?courseID1\nWHERE dept_name = ?deptName1;",
+                                "manualmode": false,
+                                "RuntimeQuery": "",
+                                "Fields": [
+                                    {
+                                        "FieldName": "courseID1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "deptName1",
+                                        "Type": "LONGVARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false
+                                    }
+                                ],
+                                "State": "91f8a020-a115-4e8b-b5f6-db1c8990d856UPDATE course\nSET course_id = ?courseID1\nWHERE dept_name = ?deptName1;",
+                                "input": {
+                                    "mapping": {
+                                        "parameters": {
+                                            "courseID1": "MTH-103",
+                                            "deptName1": "Maths"
+                                        }
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"courseID1\":{\"type\":\"string\"},\"deptName1\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"courseID1\":{\"type\":\"string\"},\"deptName1\":{\"type\":\"string\"}}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "PostgreSQLQuery",
+                        "name": "PostgreSQLQuery",
+                        "description": "This activity executes query on a PostgreSQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 5,
+                                "interval": 5000
+                            }
+                        },
+                        "activity": {
+                            "ref": "#query",
+                            "input": {
+                                "Connection": "conn://6291c490-fb6d-11ec-a096-b5024ad2da5a",
+                                "QueryName": "",
+                                "Query": "SELECT * from course WHERE course_id = ?courseID;;",
+                                "manualmode": false,
+                                "Fields": [
+                                    {
+                                        "FieldName": "courseID",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false
+                                    }
+                                ],
+                                "RuntimeQuery": "",
+                                "State": "f3bb6f78-88b5-476e-aa72-697bd74b788cSELECT * from course WHERE course_id = ?courseID;;",
+                                "input": {
+                                    "mapping": {
+                                        "parameters": {
+                                            "courseID": "MTH-103"
+                                        }
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"courseID\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"courseID\":{\"type\":\"string\"}}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "PostgreSQLDelete",
+                        "name": "PostgreSQLDelete",
+                        "description": "This activity executes delete on a PostgreSQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 5,
+                                "interval": 5000
+                            }
+                        },
+                        "activity": {
+                            "ref": "#delete",
+                            "input": {
+                                "Connection": "conn://6291c490-fb6d-11ec-a096-b5024ad2da5a",
+                                "QueryName": "",
+                                "Query": "DELETE from course\nWHERE course_id = ?courseID1;",
+                                "manualmode": false,
+                                "RuntimeQuery": "",
+                                "Fields": [
+                                    {
+                                        "FieldName": "courseID1",
+                                        "Type": "LONGVARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false
+                                    }
+                                ],
+                                "State": "dc27c92e-ccc3-473b-bb6e-3bc5ddb91847DELETE from course\nWHERE course_id = ?courseID1;",
+                                "input": {
+                                    "mapping": {
+                                        "parameters": {
+                                            "courseID1": "MTH-103"
+                                        }
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"courseID1\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"courseID1\":{\"type\":\"string\"}}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"}}}",
+                                        "fe_metadata": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.concat(string.tostring($activity[PostgreSQLInsert].Output), string.tostring($activity[PostgreSQLUpdate].Output), string.tostring($activity[PostgreSQLQuery].Output), string.tostring($activity[PostgreSQLDelete].Output))"
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "output": "=string.concat(string.tostring($activity[PostgreSQLInsert].Output), string.tostring($activity[PostgreSQLUpdate].Output), string.tostring($activity[PostgreSQLQuery].Output), string.tostring($activity[PostgreSQLDelete].Output))"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [],
+                    "output": [
+                        {
+                            "name": "output",
+                            "type": "string"
+                        }
+                    ],
+                    "fe_metadata": {
+                        "output": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}"
+                    }
+                },
+                "explicitReply": true
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "PostgreSQL.Redshift.Host",
+            "type": "string",
+            "value": "wicluster.cg7tnnnvtnjw.us-west-1.redshift.amazonaws.com"
+        },
+        {
+            "name": "PostgreSQL.Redshift.Port",
+            "type": "float64",
+            "value": 5439
+        },
+        {
+            "name": "PostgreSQL.Redshift.Database_Name",
+            "type": "string",
+            "value": "wicluster"
+        },
+        {
+            "name": "PostgreSQL.Redshift.User",
+            "type": "string",
+            "value": "widev"
+        },
+        {
+            "name": "PostgreSQL.Redshift.Password",
+            "type": "string",
+            "value": "SECRET:z+IIqRlA822iHWWOuM7hWRXQT8aStAlq"
+        },
+        {
+            "name": "PostgreSQL.Redshift.Maximum_Open_Connections",
+            "type": "float64",
+            "value": 0
+        },
+        {
+            "name": "PostgreSQL.Redshift.Maximum_Idle_Connections",
+            "type": "float64",
+            "value": 2
+        },
+        {
+            "name": "PostgreSQL.Redshift.Maximum_Connection_Lifetime",
+            "type": "string",
+            "value": 0
+        },
+        {
+            "name": "PostgreSQL.Redshift.Maximum_Connection_Retry_Attempts",
+            "type": "float64",
+            "value": 3
+        },
+        {
+            "name": "PostgreSQL.Redshift.Connection_Retry_Delay",
+            "type": "float64",
+            "value": 5
+        },
+        {
+            "name": "PostgreSQL.Redshift.Connection_Timeout",
+            "type": "float64",
+            "value": 20
+        }
+    ],
+    "connections": {
+        "6291c490-fb6d-11ec-a096-b5024ad2da5a": {
+            "id": "6291c490-fb6d-11ec-a096-b5024ad2da5a",
+            "name": "Redshift",
+            "ref": "#connection",
+            "isGlobal": false,
+            "settings": {
+                "databaseType": "Redshift",
+                "name": "Redshift",
+                "description": "",
+                "host": "=$property[\"PostgreSQL.Redshift.Host\"]",
+                "port": "=$property[\"PostgreSQL.Redshift.Port\"]",
+                "databaseName": "=$property[\"PostgreSQL.Redshift.Database_Name\"]",
+                "user": "=$property[\"PostgreSQL.Redshift.User\"]",
+                "password": "=$property[\"PostgreSQL.Redshift.Password\"]",
+                "maxopenconnection": "=$property[\"PostgreSQL.Redshift.Maximum_Open_Connections\"]",
+                "maxidleconnection": "=$property[\"PostgreSQL.Redshift.Maximum_Idle_Connections\"]",
+                "connmaxlifetime": "=$property[\"PostgreSQL.Redshift.Maximum_Connection_Lifetime\"]",
+                "maxconnectattempts": "=$property[\"PostgreSQL.Redshift.Maximum_Connection_Retry_Attempts\"]",
+                "connectionretrydelay": "=$property[\"PostgreSQL.Redshift.Connection_Retry_Delay\"]",
+                "connectiontimeout": "=$property[\"PostgreSQL.Redshift.Connection_Timeout\"]",
+                "onprem": false,
+                "tlsconfig": false,
+                "tlsparam": "VerifyCA",
+                "cacert": "",
+                "clientcert": "",
+                "clientkey": ""
+            }
+        }
+    },
+    "contrib": "W3sicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1wb3N0Z3Jlcy5naXQvc3JjL2FwcC9Qb3N0Z3JlU1FMIiwiczNsb2NhdGlvbiI6IlRpYmNvL1Bvc3RncmVTUUwifV0="
+}
