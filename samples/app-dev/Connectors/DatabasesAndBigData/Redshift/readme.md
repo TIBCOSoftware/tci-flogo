@@ -15,7 +15,7 @@ b) Update the data using Update activity.
 
 c) Delete the data using Delete activity.
 
-d) To fetch data using Query activity from PostgreSQL database.
+d) To fetch data using Query activity from Redshift database.
 
 ## Prerequisites
 
