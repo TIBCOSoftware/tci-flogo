@@ -3,7 +3,7 @@
 
 ## Description
 
-This example demonstrate how we can create a Redshift connection using PostgreSQL connector and use CRUD activities.The PostgreSQL connector provides the connection for Redshift.
+This example demonstrates how we can create a Redshift connection using PostgreSQL connector and use CRUD activities.The PostgreSQL connector provides the connection for Redshift.
 With TIBCO Flogo® Connector for PostgreSQL, you can run SQL queries on a PostgreSQL, Redshift, or Greenplum database by using the PostgreSQL activities.
 Redshift CRUD app using PostgreSQL Connector bascially contains 4 activities. 
 
@@ -11,9 +11,9 @@ The main purpose of these activities are:
 
 a) To insert data using Insert activity.
 
-b) Update the data using Update activity.
+b) Update data using Update activity.
 
-c) Delete the data using Delete activity.
+c) Delete data using Delete activity.
 
 d) To fetch data using Query activity from Redshift database.
 
