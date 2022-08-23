@@ -1,0 +1,499 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "git.tibco.com/git/product/ipaas/wi-mysql.git/src/app/MySQL/activity/query",
+        "git.tibco.com/git/product/ipaas/wi-mysql.git/src/app/MySQL/activity/insert",
+        "git.tibco.com/git/product/ipaas/wi-mysql.git/src/app/MySQL/activity/update",
+        "git.tibco.com/git/product/ipaas/wi-mysql.git/src/app/MySQL/activity/delete",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/log",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/rest",
+        "github.com/project-flogo/contrib/function/string",
+        "git.tibco.com/git/product/ipaas/wi-mysql.git/src/app/MySQL/connector/connection"
+    ],
+    "name": "MySQLSSLCRUD",
+    "description": "",
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9999,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "Path": "/pathmysql",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:CRUD"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "data": {
+                                "mapping": {
+                                    "output": "=$.message"
+                                }
+                            }
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}"
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}"
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "CRUD"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:CRUD",
+            "data": {
+                "name": "CRUD",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "MySQLQuery",
+                        "to": "MySQLInsert",
+                        "type": "default"
+                    },
+                    {
+                        "id": 2,
+                        "from": "MySQLInsert",
+                        "to": "MySQLUpdate",
+                        "type": "default"
+                    },
+                    {
+                        "id": 3,
+                        "from": "MySQLUpdate",
+                        "to": "MySQLDelete",
+                        "type": "default"
+                    },
+                    {
+                        "id": 4,
+                        "from": "MySQLDelete",
+                        "to": "LogMessage",
+                        "type": "default"
+                    },
+                    {
+                        "id": 5,
+                        "from": "LogMessage",
+                        "to": "Return",
+                        "type": "default"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "MySQLQuery",
+                        "name": "MySQLQuery",
+                        "description": "This activity executes query on a MySQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#query",
+                            "input": {
+                                "Connection": "conn://857276f0-9212-11eb-8d99-713f4bb85438",
+                                "QueryName": "",
+                                "Query": "SELECT * FROM tutorials_tbl_New;",
+                                "manualmode": false,
+                                "Fields": [
+                                    {
+                                        "FieldName": "tutorial_id",
+                                        "Type": "INTEGER",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "tutorial_title",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "tutorial_author",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "submission_date",
+                                        "Type": "DATE",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    }
+                                ],
+                                "State": "c49e0c68-dc23-4e45-bb52-e4b929b7f2f9SELECT * FROM tutorials_tbl_New;"
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"tutorial_id\":{\"type\":\"integer\"},\"tutorial_title\":{\"type\":\"string\"},\"tutorial_author\":{\"type\":\"string\"},\"submission_date\":{\"type\":\"string\",\"format\":\"date\"}}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"tutorial_id\":{\"type\":\"integer\"},\"tutorial_title\":{\"type\":\"string\"},\"tutorial_author\":{\"type\":\"string\"},\"submission_date\":{\"type\":\"string\",\"format\":\"date\"}}}}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "MySQLInsert",
+                        "name": "MySQLInsert",
+                        "description": "This activity executes insert on a MySQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#insert",
+                            "input": {
+                                "Connection": "conn://857276f0-9212-11eb-8d99-713f4bb85438",
+                                "InsertStatement": "INSERT INTO tutorials_tbl_New VALUES(?tutorial_id1,?tutorial_title1,?tutorial_author1,?submission_date1);",
+                                "manualmode": false,
+                                "Fields": [
+                                    {
+                                        "FieldName": "tutorial_id1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "tutorial_title1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "tutorial_author1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "submission_date1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    }
+                                ],
+                                "State": "00ee0c79-c89b-4663-8c4d-fc2ca3237268INSERT INTO tutorials_tbl_New VALUES(?tutorial_id1,?tutorial_title1,?tutorial_author1,?submission_date1);",
+                                "input": {
+                                    "mapping": {
+                                        "parameters": {
+                                            "tutorial_id1": "2",
+                                            "tutorial_title1": "Java Basics",
+                                            "tutorial_author1": "John",
+                                            "submission_date1": "22-03-20"
+                                        }
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}},\"parameters\":{\"type\":\"object\",\"properties\":{\"tutorial_id1\":{\"type\":\"string\"},\"tutorial_title1\":{\"type\":\"string\"},\"tutorial_author1\":{\"type\":\"string\"},\"submission_date1\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}},\"parameters\":{\"type\":\"object\",\"properties\":{\"tutorial_id1\":{\"type\":\"string\"},\"tutorial_title1\":{\"type\":\"string\"},\"tutorial_author1\":{\"type\":\"string\"},\"submission_date1\":{\"type\":\"string\"}}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}",
+                                        "fe_metadata": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"},\"lastInsertId\":{\"type\":\"int\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "MySQLUpdate",
+                        "name": "MySQLUpdate",
+                        "description": "This activity executes update on a MySQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#update",
+                            "input": {
+                                "Connection": "conn://857276f0-9212-11eb-8d99-713f4bb85438",
+                                "UpdateStatement": "UPDATE tutorials_tbl_New \nSET tutorial_title ='C Basics'\nWHERE tutorial_id= '2';",
+                                "manualmode": false,
+                                "Fields": [],
+                                "State": "b39acaa2-8239-421e-bbd8-308b2b5027a4UPDATE tutorials_tbl_New \nSET tutorial_title ='C Basics'\nWHERE tutorial_id= '2';"
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"}}}",
+                                        "fe_metadata": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "MySQLDelete",
+                        "name": "MySQLDelete",
+                        "description": "This activity executes delete on a MySQL database",
+                        "settings": {
+                            "retryOnError": {
+                                "count": 0,
+                                "interval": 0
+                            }
+                        },
+                        "activity": {
+                            "ref": "#delete",
+                            "input": {
+                                "Connection": "conn://857276f0-9212-11eb-8d99-713f4bb85438",
+                                "DeleteStatement": "DELETE FROM tutorials_tbl_New WHERE tutorial_title ='C Basics';",
+                                "manualmode": false,
+                                "Fields": [],
+                                "State": "5d3c0a1e-61ee-45b3-bf01-b15c9f380697DELETE FROM tutorials_tbl_New WHERE tutorial_title ='C Basics';"
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                                    }
+                                },
+                                "output": {
+                                    "Output": {
+                                        "type": "json",
+                                        "value": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"}}}",
+                                        "fe_metadata": "{\"type\":\"object\",\"properties\":{\"rowsAffected\":{\"type\":\"int\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.concat(string.tostring($activity[MySQLQuery].Output), string.tostring($activity[MySQLInsert].Output), string.tostring($activity[MySQLUpdate].Output), string.tostring($activity[MySQLDelete].Output))"
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "message": "=string.concat(string.tostring($activity[MySQLQuery].Output), string.tostring($activity[MySQLInsert].Output), string.tostring($activity[MySQLUpdate].Output), string.tostring($activity[MySQLDelete].Output))"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "message",
+                            "type": "string"
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"message\":{\"type\":\"string\",\"required\":false}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "MySQL.mysqlssl_conn.Host",
+            "type": "string",
+            "value": "ec2-13-57-48-134.us-west-1.compute.amazonaws.com"
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.Port",
+            "type": "float64",
+            "value": 3306
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.Database_Name",
+            "type": "string",
+            "value": "example"
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.User",
+            "type": "string",
+            "value": "adminssl"
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.Password",
+            "type": "string",
+            "value": "SECRET:6gg1KA98y2gbSfKZQxL3pymKqWA4AWcXKA=="
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.Maximum_Open_Connections",
+            "type": "float64",
+            "value": 0
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.Maximum_Idle_Connections",
+            "type": "float64",
+            "value": 2
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.Maximum_Connection_Lifetime",
+            "type": "string",
+            "value": 0
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.Maximum_Connection_Retry_Attempts",
+            "type": "float64",
+            "value": 3
+        },
+        {
+            "name": "MySQL.mysqlssl_conn.Connection_Retry_Delay",
+            "type": "float64",
+            "value": 5
+        }
+    ],
+    "connections": {
+        "857276f0-9212-11eb-8d99-713f4bb85438": {
+            "id": "857276f0-9212-11eb-8d99-713f4bb85438",
+            "name": "mysqlssl_conn",
+            "ref": "#connection",
+            "isGlobal": false,
+            "settings": {
+                "name": "mysqlssl_conn",
+                "description": "",
+                "host": "=$property[\"MySQL.mysqlssl_conn.Host\"]",
+                "port": "=$property[\"MySQL.mysqlssl_conn.Port\"]",
+                "databaseName": "=$property[\"MySQL.mysqlssl_conn.Database_Name\"]",
+                "user": "=$property[\"MySQL.mysqlssl_conn.User\"]",
+                "password": "=$property[\"MySQL.mysqlssl_conn.Password\"]",
+                "maxopenconnection": "=$property[\"MySQL.mysqlssl_conn.Maximum_Open_Connections\"]",
+                "maxidleconnection": "=$property[\"MySQL.mysqlssl_conn.Maximum_Idle_Connections\"]",
+                "connmaxlifetime": "=$property[\"MySQL.mysqlssl_conn.Maximum_Connection_Lifetime\"]",
+                "maxconnectattempts": "=$property[\"MySQL.mysqlssl_conn.Maximum_Connection_Retry_Attempts\"]",
+                "connectionretrydelay": "=$property[\"MySQL.mysqlssl_conn.Connection_Retry_Delay\"]",
+                "onprem": false,
+                "tlsconfig": true,
+                "tlsparam": "Required",
+                "cacert": {
+                    "filename": "ca.pem",
+                    "content": "data:application/x-x509-ca-cert;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURGekNDQWYrZ0F3SUJBZ0lVS1IwaTNBL0ZnQ0h2RnRKQjdabG93R2JYeFlrd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0d6RVpNQmNHQTFVRUF3d1FhWEF0TVRjeUxUTXhMVEl5TFRFeU9UQWVGdzB5TURFd01UTXhOVFU0TkROYQpGdzB6TURBNE1qSXhOVFU0TkROYU1Cc3hHVEFYQmdOVkJBTU1FR2x3TFRFM01pMHpNUzB5TWkweE1qa3dnZ0VpCk1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLQW9JQkFRQ3pCbjB6WnczcFlDTzdrTVpIb1Y3TjQvQjcKU1BiMTB4bDlOL2J3QzhOUnV0eWFLRG1JK2k1VWFBdE0vaklCNng0UTRwR2RJOEkybTB6TGxLeE0zWDdBWHJCNwpjOEVkRk9VeWdMMHhvN1FIcW9sMFo3cTFBa0hFNHduM0tjbXRVeEJFb0VmZmlYRG11cEVPNnFyd1I2VVdRZWdsCml1aTRpVkZZSlNROXRYTUZkQ25uaWxsRk1NbkNGbnl1eXNuc21wNHBEKzhKNnBUMGNHU2tRR25oK2duSzZsWTcKNEZvK2ZpWlZOOEpsSUxqQ09HWUgxSm9Nb3JQVEM1d056QkRySmNkZWlyZHhJcVRCekxYc0trUldRNFdZMkVZcwpnV0k4Yzh6bitnMXZnV2dnUEJTQUJsQXZWaWZYNFRSalBrZnl2QWIrSzRveFpheGxGMlcxam0wWHBkN0xBZ01CCkFBR2pVekJSTUIwR0ExVWREZ1FXQkJRYlErelpvWHRoR2RTMHZqaUh1WmZteU5DbFd6QWZCZ05WSFNNRUdEQVcKZ0JRYlErelpvWHRoR2RTMHZqaUh1WmZteU5DbFd6QVBCZ05WSFJNQkFmOEVCVEFEQVFIL01BMEdDU3FHU0liMwpEUUVCQ3dVQUE0SUJBUUNqMWswdkpYOUFVNTJWL1hmbmY1TnM5bXJ5eGJ3UmUvNGRlRFp3cDBZV2EwdXkrek5BCllNNlRUekNHdkpGczRkc01zSmJlUFRhcTVZcWN0ai9oUUkyakdmYkhFangwZTVXOG05MU8yakNBZGYzcTEyYk0Kc3VJV1NrNWlpMm5VTCtHbkpYMU1YdTZJOCtjMFpRMVlqRC9qU3gvTDdua1IvaGtFQm5PWjNGZVhocFJrM1ZESwpUQjBDTTU3VTBWQXBDektqeWwrWndoeTlvMmwwenA2TlhXUU5Nbys0M3pEcVJPOEVIVHg0RnM2a1lwdnh1d0Q4CkViUWNLdGZuK3QwMUNBMkw2cUFtTy92NENOSU9XYlkzb3UwSE9oZWpVb3RnU0czYUlCQk1Fby83Y243WkRLQ3kKTlowZGloSWxUQW14RGs0L3NqZ05QdE95cU5SbU9sang0YkVLCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K"
+                },
+                "clientcert": {
+                    "filename": "client-cert.pem",
+                    "content": "data:application/x-x509-ca-cert;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNwVENDQVkwQ0FRRXdEUVlKS29aSWh2Y05BUUVMQlFBd0d6RVpNQmNHQTFVRUF3d1FhWEF0TVRjeUxUTXgKTFRJeUxURXlPVEFlRncweU1ERXdNVE14TmpBME1UVmFGdzB6TURBNE1qSXhOakEwTVRWYU1CWXhGREFTQmdOVgpCQU1NQ3pFNU1pNHhOamd1TUM0MU1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBCnZaRnd6Kzd6QUEzUFpLNWoybUx4UVh2c2FKMFZJa3JkQ3MyNW03TG9uUVd1OTFVTHdxS0JvQ1pYMmNLWEx2VHIKZGZlcytaN2NnQXByaVJXQmwyR085N2ZVVjB5MDZsa01oNlF5MkNKMGpSdW45OVFBUE15VEdOeHZwSjd0Y3F2YgpNY2JocHVodm95V3NCendmVXlBWDF5YmxoVGVwVE81eU01UzZxRWsxd1Q2VkhNajZQUFdzcklvMzIrbmtqSnpzCk9rT3JlNFE2V3VHYVpsbzFmRk1IanRkcUI0SHNSSkwvdjd2SUV0R1JzeEliK2FVcFFoS2JySVlyaDBlSFZSZDUKL3hQRjFHSXBiclZHaDJEdlNyK01uaG1GeUx3cXpxOWF3bEFqc09IVHFrdk8rekFTTzRjVEZncHlMekFudlp2bQpyajQwZmtzVDVPbWpWd3FWL2F3NU13SURBUUFCTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFBdXNhbFlKL3JXCkg3eFF5dGtzbnpTYVBpWmh0dll0MHNxTERkamhyWm5JY2VxbkZjSlpjbXMyUzNaUlRrSUZsc3ZtSzVNVlduRXgKUUt3WENjMW96cXFDS1ZBWFB6b084RlJCdXpDZlI5QzJBdGkwOHR3YzVjRFZhVEZLU29nc3p5dWhBZjlvb0k4UQpWRVJzQmd1Q0JSanBkMkNyRVc4WlcyV0RSWEJVc1plMGpXV1NoNHdZaVUyU1dBK1NrRjc2U3lmcUxkNTM1WTl4CmNPS1BZbGNXMUxVU3ZFZFJoamVpRTlmU2pzSHVwckdiOGxEenhPL1VxR29xRjFnZ3M4dnpXbzd0WFFEdEVrZDAKTTl2Zk1MZ081Q2xpRDJncndhRmk4U3FTSmc5eitvTjhXanY0LzUxOWFDTEgvUFBKZHFtUkp5ZW92c05mSlU4bQpxcGljR2o1ZytnN00KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
+                },
+                "clientkey": {
+                    "filename": "client-key.pem",
+                    "content": "data:application/x-x509-ca-cert;base64,LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdlpGd3orN3pBQTNQWks1ajJtTHhRWHZzYUowVklrcmRDczI1bTdMb25RV3U5MVVMCndxS0JvQ1pYMmNLWEx2VHJkZmVzK1o3Y2dBcHJpUldCbDJHTzk3ZlVWMHkwNmxrTWg2UXkyQ0owalJ1bjk5UUEKUE15VEdOeHZwSjd0Y3F2Yk1jYmhwdWh2b3lXc0J6d2ZVeUFYMXlibGhUZXBUTzV5TTVTNnFFazF3VDZWSE1qNgpQUFdzcklvMzIrbmtqSnpzT2tPcmU0UTZXdUdhWmxvMWZGTUhqdGRxQjRIc1JKTC92N3ZJRXRHUnN4SWIrYVVwClFoS2JySVlyaDBlSFZSZDUveFBGMUdJcGJyVkdoMkR2U3IrTW5obUZ5THdxenE5YXdsQWpzT0hUcWt2Tyt6QVMKTzRjVEZncHlMekFudlp2bXJqNDBma3NUNU9talZ3cVYvYXc1TXdJREFRQUJBb0lCQUFLeFpUdmU5aDdERTNZbgpzQTF6S0dBNHhYUDYvMGpjYldWdzVMa2Nnb2R3aERySlA0Q0ZWSGdVODF5SmtpSTlvbmFyalE2Q3Zqa25iTDJtCnk0OTkrRXoybEpLazZWRUc4TkdnZUlSdmdONWNUVGVORUcvTXJDNUhPMkxJU3pFODFjRlFSUFpkQ1BEMVlRczkKUkdpbTVRL09ZcVpRMHh2ZnEwbW1URHlGeGJpNEI1MnI1ZkJFVGZqWW9XWFpZVEhjN3p4MXF4T2V5bGJhMXV0NAptaUtUVG1tdmVhZkJleTREa1lpRkdldDRzMVVld280aWRybktqekFTVTFIQ0RYZC9MZnZNblpWVVhMMi9maVlpCmRsazhkTFZMeGJKYXl0VTQ1OEdtVnphWWFTeFRTU3Uyclk3L210YTF2OUVkN2hWR3hFT3gwbFV2NGl5M1pnODEKcCszUm0za0NnWUVBNEh1UlZjWmZHYmhydjZ3RG1xcm0rNEhzbW00MFU1OTRzZk5ERGtJTG1PQStnaVJEdTRPZAowU0RMalpHeU5rTnBGcXgzdXlCRjBQeGxhbEtTZ3hIUm5ZTS94VTB2SXdsbktjOERmeTBOVnpUOTQvRUVwMWl0CktvUlRBd3NzMkFMTktnTVEzTlc4U1dyVXZqYVpNb3c0Wmc4TWpFUE4zNUQ1U293OXhVR2d3dDhDZ1lFQTJDNzIKVGxuc2t5L2x3Z1hqelVDS2Q1K2VhWU9XVGpneXpOM3BWMHlVcy9vKzVWbHhvTTZBS3dXYWwwbXVyQTE0S2kxRwpmYnhCcVQ0bDN5ZXVXd0RUbllWSmxkcUgrT1JIUkNUUHNhUjhtcXMramtqZkR0NUxuTFF6VmJ3VlNZdFNQTUVyCk80azMvek8xc2hWQnFUNWFqZmY4bEcyVEdsREJxYjMwWDVjTkNDMENnWUVBdkU3cjI4aE1mb2IxM0JPdjhrN3EKOUpCSXFrTklJZDNrb1dJdkhnYkpNN1RvdXNNeERsdWFSNVA3TFFiTE9EblVMZkQvZnpuVFZ6eGkxbzN0MllWWgpFWWpJTmZwSlVGclM3Mzk0cjNaYmVvdzVicnovNm1HNDRiR2U4UzZ1cjRXcUZWUDlFVU02YjF2dW1xR3lZWFMrCjJ0NUU2R1Q0amxKT3pQcFgxdUQydW9FQ2dZRUFzOVE4NTJnK055Rzh5ZTBFVmhTK0drd1pCa1NEbjRWNEhKcnMKSThaOFhFcHFUM1piNHh4ajJXWEw5dFZBQzdjWW9sMFBLa0NUamlrNGI2MGVpR3pqbTBEb3VWTVRrS0t6OWFkNQpiWmdhWHI3Y1JwZXZsVHF0UXlsVEdwcGVTdE11RVlQT1pyUDZkTHViQlF4UmxtdGNBSVN0QXZzelJzeXVqSGlLCjg0ay9PZkVDZ1lBUUdvZWozT0c0QjNEL2pERUQvMTlDVU0rS3VESEJ4ZmdGemF3YkE5OStpV0xrSnFDcVBTTlMKLzE3bXlaZmtYM0ZDN0wwMDJiZEUwUElzMmZqV3Fxb09NSXRHSVJMOFVSZ3k5dm5taUYwNGE3QnhNYW03Ti9xawphM1dzMXhwaVlDMnJwbUNWUFoxUk5qMG1qcktLMU02dTJ5OUE2R1hFelZJMkVUT1JHWWJCZHc9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo="
+                },
+                "validatecert": false
+            }
+        }
+    },
+    "contrib": "W3sicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1teXNxbC5naXQvc3JjL2FwcC9NeVNRTCIsInMzbG9jYXRpb24iOiJUaWJjby9NeVNRTCJ9XQ==",
+    "fe_metadata": "UEsDBAoAAAAIAClsf1KrqSRGFQAAABMAAAAIAAAAYXBwLmpzb26rViopykxPTy1yy8kvL1ayio6tBQBQSwECFAAKAAAACAApbH9Sq6kkRhUAAAATAAAACAAAAAAAAAAAAAAAAAAAAAAAYXBwLmpzb25QSwUGAAAAAAEAAQA2AAAAOwAAAAAA"
+}
