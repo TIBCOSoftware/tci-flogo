@@ -26,12 +26,13 @@ tibco plugins:install @tibco-software/cli-plugin-tci-flogo
 Run `tibco tci:flogo --help` to ensure plug-in is successfully installed.
 
 # Commands
-* [`tibco tci:flogo:export-app`](#Export App)
-* [`tibco tci:flogo:build-app`](#Build App)
-* [`tibco tci:flogo:upload-extn`](#Upload Extensions)
-* [`tibco tci:flogo:encrypt`](#Encrypt Secret)
+<!-- commands -->
+* [`tibco tci:flogo:export-app`](#tibco-tciflogoexport-app)
+* [`tibco tci:flogo:build-app`](#tibco-tciflogobuild-app)
+* [`tibco tci:flogo:upload-extn`](#tibco-tciflogoupload-extn)
+* [`tibco tci:flogo:encrypt`](#tibco-tciflogoencrypt)
 
-### Export App
+## `tibco tci:flogo:export-app`
 This command helps you export the application JSON or application JSON and deployment manifest JSON from TIBCO Cloud™ Integration. 
 
 **Usage**
@@ -48,7 +49,7 @@ tibco tci:flogo:export-app --app-id=<app-id> --file-name=OrderProcessingApp --ou
 
 tibco tci:flogo:export-app --app-id=<app-id> --file-name=OrderProcessingApp --output-dir=/opt/source/orderprocessing/app --profile=US_DevOrg --tci-manifest
 ```
-### Build App
+## `tibco tci:flogo:build-app`
 This command helps you build and download an app executable either for the existing app in your TIBCO Cloud™ Integration organization or for the application JSON you exported from TIBCO Cloud™ Integration organization. It also provides convenient options for building docker image. To use docker related options, [Docker](https://www.docker.com/) must be installed on the machine.
 
 **Usage**
@@ -70,7 +71,7 @@ tibco tci:flogo:build-app --app-id=<tci-app-id> --exe-name=OrderProcessingApp --
 
 tibco tci:flogo:build-app --app-id=<tci-app-id> --exe-name=OrderProcessingApp --output-dir=/opt/source/orderprocessing/cicd --build-docker-image --docker-file=/opt/source/orderprocessing/cicd/Dockerfile --docker-image=tibco.com/apps/OrderProcessingApp:1.0.0 --profile=US_DevOrg
 ```
-### Upload Extensions
+## `tibco tci:flogo:upload-extn`
 This command helps you upload one or more custom extensions for yourself or for your organization.
 
 **Usage**
@@ -86,7 +87,7 @@ tibco tci:flogo:upload-extn --extn-file=/opt/source/extensions/ParseXMLActivity.
 tibco tci:flogo:upload-extn --extn-file=/opt/source/extensions/ParseXMLActivity.zip --extn-file=/opt/source/extensions/CustomFunctions.zip --scope=org --profile=US_StagingOrg
 ```
 
-### Encrypt Secret
+## `tibco tci:flogo:encrypt`
 This command helps yor encrypt confidential data. This is helpful in protecting confidential data like password,key etc. while deploying Flogo® applications in TIBCO Cloud™ Integration or on-premise.
 
 **Usage**
@@ -98,6 +99,6 @@ This command helps yor encrypt confidential data. This is helpful in protecting 
  export AccessKeyVar=my_access_key
  tibco tci:flogo:encrypt --value=$AccessKeyVar
 ```
-## License
+# License
 **BSD**
 
