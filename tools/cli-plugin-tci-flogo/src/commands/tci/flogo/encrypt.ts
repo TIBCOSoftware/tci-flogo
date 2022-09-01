@@ -6,6 +6,7 @@ import {CLIBaseError, HTTPError, HTTPResponse, TCBaseCommand} from '@tibco-softw
 export default class TciFlogoEncryptSecret extends TCBaseCommand {
   static description = 'Encrypt confidential data for Flogo® application configuration'
   static flags = {
+    ...TCBaseCommand.flags,
     'value': flags.string({
       required: true,
       description: 'Value to be encrypted. Encrypted value will be printed in the terminal in the format: SECRET:<encrypted_value>. It is recommended to use encrypted value for confidential data like password, key etc. while running Flogo® apps on TIBCO Cloud™ or on-premise',

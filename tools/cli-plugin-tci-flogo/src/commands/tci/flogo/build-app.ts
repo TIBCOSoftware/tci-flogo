@@ -123,7 +123,7 @@ export default class TciFlogoBuildApp extends TCBaseCommand {
             }
             const startTime = Date.now();
             this.log(`Building docker image [${dockerImage}] using Dockerfile [${dockerFile}] from app directory [${dest}]`);
-            exec("docker build -f "+dockerFile+" -t "+dockerImage+" "+dest, (error, stdout, stderr) => {
+            exec("docker build -f "+dockerFile+" -t "+dockerImage+" "+dest, (error : Error) => {
               if (error) {
                 this.log('Failed to build Docker image ['+dockerImage+']');
                 throw new CLIBaseError(error.message);
