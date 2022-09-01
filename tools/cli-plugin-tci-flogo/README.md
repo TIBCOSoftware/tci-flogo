@@ -78,17 +78,17 @@ This command helps you upload one or more custom extensions for yourself or for 
 ```
 tibco tci:flogo:upload-extn --help
 
-# Upload multiple extesions for current user
+# Upload multiple extensions for current user
 
 tibco tci:flogo:upload-extn --extn-file=/opt/source/extensions/ParseXMLActivity.zip --extn-file=/opt/source/extensions/CustomFunctions.zip --scope=user --profile=US_DevOrg
 
-# Upload multiple extesions to organization
+# Upload multiple extensions to organization
 
 tibco tci:flogo:upload-extn --extn-file=/opt/source/extensions/ParseXMLActivity.zip --extn-file=/opt/source/extensions/CustomFunctions.zip --scope=org --profile=US_StagingOrg
 ```
 
 ## `tibco tci:flogo:encrypt`
-This command helps yor encrypt confidential data. This is helpful in protecting confidential data like password,key etc. while deploying Flogo® applications in TIBCO Cloud™ Integration or on-premise.
+This command helps yor encrypt confidential data. This is helpful in protecting confidential data like password,key etc. while deploying Flogo® applications to TIBCO Cloud™ Integration or on-premise platforms.
 
 **Usage**
 ```
