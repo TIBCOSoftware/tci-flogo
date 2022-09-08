@@ -41,7 +41,7 @@ export default class TciFlogoExportApp extends TCBaseCommand {
       let filePath = dest+`/${fileName}.zip`;
       let success = false;
       try {
-         success = await req.download(`/tci/v1/subscriptions/0/apps/${appId}/export?manifest=true`, filePath, {method: "GET"}, false);
+         success = await req.download(`/tci/v1/subscriptions/0/apps/${appId}/export?manifest=true`, filePath, {method: "GET", timeout: 120000}, false);
       } catch (err) {
         if(err instanceof HTTPError) {
           let httpErr = err as HTTPError;
@@ -60,7 +60,7 @@ export default class TciFlogoExportApp extends TCBaseCommand {
       let filePath = dest+`/${fileName}.json`;
       let resp = {} as HTTPResponse;
       try {
-         resp = await req.doRequest(`/tci/v1/subscriptions/0/apps/${appId}/export`, {method: "GET"}, {});
+         resp = await req.doRequest(`/tci/v1/subscriptions/0/apps/${appId}/export`, {method: "GET", timeout: 120000}, {});
       } catch (err) {
         if(err instanceof HTTPError) {
          let httpErr = err as HTTPError;

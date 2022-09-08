@@ -37,7 +37,7 @@ export default class TciFlogoUploadExtension extends TCBaseCommand {
         'extensionZip': "file://" + file
       }
       try {
-        resp = await req.upload(`/tci/v1/subscriptions/0/extensions/upload?override=${override}&scope=${scope}`, data, {}, false);
+        resp = await req.upload(`/tci/v1/subscriptions/0/extensions/upload?override=${override}&scope=${scope}`, data, {timeout: 120000}, false);
       } catch (err) {
         if (err instanceof HTTPError) {
           let httpErr = err as HTTPError;

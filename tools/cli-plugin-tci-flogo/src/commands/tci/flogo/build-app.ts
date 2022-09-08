@@ -60,7 +60,7 @@ export default class TciFlogoBuildApp extends TCBaseCommand {
         'flogo.json': "file://" + app
       }
       try {
-        resp = await req.upload("/tci/v1/subscriptions/0/app/build/flogo?os=" + os_name + "&arch=" + os_arch, data, {}, showProgress);
+        resp = await req.upload("/tci/v1/subscriptions/0/app/build/flogo?os=" + os_name + "&arch=" + os_arch, data, {timeout: 120000}, showProgress);
       } catch (err) {
         if(err instanceof HTTPError) {
           let httpErr = err as HTTPError;
@@ -71,7 +71,7 @@ export default class TciFlogoBuildApp extends TCBaseCommand {
     } else {
       this.log(`Building executable [Name:${name}, OS:${os_name}, Arch:${os_arch}] for the TCI app with Id [${appId}]`)
       try {
-        resp = await req.doRequest("/tci/v1/subscriptions/0/apps/" + appId + "/flogo/build?os=" + os_name + "&arch=" + os_arch, {method: "POST"}, {});
+        resp = await req.doRequest("/tci/v1/subscriptions/0/apps/" + appId + "/flogo/build?os=" + os_name + "&arch=" + os_arch, {method: "POST", timeout: 120000}, {});
       } catch (err) {
         if(err instanceof HTTPError) {
           let httpErr = err as HTTPError;
@@ -89,7 +89,7 @@ export default class TciFlogoBuildApp extends TCBaseCommand {
         if(app && app !== "") {
           let buildId = res['buildId'];
           try {
-            success = await req.download("/tci/v1/subscriptions/0/app/build/flogo/" + buildId + "?compress=" + compress, dest + "/" + name, {method: "GET"}, showProgress);
+            success = await req.download("/tci/v1/subscriptions/0/app/build/flogo/" + buildId + "?compress=" + compress, dest + "/" + name, {method: "GET", timeout: 120000}, showProgress);
           } catch (err) {
             if(err instanceof HTTPError) {
               let httpErr = err as HTTPError;
@@ -99,7 +99,7 @@ export default class TciFlogoBuildApp extends TCBaseCommand {
           }
         } else {
           try {
-            success = await req.download("/tci/v1/subscriptions/0/apps/" + appId + "/flogo/build?compress=" + compress, dest + "/" + name, {method: "GET"}, showProgress);
+            success = await req.download("/tci/v1/subscriptions/0/apps/" + appId + "/flogo/build?compress=" + compress, dest + "/" + name, {method: "GET", timeout: 120000}, showProgress);
           } catch (err) {
             if(err instanceof HTTPError) {
               let httpErr = err as HTTPError;

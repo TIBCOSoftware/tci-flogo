@@ -21,7 +21,7 @@ export default class TciFlogoEncryptSecret extends TCBaseCommand {
     let val = flags.value;
     this.log(val);
     try {
-      resp = await req.doRequest(`/tci/v1/utils/encrypt?appType=flogo`, {method: "POST"}, {"value": val});
+      resp = await req.doRequest(`/tci/v1/utils/encrypt?appType=flogo`, {method: "POST", timeout: 120000}, {"value": val});
     } catch (err) {
       if (err instanceof HTTPError) {
         let httpErr = err as HTTPError;
