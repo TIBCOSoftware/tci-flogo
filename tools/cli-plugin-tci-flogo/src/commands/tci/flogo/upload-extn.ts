@@ -22,6 +22,12 @@ export default class TciFlogoUploadExtension extends TCBaseCommand {
     "override": flags.boolean({ description: 'Overwrite an existing extension with the same name and type. If set to true and the extension already exists it will be deleted and then copied. By default this option is disabled', default: false}),
   }
 
+  static examples = [
+    '$ tibco tci:flogo:upload-extn --extn-file=/local/path/Extension1.zip --extn-file=/local/path/Extension2.zip --scope=user',
+    '$ tibco tci:flogo:upload-extn --extn-file=/local/path/Extension1.zip --extn-file=/local/path/Extension2.zip --scope=org',
+    '$ tibco tci:flogo:upload-extn --extn-file=/local/path/Extension1.zip --extn-file=/local/path/Extension2.zip --scope=org --override'
+  ]
+
   async run() {
     const {flags} = this.parse(TciFlogoUploadExtension)
     let scope = flags.scope;

@@ -27,6 +27,12 @@ export default class TciFlogoExportApp extends TCBaseCommand {
     }),
   }
 
+  static examples = [
+    '$ tibco tci:flogo:export-app --app-id=1234556789101112 --file-name=MyApp --output-dir=/local/path/app',
+    '$ tibco tci:flogo:export-app --app-id=1234556789101112 --file-name=MyAppArtifacts  --tci-manifest --output-dir=/local/path/app',
+  ]
+
+
 
   async run() {
     const {flags} = this.parse(TciFlogoExportApp)

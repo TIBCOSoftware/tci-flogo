@@ -30,6 +30,12 @@ export default class TciFlogoBuildApp extends TCBaseCommand {
     'show-progress': flags.boolean({ description: 'Set this option in case you want to see the progress bar for operations. By default this option is disabled', default: false, hidden: true}),
   }
 
+  static examples = [
+    '$ tibco tci:flogo:build-app --app-file=/local/path/MyApp.json --exe-name=MyApp --exe-arch=amd64 --exe-os=linux --output-dir=/local/path/cicd',
+    '$ tibco tci:flogo:build-app --app-id=1234556789101112 --exe-name=MyApp --exe-arch=amd64 --exe-os=linux --output-dir=/local/path/cicd --compress-exe',
+    '$ tibco tci:flogo:build-app --app-id=1234556789101112 --exe-name=MyApp --output-dir=/local/path/cicd --compress-exe --build-docker-imag --docker-image=dockerhub.io/myapp:1.0.0  --docker-file=/local/path/cicd/Dockerfile',
+  ]
+
 
 
   async run() {

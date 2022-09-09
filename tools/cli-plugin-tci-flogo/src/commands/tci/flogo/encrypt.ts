@@ -14,6 +14,10 @@ export default class TciFlogoEncryptSecret extends TCBaseCommand {
     }),
   }
 
+  static examples = [
+    '$ tibco tci:flogo:encrypt --value=MyAccessKey'
+  ]
+
   async run() {
     const {flags} = this.parse(TciFlogoEncryptSecret)
     let req = this.getTCRequest();
