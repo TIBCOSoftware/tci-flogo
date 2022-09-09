@@ -19,7 +19,7 @@ export default class TciFlogoUploadExtension extends TCBaseCommand {
       options: ["user", "org"],
       parse: (input) => input.trim(),
     }),
-    "override": flags.boolean({ description: 'Overwrite an existing extension with the same name and type. If set to true and the extension already exists it will be deleted and then copied. By default this option is disabled', default: false}),
+    "override": flags.boolean({ description: 'Overwrite an existing extension with the same name and type. If this option is set and the extension is already uploaded, then existing extension will be replaced with new upload. By default this option is disabled', default: false}),
   }
 
   static examples = [
