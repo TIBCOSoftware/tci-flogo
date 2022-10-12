@@ -66,7 +66,7 @@ You can map the actual message and the message properties in the Input tab. It r
 
 To receive the messages, it has a consumer trigger flow which subscribes to the same topic using a subscription name to process the incoming messages. You can set the subscription type and processing mode according to your choice in the trigger setting.  
 For information on trigger settings please refer to https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo-pulsar/connector-users-guide/pulsar-consumer-trigger.html
-When there is a new message, the consumer triggers get extecuted and it prints the Message payload, properties and the topic name using a log activity.
+When there is a new message, the consumer triggers get extecuted and it prints the message payload, properties, topic name and the message id of received message using a log activity.
 
 ![The Pulsar Trigger](../../../import-screenshots/pulsar/pulsar_consumer_flow.png)
 ![The Pulsar Trigger](../../../import-screenshots/pulsar/Pulsar_Trigger_settings.png)
