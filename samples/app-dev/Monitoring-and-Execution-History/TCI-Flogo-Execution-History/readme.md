@@ -48,15 +48,15 @@ This is TCI-Flogo Execution History Sample.Execution History is used to capture 
 
 ![Payload](../../import-screenshots/tci-execution-history/2-payload.png)
 
-3. Once the API is successfully run, you can check the status of the API using the Get Execution History status API. If you get the details of the payload you gave while enabling the EH, your Execution History is enabled for your org. Where as if you get a blank response, then either your org is a legacy org, or something has gone wrong with your DB. You can contact Tibco Support to get it resolved.
+3. Once the API is successfully run, you can check the status of the API using the Get Execution History status API. If you get the details of the payload you gave while enabling the Execution History,that means Execution History has been enabled for your org.
 
 ![get status](../../import-screenshots/tci-execution-history/3-getstatus.png)
 
 
 
-### Push App and Use Execution History
+## Push App and Use Execution History
 
-1. Once Execution Histroy is enabled for your org, Open the app details page and go to *Execution History* tab, You will see that the *Persist Execution Data* toggle is now displayed.  
+1. Once Execution Histroy is enabled for your org, wait for 2-4 minutes and Open the app details page and go to *Execution History* tab, You will see that the *Persist Execution Data* toggle is now displayed.  
 
 ![toggle](../../import-screenshots/tci-execution-history/4-ehtab.png)
 
@@ -68,11 +68,11 @@ This is TCI-Flogo Execution History Sample.Execution History is used to capture 
 
 ![toggle](../../import-screenshots/tci-execution-history/6-run.png)
 
-4. Hit the app endpoint and move to Execution Histroy Tab. You will get the list of execution record as shown below.
+4. After hitting endpoint,move to *Execution Histroy* Tab. You will get the list of execution record as shown below.
 
 ![execution](../../import-screenshots/tci-execution-history/7-execution.png)
 
-5. Click on the three dots beside an execution record and click on view details button. The instance execution record will display all the activities that got executed. 
+5. Click on the three dots beside an execution record and click on view details button. The execution record will display all the activities that got executed. 
 
 ![view details](../../import-screenshots/tci-execution-history/8-viewdetails.png)
 ![activity list](../../import-screenshots/tci-execution-history/9-activitylist.png)
