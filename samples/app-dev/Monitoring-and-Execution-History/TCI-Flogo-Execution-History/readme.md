@@ -81,6 +81,17 @@ This is TCI-Flogo Execution History Sample.Execution History is used to capture 
 ![activity list](../../import-screenshots/tci-execution-history/10-input-output.png)
 
 
+## Re-Run The Flow Instance
+
+For a failed instance, you have an option to re-run it from the execution history. to re-run a flow instance,
+
+1. Click on the three dots beside an execution record and click on, re-run option. All the activities in that particular execution instance will be re-run and the same can be verified from the app logs and monitoring data. 
+
+![re-run](../../import-screenshots/tci-execution-history/11-rerun.png)
+
+
+
+
 ## Troubleshooting
 
 * If you do not see the Endpoint enabled, make sure your apps is in Running status.
