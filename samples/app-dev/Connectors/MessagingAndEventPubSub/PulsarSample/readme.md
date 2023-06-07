@@ -42,6 +42,7 @@ When you import this app, you need to re-configure the 'flogo_pulsar_TLS' connec
 
 ![The pulsar connection](../../../import-screenshots/pulsar/pulsar_connection.png)
 
+
 In the sample connection,
 * It uses a pulsar broker running TLS mode. You can set the authorization type according to your broker flavour. If its running in plain mode, simply choose 'None' in 'auth type' dropdown.
 * In TLS or JWT auth types, broker URL requires 'pulsar+ssl' in the beginning of the URL. In plain mode, only 'pulsar' is required.
