@@ -75,7 +75,7 @@ This is TCI-Flogo Execution History Sample.Execution History is used to capture 
 5. Click on the three dots beside an execution record and click on view details button. The execution record will display all the activities that got executed. 
 
 ![view details](../../import-screenshots/tci-execution-history/8-viewdetails.png)
-![activity list](../../import-screenshots/tci-execution-history/9-activitylist.png)
+![activity list](../../import-screenshots/tci-execution-history/9-activitylist.png) 
 
 6. Click on the input&Output Data for an activity. The details of the input and output data that went into the activity during execution will be displayed. (*Input & Output Data Currently Non Editable here*)
 ![activity list](../../import-screenshots/tci-execution-history/10-input-output.png)
