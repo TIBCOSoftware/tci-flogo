@@ -55,7 +55,8 @@ Once you login and allow access in user consent screen, a Base64 encoded access 
 
 ### The Flow and InvokeRestService activity
 If you open the app, you will see there are InvokeRestService activities which are authentication enabled and using the 'google-tasks' connection.
-![Sample Response](../../../import-screenshots/rest-auth/10.png)
+![Sample Flow](../../../import-screenshots/rest-auth/20.png)
+![Sample Activity](../../../import-screenshots/rest-auth/10.png)
 You can enable/disable the Authentication by setting 'Enable Authentication' to 'True' or 'False'. For this sample, we need it to be 'True'.
 If you enable the authentication, you will have to select one of the existing HTTP Client Authorization connections from the drop-down. In this sample, its 'google-tasks'.
 You can explore all activities in the flow. They are designed in a way to create task list, insert a task in the task list, update the title of this task using PATCH method and finally delete the task list. 
@@ -67,7 +68,9 @@ You will have to pass the query parameter 'tasklist_path'. The value is 'users/@
 Now click Execute button.
 
 If you want to test the sample in the Flow tester, either you can create a new launch configuration and give the above value for query parameter 'tasklist_path' in inputs or import the attached 'google_tasks_Launch_Configuration.json' with this sample and start testing.
-![Sample Response](../../../import-screenshots/rest-auth/9.png)
+![Sample Configuration](../../../import-screenshots/rest-auth/9.png)
+![Sample Response](../../../import-screenshots/rest-auth/19.png)
+
 
 ### Note about Refresh Token
 Based on the service you use, you need to look for the parameters to refresh the access token if you want to run your apps for longer duration. In this example access_type=offline is used in additional query parameters for this purpose. For other service like Salesforce, you may want to specify 'refresh_token' in the scope field.
