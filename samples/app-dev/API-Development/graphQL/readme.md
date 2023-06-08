@@ -90,13 +90,13 @@ In the flow, click on Test Button -> create Launch configuration -> provide valu
 
 ![Sample Response](../../import-screenshots/Graphql-InvokeRest-graphql.png)
 
-3. Provide the Content header as *application/graphql*
+3. Provide the Content header as *application/graphql*  
 
 ![Sample Response](../../import-screenshots/Graphql-invokeRest-Headers.png)
 
-4. Run the flow tester for *invokeRESTService* activity and the response will look like this:-
+4. Run the flow tester for *invokeRESTService* activity and the response will look as shown in the Flow Tester section of Outputs.
 
-![Sample Response](../../import-screenshots/Graphql-restinvoke-flow3-response.png)
+
 
 
 ## Outputs
