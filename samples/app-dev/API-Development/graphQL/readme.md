@@ -13,7 +13,7 @@ To know more about Graphql, please refer [here](https://graphql.org/)
 
 2. Create a new empty app
 
-![Create a new empty app](../../import-screenshots/graphql-create-app.png)
+![Create a new empty app](../../import-screenshots/2.png)
 
 3. On the app details page, select import app option.
 
