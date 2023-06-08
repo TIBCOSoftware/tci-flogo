@@ -62,13 +62,15 @@ The 4th flow name is *Mutation_createReview*. it is updating the user's review b
 
 ### Run the application
 
-To run the application, generate the app binary according to the platform you are going to run. If you are using Tibco Cloud Integration, push the app to TIBCO Cloud and then scale up to 1 instance. Once your app is scaled, you can see your app in running status.
+To run the application, push the app to TIBCO Cloud and then scale up to 1 instance. Once your app is scaled, you can see your app in running status.
 
-![Sample Response](../../import-screenshots/graphql-binary-generation.png)
+![Sample Response](../../import-screenshots/graphql-app-scale.png)
 
-Once your app reaches to Running state, use a rest client to hit the endpoints.  
+Once your app reaches to Running state, you can copy the URL from *Endpoints* tab and use a Graphql client like [Graphql bin](https://www.graphqlbin.com/v2/new)  to query the endpoint.
 
-![Sample Response](../../import-screenshots/graphql-app-running.png)
+*Note:- The graphql bin client requires the path parameter "/graphql" to be appended in the URL that you copy from the Endpoints tab*
+
+![Sample Response](../../import-screenshots/graphql-bin.png)
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
