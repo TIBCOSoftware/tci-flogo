@@ -1,4 +1,4 @@
-# json.path Sample
+# json.path and json.exists Sample
 
 ## Description
 
@@ -13,6 +13,15 @@ json.path("$.book[0].category", $flow.body.store)
 
 	* 1st argument - JSONPath syntax of the element
 	* 2nd argument - JSON Object in which to find the element
+	
+This sample also demonstrates, how to check if a particular key/jsonPath is present in the json object.
+
+For example - if we have 'Store' JSON object and we want to check if 'book' key is present in the JSON object then we will use the json.exists function as below -
+
+json.exists($flow.body.store, "book") - If the key is present this function will return TRUE else it will return FALSE.
+	
+	* 1st argument - JSON Object from which we need to check.
+	* 2nd argument - key which we want to check for.
 
 ## Operators
 referenced from github.com/jayway/JsonPath
@@ -42,6 +51,9 @@ In the attached sample *jsonpath.sample.json*, there is a flow *jsonpath example
 
 
 It also returns book category when book author is 'Nigel Rees', when Availability Quantity is >=6000, when Availability Address city is 'sugarland'
+
+
+Also, Log message simply prints TRUE/FALSE depending on if the key exists in the json object.
 
 
 You can also import FLOGO Tester Launch Configuration - *jsonpath_example_Launch_Configuration_1.json*, attached in this sample and start testing in Flow Tester.
