@@ -3,10 +3,7 @@
 
 ## Description
 
-This example demonstrate how we can create and use Stripe CRUD activities.
-Stripe_CRUD app bascially contains 4 activities. The main purpose of these activities are to create data, update the data, query the data and then finally delete the data for Stripe.
-The Stripe flow consist of Creating a Customer, Creating a Charge, Capturing a Charge, Creating a Subscription for the card, Creating a Refund, Cancelling Subscription, Querying Charge, Quering Account Balance, Updating Customer, Deleting Card & finally Deleting the Customer.
-
+This example demonstrate how we can create and use Stripe CRUD activities. Stripe_CRUD app bascially contains 4 activities. The main purpose of these activities are to create data, update the data, query the data and then finally delete the data for Stripe. The Stripe flow consist of Creating a Customer, Creating a card, Creating a Charge, Capturing a Charge, Creating a Subscription for the card, Creating a Refund, Cancelling Subscription, Querying Customer & finally Deleting the Customer.
 ## Prerequisites
 
 * Ensure that Flogo Connector for Stripe must be install.
