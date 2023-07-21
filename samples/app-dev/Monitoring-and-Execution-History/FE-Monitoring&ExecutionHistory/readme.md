@@ -19,19 +19,19 @@ For more information on the configuration of Flogo Enterprise Monitoring, Flogo 
 
 2. Create a new empty app
 
-![Create a new empty app](../import-screenshots/2.png)
+![Create a new empty app](../../import-screenshots/2.png)
 
 3. On the app details page, select import app option.
 
-![Select import](../import-screenshots/3.png)
+![Select import](../../import-screenshots/3.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../import-screenshots/4.png)
+![Import your sample](../../import-screenshots/4.png)
 
 5. Click on Upload Button. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
-![The Import app dialog](../import-screenshots/5.png)
+![The Import app dialog](../../import-screenshots/5.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
@@ -42,20 +42,20 @@ For more information on the configuration of Flogo Enterprise Monitoring, Flogo 
 
 In the attached sample *fe-mon-execution-history-demo-app.json*, there are 3 flows *MainFlow*, *Subflow1* and *Subflow2*.
 
-![flow details page](../import-screenshots/fe-mon-eh/1-FlowDeatails.png)
+![flow details page](../../import-screenshots/fe-mon-eh/1-FlowDeatails.png)
 
 First flow which is *MainFlow* calls the *Subflow1*  via call subflow activity. *Subflow1* further calls the *Subflow2* and *Subflow2* returns the output of the service which it is invoking to the *Subflow1*. *Subflow1* takes the output from the *Subflow2* and return this to *MainFlow*. *MainFlow* returns the output which it get from the *Subflow1*. 
 
-![MainFlow](../import-screenshots/fe-mon-eh/MainFlow.png)
-![Subflow1](../import-screenshots/fe-mon-eh/Subflow1.png)
-![Subflow2](../import-screenshots/fe-mon-eh/Subflow2.png)
+![MainFlow](../../import-screenshots/fe-mon-eh/MainFlow.png)
+![Subflow1](../../import-screenshots/fe-mon-eh/Subflow1.png)
+![Subflow2](../../import-screenshots/fe-mon-eh/Subflow2.png)
 
 
 ### Generate and Run the App Executable
 
 To generate the app executable, click on the hamburger menu option beside the push button and click on the *Build app* option. Select the supported Platform type and your app executable will be downloaded locally.
 
-![Sample binary generation](../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
+![Sample binary generation](../../import-screenshots/fe-mon-eh/2-GenerateBinary.png)
 
 Once your app executable is generated and downloaded locally, Configure the app executable with the Flogo Monitoring app and Flogo Flow state manager app and run it.
 For more information on the configuration, please refer the documentation link given below:-
@@ -69,39 +69,39 @@ For more information on the configuration, please refer the documentation link g
 4. To configure and run the app executable with the Flogo Enterprise Monitoring and Flogo Flow State Manager app, refer [here](https://au.integration.cloud.tibco.com/docs/index.html#Subsystems/flogo/flogo-all/flowstatemgr-starting-flogo-app-binary.html?TocPath=Deployment%2520and%2520Configuration%257CBuilding%2520an%2520App%2520Executable%257CMonitoring%257CAbout%2520TIBCO%2520Flogo%25C2%25AE%2520Flow%2520State%2520Manager%257C_____8)
 
 
-![Flogo flow state manager console](../import-screenshots/fe-mon-eh/flowStateManagerConsole.png)
-![flogo monitoring console](../import-screenshots/fe-mon-eh/fe-mon-console.png)
-![App binary run console](../import-screenshots/fe-mon-eh/app-binary-run-console.png)
+![Flogo flow state manager console](../../import-screenshots/fe-mon-eh/flowStateManagerConsole.png)
+![flogo monitoring console](../../import-screenshots/fe-mon-eh/fe-mon-console.png)
+![App binary run console](../../import-screenshots/fe-mon-eh/app-binary-run-console.png)
 
 
 Once the executable is configured and running, Hit the app endpoint and open the Flogo Monitoring app in the browser with the url *http://localhost:7337* and you will see the app name in the app list.
 On App list page, click on app name -> Monitoring -> Flow -> Trigger
 
-![app list page on fe-mon](../import-screenshots/fe-mon-eh/fe-mon-applist.png)
+![app list page on fe-mon](../../import-screenshots/fe-mon-eh/fe-mon-applist.png)
 
 For Execution History, Click in the *Executions* tab on the Flogo Enterprise Monitoring UI. You will see a list of the execution record and their start and end time. To capture the Executions record, one must enable the *Persist Execution Data* toggle. 
 
-![Execution History Sample Response](../import-screenshots/fe-mon-eh/EH-sample-response.png)
+![Execution History Sample Response](../../import-screenshots/fe-mon-eh/EH-sample-response.png)
 
 To re-run a flow from the Executions tab. Click on the Kebab Menu option beside an execution record and click on the *View Details* button. There will be a pop-up With the name Activities List and Execution id for a specific flow. Select an activity from which you want to re-run the flow. This feature works the same way as a Flow tester feature and does not include the app trigger in the re-run process.
 
-![Re-run feature](../import-screenshots/fe-mon-eh/Re-run-popup.png)
+![Re-run feature](../../import-screenshots/fe-mon-eh/Re-run-popup.png)
 
 
 ## Outputs
 
 1. App Monitoring
 
-![monitoring Sample Response](../import-screenshots/fe-mon-eh/Monitoring-sample-response.png)
+![monitoring Sample Response](../../import-screenshots/fe-mon-eh/Monitoring-sample-response.png)
 
 2. Execution Record
 
-![Execution History Record](../import-screenshots/fe-mon-eh/EH-sample-response.png)
+![Execution History Record](../../import-screenshots/fe-mon-eh/EH-sample-response.png)
 
 
 3. Re-run Feature
-![Re-run response feature screenshot](../import-screenshots/fe-mon-eh/run-flow-from-this-actovity.png)
-![Re-run response feature screenshot](../import-screenshots/fe-mon-eh/after-re-run.png)
+![Re-run response feature screenshot](../../import-screenshots/fe-mon-eh/run-flow-from-this-actovity.png)
+![Re-run response feature screenshot](../../import-screenshots/fe-mon-eh/after-re-run.png)
 
 ## Troubleshooting
 

@@ -3,7 +3,7 @@
 
 Preparation:
 
-     1. Install Flogo CLI first, please following CLI guideline
+     1. Install Flogo CLI first,  please following CLI guideline
      2. Set FLOGO_HOME Env Variable, such as: 
         export FLOGO_HOME=/opt/tibco/flogo/2.6
 
