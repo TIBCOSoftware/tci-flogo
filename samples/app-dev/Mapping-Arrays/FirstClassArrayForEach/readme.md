@@ -52,7 +52,7 @@ There may be situations when you want to map an element within an array of objec
 ![Input Array1](../../../import-screenshots/FirstClassArrayForEach/Input_Schema_In_Mapper_Activity.png)
 
 9. Go to Inputs and expand Activity input and build array using any of the below options
-![Input Array1](../../../import-screenshots/FirstClassArrayForEach/Build_Array.png)
+![Input Array1](samples/app-dev/import-screenshots/FirstClassArrayForEach/Build_Array.png)
 
 
 
