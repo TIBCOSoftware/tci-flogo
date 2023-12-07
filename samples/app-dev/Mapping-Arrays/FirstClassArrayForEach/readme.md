@@ -71,7 +71,7 @@ To run the second flow in tester, use the input schema from 'input_schema_arrayF
 ![Input Array1](../../import-screenshots/FirstClassArrayForEach/ConfigureWithItem.png)
 
 3. Configure with JSON
-![Input Array1](../../../import-screenshots/FirstClassArrayForEach/ConfigureWithJSON.png)
+![Input Array1](../../import-screenshots/FirstClassArrayForEach/ConfigureWithJSON.png)
 
 
 ## Outputs
