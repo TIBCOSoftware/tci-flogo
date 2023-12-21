@@ -27,15 +27,15 @@ e) To execute SQL Merge statement.
 
 2. Click on Create/Import from the UI.
 
-![Create an app](../../import-screenshots/snowflake_screenshot/1.png)
+![Create an app](../../../import-screenshots/snowflake_screenshot/1.png)
 
 3. From the same page, select import a Flogo app option.
 
-![Select import](../../import-screenshots/snowflake_screenshot/2.png)
+![Select import](../../../import-screenshots/snowflake_screenshot/2.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../import-screenshots/snowflake_screenshot/3.png)
+![Import your sample](../../../import-screenshots/snowflake_screenshot/3.png)
 
 5. After importing app is done, in connection tab make sure to enter the client secret and authorization code and click on generate access token button to establish the connection.
 
@@ -45,7 +45,7 @@ e) To execute SQL Merge statement.
 
 When you import the app you need to enter the client secret and the authorization code and click on generate access token button to establish the connection.
 
-![The connection](../../import-screenshots/snowflake_screenshot/4.png)
+![The connection](../../../import-screenshots/snowflake_screenshot/4.png)
 
 In the connection, note that: 
 1. Name: Unique name for the Snowflake connector.
@@ -66,32 +66,32 @@ In the connection, note that:
 
 If you go inside the app, you can see in flow we have 5 activities (Insert, Update, Query, Delete and Merge) that perform some operations. Also in flow we have Log Message after each activity to print the logs.
 
-![Sample Response](../../import-screenshots/snowflake_screenshot/5.png)
+![Sample Response](../../../import-screenshots/snowflake_screenshot/5.png)
 
 ### Run the application
 For running the application, first you have to push the app and then scale up the app.
 Then after sometime you can see your app in running status.
 
-![Sample Response](../../import-screenshots/snowflake_screenshot/6.png)
+![Sample Response](../../../import-screenshots/snowflake_screenshot/6.png)
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
 In flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
 
-![sample Response](../../import-screenshots/snowflake_screenshot/7.png)
-![Sample Response](../../import-screenshots/snowflake_screenshot/8.png)
-![Sample Response](../../import-screenshots/snowflake_screenshot/9.png)
+![sample Response](../../../import-screenshots/snowflake_screenshot/7.png)
+![Sample Response](../../../import-screenshots/snowflake_screenshot/8.png)
+![Sample Response](../../../import-screenshots/snowflake_screenshot/9.png)
 
 ## Outputs
 
 1. Flow Tester
 
-![Sample Response](../../import-screenshots/snowflake_screenshot/10.png)
-![Sample Response](../../import-screenshots/snowflake_screenshot/11.png)
+![Sample Response](../../../import-screenshots/snowflake_screenshot/10.png)
+![Sample Response](../../../import-screenshots/snowflake_screenshot/11.png)
 
 2. Runtime Deployment logs
 
-![Sample Response](../../import-screenshots/snowflake_screenshot/12.png)
+![Sample Response](../../../import-screenshots/snowflake_screenshot/12.png)
 
 
 ## Troubleshooting
