@@ -33,10 +33,10 @@ There may be situations when you want to map an element within an array of objec
 1. Download the FirstClassArrayForEach_AllThreeConfigurations.json file.'
 
 2. Create a new empty app.
-![Create an app](../../../import-screenshots/2.png)
+![Create an app](../../import-screenshots/2.png)
 
 3. On the app details page, select Import app.
-![Select import](../../../import-screenshots/3.png)
+![Select import](../../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json file for the app that you want to import.
 ![Import App](../../import-screenshots/FirstClassArrayForEach/UploadFirstClassArrayForEachApp.png)
