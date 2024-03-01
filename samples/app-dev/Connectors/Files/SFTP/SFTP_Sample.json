@@ -1,0 +1,553 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "github.com/project-flogo/contrib/activity/noop",
+        "github.com/tibco/flogo-sftp/src/app/SFTP/activity/get",
+        "github.com/tibco/wi-amazons3/src/app/AmazonS3/activity/put",
+        "get_1 github.com/tibco/wi-amazons3/src/app/AmazonS3/activity/get",
+        "github.com/tibco/flogo-sftp/src/app/SFTP/activity/mkdir",
+        "put_1 github.com/tibco/flogo-sftp/src/app/SFTP/activity/put",
+        "github.com/tibco/flogo-sftp/src/app/SFTP/activity/list",
+        "github.com/tibco/flogo-sftp/src/app/SFTP/activity/rename",
+        "github.com/tibco/flogo-sftp/src/app/SFTP/activity/delete",
+        "github.com/tibco/flogo-general/src/app/General/trigger/timer",
+        "github.com/tibco/flogo-sftp/src/app/SFTP/connector/connection",
+        "github.com/tibco/flogo-aws/src/app/AWS/connector"
+    ],
+    "name": "SFTP_AWS_S3_Sample",
+    "description": "",
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#timer",
+            "name": "tibco-wi-timer",
+            "description": "Simple Timer trigger",
+            "settings": {},
+            "id": "TimerTrigger",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Scheduler Options": "Timer",
+                        "Start Time": "",
+                        "Repeating": false,
+                        "Delayed Start": false,
+                        "Time Interval": 1,
+                        "Interval Unit": "Second",
+                        "Cron Expression": "CRON_TZ=Asia/Calcutta * * * * *"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:s3"
+                        }
+                    },
+                    "name": "s3"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:s3",
+            "data": {
+                "name": "s3",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "SFTPGet",
+                        "type": "label",
+                        "label": "StartActivitytoSFTPGet"
+                    },
+                    {
+                        "id": 2,
+                        "from": "SFTPGet",
+                        "to": "Put",
+                        "type": "label",
+                        "label": "SFTPGettoPut"
+                    },
+                    {
+                        "id": 3,
+                        "from": "Put",
+                        "to": "Get",
+                        "type": "label",
+                        "label": "PuttoGet"
+                    },
+                    {
+                        "id": 4,
+                        "from": "Get",
+                        "to": "SFTPMakeRemoteDirectory",
+                        "type": "label",
+                        "label": "GettoSFTPMakeRemoteDirectory"
+                    },
+                    {
+                        "id": 5,
+                        "from": "SFTPMakeRemoteDirectory",
+                        "to": "SFTPPut",
+                        "type": "label",
+                        "label": "SFTPMakeRemoteDirectorytoSFTPPut"
+                    },
+                    {
+                        "id": 6,
+                        "from": "SFTPPut",
+                        "to": "SFTPList",
+                        "type": "label",
+                        "label": "SFTPPuttoSFTPList"
+                    },
+                    {
+                        "id": 7,
+                        "from": "SFTPList",
+                        "to": "SFTPRename",
+                        "type": "label",
+                        "label": "SFTPListtoSFTPRename"
+                    },
+                    {
+                        "id": 8,
+                        "from": "SFTPRename",
+                        "to": "SFTPDelete",
+                        "type": "label",
+                        "label": "SFTPRenametoSFTPDelete"
+                    },
+                    {
+                        "id": 9,
+                        "from": "SFTPDelete",
+                        "to": "SFTPDelete1",
+                        "type": "label",
+                        "label": "SFTPDeletetoSFTPDelete1"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "SFTPGet",
+                        "name": "SFTPGet",
+                        "description": "This activity executes get operation on SFTP server",
+                        "activity": {
+                            "ref": "#get",
+                            "input": {
+                                "SFTP Connection": "conn://9187d080-d485-11ee-a75e-479d455584a2",
+                                "processdata": true,
+                                "binary": true,
+                                "overwrite": true,
+                                "input": {
+                                    "mapping": {
+                                        "Remote File Name": "sftpuser/sftp-test/a.txt"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Remote File Name\":{\"type\":\"string\"}},\"required\":[\"Remote File Name\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Remote File Name\":{\"type\":\"string\"}},\"required\":[\"Remote File Name\"],\"type\":\"object\"}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Binary Data\":{\"type\":\"string\"},\"FileTransferred\":{\"items\":{\"properties\":{\"File Name\":{\"type\":\"string\"},\"Number of Bytes\":{\"type\":\"number\"}},\"type\":\"object\"},\"type\":\"array\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Binary Data\":{\"type\":\"string\"},\"FileTransferred\":{\"items\":{\"properties\":{\"File Name\":{\"type\":\"string\"},\"Number of Bytes\":{\"type\":\"number\"}},\"type\":\"object\"},\"type\":\"array\"}},\"type\":\"object\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Put",
+                        "name": "Put",
+                        "description": "Amazon S3 Put Activity",
+                        "activity": {
+                            "ref": "#put",
+                            "input": {
+                                "connection": "conn://91a6a320-d485-11ee-a75e-479d455584a2",
+                                "serviceName": "object",
+                                "putType": "upload",
+                                "inputType": "text",
+                                "preserveACL": false,
+                                "input": {
+                                    "mapping": {
+                                        "Bucket": "vinsharm-s3-test",
+                                        "TextContent": "=$activity[SFTPGet].output[\"Binary Data\"]",
+                                        "Key": "sftp-test2"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"required\":[\"Bucket\",\"Key\",\"TextContent\"],\"properties\":{\"Bucket\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"TextContent\":{\"type\":\"string\"},\"ACL\":{\"type\":\"string\"},\"CacheControl\":{\"type\":\"string\"},\"ContentDisposition\":{\"type\":\"string\"},\"ContentEncoding\":{\"type\":\"string\"},\"ContentLanguage\":{\"type\":\"string\"},\"ContentLength\":{\"type\":\"integer\"},\"ContentMD5\":{\"type\":\"string\"},\"ContentType\":{\"type\":\"string\"},\"Expires\":{\"type\":\"string\",\"format\":\"date-time\"},\"GrantFullControl\":{\"type\":\"string\"},\"GrantRead\":{\"type\":\"string\"},\"GrandReadACP\":{\"type\":\"string\"},\"GrantWriteACP\":{\"type\":\"string\"},\"RequestPayer\":{\"type\":\"string\"},\"SSECustomerAlgorithm\":{\"type\":\"string\"},\"SSECustomerKey\":{\"type\":\"string\"},\"SSECustomerKeyMD5\":{\"type\":\"string\"},\"SSEKMSKeyId\":{\"type\":\"string\"},\"ServerSideEncryption\":{\"type\":\"string\"},\"StorageClass\":{\"type\":\"string\"},\"Tagging\":{\"type\":\"string\"},\"UserMetadata\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"Key\":{\"type\":\"string\"},\"Value\":{\"type\":\"string\"}}}},\"WebsiteRedirectLocation\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"required\":[\"Bucket\",\"Key\",\"TextContent\"],\"properties\":{\"Bucket\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"TextContent\":{\"type\":\"string\"},\"ACL\":{\"type\":\"string\"},\"CacheControl\":{\"type\":\"string\"},\"ContentDisposition\":{\"type\":\"string\"},\"ContentEncoding\":{\"type\":\"string\"},\"ContentLanguage\":{\"type\":\"string\"},\"ContentLength\":{\"type\":\"integer\"},\"ContentMD5\":{\"type\":\"string\"},\"ContentType\":{\"type\":\"string\"},\"Expires\":{\"type\":\"string\",\"format\":\"date-time\"},\"GrantFullControl\":{\"type\":\"string\"},\"GrantRead\":{\"type\":\"string\"},\"GrandReadACP\":{\"type\":\"string\"},\"GrantWriteACP\":{\"type\":\"string\"},\"RequestPayer\":{\"type\":\"string\"},\"SSECustomerAlgorithm\":{\"type\":\"string\"},\"SSECustomerKey\":{\"type\":\"string\"},\"SSECustomerKeyMD5\":{\"type\":\"string\"},\"SSEKMSKeyId\":{\"type\":\"string\"},\"ServerSideEncryption\":{\"type\":\"string\"},\"StorageClass\":{\"type\":\"string\"},\"Tagging\":{\"type\":\"string\"},\"UserMetadata\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"Key\":{\"type\":\"string\"},\"Value\":{\"type\":\"string\"}}}},\"WebsiteRedirectLocation\":{\"type\":\"string\"}}}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"ETag\":{\"type\":\"string\"},\"Expiration\":{\"type\":\"string\"},\"RequestCharged\":{\"type\":\"string\"},\"SSECustomerAlgorithm\":{\"type\":\"string\"},\"SSECustomerKeyMD5\":{\"type\":\"string\"},\"SSEKMSKeyId\":{\"type\":\"string\"},\"ServerSideEncryption\":{\"type\":\"string\"},\"VersionId\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"ETag\":{\"type\":\"string\"},\"Expiration\":{\"type\":\"string\"},\"RequestCharged\":{\"type\":\"string\"},\"SSECustomerAlgorithm\":{\"type\":\"string\"},\"SSECustomerKeyMD5\":{\"type\":\"string\"},\"SSEKMSKeyId\":{\"type\":\"string\"},\"ServerSideEncryption\":{\"type\":\"string\"},\"VersionId\":{\"type\":\"string\"}}}"
+                                    },
+                                    "error": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"statusCode\":{\"type\":\"integer\"},\"requestId\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"statusCode\":{\"type\":\"integer\"},\"requestId\":{\"type\":\"string\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "Get",
+                        "name": "Get",
+                        "description": "Amazon S3 Get Activity",
+                        "activity": {
+                            "ref": "#get_1",
+                            "input": {
+                                "connection": "conn://91a6a320-d485-11ee-a75e-479d455584a2",
+                                "operationType": "single",
+                                "outputType": "text",
+                                "input": {
+                                    "mapping": {
+                                        "Bucket": "vinsharm-s3-test",
+                                        "Key": "sftp-test2"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"required\":[\"Bucket\",\"Key\"],\"properties\":{\"Bucket\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"VersionId\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"required\":[\"Bucket\",\"Key\"],\"properties\":{\"Bucket\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"VersionId\":{\"type\":\"string\"}}}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"Bucket\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"TextContent\":{\"type\":\"string\"},\"Metadata\":{\"type\":\"object\",\"properties\":{\"AcceptRanges\":{\"type\":\"string\"},\"CacheControl\":{\"type\":\"string\"},\"ContentDisposition\":{\"type\":\"string\"},\"ContentEncoding\":{\"type\":\"string\"},\"ContentLanguage\":{\"type\":\"string\"},\"ContentLength\":{\"type\":\"integer\"},\"ContentRange\":{\"type\":\"string\"},\"ContentType\":{\"type\":\"string\"},\"DeleteMarker\":{\"type\":\"boolean\"},\"ETag\":{\"type\":\"string\"},\"Expiration\":{\"type\":\"string\"},\"Expires\":{\"type\":\"string\"},\"LastModified\":{\"type\":\"string\",\"format\":\"date-time\"},\"MissingMeta\":{\"type\":\"integer\"},\"PartsCount\":{\"type\":\"integer\"},\"ReplicationStatus\":{\"type\":\"string\"},\"RequestCharged\":{\"type\":\"string\"},\"Restore\":{\"type\":\"string\"},\"SSECustomerAlgorithm\":{\"type\":\"string\"},\"SSECustomerKeyMD5\":{\"type\":\"string\"},\"SSEKMSKeyId\":{\"type\":\"string\"},\"ServerSideEncryption\":{\"type\":\"string\"},\"StorageClass\":{\"type\":\"string\"},\"TagCount\":{\"type\":\"integer\"},\"UserMetadata\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"Key\":{\"type\":\"string\"},\"Value\":{\"type\":\"string\"}}}},\"VersionId\":{\"type\":\"string\"},\"WebsiteRedirectLocation\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"Bucket\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"TextContent\":{\"type\":\"string\"},\"Metadata\":{\"type\":\"object\",\"properties\":{\"AcceptRanges\":{\"type\":\"string\"},\"CacheControl\":{\"type\":\"string\"},\"ContentDisposition\":{\"type\":\"string\"},\"ContentEncoding\":{\"type\":\"string\"},\"ContentLanguage\":{\"type\":\"string\"},\"ContentLength\":{\"type\":\"integer\"},\"ContentRange\":{\"type\":\"string\"},\"ContentType\":{\"type\":\"string\"},\"DeleteMarker\":{\"type\":\"boolean\"},\"ETag\":{\"type\":\"string\"},\"Expiration\":{\"type\":\"string\"},\"Expires\":{\"type\":\"string\"},\"LastModified\":{\"type\":\"string\",\"format\":\"date-time\"},\"MissingMeta\":{\"type\":\"integer\"},\"PartsCount\":{\"type\":\"integer\"},\"ReplicationStatus\":{\"type\":\"string\"},\"RequestCharged\":{\"type\":\"string\"},\"Restore\":{\"type\":\"string\"},\"SSECustomerAlgorithm\":{\"type\":\"string\"},\"SSECustomerKeyMD5\":{\"type\":\"string\"},\"SSEKMSKeyId\":{\"type\":\"string\"},\"ServerSideEncryption\":{\"type\":\"string\"},\"StorageClass\":{\"type\":\"string\"},\"TagCount\":{\"type\":\"integer\"},\"UserMetadata\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"Key\":{\"type\":\"string\"},\"Value\":{\"type\":\"string\"}}}},\"VersionId\":{\"type\":\"string\"},\"WebsiteRedirectLocation\":{\"type\":\"string\"}}}}}"
+                                    },
+                                    "error": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"statusCode\":{\"type\":\"integer\"},\"requestId\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"statusCode\":{\"type\":\"integer\"},\"requestId\":{\"type\":\"string\"}}}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "SFTPMakeRemoteDirectory",
+                        "name": "SFTPMakeRemoteDirectory",
+                        "description": "This activity creates remote directory on SFTP server",
+                        "activity": {
+                            "ref": "#mkdir",
+                            "input": {
+                                "SFTP Connection": "conn://9187d080-d485-11ee-a75e-479d455584a2",
+                                "input": {
+                                    "mapping": {
+                                        "Remote Directory": "sftpuser/sftp-test/newDir"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Remote Directory\":{\"type\":\"string\"}},\"required\":[\"Remote Directory\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Remote Directory\":{\"type\":\"string\"}},\"required\":[\"Remote Directory\"],\"type\":\"object\"}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Remote Directory\":{\"type\":\"string\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Remote Directory\":{\"type\":\"string\"}},\"type\":\"object\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "SFTPPut",
+                        "name": "SFTPPut",
+                        "description": "This activity executes put operation on SFTP server",
+                        "activity": {
+                            "ref": "#put_1",
+                            "input": {
+                                "SFTP Connection": "conn://9187d080-d485-11ee-a75e-479d455584a2",
+                                "processdata": true,
+                                "binary": true,
+                                "overwrite": true,
+                                "input": {
+                                    "mapping": {
+                                        "Remote File Name": "sftpuser/sftp-test/newDir/s3.txt",
+                                        "Binary Data": "=$activity[Get].output.TextContent"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Remote File Name\":{\"type\":\"string\"},\"Binary Data\":{\"type\":\"string\"}},\"required\":[\"Remote File Name\",\"Binary Data\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Remote File Name\":{\"type\":\"string\"},\"Binary Data\":{\"type\":\"string\"}},\"required\":[\"Remote File Name\",\"Binary Data\"],\"type\":\"object\"}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"FileTransferred\":{\"items\":{\"properties\":{\"File Name\":{\"type\":\"string\"},\"Number of Bytes\":{\"type\":\"number\"}},\"type\":\"object\"},\"type\":\"array\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"FileTransferred\":{\"items\":{\"properties\":{\"File Name\":{\"type\":\"string\"},\"Number of Bytes\":{\"type\":\"number\"}},\"type\":\"object\"},\"type\":\"array\"}},\"type\":\"object\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "SFTPList",
+                        "name": "SFTPList",
+                        "description": "This activity lists all the files in the directory on SFTP server",
+                        "activity": {
+                            "ref": "#list",
+                            "input": {
+                                "SFTP Connection": "conn://9187d080-d485-11ee-a75e-479d455584a2",
+                                "input": {
+                                    "mapping": {
+                                        "Remote Directory": "sftpuser/sftp-test/newDir"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Remote Directory\":{\"type\":\"string\"}},\"required\":[\"Remote Directory\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Remote Directory\":{\"type\":\"string\"}},\"required\":[\"Remote Directory\"],\"type\":\"object\"}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"FileMetadata\":{\"items\":{\"properties\":{\"Name\":{\"type\":\"string\"},\"Size\":{\"type\":\"number\"},\"Mode\":{\"type\":\"string\"},\"ModTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"IsDir\":{\"type\":\"boolean\"}},\"type\":\"object\"},\"type\":\"array\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"FileMetadata\":{\"items\":{\"properties\":{\"Name\":{\"type\":\"string\"},\"Size\":{\"type\":\"number\"},\"Mode\":{\"type\":\"string\"},\"ModTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"IsDir\":{\"type\":\"boolean\"}},\"type\":\"object\"},\"type\":\"array\"}},\"type\":\"object\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "SFTPRename",
+                        "name": "SFTPRename",
+                        "description": "This activity renames a file on SFTP server",
+                        "activity": {
+                            "ref": "#rename",
+                            "input": {
+                                "SFTP Connection": "conn://9187d080-d485-11ee-a75e-479d455584a2",
+                                "input": {
+                                    "mapping": {
+                                        "Old Remote File Name": "sftpuser/sftp-test/newDir/s3.txt",
+                                        "New Remote File Name": "sftpuser/sftp-test/newDir/s3Renamed1.txt"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Old Remote File Name\":{\"type\":\"string\"},\"New Remote File Name\":{\"type\":\"string\"}},\"required\":[\"Old Remote File Name\",\"New Remote File Name\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Old Remote File Name\":{\"type\":\"string\"},\"New Remote File Name\":{\"type\":\"string\"}},\"required\":[\"Old Remote File Name\",\"New Remote File Name\"],\"type\":\"object\"}"
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"New Remote File Name\":{\"type\":\"string\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"New Remote File Name\":{\"type\":\"string\"}},\"type\":\"object\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "SFTPDelete",
+                        "name": "SFTPDelete",
+                        "description": "This activity executes delete operation on SFTP server",
+                        "activity": {
+                            "ref": "#delete",
+                            "input": {
+                                "SFTP Connection": "conn://9187d080-d485-11ee-a75e-479d455584a2",
+                                "input": {
+                                    "mapping": {
+                                        "Remote File Name": "sftpuser/sftp-test/newDir/s3Renamed1.txt"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Remote File Name\":{\"type\":\"string\"}},\"required\":[\"Remote File Name\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Remote File Name\":{\"type\":\"string\"}},\"required\":[\"Remote File Name\"],\"type\":\"object\"}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "SFTPDelete1",
+                        "name": "SFTPDelete1",
+                        "description": "This activity executes delete operation on SFTP server",
+                        "activity": {
+                            "ref": "#delete",
+                            "input": {
+                                "SFTP Connection": "conn://9187d080-d485-11ee-a75e-479d455584a2",
+                                "input": {
+                                    "mapping": {
+                                        "Remote File Name": "sftpuser/sftp-test/newDir"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"Remote File Name\":{\"type\":\"string\"}},\"required\":[\"Remote File Name\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"Remote File Name\":{\"type\":\"string\"}},\"required\":[\"Remote File Name\"],\"type\":\"object\"}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjU2LCJ5IjoxMzJ9LCJTRlRQR2V0Ijp7IngiOjE3MSwieSI6MTIyfSwiUHV0Ijp7IngiOjM3NiwieSI6MTI1fSwiR2V0Ijp7IngiOjU4MiwieSI6MTI2fSwiU0ZUUE1ha2VSZW1vdGVEaXJlY3RvcnkiOnsieCI6Nzc3LCJ5IjoxMjl9LCJTRlRQUHV0Ijp7IngiOjk2NiwieSI6MTMxfSwiU0ZUUExpc3QiOnsieCI6MTE0MiwieSI6MTMxfSwiU0ZUUFJlbmFtZSI6eyJ4IjoxMzM0LCJ5IjoxMzV9LCJTRlRQRGVsZXRlIjp7IngiOjE1MTAsInkiOjEzNn0sIlNGVFBEZWxldGUxIjp7IngiOjE2OTIsInkiOjEzOH19",
+                "metadata": {
+                    "input": [],
+                    "output": [],
+                    "fe_metadata": {}
+                }
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "SFTP.V5_NehaLocal.Host",
+            "type": "string",
+            "value": "10.245.2.129"
+        },
+        {
+            "name": "SFTP.V5_NehaLocal.Port",
+            "type": "float64",
+            "value": 22
+        },
+        {
+            "name": "SFTP.V5_NehaLocal.User_Name",
+            "type": "string",
+            "value": "sftpuser"
+        },
+        {
+            "name": "SFTP.V5_NehaLocal.Password",
+            "type": "string",
+            "value": "SECRET:OmZ0asg/US+KaZVcrqd9dGO3360HpoZ1"
+        },
+        {
+            "name": "AWS.AWS_sftpV5.Custom_Endpoint",
+            "type": "boolean",
+            "value": false
+        },
+        {
+            "name": "AWS.AWS_sftpV5.Region",
+            "type": "string",
+            "value": "us-west-2"
+        },
+        {
+            "name": "AWS.AWS_sftpV5.Authentication_Type",
+            "type": "string",
+            "value": "AWS Credentials"
+        },
+        {
+            "name": "AWS.AWS_sftpV5.Access_key_ID",
+            "type": "string",
+            "value": "ASIA3J6MPFK2U7TK6EPO"
+        },
+        {
+            "name": "AWS.AWS_sftpV5.Secret_access_key",
+            "type": "string",
+            "value": "SECRET:vP60RzMrVU9mWO1Brifby17oHEWQeB72Zb053KhSTMPyD1akG1AriCF1olGq3tk+nOqedf7e64I="
+        },
+        {
+            "name": "AWS.AWS_sftpV5.Session_Token",
+            "type": "string",
+            "value": "SECRET:Xqz2GtyhYrSlUhie49wDQr3Kpp4fboEZFNZmX9ZZA11g63OTZSEOsl/CzoKchnPnO9GI9i77Bd0aOu1CpaoWy6Zps5gXPvM6OilSgMdDbwbGljuyMONTJG/S/44BMzQr5Tpg+zaj7ZjMRnHk66cA0ZR7qIrO1occjiA2qQj3htdOppjFv5r7WHfvBZdi3SI1GIELqicZa8j2F1E59T1Hc3mVkGU/81UnnTXgROBBe9T1fMz7b/UbYDZPcw5T5FC4Bd6aYk4iIJmXTnAVQGNy8FE5387a4hyGwv20US5ifvv2P33HPi6wRNP46kJwaGmJe7PORfajE+wvNICtwFIVfmwPDkzCGEwMrBfcL89XrVuVkV5FEsrqcuzAkeiG1KAGi+e5fsWq5q2/c3rJjsmfY5kkeTgA4lJk+akTjhElj0jfBE1CjMG9TA2Vfy3skzyFugK2w37fkMd0tF791OgEgyXxiRr91XKlRL28WcjbSU6Kjo8o/LanJAGx14SdJT5RD/9yEkgcEpvO1RIbP8cU7fpb1l+/EWJICF5Exzi0HAoMzGnsoBnGg2KILGTG/oRbs2UKlGAmLFyNY98ti5dPa7Ejw7XMP5qXYdl0Q1ek/PL2yn7Y4+zCZ8FLDMexahmXKPrGkgbCdm00Tve+XrcddrFjqCIGdzxwfQHU9aqAQ1nqaIxaN8idcUJ8WdRCJ8bpKa7uweNPYCltWnzeGCH9kmobFDPOIcjOlbnEIpIrFiwKMRMfvKw5vs/IOLsQBOjo9kn1vtbMVjvjAj0IdL/liUtKsv3vYuxlZsDYzcXkeMCkJYGVyuYceX8xZbhIE5tG4Ao+3SwvfUPdLi4GV9gJD5xsUvo3YYb54ccCv2fB9+KE989W/zSIZYpM/NAInwoYz5Cbuv+6gt3vEG4Jnz9mbVR2Ux+1ZMAObLov/r0ZlzrP6t4kfiBYQ7ye/42nIZ1jt2g1M4tj1XXZCFd1fk9vK4WatV0pxe3ANOZ7IXBdX8VM1IZHl/waYtMUmHfVOHWzPMVOOWleiMLEVvd+0BhMleHZmUAwcemc5JGmFxrnsL+cRT4TL6fJxLxRwxneChMb2p1OvCWIYtrJJ/kRkvOYUTjx0gA+gok6dGGGx4Vn7ck8edZflfhg9wiBt7SrSyKhEndzfLJhpLB4Fkw+3k6fFCtiQTg23cDHBN4+m9fOIWEusG/mgMkZpLz0cf6wfwYsPeLZcQ=="
+        },
+        {
+            "name": "SFTP.V5_NehaLocal.Known_Host_File",
+            "type": "string",
+            "value": {
+                "filename": "knownhostnehav5",
+                "content": "data:application/octet-stream;base64,MTAuMjQ1LjIuMTI5IHNzaC1yc2EgQUFBQUIzTnphQzF5YzJFQUFBQURBUUFCQUFBQmdRRG5CczBNNTl1K0NGYVp3L2pCMUtyZjNvSHR6TGxKeUNEWmwzVW95WWVGZm5ibUcrc3NhOGp0MERIamR5aGFtR0xMWktPL2x1L0NVaXdyeFRwaVVmeXUzY3N0YWRKRW9vUmRxVE1rWnQzNkd1STFTSndTQld3TDJwODRCWE9YZGhNSGVVcjhnQ1c5ZFQ1YkE5eDVreERoZnlVcHRXVWxpaW0rVVkrQmRQTlpSU1V2TW9lc0NmaGV0RDhqVTVtNTFkTHFmaWF2d1JTTzZXcUdvTXZud3I4SW82QStDa1IwZEJYZlJOczk0MUl1RW9RMGg4azRRdHJSYVRwY29ha3pzVGdpbHdEWlQxQVBKcGlETDhDZGVwczFMTGpQVUdJN0J6MkRJTlh1cy9raWJXOFBLMWVCRFVoSHZjUUp6L2RvL0srYUdVajNQZTJQLzdRbGQ5QkRncFBQT2J0dEZ5ZGtqRWkvS3BSSmZZMFd1QjdtajJXZnl4RkhmUEIrWXZtZFVXRDg3c2hrSEUweDhOMkx2MWNyRGdacHFFQjd3NWNmbGlDaWxERVFVdk1Xa0pyZnlFOVpGUWN6aStzVklyWVNGMGwwS0U0TUs4NzVyL2h4KytnN3Q4dURvK3FVY3Bxb2JvWmMrNHFwcDR6OUg3ZVZ6QlA4ZHJIampHd05rQ3RERUdFPQoxMC4yNDUuMi4xMjkgZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQks4YmRsNVhFVnVhVkluYmlXVkIzTFpnSkEzdllpa2U1Yk9IQnZRMWFsRlpmNlhSd1BYUUVGS3R3aGN5Z3d2K1pNT2laWjdnUjFFcEJWaXdTTGV6by9ZPQoxMC4yNDUuMi4xMjkgc3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUw5THNjdVVOdENOdUxSM0pjUmNiQ1ovN0FIa3hEb3dRMWo4ZlVGV3VqSnUK"
+            }
+        }
+    ],
+    "connections": {
+        "9187d080-d485-11ee-a75e-479d455584a2": {
+            "id": "9187d080-d485-11ee-a75e-479d455584a2",
+            "name": "V5_NehaLocal",
+            "ref": "#connection",
+            "isGlobal": false,
+            "settings": {
+                "name": "V5_NehaLocal",
+                "description": "",
+                "host": "=$property[\"SFTP.V5_NehaLocal.Host\"]",
+                "port": "=$property[\"SFTP.V5_NehaLocal.Port\"]",
+                "user": "=$property[\"SFTP.V5_NehaLocal.User_Name\"]",
+                "password": "=$property[\"SFTP.V5_NehaLocal.Password\"]",
+                "publicKeyFlag": false,
+                "privateKey": "",
+                "privateKeyPassword": "SECRET:sa40XLig4ga4b9gjUaBRlA==",
+                "hostKeyFlag": true,
+                "knownHostFile": "=$property[\"SFTP.V5_NehaLocal.Known_Host_File\"]"
+            }
+        },
+        "91a6a320-d485-11ee-a75e-479d455584a2": {
+            "id": "91a6a320-d485-11ee-a75e-479d455584a2",
+            "name": "AWS_sftpV5",
+            "ref": "#connector",
+            "isGlobal": false,
+            "settings": {
+                "name": "AWS_sftpV5",
+                "description": "",
+                "customEndpoint": "=$property[\"AWS.AWS_sftpV5.Custom_Endpoint\"]",
+                "endpoint": "",
+                "region": "=$property[\"AWS.AWS_sftpV5.Region\"]",
+                "authenticationType": "=$property[\"AWS.AWS_sftpV5.Authentication_Type\"]",
+                "accessKey": "=$property[\"AWS.AWS_sftpV5.Access_key_ID\"]",
+                "secretKey": "=$property[\"AWS.AWS_sftpV5.Secret_access_key\"]",
+                "sessionToken": "=$property[\"AWS.AWS_sftpV5.Session_Token\"]",
+                "assumeRole": false,
+                "roleArn": "",
+                "roleSessionName": "",
+                "externalId": "",
+                "expirationDuration": 900,
+                "LAMBDA_CONNECTION_INFO": ""
+            }
+        }
+    },
+    "metadata": {
+        "endpoints": [],
+        "flogoVersion": "2.24.0"
+    },
+    "contrib": "W3sicmVmIjoiZ2l0aHViLmNvbS90aWJjby9mbG9nby1nZW5lcmFsL3NyYy9hcHAvR2VuZXJhbCIsInZlcnNpb24iOiIxLjYuMCIsInRhZyI6IjEuNi4wLWIwNCIsIm5hbWUiOiJHZW5lcmFsIiwiaWQiOiJHZW5lcmFsIiwiczNsb2NhdGlvbiI6IlRpYmNvL0dlbmVyYWwiLCJpc1VzZXJFeHRlbnNpb24iOmZhbHNlfSx7InJlZiI6ImdpdGh1Yi5jb20vdGliY28vZmxvZ28tc2Z0cC9zcmMvYXBwL1NGVFAiLCJ2ZXJzaW9uIjoiMS4wLjAiLCJ0YWciOiIxLjAuMC1iMDUiLCJuYW1lIjoiU0ZUUCIsImlkIjoiU0ZUUCIsInMzbG9jYXRpb24iOiJUaWJjby9TRlRQIiwiaXNVc2VyRXh0ZW5zaW9uIjpmYWxzZX0seyJyZWYiOiJnaXRodWIuY29tL3RpYmNvL3dpLWFtYXpvbnMzL3NyYy9hcHAvQW1hem9uUzMiLCJ2ZXJzaW9uIjoiMS4zLjEiLCJ0YWciOiIxLjMuMS1iMDIiLCJuYW1lIjoiQW1hem9uIFMzIiwiaWQiOiJBbWF6b25TMyIsInMzbG9jYXRpb24iOiJUaWJjby9BbWF6b25TMyIsImlzVXNlckV4dGVuc2lvbiI6ZmFsc2V9LHsicmVmIjoiZ2l0aHViLmNvbS90aWJjby9mbG9nby1hd3Mvc3JjL2FwcC9BV1MiLCJ2ZXJzaW9uIjoiMS4yLjIiLCJ0YWciOiIxLjIuMi1iMDIiLCJuYW1lIjoiQVdTIiwiaWQiOiJBV1MiLCJzM2xvY2F0aW9uIjoiVGliY28vQVdTIiwiaXNVc2VyRXh0ZW5zaW9uIjpmYWxzZX1d"
+}
