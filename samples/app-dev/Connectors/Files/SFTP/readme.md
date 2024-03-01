@@ -29,15 +29,15 @@ f) Delete Activity
 
 2. Click on Create/Import from the UI.
 
-![Create an app](../../import-screenshots/sftp_screenshot/1.png)
+![Create an app](../../../import-screenshots/sftp_screenshot/1.png)
 
 3. From the same page, select import a Flogo app option.
 
-![Select import](../../import-screenshots/sftp_screenshot/2.png)
+![Select import](../../../import-screenshots/sftp_screenshot/2.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../import-screenshots/sftp_screenshot/3.png)
+![Import your sample](../../../import-screenshots/sftp_screenshot/3.png)
 
 5. After importing app is done, in connection tab make sure to enter the client secret and authorization code and click on generate access token button to establish the connection.
 
@@ -47,7 +47,7 @@ f) Delete Activity
 
 When you import the app you need to enter the client secret and the authorization code and click on generate access token button to establish the connection.
 
-![The connection](../../import-screenshots/sftp_screenshot/4.png)
+![The connection](../../../import-screenshots/sftp_screenshot/4.png)
 
 In the connection, note that: 
 1. Name: Unique name for the SFTP connector.
@@ -75,32 +75,32 @@ If you go inside the app, you can see in flow where we have the combination of A
 9. Since the directory is now empty, we can delete the empty directory with SFTP Delete activity.
 
 
-![Sample Response](../../import-screenshots/sftp_screenshot/5.png)
+![Sample Response](../../../import-screenshots/sftp_screenshot/5.png)
 
 ### Run the application
 For running the application, first you have to push the app and then scale up the app.
 Then after sometime you can see your app in running status.
 
-![Sample Response](../../import-screenshots/sftp_screenshot/6.png)
-![Sample Response](../../import-screenshots/sftp_screenshot/6.1.png)
+![Sample Response](../../../import-screenshots/sftp_screenshot/6.png)
+![Sample Response](../../../import-screenshots/sftp_screenshot/6.1.png)
 
 Another option, If you want to test the sample in the Flow tester then follow below instructions:
  
 In flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
 
-![sample Response](../../import-screenshots/sftp_screenshot/7.png)
-![Sample Response](../../import-screenshots/sftp_screenshot/8.png)
-![Sample Response](../../import-screenshots/sftp_screenshot/9.png)
+![sample Response](../../../import-screenshots/sftp_screenshot/7.png)
+![Sample Response](../../../import-screenshots/sftp_screenshot/8.png)
+![Sample Response](../../../import-screenshots/sftp_screenshot/9.png)
 
 ## Outputs
 
 1. Flow Tester
 
-![Sample Response](../../import-screenshots/sftp_screenshot/10.png)
+![Sample Response](../../../import-screenshots/sftp_screenshot/10.png)
 
 2. Runtime Deployment
 
-![Sample Response](../../import-screenshots/sftp_screenshot/11.png)
+![Sample Response](../../../import-screenshots/sftp_screenshot/11.png)
 
 
 ## Troubleshooting
