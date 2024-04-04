@@ -14,7 +14,8 @@ Effectively handling null or empty JSON objects within the condition paths is us
 3. Steps to import the Flogo application (from step #1) is listed [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/readme.md)
 4. The imported Flogo app with 03 flows should look like shown below.
 5. Every flow represents a way to check for null or empty JSON objects in the condition path. 
-6. For any additional information, please raise your queries or issues via the Issues section.
 <img width="1680" alt="HandlingNullObjects" src="https://user-images.githubusercontent.com/17696107/113671146-9a8b0500-96d3-11eb-8b48-1e6e68d06527.png">
-
-
+6. As shown in below screenshot with the help of error message in flowTester you can enhanced the handling of the null and empty objects.
+7. For any additional information, please raise your queries or issues via the Issues section.
+![FlowTester Screenshots-1](../../../import-screenshots/BranchingErrorHandling/BranchingErrorHandling1.png)
+![FlowTester Screenshots-2](../../../import-screenshots/BranchingErrorHandling/BranchingErrorHandling2.png)
