@@ -20,6 +20,7 @@ Publisher flow uses the Timer trigger for publishing events and the Subscriber f
 6. Subscriber flow leverages MessageSubscriber trigger to subscribe to messages on the destination called "sub".
 7. Users need a valid subscription to TIBCO Cloud Messaging to configure the TIBCO Cloud Messaging Connector appropriately as shown below. 
 8. For any additional information, please raise your queries or issues via the Issues section.
-![Import your sample](../../../import-screenshots/TCM/Pub-Sub-Connector.png)
-![Import your sample](../../../import-screenshots/TCM/Pub-Sub-Connection.png) 
+![Import your sample](../../../app-dev/import-screenshots/TCM/Pub-Sub-Connector.png)
+![Import your sample](../../../app-dev/import-screenshots/TCM/Pub-Sub-Connection.png) 
+
 
