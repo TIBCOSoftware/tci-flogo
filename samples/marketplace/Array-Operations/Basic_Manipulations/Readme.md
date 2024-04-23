@@ -13,7 +13,7 @@ Here, we’re demonstrating 4 different widely used and required array operation
 4. Filtering of the Array
 
 ## Steps to use the Flogo application: 
-1. Download the Flogo application (JSON file) from [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/Array-Operations/Basic_Manipulations/ArrayManipulationOperations.json).
+1. Download the Flogo application (JSON file) from [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/marketplace/Array-Operations/Basic_Manipulations/ArrayManipulationOperations.json).
 2. Login to TIBCO Cloud™ Integration with a valid subscription.
 3. Steps to import the Flogo application (from step #1) is listed [here](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/readme.md).
 4. The imported Flogo app should look like shown below.![commonElementArray](../../../app-dev/import-screenshots/basic-operations.png)

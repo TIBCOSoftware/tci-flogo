@@ -33,7 +33,7 @@ Unmatching elements from only array 1 are returned as output array.
 ![UNmatching](../../../app-dev/import-screenshots/non-matching.png)
 
 ## Reference applications 
-1. Flogo application to demonstrate the usage of unmatching() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/Array-Operations/Find_NonCommonArrayElement-UsingCustomExtension/FindNonCommon_ArrayElement_UsingCustomExtension.json)
-2. Flogo application to demonstrate the usage of merge() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/Array-Operations/FindCommonArrayElement-UsingCustomExtension/FindCommon_ArrayElement-UsingCustomExtension.json)
+1. Flogo application to demonstrate the usage of unmatching() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/marketplace/Array-Operations/Find_NonCommonArrayElement-UsingCustomExtension/FindNonCommon_ArrayElement_UsingCustomExtension.json)
+2. Flogo application to demonstrate the usage of merge() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/marketplace/Array-Operations/FindCommonArrayElement-UsingCustomExtension/FindCommon_ArrayElement-UsingCustomExtension.json)
 3. Steps to import Flogo application can be found [here.](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev)
 
