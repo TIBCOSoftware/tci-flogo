@@ -11,18 +11,15 @@ Here, we’re demonstrating 3 different ways to use json.exists function like,
 
 1. JSON.exits function: Array inside Object
 Use json.exists function to check if a key exists in given Array element or not. If key exists it will return ture else false.
-![Array inside object](../../import-screenshots/jsonExists/JsonExistsArrayElement_LogMessage.png)
 ![Array inside object](../../import-screenshots/jsonExists/JsonExistsArrayElement_Mapper.png)
 
 2. JSON.exits function: using Itertor
 Use json.exists function to check if a key exists in given Array element or not using iterato. If key exists it will return ture else false.
-![Iterator](../../import-screenshots/jsonExists/JsonExistsUsingIterator_LogMessage.png)
 ![Iterator](../../import-screenshots/jsonExists/JsonExistsUsingIterator.png)
 ![Iterator](../../import-screenshots/jsonExists/JsonExistsUsingIterator_Mapper.png)
 
 3. JSON.exits function: using Nested object
 Use json.exists function to check if a key exists in given Nested Array or not. If key exists it will return ture else false.
-![Nested Array](../../import-screenshots/jsonExists/JsonExistsNestedObj_LogMessage.png)
 ![Nested Array](../../import-screenshots/jsonExists/JsonExistsNestedObj_Mapper.png)
 
 
