@@ -1,0 +1,527 @@
+{
+  "imports": [
+    "github.com/project-flogo/flow",
+    "github.com/project-flogo/contrib/activity/noop",
+    "github.com/tibco/flogo-tdv/src/app/TDV/activity/query",
+    "github.com/tibco/flogo-tdv/src/app/TDV/activity/callprocedure",
+    "github.com/tibco/flogo-general/src/app/General/activity/log",
+    "github.com/project-flogo/contrib/activity/actreturn",
+    "github.com/tibco/flogo-general/src/app/General/trigger/rest",
+    "github.com/project-flogo/contrib/function/string",
+    "github.com/tibco/flogo-tdv/src/app/TDV/connector/connection"
+  ],
+  "name": "TDV-EC2-Json",
+  "description": "",
+  "version": "1.0.0",
+  "type": "flogo:app",
+  "appModel": "1.1.1",
+  "tags": [],
+  "triggers": [
+    {
+      "ref": "#rest",
+      "name": "tibco-wi-rest",
+      "description": "Simple REST Trigger",
+      "settings": {
+        "port": 9999,
+        "APISpecUpdate": false,
+        "swagger": "",
+        "swaggerVersion": "v2",
+        "apiVersion": "1.0.0",
+        "secureConnection": false,
+        "serverKey": "",
+        "caCertificate": ""
+      },
+      "id": "ReceiveHTTPMessage",
+      "handlers": [
+        {
+          "description": "",
+          "settings": {
+            "Method": "GET",
+            "reqType": "application/json",
+            "Path": "/tdv",
+            "OutputValidation": false
+          },
+          "action": {
+            "ref": "github.com/project-flogo/flow",
+            "settings": {
+              "flowURI": "res://flow:New_flow"
+            },
+            "input": {
+              "headers": "=$.headers"
+            },
+            "output": {
+              "code": "=$.code",
+              "data": {
+                "mapping": {
+                  "output": "=$.data.output"
+                }
+              }
+            }
+          },
+          "reply": {
+            "code": 200,
+            "configureResponseCodes": false,
+            "message": {}
+          },
+          "schemas": {
+            "reply": {
+              "data": {
+                "type": "json",
+                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                "fe_metadata": "{\n    \"output\":\"\"\n}"
+              },
+              "responseBody": {
+                "type": "json",
+                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}"
+              }
+            },
+            "output": {
+              "headers": {
+                "type": "json",
+                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+              }
+            }
+          },
+          "name": "New_flow"
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "flow:New_flow",
+      "data": {
+        "name": "New_flow",
+        "description": "",
+        "links": [
+          {
+            "id": 1,
+            "from": "StartActivity",
+            "to": "TDVQuery",
+            "type": "label",
+            "label": "StartActivity to TDVQuery"
+          },
+          {
+            "id": 2,
+            "from": "TDVQuery",
+            "to": "TDVCallProcedure",
+            "type": "label",
+            "label": "TDVQuery to TDVCallProcedure"
+          },
+          {
+            "id": 3,
+            "from": "TDVCallProcedure",
+            "to": "LogMessage",
+            "type": "label",
+            "label": "TDVCallProcedure to LogMessage"
+          },
+          {
+            "id": 4,
+            "from": "LogMessage",
+            "to": "Return",
+            "type": "label",
+            "label": "LogMessage to Return"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "StartActivity",
+            "name": "StartActivity",
+            "description": "NoOp Activity",
+            "activity": {
+              "ref": "#noop"
+            }
+          },
+          {
+            "id": "TDVQuery",
+            "name": "TDVQuery",
+            "description": "This activity executes query on a TDV database",
+            "settings": {
+              "retryOnError": {
+                "count": 0,
+                "interval": 0
+              }
+            },
+            "activity": {
+              "ref": "#query",
+              "input": {
+                "Connection": "conn://8744bfdb-717e-4711-8eda-08e29822a4c0",
+                "QueryName": "",
+                "Catalog": "catalog1",
+                "Schema": "schema3",
+                "Query": "SELECT * FROM ViewOrder;",
+                "Fields": [
+                  {
+                    "FieldName": "OrderID",
+                    "Type": "INTEGER",
+                    "Selected": true,
+                    "Parameter": false,
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "ProductID",
+                    "Type": "INTEGER",
+                    "Selected": true,
+                    "Parameter": false,
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "Discount",
+                    "Type": "NUMERIC",
+                    "Selected": true,
+                    "Parameter": false,
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "OrderDate",
+                    "Type": "DATE",
+                    "Selected": true,
+                    "Parameter": false,
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "CompanyName",
+                    "Type": "VARCHAR",
+                    "Selected": true,
+                    "Parameter": false,
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "CustomerContactFirstName",
+                    "Type": "VARCHAR",
+                    "Selected": true,
+                    "Parameter": false,
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "CustomerContactLastName",
+                    "Type": "VARCHAR",
+                    "Selected": true,
+                    "Parameter": false,
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "CustomerContactPhone",
+                    "Type": "VARCHAR",
+                    "Selected": true,
+                    "Parameter": false,
+                    "isEditable": false
+                  }
+                ],
+                "ConnectionState": "714062a1-6f33-42c2-b619-7b6928ca71c98744bfdb-717e-4711-8eda-08e29822a4c0",
+                "CatalogState": "714062a1-6f33-42c2-b619-7b6928ca71c98744bfdb-717e-4711-8eda-08e29822a4c0catalog1",
+                "State": "714062a1-6f33-42c2-b619-7b6928ca71c9SELECT * FROM ViewOrder;"
+              },
+              "schemas": {
+                "input": {
+                  "input": {
+                    "type": "json",
+                    "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
+                    "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                  }
+                },
+                "output": {
+                  "Output": {
+                    "type": "json",
+                    "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"OrderID\":{\"type\":\"integer\"},\"ProductID\":{\"type\":\"integer\"},\"Discount\":{\"type\":\"number\"},\"OrderDate\":{\"type\":\"string\",\"format\":\"date\"},\"CompanyName\":{\"type\":\"string\"},\"CustomerContactFirstName\":{\"type\":\"string\"},\"CustomerContactLastName\":{\"type\":\"string\"},\"CustomerContactPhone\":{\"type\":\"string\"}}}}}}",
+                    "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"OrderID\":{\"type\":\"integer\"},\"ProductID\":{\"type\":\"integer\"},\"Discount\":{\"type\":\"number\"},\"OrderDate\":{\"type\":\"string\",\"format\":\"date\"},\"CompanyName\":{\"type\":\"string\"},\"CustomerContactFirstName\":{\"type\":\"string\"},\"CustomerContactLastName\":{\"type\":\"string\"},\"CustomerContactPhone\":{\"type\":\"string\"}}}}}}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "TDVCallProcedure",
+            "name": "TDVCallProcedure",
+            "description": "This activity Calls Procedure to be execute on TDV database",
+            "settings": {
+              "retryOnError": {
+                "count": 0,
+                "interval": 0
+              }
+            },
+            "activity": {
+              "ref": "#callprocedure",
+              "settings": {
+                "Connection": "conn://8744bfdb-717e-4711-8eda-08e29822a4c0"
+              },
+              "input": {
+                "Catalog": "catalog1",
+                "Schema": "schema3",
+                "QueryName": "",
+                "Procedure": "LookupProduct",
+                "Fields": [
+                  {
+                    "FieldName": "desiredProduct",
+                    "Type": "INTEGER",
+                    "Direction": "IN",
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "result",
+                    "Type": "STRUCT",
+                    "Direction": "RETURNVALUE",
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "ProductName",
+                    "Type": "VARCHAR",
+                    "Direction": "OUT",
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "ProductID",
+                    "Type": "INTEGER",
+                    "Direction": "OUT",
+                    "isEditable": false
+                  },
+                  {
+                    "FieldName": "ProductDescription",
+                    "Type": "VARCHAR",
+                    "Direction": "OUT",
+                    "isEditable": false
+                  }
+                ],
+                "State": "1b3c69cd-c700-43a4-991a-7f4f51af9aa88744bfdb-717e-4711-8eda-08e29822a4c0catalog1schema3LookupProduct",
+                "ConnectionState": "1b3c69cd-c700-43a4-991a-7f4f51af9aa88744bfdb-717e-4711-8eda-08e29822a4c0",
+                "CatalogState": "1b3c69cd-c700-43a4-991a-7f4f51af9aa88744bfdb-717e-4711-8eda-08e29822a4c0catalog1",
+                "SchemaState": "1b3c69cd-c700-43a4-991a-7f4f51af9aa88744bfdb-717e-4711-8eda-08e29822a4c0catalog1schema3",
+                "input": {
+                  "mapping": {
+                    "parameters": {
+                      "desiredProduct": 3
+                    }
+                  }
+                }
+              },
+              "schemas": {
+                "input": {
+                  "input": {
+                    "type": "json",
+                    "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"desiredProduct\":{\"type\":\"integer\"}}}}}",
+                    "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"desiredProduct\":{\"type\":\"integer\"}}}}}"
+                  }
+                },
+                "output": {
+                  "Output": {
+                    "type": "json",
+                    "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"result\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"ProductName\":{\"type\":\"string\"},\"ProductID\":{\"type\":\"integer\"},\"ProductDescription\":{\"type\":\"string\"}}}}}}",
+                    "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"result\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"ProductName\":{\"type\":\"string\"},\"ProductID\":{\"type\":\"integer\"},\"ProductDescription\":{\"type\":\"string\"}}}}}}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "LogMessage",
+            "name": "LogMessage",
+            "description": "Simple Log Message Activity",
+            "activity": {
+              "ref": "#log",
+              "input": {
+                "Log Level": "INFO",
+                "flowInfo": false,
+                "message": "=string.concat(string.tostring($activity[TDVQuery].Output),string.tostring($activity[TDVCallProcedure].Output))",
+                "logLevel": ""
+              }
+            }
+          },
+          {
+            "id": "Return",
+            "name": "Return",
+            "description": "Simple Return Activity",
+            "activity": {
+              "ref": "#actreturn",
+              "settings": {
+                "mappings": {
+                  "code": 200,
+                  "data": {
+                    "mapping": {
+                      "output": "=string.concat(string.tostring($activity[TDVQuery].Output),string.tostring($activity[TDVCallProcedure].Output))"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjAsInkiOjk3fSwiVERWUXVlcnkiOnsieCI6NjgsInkiOjkzfSwiVERWQ2FsbFByb2NlZHVyZSI6eyJ4IjoyNTMsInkiOjk3fSwiTG9nTWVzc2FnZSI6eyJ4Ijo0MTQsInkiOjkyfSwiUmV0dXJuIjp7IngiOjI3NiwieSI6Mjc4fX0=",
+        "metadata": {
+          "input": [
+            {
+              "name": "headers",
+              "type": "object",
+              "schema": {
+                "type": "json",
+                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+              }
+            },
+            {
+              "name": "requestURI",
+              "type": "string"
+            },
+            {
+              "name": "method",
+              "type": "string"
+            }
+          ],
+          "output": [
+            {
+              "name": "code",
+              "type": "integer"
+            },
+            {
+              "name": "data",
+              "type": "object",
+              "schema": {
+                "type": "json",
+                "value": "{\"output\":{\"type\":\"string\"}}"
+              }
+            }
+          ],
+          "fe_metadata": {
+            "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+            "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+          }
+        },
+        "explicitReply": true
+      }
+    }
+  ],
+  "properties": [
+    {
+      "name": "TDV.TDV-EC2.Server",
+      "type": "string",
+      "value": "54.153.30.86"
+    },
+    {
+      "name": "TDV.TDV-EC2.Port",
+      "type": "float64",
+      "value": 9401
+    },
+    {
+      "name": "TDV.TDV-EC2.Domain",
+      "type": "string",
+      "value": "composite"
+    },
+    {
+      "name": "TDV.TDV-EC2.Datasource_Name",
+      "type": "string",
+      "value": "Datasource1"
+    },
+    {
+      "name": "TDV.TDV-EC2.User",
+      "type": "string",
+      "value": "admin"
+    },
+    {
+      "name": "TDV.TDV-EC2.Password",
+      "type": "string",
+      "value": "SECRET:XrDhG+HNYn3DK6Bn7W3PaC1V/xY8Rg=="
+    },
+    {
+      "name": "TDV.TDV-EC2.Maximum_Connection_Retry_Attempts",
+      "type": "float64",
+      "value": 3
+    },
+    {
+      "name": "TDV.TDV-EC2.Connection_Retry_Delay",
+      "type": "float64",
+      "value": 5
+    },
+    {
+      "name": "TDV.TDV-EC2.Connection_Timeout",
+      "type": "float64",
+      "value": 20
+    },
+    {
+      "name": "TDV.TDV-EC2.Session_Timeout",
+      "type": "float64",
+      "value": 0
+    },
+    {
+      "name": "TDV.TDV-EC2.Request_Timeout",
+      "type": "float64",
+      "value": 0
+    }
+  ],
+  "connections": {
+    "8744bfdb-717e-4711-8eda-08e29822a4c0": {
+      "id": "8744bfdb-717e-4711-8eda-08e29822a4c0",
+      "name": "TDV-EC2",
+      "ref": "#connection",
+      "isGlobal": false,
+      "settings": {
+        "name": "TDV-EC2",
+        "description": "",
+        "server": "=$property[\"TDV.TDV-EC2.Server\"]",
+        "port": "=$property[\"TDV.TDV-EC2.Port\"]",
+        "domain": "=$property[\"TDV.TDV-EC2.Domain\"]",
+        "datasource": "=$property[\"TDV.TDV-EC2.Datasource_Name\"]",
+        "user": "=$property[\"TDV.TDV-EC2.User\"]",
+        "password": "=$property[\"TDV.TDV-EC2.Password\"]",
+        "maxconnectattempts": "=$property[\"TDV.TDV-EC2.Maximum_Connection_Retry_Attempts\"]",
+        "connectionretrydelay": "=$property[\"TDV.TDV-EC2.Connection_Retry_Delay\"]",
+        "connectiontimeout": "=$property[\"TDV.TDV-EC2.Connection_Timeout\"]",
+        "sessionTimeout": "=$property[\"TDV.TDV-EC2.Session_Timeout\"]",
+        "requestTimeout": "=$property[\"TDV.TDV-EC2.Request_Timeout\"]",
+        "tlsconfig": false,
+        "tlsparam": "VerifyCA",
+        "cacert": "",
+        "onprem": false
+      }
+    }
+  },
+  "contrib": "W3sicmVmIjoiZ2l0aHViLmNvbS90aWJjby9mbG9nby1nZW5lcmFsL3NyYy9hcHAvR2VuZXJhbCIsImlkIjoiR2VuZXJhbCIsInZlcnNpb24iOiIxLjYuMSIsInRhZyI6IjEuNi4xLWIwNyIsIm5hbWUiOiJHZW5lcmFsIiwiczNsb2NhdGlvbiI6IlRpYmNvL0dlbmVyYWwiLCJpc1VzZXJFeHRlbnNpb24iOmZhbHNlfSx7InJlZiI6ImdpdGh1Yi5jb20vdGliY28vZmxvZ28tdGR2L3NyYy9hcHAvVERWIiwiaWQiOiJURFYiLCJ2ZXJzaW9uIjoiMS4xLjIiLCJ0YWciOiIxLjEuMi1iMDUiLCJuYW1lIjoiVElCQ08gRGF0YSBWaXJ0dWFsaXphdGlvbiIsInMzbG9jYXRpb24iOiJUaWJjby9URFYiLCJpc1VzZXJFeHRlbnNpb24iOmZhbHNlfV0=",
+  "metadata": {
+    "endpoints": [
+      {
+        "protocol": "http",
+        "port": "9999",
+        "spec": {
+          "name": "TDV-EC2-Json",
+          "version": "1.0.0"
+        },
+        "title": "ReceiveHTTPMessage",
+        "swagger": {
+          "swagger": "2.0",
+          "info": {
+            "title": "TDV-EC2-Json",
+            "version": "1.0.0",
+            "description": "Simple REST Trigger"
+          },
+          "paths": {
+            "/tdv": {
+              "get": {
+                "summary": "New_flow",
+                "operationId": "get_tdv",
+                "parameters": [],
+                "responses": {
+                  "200": {
+                    "description": "Rest Response",
+                    "schema": {
+                      "$ref": "#/definitions/schema1"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "definitions": {
+            "schema1": {
+              "type": "object",
+              "properties": {
+                "output": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    ],
+    "flogoVersion": "2.25.0"
+  }
+}
