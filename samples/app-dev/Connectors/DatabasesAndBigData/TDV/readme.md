@@ -3,10 +3,11 @@
 
 ## Description
 
-This example demonstrate how we can create and run TDV app. With TIBCO Flogo® Connector for TIBCO® Data Virtualization, you can run TDV queries by using a Query activity and invoke a stored procedure by using a Call Procedure activity.TDV app contains 2 activities TDV Query and TDV CallProcedure.
+This example demonstrate how we can create and run a TDV app. With TIBCO Flogo® Connector for TIBCO® Data Virtualization, you can run TDV queries by using a Query activity and invoke a stored procedure by using a Call Procedure activity. TDV app contains 2 activities TDV Query and TDV CallProcedure.
 
-TDV Query:Use this activity to run a simple or a complex TDV query on a database. The TDV Query activity returns information in the form of rows.
-TDV CallProcedure: Use this activity to run a TDV script procedure.
+TDV Query : Use this activity to run a simple or a complex TDV query on a database. The TDV Query activity returns information in the form of rows.
+
+TDV CallProcedure : Use this activity to run a TDV script procedure.
 
 ## Prerequisites
 
@@ -30,7 +31,7 @@ TDV CallProcedure: Use this activity to run a TDV script procedure.
 
 ![Import your sample](../../../import-screenshots/tdv_screenshots/3.png)
 
-5. Click on Upload Button. The Import app dialog displays the connector name, some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
+5. Click on Upload Button. The Import app dialog displays the trigger used, flowname, connector name, some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
 ![The Import app dialog](../../../import-screenshots/tdv_screenshots/3-.png)
 ![The Import app dialog](../../../import-screenshots/tdv_screenshots/4.png)
