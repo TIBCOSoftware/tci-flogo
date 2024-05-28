@@ -23,19 +23,20 @@ Below is the API that we should invoke to enable the db service.
 
 **/v1/subscriptions/{subscriptionLocator}/dbservice**
 
-![Enable dbservice] (../../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
+![Enable dbservice](../../../import-screenshots/Onpremise_Postgresql/enable_dbservice.jpg)
 
 ## Create, configure access key & secret and Start the tibagent
 
-Here we need 2 tibagents this is because when we enable dbservice from UI/API then it enabled with system access key which is used by connection for design time and to test on-premise app via endpoint it uses custom access key which need to attach in app before scaling it. So we can't use both access key in single agent that's why we need 2 tibagents.
+Here we need 2 tibagents this is because when we enable dbservice from UI/API then it enabled with system access key which is used by connection for design time and to test on-premise app via endpoint it uses custom access key which need to attach in app before scaling it. 
+So we can't use both access key in single agent that's why we need 2 tibagents.
 
-Tibagent 1
+**Tibagent 1**
 
 ./tibagent configure agent <agent_name1> 
 
 ./tibagent start agent --spec container_port:onpremise_host:onpremise_port <agent_name1>
 
-Tibagent 2
+**Tibagent 2**
 
 ./tibagent configure agent -p <pass_differnt_port> <agent_name2> 
 
@@ -119,7 +120,6 @@ Endpoint
 * If PostgreSQL database is not up and running then we should see error while creating connection.
 * If user don't have admin right and try to enable/disable service through Platform API then error "No permission to enable Flogo Tester" should appear.
 * If there are no Hybrid Agents configured for the Organization before and you attempt to enable the service using the API, the following warning message is generated "Please enable hybrid proxy first". To solve this issue create Hybrid agent first.
-* If flogotester service is not enabled using the API and we try to click "Using on-premise services" checkbox in flogo Launch Configuartion then we should see error "Flow tester service unreachable. To use this feature, Flow tester service must be enabled and running for your organization. Refer 'Flow Tester' documentation for more details."
 
 ## Contributing
 
