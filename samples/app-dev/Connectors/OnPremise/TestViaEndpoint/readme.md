@@ -1,16 +1,18 @@
-# Sample demonstrating Flow Tester using on-premise DB services
+# Sample demonstrating on-premise DB service app test via endpoint
 
 ## Description
 
-This sample demonstrates how to use flow tester for the apps using on-premise PostgreSQL Database.
+This sample demonstrates how to test apps using on-premise PostgreSQL Database via endpoint.
 
 ## Pre-requisites
 
 1. Ensure that PostgreSQL DB is up and running on-premise.
 2. User must have Admin access to enable/disable services via TCI Platform API.
 3. Ensure that OAUTH Token is generated in order to use API. Please refer [here](https://integration.cloud.tibco.com/docs/#Subsystems/tci-api/getstarted/basics/enable-api-access.html?Highlight=OAUTH%20Token)
-4. User must download the latest tibagent. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____4)
-5. Ensure that hybrid proxy must be enabled in your organization before (To enable the Hybrid proxy user just need to create agent in the current organization. This step should only perform when user see error message "Please enable hybrid proxy first" while enabling/disabling the serivce through Platform API. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____4))
+4. Ensure that Proxy Agent access key is generated in order to attach/use in app. Please refer [here](https://account.cloud.tibco.com/cloud/docs/proxy-agent/creating_access_key.html)
+5. User must download the latest tibagent. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____4)
+6. Ensure that hybrid proxy must be enabled in your organization before (To enable the Hybrid proxy user just need to create agent in the current organization. This step should only perform when user see error message "Please enable hybrid proxy first" while enabling/disabling the serivce through Platform API. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____4))
+
 
 ## Enable the dbservice
 
@@ -21,25 +23,25 @@ Below is the API that we should invoke to enable the db service.
 
 **/v1/subscriptions/{subscriptionLocator}/dbservice**
 
-![Enable dbservice](../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
- 
-## Enable the Flogotester
+![Enable dbservice](../../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
 
-In order to test on-premise services using flow tester user first need to enable the flogotester service TCI Platform API.To know more, please refer [here](https://integration.cloud.tibco.com/docs/#Subsystems/tci-api/organization/flogo-tester-access.html?TocPath=TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520API%257CManaging%2520an%2520Organization%2520with%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520API%257C_____11)
+## Create, configure access key & secret and Start the tibagent
 
-Hit below API to enable the flogotester.
+Here we need 2 tibagents this is because when we enable dbservice from UI/API then it enabled with system access key which is used by connection for design time and to test on-premise app via endpoint it uses custom access key which need to attach in app before scaling it. So we can't use both access key in single agent that's why we need 2 tibagents.
 
-**/v1/subscriptions/{subscriptionLocator}/flogotester**
+Tibagent 1
 
-![Enable flogotester](../../import-screenshots/Onpremise_Postgresql/enable_flogotester.png)
+./tibagent configure agent <agent_name1> 
 
-## Create and Start the tibagent
+./tibagent start agent --spec container_port:onpremise_host:onpremise_port <agent_name1>
 
-Below are the steps to create and start an agent:
+Tibagent 2
 
-./tibagent configure agent <agent_name> 
+./tibagent configure agent -p <pass_differnt_port> <agent_name2> 
 
-./tibagent start agent --spec container_port:onpremise_host:onpremise_port <agent_name>
+./tibagent configure connect -a <access_key> -s <access_secret> <agent_name2>
+
+./tibagent start agent --spec container_port:onpremise_host:onpremise_port <agent_name2>
 
 To know more about Hybrid agents. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/agent-command-reference.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____5)
 
@@ -49,21 +51,21 @@ To know more about Hybrid agents. Please refer [here](https://integration.cloud.
 
 2. Create a new empty app
 
-![Create an app](../../import-screenshots/sqlserver_screenshot/1.png)
+![Create an app](../../../import-screenshots/sqlserver_screenshot/1.png)
 
 3. On the app details page, select import app option.
 
-![Select import](../../import-screenshots/sqlserver_screenshot/2.png)
+![Select import](../../../import-screenshots/sqlserver_screenshot/2.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../import-screenshots/Onpremise_Postgresql/3.png)
+![Import your sample](../../../import-screenshots/Onpremise_Postgresql/3.png)
 
 5. Click on Upload Button. The Import app dialog displays shows what Triggers is using, Flow name, Connection and some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
-![The Import app dialog](../../import-screenshots/Onpremise_Postgresql/4.png)
+![The Import app dialog](../../../import-screenshots/Onpremise_Postgresql/4.jpg)
 
-![The Import app dialog](../../import-screenshots/Onpremise_Postgresql/5.png)
+![The Import app dialog](../../../import-screenshots/Onpremise_Postgresql/5.jpg)
 
 6. After importing app is done, in connection tab make sure to re-enter the password and click on connect button to establish the connection.
 
@@ -73,9 +75,11 @@ To know more about Hybrid agents. Please refer [here](https://integration.cloud.
 
 When you import the app you need to re-enter the password and establish the connection.
 
-![The connection](../../import-screenshots/Onpremise_Postgresql/6.png)
-![The connection](../../import-screenshots/Onpremise_Postgresql/7.png)
-![The connection](../../import-screenshots/Onpremise_Postgresql/8.png)
+![The connection](../../../import-screenshots/Onpremise_Postgresql/6.png)
+
+![The connection](../../../import-screenshots/Onpremise_Postgresql/7.png)
+
+![The connection](../../../import-screenshots/Onpremise_Postgresql/8.png)
 
 In the connection, note that,
 1. Host - In this field we give private ip of the on-premise system on which database is hosted.
@@ -84,29 +88,30 @@ In the connection, note that,
 ### The Flow
 
 If you go inside the app, you can see in flow we have 4 activities (Query,Insert, Update and Delete) that perform some operations.
-Also in flow we have Log Message for getting the output.
+Also in flow we have Log Message and Return activity for getting the output.
 
-![Sample Response](../../import-screenshots/Onpremise_Postgresql/9.png)
+![Sample Response](../../../import-screenshots/Onpremise_Postgresql/9.jpg)
 
 ### Run the application
 
-In order to test the on-premise DBConnector service in flow tester we need to select the "*Using on-premise services*" checkbox in Flogo Launch configuration.
+In order to test the on-premise DBConnector app via endpoint we need to attach access key in app and push the app.
+In app , click on Environment controls -> click on Hybrid connectivity -> select access key from drop down -> click on Push updates.
  
-In flow, click on Test Button -> create Launch configuration -> Select "Using on-premise services" checkbox -> click Next button -> click on Run
 
-![sample Response](../../import-screenshots/Onpremise_Postgresql/10.png)
+![sample Response](../../../import-screenshots/Onpremise_Postgresql/15.jpg)
 
-![Sample Response](../../import-screenshots/Onpremise_Postgresql/11.png)
+![Sample Response](../../../import-screenshots/Onpremise_Postgresql/16.jpg)
 
-![Sample Response](../../import-screenshots/Onpremise_Postgresql/12.png)
 
 ## Outputs
 
-Flow Tester
+Endpoint
 
-![Sample Response](../../import-screenshots/Onpremise_Postgresql/13.png)
+![Sample Response](../../../import-screenshots/Onpremise_Postgresql/17.jpg)
 
-![Sample Response](../../import-screenshots/Onpremise_Postgresql/14.png)
+![Sample Response](../../../import-screenshots/Onpremise_Postgresql/18.jpg)
+
+![Sample Response](../../../import-screenshots/Onpremise_Postgresql/19.jpg)
 
 
 ## Troubleshooting
