@@ -23,7 +23,7 @@ Below is the API that we should invoke to enable the db service.
 
 **/v1/subscriptions/{subscriptionLocator}/dbservice**
 
-![Enable dbservice](../../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
+![Enable dbservice] (../../../import-screenshots/Onpremise_Postgresql/enable_dbservice.png)
 
 ## Create, configure access key & secret and Start the tibagent
 
