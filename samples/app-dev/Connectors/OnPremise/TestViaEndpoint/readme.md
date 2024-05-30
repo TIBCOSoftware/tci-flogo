@@ -2,14 +2,14 @@
 
 ## Description
 
-This sample demonstrates how to test apps using on-premise PostgreSQL Database via endpoint.
+This sample demonstrates how to test Flogo apps using on-premise PostgreSQL Database via endpoint.
 
 ## Pre-requisites
 
 1. Ensure that PostgreSQL DB is up and running on-premise.
 2. User must have Admin access to enable/disable services via TCI Platform API.
 3. Ensure that OAUTH Token is generated in order to use API. Please refer [here](https://integration.cloud.tibco.com/docs/#Subsystems/tci-api/getstarted/basics/enable-api-access.html?Highlight=OAUTH%20Token)
-4. Ensure that Proxy Agent access key is generated in order to attach/use in app. Please refer [here](https://account.cloud.tibco.com/cloud/docs/proxy-agent/creating_access_key.html)
+4. Ensure that Proxy Agent access key is generated in order to configure in tibagent and attach in the flogo app for runtime. Please refer [here](https://account.cloud.tibco.com/cloud/docs/proxy-agent/creating_access_key.html)
 5. User must download the latest tibagent. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____4)
 6. Ensure that hybrid proxy must be enabled in your organization before (To enable the Hybrid proxy user just need to create agent in the current organization. This step should only perform when user see error message "Please enable hybrid proxy first" while enabling/disabling the serivce through Platform API. Please refer [here](https://integration.cloud.tibco.com/docs/#tci/using/hybrid-agent/installing-configuring-running-agent.html?TocPath=Using%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%257CUsing%2520the%2520TIBCO%2520Cloud%25E2%2584%25A2%2520Integration%2520-%2520Hybrid%2520Agent%257C_____4))
 
@@ -27,8 +27,11 @@ Below is the API that we should invoke to enable the db service.
 
 ## Create, configure access key & secret and Start the tibagent
 
-Here we need 2 tibagents this is because when we enable dbservice from UI/API then it enabled with system access key which is used by connection for design time and to test on-premise app via endpoint it uses custom access key which need to attach in app before scaling it. 
-So we can't use both access key in single agent that's why we need 2 tibagents.
+Here we need 2 tibagents this is because when we enable dbservice from UI/API then it enabled with system access key which is used by connection for design time and to test on-premise app via endpoint it uses custom access key which need to be attached in app before scaling it. 
+
+We can't use both system and custom access key in single agent. So that's why we need 2 tibagents with different access keys.
+
+Here are the steps to start the agents.
 
 **Tibagent 1**
 
@@ -89,7 +92,7 @@ In the connection, note that,
 ### The Flow
 
 If you go inside the app, you can see in flow we have 4 activities (Query,Insert, Update and Delete) that perform some operations.
-Also in flow we have Log Message and Return activity for getting the output.
+Also in flow we have Log Message to log the output and Return activity for getting the output.
 
 ![Sample Response](../../../import-screenshots/Onpremise_Postgresql/9.jpg)
 
@@ -117,7 +120,7 @@ Endpoint
 
 ## Troubleshooting
 
-* If PostgreSQL database is not up and running then we should see error while creating connection.
+* If PostgreSQL database is not up and running then we should see error "Connection timed out" while creating connection.
 * If user don't have admin right and try to enable/disable service through Platform API then error "No permission to enable Flogo Tester" should appear.
 * If there are no Hybrid Agents configured for the Organization before and you attempt to enable the service using the API, the following warning message is generated "Please enable hybrid proxy first". To solve this issue create Hybrid agent first.
 
