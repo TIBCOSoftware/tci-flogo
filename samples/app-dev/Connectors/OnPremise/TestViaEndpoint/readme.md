@@ -25,6 +25,8 @@ Below is the API that we should invoke to enable the db service.
 
 ![Enable dbservice](../../../import-screenshots/Onpremise_Postgresql/enable_dbservice.jpg)
 
+**Note:-** To test Flogo apps using on-premise PostgreSQL Database via flogo tester then please refer [this](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/Connectors/OnPremise/TestInFlowTester) sample
+
 ## Create, configure access key & secret and Start the tibagent
 
 Here we need 2 tibagents this is because when we enable dbservice from UI/API then it enabled with system access key which is used by connection for design time and to test on-premise app via endpoint it uses custom access key which need to be attached in app before scaling it. 

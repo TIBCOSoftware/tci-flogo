@@ -2,7 +2,7 @@
 
 ## Description
 
-This sample demonstrates how to use flow tester for the apps using on-premise PostgreSQL Database.
+This sample demonstrates how to use flow tester for the Flogo apps using on-premise PostgreSQL Database.
 
 ## Pre-requisites
 
@@ -32,6 +32,8 @@ Hit below API to enable the flogotester.
 **/v1/subscriptions/{subscriptionLocator}/flogotester**
 
 ![Enable flogotester](../../../import-screenshots/Onpremise_Postgresql/enable_flogotester.png)
+
+**Note:-** To test Flogo apps using on-premise PostgreSQL Database via endpoints then please refer [this](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev/Connectors/OnPremise/TestViaEndpoint) sample
 
 ## Create and Start the tibagent
 
@@ -84,7 +86,7 @@ In the connection, note that,
 ### The Flow
 
 If you go inside the app, you can see in flow we have 4 activities (Query,Insert, Update and Delete) that perform some operations.
-Also in flow we have Log Message for getting the output.
+Also in flow we have Log Message to log the output and Return activity for getting the output.
 
 ![Sample Response](../../../import-screenshots/Onpremise_Postgresql/9.jpg)
 
@@ -111,7 +113,7 @@ Flow Tester
 
 ## Troubleshooting
 
-* If PostgreSQL database is not up and running then we should see error while creating connection.
+* If PostgreSQL database is not up and running then we should see error "Connection timed out" while creating connection.
 * If user don't have admin right and try to enable/disable service through Platform API then error "No permission to enable Flogo Tester" should appear.
 * If there are no Hybrid Agents configured for the Organization before and you attempt to enable the service using the API, the following warning message is generated "Please enable hybrid proxy first". To solve this issue create Hybrid agent first.
 * If flogotester service is not enabled using the API and we try to click "Using on-premise services" checkbox in flogo Launch Configuartion then we should see error "Flow tester service unreachable. To use this feature, Flow tester service must be enabled and running for your organization. Refer 'Flow Tester' documentation for more details."
