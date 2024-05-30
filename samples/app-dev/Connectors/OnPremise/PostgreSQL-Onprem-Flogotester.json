@@ -1,14 +1,16 @@
 {
     "imports": [
         "github.com/project-flogo/flow",
-        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/activity/insert",
-        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/activity/update",
-        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/activity/query",
-        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/activity/delete",
-        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/activity/log",
-        "git.tibco.com/git/product/ipaas/wi-contrib.git/contributions/General/trigger/timer",
+        "github.com/project-flogo/contrib/activity/noop",
+        "github.com/tibco/wi-postgres/src/app/PostgreSQL/activity/insert",
+        "github.com/tibco/wi-postgres/src/app/PostgreSQL/activity/update",
+        "github.com/tibco/wi-postgres/src/app/PostgreSQL/activity/query",
+        "github.com/tibco/wi-postgres/src/app/PostgreSQL/activity/delete",
+        "github.com/tibco/flogo-general/src/app/General/activity/log",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "github.com/tibco/flogo-general/src/app/General/trigger/rest",
         "github.com/project-flogo/contrib/function/string",
-        "git.tibco.com/git/product/ipaas/wi-postgres.git/src/app/PostgreSQL/connector/connection"
+        "github.com/tibco/wi-postgres/src/app/PostgreSQL/connector/connection"
     ],
     "name": "PostgreSQL-Onprem-Flogotester",
     "description": "",
@@ -18,26 +20,66 @@
     "tags": [],
     "triggers": [
         {
-            "ref": "#timer",
-            "name": "tibco-wi-timer",
-            "description": "Simple Timer trigger",
-            "settings": {},
-            "id": "TimerTrigger",
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9999,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "apiVersion": "1.0.0",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage",
             "handlers": [
                 {
                     "description": "",
                     "settings": {
-                        "Scheduler Options": "Timer",
-                        "Repeating": false,
-                        "Delayed Start": false,
-                        "Time Interval": 1,
-                        "Interval Unit": "Second",
-                        "Cron Expression": ""
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/postgres-onprem",
+                        "OutputValidation": false
                     },
                     "action": {
                         "ref": "github.com/project-flogo/flow",
                         "settings": {
                             "flowURI": "res://flow:CRUD_Flow"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "data": "=$.data"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}"
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}"
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
                         }
                     },
                     "name": "CRUD_Flow"
@@ -54,30 +96,56 @@
                 "links": [
                     {
                         "id": 1,
-                        "from": "PostgreSQLInsert",
-                        "to": "PostgreSQLUpdate",
-                        "type": "default"
+                        "from": "StartActivity",
+                        "to": "PostgreSQLInsert",
+                        "type": "label",
+                        "label": "StartActivitytoPostgreSQLInsert"
                     },
                     {
                         "id": 2,
-                        "from": "PostgreSQLUpdate",
-                        "to": "PostgreSQLQuery",
-                        "type": "default"
+                        "from": "PostgreSQLInsert",
+                        "to": "PostgreSQLUpdate",
+                        "type": "label",
+                        "label": "PostgreSQLInserttoPostgreSQLUpdate"
                     },
                     {
                         "id": 3,
-                        "from": "PostgreSQLQuery",
-                        "to": "PostgreSQLDelete",
-                        "type": "default"
+                        "from": "PostgreSQLUpdate",
+                        "to": "PostgreSQLQuery",
+                        "type": "label",
+                        "label": "PostgreSQLUpdatetoPostgreSQLQuery"
                     },
                     {
                         "id": 4,
+                        "from": "PostgreSQLQuery",
+                        "to": "PostgreSQLDelete",
+                        "type": "label",
+                        "label": "PostgreSQLQuerytoPostgreSQLDelete"
+                    },
+                    {
+                        "id": 5,
                         "from": "PostgreSQLDelete",
                         "to": "LogMessage",
-                        "type": "default"
+                        "type": "label",
+                        "label": "PostgreSQLDeletetoLogMessage"
+                    },
+                    {
+                        "id": 6,
+                        "from": "LogMessage",
+                        "to": "Return",
+                        "type": "label",
+                        "label": "LogMessagetoReturn"
                     }
                 ],
                 "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
                     {
                         "id": "PostgreSQLInsert",
                         "name": "PostgreSQLInsert",
@@ -91,13 +159,14 @@
                         "activity": {
                             "ref": "#insert",
                             "input": {
-                                "Connection": "conn://7befa560-952e-11ec-8cc6-69f09c60a5c5",
+                                "Connection": "conn://173dd180-1c0b-11ef-93c2-916e31a58a4a",
                                 "QueryName": "",
-                                "Query": "INSERT INTO author (auth_id,bookname,price)\nVALUES (?auth_id1,?bookname1,?price1)\nreturning *;",
+                                "Schema": "public",
+                                "Query": "INSERT INTO public.employee(id,name,city,state,country,zip,phone,department,vehicle)\nVALUES(?id1,?name1,?city1,?state1,?country1,?zip1,?phone1,?department1,?vehicle1)\nRETURNING *;",
                                 "manualmode": false,
                                 "Fields": [
                                     {
-                                        "FieldName": "auth_id1",
+                                        "FieldName": "id1",
                                         "Type": "INTEGER",
                                         "Selected": false,
                                         "Parameter": true,
@@ -105,7 +174,7 @@
                                         "Value": false
                                     },
                                     {
-                                        "FieldName": "bookname1",
+                                        "FieldName": "name1",
                                         "Type": "VARCHAR",
                                         "Selected": false,
                                         "Parameter": true,
@@ -113,15 +182,63 @@
                                         "Value": false
                                     },
                                     {
-                                        "FieldName": "price1",
-                                        "Type": "INTEGER",
+                                        "FieldName": "city1",
+                                        "Type": "VARCHAR",
                                         "Selected": false,
                                         "Parameter": true,
                                         "isEditable": false,
                                         "Value": false
                                     },
                                     {
-                                        "FieldName": "auth_id",
+                                        "FieldName": "state1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "country1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "zip1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "phone1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "department1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "vehicle1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "id",
                                         "Type": "INTEGER",
                                         "Selected": true,
                                         "Parameter": false,
@@ -129,7 +246,7 @@
                                         "Value": false
                                     },
                                     {
-                                        "FieldName": "bookname",
+                                        "FieldName": "name",
                                         "Type": "VARCHAR",
                                         "Selected": true,
                                         "Parameter": false,
@@ -137,8 +254,56 @@
                                         "Value": false
                                     },
                                     {
-                                        "FieldName": "price",
-                                        "Type": "INTEGER",
+                                        "FieldName": "city",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "state",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "country",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "zip",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "phone",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "department",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false,
+                                        "Value": false
+                                    },
+                                    {
+                                        "FieldName": "vehicle",
+                                        "Type": "VARCHAR",
                                         "Selected": true,
                                         "Parameter": false,
                                         "isEditable": false,
@@ -146,13 +311,19 @@
                                     }
                                 ],
                                 "RuntimeQuery": "",
-                                "State": "3387ccd5-7997-42a4-953b-005cf6a8bae1INSERT INTO author (auth_id,bookname,price)\nVALUES (?auth_id1,?bookname1,?price1)\nreturning *;",
+                                "State": "1148c44c-abe5-4e17-9ad6-309f44930f2eINSERT INTO public.employee(id,name,city,state,country,zip,phone,department,vehicle)\nVALUES(?id1,?name1,?city1,?state1,?country1,?zip1,?phone1,?department1,?vehicle1)\nRETURNING *;",
                                 "input": {
                                     "mapping": {
                                         "parameters": {
-                                            "auth_id1": 104,
-                                            "bookname1": "A Tale of Two Cities",
-                                            "price1": 2999
+                                            "id1": 11,
+                                            "name1": "James Anderson",
+                                            "city1": "Edison",
+                                            "state1": "NJ",
+                                            "country1": "USA",
+                                            "zip1": "52001",
+                                            "phone1": "555-2490",
+                                            "department1": "IT",
+                                            "vehicle1": "Car"
                                         }
                                     }
                                 }
@@ -161,15 +332,15 @@
                                 "input": {
                                     "input": {
                                         "type": "json",
-                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}},\"parameters\":{\"type\":\"object\",\"properties\":{\"auth_id1\":{\"type\":\"integer\"},\"bookname1\":{\"type\":\"string\"},\"price1\":{\"type\":\"integer\"}}}}}",
-                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}},\"parameters\":{\"type\":\"object\",\"properties\":{\"auth_id1\":{\"type\":\"integer\"},\"bookname1\":{\"type\":\"string\"},\"price1\":{\"type\":\"integer\"}}}}}"
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}},\"parameters\":{\"type\":\"object\",\"properties\":{\"id1\":{\"type\":\"integer\"},\"name1\":{\"type\":\"string\"},\"city1\":{\"type\":\"string\"},\"state1\":{\"type\":\"string\"},\"country1\":{\"type\":\"string\"},\"zip1\":{\"type\":\"string\"},\"phone1\":{\"type\":\"string\"},\"department1\":{\"type\":\"string\"},\"vehicle1\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"values\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{}}},\"parameters\":{\"type\":\"object\",\"properties\":{\"id1\":{\"type\":\"integer\"},\"name1\":{\"type\":\"string\"},\"city1\":{\"type\":\"string\"},\"state1\":{\"type\":\"string\"},\"country1\":{\"type\":\"string\"},\"zip1\":{\"type\":\"string\"},\"phone1\":{\"type\":\"string\"},\"department1\":{\"type\":\"string\"},\"vehicle1\":{\"type\":\"string\"}}}}}"
                                     }
                                 },
                                 "output": {
                                     "Output": {
                                         "type": "json",
-                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"auth_id\":{\"type\":\"integer\"},\"bookname\":{\"type\":\"string\"},\"price\":{\"type\":\"integer\"}}}}}}",
-                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"auth_id\":{\"type\":\"integer\"},\"bookname\":{\"type\":\"string\"},\"price\":{\"type\":\"integer\"}}}}}}"
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"name\":{\"type\":\"string\"},\"city\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"country\":{\"type\":\"string\"},\"zip\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"},\"department\":{\"type\":\"string\"},\"vehicle\":{\"type\":\"string\"}}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"name\":{\"type\":\"string\"},\"city\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"country\":{\"type\":\"string\"},\"zip\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"},\"department\":{\"type\":\"string\"},\"vehicle\":{\"type\":\"string\"}}}}}}"
                                     }
                                 }
                             }
@@ -188,47 +359,48 @@
                         "activity": {
                             "ref": "#update",
                             "input": {
-                                "Connection": "conn://7befa560-952e-11ec-8cc6-69f09c60a5c5",
+                                "Connection": "conn://173dd180-1c0b-11ef-93c2-916e31a58a4a",
                                 "UpdateName": "",
-                                "Query": "UPDATE author\nSET price = ?price1\nWHERE auth_id = ?auth_id1\nreturning auth_id, price;",
+                                "Schema": "public",
+                                "Query": "UPDATE public.employee\nSET department = ?department1\nWHERE id = ?id1\nreturning public.employee.id,public.employee.department;",
                                 "manualmode": false,
                                 "RuntimeQuery": "",
                                 "Fields": [
                                     {
-                                        "FieldName": "price1",
+                                        "FieldName": "department1",
+                                        "Type": "VARCHAR",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "id1",
                                         "Type": "INTEGER",
                                         "Selected": false,
                                         "Parameter": true,
                                         "isEditable": false
                                     },
                                     {
-                                        "FieldName": "auth_id1",
-                                        "Type": "INTEGER",
-                                        "Selected": false,
-                                        "Parameter": true,
-                                        "isEditable": false
-                                    },
-                                    {
-                                        "FieldName": "auth_id",
+                                        "FieldName": "id",
                                         "Type": "INTEGER",
                                         "Selected": true,
                                         "Parameter": false,
                                         "isEditable": false
                                     },
                                     {
-                                        "FieldName": "price",
-                                        "Type": "INTEGER",
+                                        "FieldName": "department",
+                                        "Type": "VARCHAR",
                                         "Selected": true,
                                         "Parameter": false,
                                         "isEditable": false
                                     }
                                 ],
-                                "State": "8107a85c-ba39-4da7-af36-4b479240b8feUPDATE author\nSET price = ?price1\nWHERE auth_id = ?auth_id1\nreturning auth_id, price;",
+                                "State": "7bd0e0de-0651-4774-a468-b2b823a1d671UPDATE public.employee\nSET department = ?department1\nWHERE id = ?id1\nreturning public.employee.id,public.employee.department;",
                                 "input": {
                                     "mapping": {
                                         "parameters": {
-                                            "price1": 2499,
-                                            "auth_id1": 104
+                                            "department1": "HR",
+                                            "id1": 11
                                         }
                                     }
                                 }
@@ -237,15 +409,15 @@
                                 "input": {
                                     "input": {
                                         "type": "json",
-                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"price1\":{\"type\":\"integer\"},\"auth_id1\":{\"type\":\"integer\"}}}}}",
-                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"price1\":{\"type\":\"integer\"},\"auth_id1\":{\"type\":\"integer\"}}}}}"
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"department1\":{\"type\":\"string\"},\"id1\":{\"type\":\"integer\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"department1\":{\"type\":\"string\"},\"id1\":{\"type\":\"integer\"}}}}}"
                                     }
                                 },
                                 "output": {
                                     "Output": {
                                         "type": "json",
-                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"auth_id\":{\"type\":\"integer\"},\"price\":{\"type\":\"integer\"}}}}}}",
-                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"auth_id\":{\"type\":\"integer\"},\"price\":{\"type\":\"integer\"}}}}}}"
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"department\":{\"type\":\"string\"}}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"department\":{\"type\":\"string\"}}}}}}"
                                     }
                                 }
                             }
@@ -264,49 +436,106 @@
                         "activity": {
                             "ref": "#query",
                             "input": {
-                                "Connection": "conn://7befa560-952e-11ec-8cc6-69f09c60a5c5",
+                                "Connection": "conn://173dd180-1c0b-11ef-93c2-916e31a58a4a",
                                 "QueryName": "",
-                                "Query": "Select * from author;",
+                                "Schema": "public",
+                                "Query": "Select * from public.employee\nWHERE public.employee.id >= ?id1;",
                                 "manualmode": false,
                                 "Fields": [
                                     {
-                                        "FieldName": "auth_id",
+                                        "FieldName": "id1",
+                                        "Type": "INTEGER",
+                                        "Selected": false,
+                                        "Parameter": true,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "id",
                                         "Type": "INTEGER",
                                         "Selected": true,
                                         "Parameter": false,
                                         "isEditable": false
                                     },
                                     {
-                                        "FieldName": "bookname",
+                                        "FieldName": "name",
                                         "Type": "VARCHAR",
                                         "Selected": true,
                                         "Parameter": false,
                                         "isEditable": false
                                     },
                                     {
-                                        "FieldName": "price",
-                                        "Type": "INTEGER",
+                                        "FieldName": "city",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "state",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "country",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "zip",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "phone",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "department",
+                                        "Type": "VARCHAR",
+                                        "Selected": true,
+                                        "Parameter": false,
+                                        "isEditable": false
+                                    },
+                                    {
+                                        "FieldName": "vehicle",
+                                        "Type": "VARCHAR",
                                         "Selected": true,
                                         "Parameter": false,
                                         "isEditable": false
                                     }
                                 ],
                                 "RuntimeQuery": "",
-                                "State": "bd094b5f-14ee-4315-b6e1-84d4b935c6fbSelect * from author;"
+                                "State": "24c6e962-5838-487c-a098-bd8c34ee15b2Select * from public.employee\nWHERE public.employee.id >= ?id1;",
+                                "input": {
+                                    "mapping": {
+                                        "parameters": {
+                                            "id1": 9
+                                        }
+                                    }
+                                }
                             },
                             "schemas": {
                                 "input": {
                                     "input": {
                                         "type": "json",
-                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}",
-                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{}}}}"
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"id1\":{\"type\":\"integer\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"id1\":{\"type\":\"integer\"}}}}}"
                                     }
                                 },
                                 "output": {
                                     "Output": {
                                         "type": "json",
-                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"auth_id\":{\"type\":\"integer\"},\"bookname\":{\"type\":\"string\"},\"price\":{\"type\":\"integer\"}}}}}}",
-                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"auth_id\":{\"type\":\"integer\"},\"bookname\":{\"type\":\"string\"},\"price\":{\"type\":\"integer\"}}}}}}"
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"name\":{\"type\":\"string\"},\"city\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"country\":{\"type\":\"string\"},\"zip\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"},\"department\":{\"type\":\"string\"},\"vehicle\":{\"type\":\"string\"}}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"records\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"name\":{\"type\":\"string\"},\"city\":{\"type\":\"string\"},\"state\":{\"type\":\"string\"},\"country\":{\"type\":\"string\"},\"zip\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"},\"department\":{\"type\":\"string\"},\"vehicle\":{\"type\":\"string\"}}}}}}"
                                     }
                                 }
                             }
@@ -325,25 +554,26 @@
                         "activity": {
                             "ref": "#delete",
                             "input": {
-                                "Connection": "conn://7befa560-952e-11ec-8cc6-69f09c60a5c5",
+                                "Connection": "conn://173dd180-1c0b-11ef-93c2-916e31a58a4a",
                                 "QueryName": "",
-                                "Query": "DELETE FROM author\nWHERE auth_id = ?auth_id1;",
+                                "Schema": "public",
+                                "Query": "DELETE FROM public.employee\nWHERE public.employee.id = ?id1;",
                                 "manualmode": false,
                                 "RuntimeQuery": "",
                                 "Fields": [
                                     {
-                                        "FieldName": "auth_id1",
+                                        "FieldName": "id1",
                                         "Type": "INTEGER",
                                         "Selected": false,
                                         "Parameter": true,
                                         "isEditable": false
                                     }
                                 ],
-                                "State": "723c11b9-7188-47e2-b007-06343f858951DELETE FROM author\nWHERE auth_id = ?auth_id1;",
+                                "State": "d54881d9-798a-4af5-a2f2-ddafef413794DELETE FROM public.employee\nWHERE public.employee.id = ?id1;",
                                 "input": {
                                     "mapping": {
                                         "parameters": {
-                                            "auth_id1": 104
+                                            "id1": 11
                                         }
                                     }
                                 }
@@ -352,8 +582,8 @@
                                 "input": {
                                     "input": {
                                         "type": "json",
-                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"auth_id1\":{\"type\":\"integer\"}}}}}",
-                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"auth_id1\":{\"type\":\"integer\"}}}}}"
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"id1\":{\"type\":\"integer\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"definitions\":{},\"properties\":{\"parameters\":{\"type\":\"object\",\"properties\":{\"id1\":{\"type\":\"integer\"}}}}}"
                                     }
                                 },
                                 "output": {
@@ -375,16 +605,70 @@
                             "input": {
                                 "Log Level": "INFO",
                                 "flowInfo": false,
-                                "message": "=string.concat(string.tostring($activity[PostgreSQLInsert].Output),string.tostring($activity[PostgreSQLUpdate].Output),string.tostring($activity[PostgreSQLQuery].Output),string.tostring($activity[PostgreSQLDelete].Output))"
+                                "message": "=string.concat(\"Insert Output :- \", string.tostring($activity[PostgreSQLInsert].Output),\"Update Output :- \", string.tostring($activity[PostgreSQLUpdate].Output))",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200,
+                                    "data": {
+                                        "mapping": {
+                                            "output": "=string.concat(\"Query Output :- \", string.tostring($activity[PostgreSQLQuery].Output),\"Delete Output :- \", string.tostring($activity[PostgreSQLDelete].Output))"
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjc0LCJ5IjoxMTN9LCJQb3N0Z3JlU1FMSW5zZXJ0Ijp7IngiOjE2NywieSI6MTIyfSwiUG9zdGdyZVNRTFVwZGF0ZSI6eyJ4IjozNTAsInkiOjEyM30sIlBvc3RncmVTUUxRdWVyeSI6eyJ4Ijo1MzIsInkiOjEyMn0sIlBvc3RncmVTUUxEZWxldGUiOnsieCI6NzEyLCJ5IjoxMTl9LCJMb2dNZXNzYWdlIjp7IngiOjg5OCwieSI6MTE1fSwiUmV0dXJuIjp7IngiOjEwNjgsInkiOjExM319",
                 "metadata": {
-                    "input": [],
-                    "output": [],
-                    "fe_metadata": {}
-                }
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        },
+                        {
+                            "name": "requestURI",
+                            "type": "string"
+                        },
+                        {
+                            "name": "method",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"output\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
             }
         }
     ],
@@ -392,7 +676,7 @@
         {
             "name": "PostgreSQL.PostgreSQL-Onprem-Conn.Host",
             "type": "string",
-            "value": ""
+            "value": "10.233.80.3"
         },
         {
             "name": "PostgreSQL.PostgreSQL-Onprem-Conn.Port",
@@ -407,12 +691,12 @@
         {
             "name": "PostgreSQL.PostgreSQL-Onprem-Conn.User",
             "type": "string",
-            "value": "postgres"
+            "value": "user"
         },
         {
             "name": "PostgreSQL.PostgreSQL-Onprem-Conn.Password",
             "type": "string",
-            "value": ""
+            "value": "SECRET:CSG69ZiLfvyZoIjEXhRVxgwypQKMC/O5mzOR"
         },
         {
             "name": "PostgreSQL.PostgreSQL-Onprem-Conn.Maximum_Open_Connections",
@@ -446,8 +730,8 @@
         }
     ],
     "connections": {
-        "7befa560-952e-11ec-8cc6-69f09c60a5c5": {
-            "id": "7befa560-952e-11ec-8cc6-69f09c60a5c5",
+        "173dd180-1c0b-11ef-93c2-916e31a58a4a": {
+            "id": "173dd180-1c0b-11ef-93c2-916e31a58a4a",
             "name": "PostgreSQL-Onprem-Conn",
             "ref": "#connection",
             "isGlobal": false,
@@ -475,5 +759,54 @@
             }
         }
     },
-    "contrib": "W3sicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1jb250cmliLmdpdC9jb250cmlidXRpb25zL0dlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCJ9LHsicmVmIjoiZ2l0LnRpYmNvLmNvbS9naXQvcHJvZHVjdC9pcGFhcy93aS1wb3N0Z3Jlcy5naXQvc3JjL2FwcC9Qb3N0Z3JlU1FMIiwiczNsb2NhdGlvbiI6IlRpYmNvL1Bvc3RncmVTUUwifV0="
+    "metadata": {
+        "endpoints": [
+            {
+                "protocol": "http",
+                "port": "9999",
+                "spec": {
+                    "name": "PostgreSQL-Onprem-Flogotester",
+                    "version": "1.0.0"
+                },
+                "title": "ReceiveHTTPMessage",
+                "swagger": {
+                    "swagger": "2.0",
+                    "info": {
+                        "title": "PostgreSQL-Onprem-Flogotester",
+                        "version": "1.0.0",
+                        "description": "Simple REST Trigger"
+                    },
+                    "paths": {
+                        "/postgres-onprem": {
+                            "get": {
+                                "summary": "CRUD_Flow",
+                                "operationId": "get_postgres-onprem",
+                                "parameters": [],
+                                "responses": {
+                                    "200": {
+                                        "description": "Rest Response",
+                                        "schema": {
+                                            "$ref": "#/definitions/schema1"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "definitions": {
+                        "schema1": {
+                            "type": "object",
+                            "properties": {
+                                "output": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ],
+        "flogoVersion": "2.24.0"
+    },
+    "contrib": "W3sicmVmIjoiZ2l0aHViLmNvbS90aWJjby9mbG9nby1nZW5lcmFsL3NyYy9hcHAvR2VuZXJhbCIsInZlcnNpb24iOiIxLjYuMCIsInRhZyI6IjEuNi4wLWIwNCIsIm5hbWUiOiJHZW5lcmFsIiwiaWQiOiJHZW5lcmFsIiwiczNsb2NhdGlvbiI6IlRpYmNvL0dlbmVyYWwiLCJpc1VzZXJFeHRlbnNpb24iOmZhbHNlfSx7InJlZiI6ImdpdGh1Yi5jb20vdGliY28vd2ktcG9zdGdyZXMvc3JjL2FwcC9Qb3N0Z3JlU1FMIiwidmVyc2lvbiI6IjIuNy4xIiwidGFnIjoiMi43LjEtYjAxIiwibmFtZSI6IlBvc3RncmVTUUwiLCJpZCI6IlBvc3RncmVTUUwiLCJzM2xvY2F0aW9uIjoiVGliY28vUG9zdGdyZVNRTCIsImlzVXNlckV4dGVuc2lvbiI6ZmFsc2V9XQ=="
 }
