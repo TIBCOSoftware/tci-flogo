@@ -16,8 +16,8 @@ You can look to the custom extension build to handle the huge array size with be
 
 
 ## Steps to use the Flogo application:
-1. Download the Flogo application (JSON file) from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/Array-Operations/Find_NonCommonArrayElements/Find_Non-CommonArrayElements.json)
+1. Download the Flogo application (JSON file) from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/marketplace/Array-Operations/Find_NonCommonArrayElements/Find_Non-CommonArrayElements.json)
 2. Login to TIBCO Cloud™ Integration with a valid subscription.
 3. Steps to import the Flogo application (from step #1) is listed [here.](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev#readme)
-4. The imported Flogo app should look like shown below.![non-matching-array](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/import-screenshots/non-matching-array.png)
+4. The imported Flogo app should look like shown below.![non-matching-array](../../../app-dev/import-screenshots/Find_Non-CommonArrayElements.png)
 5. The imported Flogo app should look like shown below. For any additional information, please raise your queries or issues via the Issues section.

@@ -29,11 +29,11 @@ Unmatching elements from only array 1 are returned as output array.
 2. Login to TIBCO Cloud™ Integration with a valid subscription. 
 3. Upload the extension following the instructions from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/extensions/Readme.md)
 4. You can now access the function (as shown below) under the Functions section by the name, arraymerge.
-![Merge](https://user-images.githubusercontent.com/17696107/114054736-bf3ad480-98ad-11eb-95e9-fda67a34eb24.png)
-![UNmatching](https://user-images.githubusercontent.com/17696107/114054966-f315fa00-98ad-11eb-8960-fd08f76b40a1.png)
+![Merge](../../../app-dev/import-screenshots/matching.png)
+![UNmatching](../../../app-dev/import-screenshots/non-matching.png)
 
 ## Reference applications 
-1. Flogo application to demonstrate the usage of unmatching() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/Array-Operations/Find_NonCommonArrayElement-UsingCustomExtension/FindNonCommon_ArrayElement_UsingCustomExtension.json)
-2. Flogo application to demonstrate the usage of merge() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/app-dev/Array-Operations/FindCommonArrayElement-UsingCustomExtension/FindCommon_ArrayElement-UsingCustomExtension.json)
+1. Flogo application to demonstrate the usage of unmatching() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/marketplace/Array-Operations/Find_NonCommonArrayElement-UsingCustomExtension/FindNonCommon_ArrayElement_UsingCustomExtension.json)
+2. Flogo application to demonstrate the usage of merge() can be downloaded from [here.](https://github.com/TIBCOSoftware/tci-flogo/blob/master/samples/marketplace/Array-Operations/FindCommonArrayElement-UsingCustomExtension/FindCommon_ArrayElement-UsingCustomExtension.json)
 3. Steps to import Flogo application can be found [here.](https://github.com/TIBCOSoftware/tci-flogo/tree/master/samples/app-dev)
 
