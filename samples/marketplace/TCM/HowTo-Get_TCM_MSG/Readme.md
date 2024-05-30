@@ -19,4 +19,5 @@ Further details about the eFTL REST APIs (in TCM) can be found [here in the docu
 5. Note: Only standard durables (and not dynamic durables) are supported with this application. 
 6. Publisher flow looks like shown below. Import the Subscriber app also from step #1.
 7. For any additional information, please raise your queries or issues via the Issues section.
-<img width="1678" alt="GetJMSMessage-TCM" src="https://user-images.githubusercontent.com/17696107/114740030-15ed5600-9d67-11eb-874d-0328ba7cef5a.png">
+![Import your sample](../../../app-dev/import-screenshots/TCM/Publisher-TCM.png)
+

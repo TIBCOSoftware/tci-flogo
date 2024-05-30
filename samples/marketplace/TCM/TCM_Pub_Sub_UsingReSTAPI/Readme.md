@@ -20,5 +20,6 @@ Further details about the eFTL REST APIs (in TCM) can be found [here in the docu
 4. The imported Flogo app should look like shown below. 
 5. Users don't need an explicit TIBCO Cloud Messaging Connector configured in this solution but will need a valid subscription to TIBCO Cloud Messaging to configure the Invoke REST API activity (in Flogo) appropriately. 
 6. For any additional information, please raise your queries or issues via the Issues section.
+![Import your sample](../../../app-dev/import-screenshots/TCM/Pub_Sub_Rest_APIs.png)
 
-<img width="1678" alt="TCM-Pub-Sub-RESTAPIs" src="https://user-images.githubusercontent.com/17696107/113585516-f446ed00-9649-11eb-9211-36916784f8a9.png">
+

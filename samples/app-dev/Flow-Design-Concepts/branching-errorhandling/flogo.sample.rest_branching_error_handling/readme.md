@@ -8,7 +8,7 @@ First you will need to upload Throw Error Extention from [github.com/TIBCOSoftwa
 
 If you run any of these samples locally using TIBCO Flogo® Enterprise -
 
-1. To Get all Books - You will need to hit the url - http://localhost:9999/books/ 
+1. To Get all Books - You will need to hit the url - http://localhost:9999/books
 2. To Get Book By ISBN - you will need to hit the url - http://localhost:9999/books/1451648537
 3. If you want to test Error Handler, you can hit the above url with Invalid ISBN number like http://localhost:9999/books/999
 4. You can check the sample JSON data for correct ISBN to be used while testing the samples - https://my-json-server.typicode.com/tibcosoftware/tci-flogo/Book
