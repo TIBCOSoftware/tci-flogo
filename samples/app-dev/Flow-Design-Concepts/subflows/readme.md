@@ -32,6 +32,23 @@ If you run any of these samples locally using TIBCO Flogo® Enterprise -
 
 7. Click Next. If you had not selected a trigger in the previous dialog, the flows associated with that trigger are displayed. You have the option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Clear the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow. Click Next.
 
+8. Subflow configuration. On opening StartaSubFlow activity we can see in settings tab, we see list of available subflows , open subflow button and an option to set detached invocation to 
+true/false
+![Subflow Configuration](../../import-screenshots/subflow_configuration.png)
+
+9. Opening a subflow. On selecting a subflow and saving it, upon clicking on Open Subflow button, it append the slected subflow to the right of current flow. We can also open or append a subflow 
+by clicking on Open Subflow on StartaSubFlow activity tile.
+![Open Subflow](../../import-screenshots/subflow_openfrom_configuration.png)
+
+10. Set Detached Invocation.Refer to app json "flogo.sample.subflows_detachedInvocation"
+Setting detached invocation to True, subflow is invoked in fire and forget mode, in such case main flow will not wait for subflow completion. Since main flow is independent of subflow output, the Output tab is hidden upon setting detached invocation. Detached Invocation is set to False by default
+![Detached Invocation](../../import-screenshots/subflow1_indetached_invocation_mode.png)
+
+In this case 'subflow1' is invoked in detached invocation True mode from mainflow. So mainflow will not wait for completion for subflow1 and will execute the activities ahead.Since subflow1 is invoked in detached True mode we will have 'Starting SubFlow 'res://flow:subflow1' in detached mode' printed in logs.
+
+Upon encountering 'subflow1' in detached mode, the execution moves to completion of main flow and 'main flow execution' is printed followed by 'subflow2 execution' and 'subflow1 execution'.
+Same can be understood by timestamp difference in logs.
+![Detached Mode Logs](../../import-screenshots/detached_mode_response_inFlowTester.png)
 
 ## Contributing
 If you want to build your own activities for Flogo please read the docs here.
