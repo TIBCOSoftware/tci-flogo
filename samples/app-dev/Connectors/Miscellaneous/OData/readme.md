@@ -46,8 +46,11 @@ When you import the app you need to re-enter the Client Secret and click on Logi
 In the connection, note that,
 1. Root URL - In this we need to pass root url of OData service. It serves as the entry point for accessing OData service.
 2. Authorization Type - It refers to the method used to control access to data and operations exposed by the service. OData supports 3 type of Authorization type:
+
    None   - It means that no authentication or authorization required for accessing OData service.
+   
    Basic  - In this we need to provide username and password for accessing OData service. SAP S4 HANA service use this type of Authorization.
+   
    OAuth2 - In this we obtain an access token from an authorization server, which is then used to authenticate API request. Dataverse service use this type of Authorization.
 3. Grant Type - It indicate the way how application get the access token from server. Default value is Client Credentials.
 4. Access Token URL - It is the Token API endpoint used to get the access token.
