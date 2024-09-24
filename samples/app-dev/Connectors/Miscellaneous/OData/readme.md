@@ -39,9 +39,9 @@ This sample demonstrate how we can connect to Dataverse service using OData conn
 
 When you import the app you need to re-enter the Client Secret and click on Login button to authenticate.
 
-![The connection](../../../import-screenshots/OData/6.png)
+![The connection](../../../import-screenshots/OData/6.jpg)
 
-![The connection](../../../import-screenshots/OData/7.png)
+![The connection](../../../import-screenshots/OData/7.jpg)
 
 In the connection, note that,
 1. Root URL - In this we need to pass root url of OData service. It serves as the entry point for accessing OData service.
