@@ -100,15 +100,15 @@ in flow, click on Test Button -> create Launch configuration -> click Next butto
 
 1. Flow Tester
 
-![Sample Response](../../../import-screenshots/Files/20.jpg)
+![Sample Response](../../../import-screenshots/Files/20.png)
 
 2. When hit endpoints
 
-![Sample Response](../../../import-screenshots/Files/21.jpg)
+![Sample Response](../../../import-screenshots/Files/21.png)
 
-![Sample Response](../../../import-screenshots/Files/22.jpg)
+![Sample Response](../../../import-screenshots/Files/22.png)
 
-![Sample Response](../../../import-screenshots/Files/23.jpg)
+![Sample Response](../../../import-screenshots/Files/23.png)
 
 
 ## Troubleshooting
