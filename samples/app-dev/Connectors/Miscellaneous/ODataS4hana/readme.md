@@ -80,9 +80,8 @@ Note: OData using SAP S4 Hana uses Basic Authentication type.
 
 If you go inside the app, you can see in flow we have 2 activities (OData Query and OData Modify) that perform CRUD operations like: data fetching, inserting data, updating data and deleting data.
 
-1. Using OData Query activity we are fetching data present at SAP S4 Hana 'A_ProductDescription' API service. 
-
-Following is the configuration needed for OData Query Activity using SAP S4 Hana service.
+#### 1. Using OData Query activity 
+We are fetching data present at SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Query Activity using SAP S4 Hana service.
 
 Select SAP S4 Hana connection in Settings tab of OData Query activity.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/8.png)
