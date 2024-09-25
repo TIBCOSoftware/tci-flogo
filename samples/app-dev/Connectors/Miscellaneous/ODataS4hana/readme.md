@@ -105,9 +105,9 @@ Provide Json Response Schema in Output Settings tab. Also add Response Headers p
 ![Sample Response](../../../import-screenshots/ODataS4Hana/14.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/15.png)
 
-2. Using Create operation of OData Modify activity we are inserting data into SAP S4 Hana 'A_ProductDescription' API service. 
+#### 2. Using Create operation of OData Modify activity 
 
-Following is the configuration needed for OData Modify Activity using Create operation.
+We are inserting data into SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Create operation.
 
 Select SAP S4 Hana connection in Settings tab of OData Modify activity. Also select Create operation for inserting data into SAP S4 Hana service. By default Request Type application/json is selected.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/16.png)
@@ -133,9 +133,9 @@ Provide Json Response Schema in Output Settings tab.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/26.png)
 
 
-3. Using Update operation of OData Modify activity we are updating data into SAP S4 Hana 'A_ProductDescription' API service. 
+#### 3. Using Update operation of OData Modify activity 
 
-Following is the configuration needed for OData Modify Activity using Update operation.
+We are updating data into SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Update operation.
 
 Select SAP S4 Hana connection in Settings tab of OData Modify activity. Also select Update operation for updating data into SAP S4 Hana service. By default Request Type application/json is selected.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/27.png)
@@ -159,9 +159,9 @@ Provide Json Response Schema in Output Settings tab.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/35.png)
 
 
-4. Using Delete operation of OData Modify activity we are deleting data from SAP S4 Hana 'A_ProductDescription' API service.
+####4. Using Delete operation of OData Modify activity 
 
-Following is the configuration needed for OData Modify Activity using Delete operation.
+We are deleting data from SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Delete operation.
 
 Select SAP S4 Hana connection in Settings tab of OData Modify activity. Also select Delete operation for deleting data from SAP S4 Hana service. By default Request Type application/json is selected.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/36.png)
