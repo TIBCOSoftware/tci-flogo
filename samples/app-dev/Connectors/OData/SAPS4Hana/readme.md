@@ -21,11 +21,11 @@ d) To delete data in SAP S4 Hana server using Delete operation of OData Modify a
 
 2. Create a new empty app
 
-![Create an app](../../import-screenshots/OData/S4Hana/60.png)
+![Create an app](../../../import-screenshots/OData/S4Hana/60.png)
 
 3. On the app details page, select import app option.
 
-![Select import](../../import-screenshots/OData/S4Hana/61.png)
+![Select import](../../../import-screenshots/OData/S4Hana/61.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
