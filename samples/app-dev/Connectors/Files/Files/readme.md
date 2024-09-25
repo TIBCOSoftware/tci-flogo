@@ -41,6 +41,12 @@ If you go inside the app, you can see multiple flows having different File activ
 
 ![Sample Response](../../../import-screenshots/Files/6.jpg)
 
+![Sample Response](../../../import-screenshots/Files/24.png)
+
+![Sample Response](../../../import-screenshots/Files/25.png)
+
+![Sample Response](../../../import-screenshots/Files/26.png)
+
 Flow 1 (Poll directory for events) : This flow has File Poller trigger to poll directories and files for events like Create, Write, Rename, Remove, Move.
 
 ![Flow1](../../../import-screenshots/Files/7.png)

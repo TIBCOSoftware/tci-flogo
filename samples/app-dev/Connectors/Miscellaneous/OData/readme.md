@@ -72,6 +72,16 @@ If you go inside the app, you can see in flow we have added OData Query, OData M
 
 ![Sample Response](../../../import-screenshots/OData/8.jpg)
 
+![Sample Response](../../../import-screenshots/OData/16.png)
+
+![Sample Response](../../../import-screenshots/OData/17.png)
+
+![Sample Response](../../../import-screenshots/OData/18.png)
+
+![Sample Response](../../../import-screenshots/OData/19.png)
+
+![Sample Response](../../../import-screenshots/OData/20.png)
+
 ### Run the application
 
 For running the application, first you have to push the app and then scale up the app. Then after sometime you can see your app in running status.
