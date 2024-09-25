@@ -159,7 +159,7 @@ Provide Json Response Schema in Output Settings tab.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/35.png)
 
 
-####4. Using Delete operation of OData Modify activity 
+#### 4. Using Delete operation of OData Modify activity 
 
 We are deleting data from SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Delete operation.
 
