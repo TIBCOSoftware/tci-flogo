@@ -13,7 +13,8 @@ d) To delete data in SAP S4 Hana server using Delete operation of OData Modify a
 
 ## Prerequisites
 
-1. Ensure that SAP S4 Hana services are up and running
+1. Ensure that SAP S4 Hana services are up and running.
+2. Make sure that user have correct Root URL of OData service (i.e., SAP S4 HANA)
   
 ## Import the sample
 
@@ -21,15 +22,15 @@ d) To delete data in SAP S4 Hana server using Delete operation of OData Modify a
 
 2. Create a new empty app
 
-![Create an app](../../../import-screenshots/ODataS4Hana/60.png)
+![Create an app](../../../import-screenshots/2.png)
 
 3. On the app details page, select import app option.
 
-![Select import](../../../import-screenshots/ODataS4Hana/61.png)
+![Select import](../../../import-screenshots/3.png)
 
 4. Now click on ‘browse to upload’ button and select the app.json from your machine that you want to import.
 
-![Import your sample](../../../import-screenshots/ODataS4Hana/1.png)
+![Import your sample](../../../import-screenshots/4.png)
 
 5. Click on Upload Button. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing.
 
@@ -60,19 +61,11 @@ In the connection, note that,
 		 	None: No Username and Password is required for aunthentication.
 		 	Basic: Basic authentication using Username and Password.
 		 	OAuth2: Access the token based client authentication by using OAuth 2.0 athentication service.
-		 
-Authorization type None 
-
-![The connection](../../../import-screenshots/ODataS4Hana/4.png)
 
 Authorization type Basic
 
 ![The connection](../../../import-screenshots/ODataS4Hana/5.png)
 
-Authorization type OAuth2
-
-![The connection](../../../import-screenshots/ODataS4Hana/6.png)
-![The connection](../../../import-screenshots/ODataS4Hana/7.png)
 
 Note: OData using SAP S4 Hana uses Basic Authentication type.
 
@@ -103,13 +96,12 @@ Provide 'fetch' value to the X-CSRF-Token header.
 
 Provide Json Response Schema in Output Settings tab. Also add Response Headers parametres like: set-cookie and x-csrf-token
 ![Sample Response](../../../import-screenshots/ODataS4Hana/14.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/15.png)
 
 #### 2. Using Create operation of OData Modify activity 
 
 We are inserting data into SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Create operation.
 
-Select SAP S4 Hana connection in Settings tab of OData Modify activity. Also select Create operation for inserting data into SAP S4 Hana service. By default Request Type application/json is selected.
+Select SAP S4 Hana connection in Settings tab of OData Modify activity. Select Create operation. By default Request Type application/json is selected.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/16.png)
 
 Add Request Body Schema for which you want to insert data into SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
@@ -123,66 +115,47 @@ Provide value for requestBody
 ![Sample Response](../../../import-screenshots/ODataS4Hana/20.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/21.png)
 
-Mapp x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyCreate activity. Similarly mapp set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyCreate activity. Set Content-Type value as "application/json".
+Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyCreate activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyCreate activity. Set Content-Type value as "application/json".
 ![Sample Response](../../../import-screenshots/ODataS4Hana/22.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/23.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/24.png)
 
 Provide Json Response Schema in Output Settings tab.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/25.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/26.png)
 
 
 #### 3. Using Update operation of OData Modify activity 
 
 We are updating data into SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Update operation.
 
-Select SAP S4 Hana connection in Settings tab of OData Modify activity. Also select Update operation for updating data into SAP S4 Hana service. By default Request Type application/json is selected.
-![Sample Response](../../../import-screenshots/ODataS4Hana/27.png)
+* Select SAP S4 Hana connection in Settings tab of OData Modify activity. Select Update operation. By default Request Type application/json is selected.
 
-Add Request Body Schema for which you want to update data into SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
-![Sample Response](../../../import-screenshots/ODataS4Hana/28.png)
+* Add Request Body Schema for which you want to update data into SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
 
-Provide OData URI value for which you want to update data into SAP S4 Hana service. Here we are updating ProductDescription property using ODataURI: "A_ProductDescription(Product='A001',Language='EN')"
-![Sample Response](../../../import-screenshots/ODataS4Hana/29.png)
+* Provide OData URI value for which you want to update data into SAP S4 Hana service. Here we are updating ProductDescription property using ODataURI: "A_ProductDescription(Product='A001',Language='EN')" .
 
-Provide value for requestBody
-![Sample Response](../../../import-screenshots/ODataS4Hana/30.png)
+* Provide value for requestBody.
 
-Mapp x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyUpdat activity. Similarly mapp set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyUpdat activity. Set Content-Type value as "application/json".
-![Sample Response](../../../import-screenshots/ODataS4Hana/31.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/32.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/33.png)
+* Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyUpdat activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyUpdat activity. Set Content-Type value as "application/json".
 
-Provide Json Response Schema in Output Settings tab.
-![Sample Response](../../../import-screenshots/ODataS4Hana/34.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/35.png)
+* Provide Json Response Schema in Output Settings tab.
 
 
 #### 4. Using Delete operation of OData Modify activity 
 
 We are deleting data from SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Delete operation.
 
-Select SAP S4 Hana connection in Settings tab of OData Modify activity. Also select Delete operation for deleting data from SAP S4 Hana service. By default Request Type application/json is selected.
-![Sample Response](../../../import-screenshots/ODataS4Hana/36.png)
+* Select SAP S4 Hana connection in Settings tab of OData Modify activity. Select Delete operation. By default Request Type application/json is selected.
 
-Add Request Body Schema for which you want to delete data from SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
-![Sample Response](../../../import-screenshots/ODataS4Hana/37.png)
+* Add Request Body Schema for which you want to delete data from SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
 
-Provide OData URI value for which you want to delete data from SAP S4 Hana service. Here we are deleting updated ProductDescription property value using ODataURI: "A_ProductDescription(Product='A001',Language='EN')"
-![Sample Response](../../../import-screenshots/ODataS4Hana/38.png)
+* Provide OData URI value for which you want to delete data from SAP S4 Hana service. Here we are deleting updated ProductDescription property value using ODataURI: "A_ProductDescription(Product='A001',Language='EN')" .
 
-Provide value for requestBody
-![Sample Response](../../../import-screenshots/ODataS4Hana/39.png)
+* Provide value for requestBody.
 
-Mapp x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyDelete activity. Similarly mapp set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyDelete activity. Set Content-Type value as "application/json".
-![Sample Response](../../../import-screenshots/ODataS4Hana/40.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/41.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/42.png)
+* Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyDelete activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyDelete activity. Set Content-Type value as "application/json".
 
-Provide Json Response Schema in Output Settings tab.
-![Sample Response](../../../import-screenshots/ODataS4Hana/43.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/44.png)
+* Provide Json Response Schema in Output Settings tab.
 
 Also in flow we have Log Message for every activity output and in last Return Activity for getting all activity output.
 
@@ -193,8 +166,6 @@ Also in flow we have Log Message for every activity output and in last Return Ac
 For running the application, first you have to push the app and then scale up the app.
 Then after sometime you can see your app goes in running state.
 
-![Sample Response](../../../import-screenshots/ODataS4Hana/47.png)
-![Sample Response](../../../import-screenshots/ODataS4Hana/48.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/49.png)
 
 Once your app reaches to Running state, go to Endpoints and for get_allcrud, select 'Try it Out’ option and then click on execute.
@@ -203,7 +174,7 @@ Another option, If you want to test the sample in the Flow tester then follow be
  
 In flow, click on Test Button -> create Launch configuration -> click Next button -> click on Run
 
-![Sample Response](../../../import-screenshots/ODataS4Hana/50.png)
+![Sample Response](../../../import-screenshots/1_launchconfig.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/51.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/52.png)
 
@@ -219,17 +190,14 @@ In flow, click on Test Button -> create Launch configuration -> click Next butto
 
 2. When hit endpoints
 
-![Sample Response](../../../import-screenshots/ODataS4Hana/58.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/59.png)
 
 
 ## Troubleshooting
 
 * If you do not see the Endpoint enabled, make sure your apps is in Running status.
-* If you see test connection failed for On-cloud connection in connection tab, then check Flogo DB Services is enabled or not and your public ip and TCI environment NAT ips are whitelisted or not.
-* If you see test connection failed for On-premies connection in connection tab, then check Flogo DB Services is enabled or not and tibagent is started for oracle database server or not.
-* If you are not able to fech the tables or table coloumns while typing a query, then make sure your connection should be establish successfully.
-* While executing on-premise connection app from endpoint, make sure that accesskey should be selected in Hybride connectivity option from Environment controls tab and executing from flow tester make sure you have to select 'Using On-premise services' check box from flow launch configuration pop up.
+* If you see test connection failed in connection tab, then check if Username and Password are correct.
+* If you see OData Modify activity using SAP S4 Hana is getting failed with 403 forbidden, then check if set-cookie and xcsrf-token fields of OData Query activity are mapped to the OData Modify activity. 
 
 ## Contributing
 If you want to build your own activities for Flogo please read the docs here.
