@@ -18,7 +18,7 @@ The sample application has two flows: the first is 'Pulsar-producer', which publ
 1. Download the sample's .json file 'PulsarChunkingApp.json','PulsarBatchingProducer.json' and 'PulsarBatchingConsumer.json'
 
 2. Create a new empty app.
-![Create an app](../../../import-screenshots/2.png)
+![Create an app](../../../../import-screenshots/2.png)
 
 3. On the app details page, select Import app.
 ![Select import](../../../import-screenshots/3.png)
