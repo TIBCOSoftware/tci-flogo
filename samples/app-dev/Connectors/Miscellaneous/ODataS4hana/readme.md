@@ -74,15 +74,15 @@ Note: OData using SAP S4 Hana uses Basic Authentication type.
 If you go inside the app, you can see in flow we have 2 activities (OData Query and OData Modify) that perform CRUD operations like: data fetching, inserting data, updating data and deleting data.
 
 #### 1. Using OData Query activity 
-We are fetching data present at SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Query Activity using SAP S4 Hana service.
+We are fetching data present at SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration required for OData Query Activity using SAP S4 Hana service.
 
-Select SAP S4 Hana connection in Settings tab of OData Query activity.
+In Settings tab: Select SAP S4 Hana connection.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/8.png)
 
-Add Request Headers parameter for getting X-CSRF-Token value. (X-CSRF-Token value required for OData Modify activity execution)
+In Input settings tab: Add Request Headers parameter for getting X-CSRF-Token value. (X-CSRF-Token value required for OData Modify activity execution)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/9.png)
 
-Provide OData URI value for which you want to fetch data from SAP S4 Hana service. Here we are fetching data from SAP S4 Hana API 'A_ProductDescription'. 
+In Input tab: Provide OData URI value. Here we are fetching data from SAP S4 Hana API 'A_ProductDescription'. 
 ![Sample Response](../../../import-screenshots/ODataS4Hana/10.png)
 
 Provide value for $select queryOptions. Here we are fetching data for provided properties like: Product, Language and ProductDescription
@@ -94,68 +94,68 @@ Provide value for $top queryOptions. Here we are fetching top 2 records from SAP
 Provide 'fetch' value to the X-CSRF-Token header.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/13.png)
 
-Provide Json Response Schema in Output Settings tab. Also add Response Headers parametres like: set-cookie and x-csrf-token
+In Output Settings tab: Provide Json Response Schema. Also add Response Headers parametres like: set-cookie (as a repetating parameter) and x-csrf-token
 ![Sample Response](../../../import-screenshots/ODataS4Hana/14.png)
 
 #### 2. Using Create operation of OData Modify activity 
 
-We are inserting data into SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Create operation.
+We are inserting data into SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration required for OData Modify Activity using Create operation.
 
-Select SAP S4 Hana connection in Settings tab of OData Modify activity. Select Create operation. By default Request Type application/json is selected.
+In Settings tab: select SAP S4 Hana connection. Select operation as Create. Request Type as application/json is selected by default.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/16.png)
 
-Add Request Body Schema for which you want to insert data into SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
+In Input settings tab: Add Request Body Schema for which you want to insert data into SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/17.png)
 
-Provide OData URI value for which you want to insert data into SAP S4 Hana service. Here we are inserting data into SAP S4 Hana API 'A_ProductDescription'.
+In Input tab: Provide OData URI value. Here we are inserting data into SAP S4 Hana API 'A_ProductDescription'.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/18.png)
 
-Provide value for requestBody
+In Input tab: Provide new value to requestBody.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/19.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/20.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/21.png)
 
-Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyCreate activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyCreate activity. Set Content-Type value as "application/json".
+In Input tab: Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyCreate activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyCreate activity. Set Content-Type value as "application/json".
 ![Sample Response](../../../import-screenshots/ODataS4Hana/22.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/23.png)
 ![Sample Response](../../../import-screenshots/ODataS4Hana/24.png)
 
-Provide Json Response Schema in Output Settings tab.
+In Output Settings tab: Provide Json Response Schema.
 ![Sample Response](../../../import-screenshots/ODataS4Hana/25.png)
 
 
 #### 3. Using Update operation of OData Modify activity 
 
-We are updating data into SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Update operation.
+We are updating data into SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration required for OData Modify Activity using Update operation.
 
-* Select SAP S4 Hana connection in Settings tab of OData Modify activity. Select Update operation. By default Request Type application/json is selected.
+* In Settings tab: select SAP S4 Hana connection. Select operation as Update. Request Type as application/json is selected by default.
 
-* Add Request Body Schema for which you want to update data into SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
+* In Input settings tab: Add Request Body Schema for which you want to update data into SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
 
-* Provide OData URI value for which you want to update data into SAP S4 Hana service. Here we are updating ProductDescription property using ODataURI: "A_ProductDescription(Product='A001',Language='EN')" .
+* In Input tab: Provide OData URI value. Here we are updating ProductDescription property using ODataURI: "A_ProductDescription(Product='A001',Language='EN')" .
 
-* Provide value for requestBody.
+* In Input tab: Provide new value to requestBody for which you want to update your data.
 
-* Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyUpdat activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyUpdat activity. Set Content-Type value as "application/json".
+* In Input tab: Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyUpdat activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyUpdat activity. Set Content-Type value as "application/json".
 
-* Provide Json Response Schema in Output Settings tab.
+* In Output Settings tab: Provide Json Response Schema.
 
 
 #### 4. Using Delete operation of OData Modify activity 
 
-We are deleting data from SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration needed for OData Modify Activity using Delete operation.
+We are deleting data from SAP S4 Hana 'A_ProductDescription' API service. Following is the configuration required for OData Modify Activity using Delete operation.
 
-* Select SAP S4 Hana connection in Settings tab of OData Modify activity. Select Delete operation. By default Request Type application/json is selected.
+* In Settings tab of OData Modify activity select SAP S4 Hana connection. Select operation as Delete. Request Type as application/json is selected by default.
 
-* Add Request Body Schema for which you want to delete data from SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
+* In Input settings tab: Add Request Body Schema for which you want to delete data into SAP S4 Hana service. Also add Request Headers parameter for mapping X-CSRF-Token value from OData Query activity response.
 
-* Provide OData URI value for which you want to delete data from SAP S4 Hana service. Here we are deleting updated ProductDescription property value using ODataURI: "A_ProductDescription(Product='A001',Language='EN')" .
+* In Input tab: Provide OData URI value. Here we are deleting ProductDescription property using ODataURI: "A_ProductDescription(Product='A001',Language='EN')" .
 
-* Provide value for requestBody.
+* In Input tab: Provide value to requestBody for which you want to delete your data.
 
-* Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyDelete activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyDelete activity. Set Content-Type value as "application/json".
+* In Input tab: Map x-csrf-token value of ODataQuery activity to the input of the x-csrf-token header of ODataModifyDelete activity. Similarly map set-cookie value of ODataQuery activity to the input of the Cookie header of ODataModifyDelete activity. Set Content-Type value as "application/json".
 
-* Provide Json Response Schema in Output Settings tab.
+* In Output Settings tab: Provide Json Response Schema.
 
 Also in flow we have Log Message for every activity output and in last Return Activity for getting all activity output.
 
