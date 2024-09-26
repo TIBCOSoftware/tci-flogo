@@ -21,13 +21,13 @@ The sample application has two flows: the first is 'Pulsar-producer', which publ
 ![Create an app](../../../../import-screenshots/2.png)
 
 3. On the app details page, select Import app.
-![Select import](../../../import-screenshots/3.png)
+![Select import](../../../../import-screenshots/3.png)
 
 4. Browse on your machine or drag and drop the .json file for the app that you want to import.
-![Import your sample](../../../import-screenshots/pulsar/ImportApp.png)
+![Import your sample](../../../../import-screenshots/pulsar/ImportApp.png)
 
 5. Click Upload. The Import app dialog displays some general warnings and specific error in you app if any.
-![The Import app dialog](../../../import-screenshots/pulsar/ImportDialog.png)
+![The Import app dialog](../../../../import-screenshots/pulsar/ImportDialog.png)
 
 6. You have the option to import all flows from the source app or selectively import flows.
 
@@ -40,7 +40,7 @@ The sample application has two flows: the first is 'Pulsar-producer', which publ
 ### The Connection
 When you import this app, you need to re-configure the 'pulsarConnection' connection in Connections page. 
 
-![The pulsar connection](../../../import-screenshots/pulsar/pulsar_connection.png)
+![The pulsar connection](../../../../import-screenshots/pulsar/pulsar_connection.png)
 
 
 In the sample connection,
@@ -53,50 +53,50 @@ Please refer to - https://messaging.cloud.tibco.com/docs/getstarted/quickstart-p
 
 ### The Producer and Consumer Flows
 The application contains two flows; a Pulsar-producer and a Pulsar-consumer flow
-![The Flows](../../../import-screenshots/pulsarBatchingchunking/PulsarFlows.png)
+![The Flows](../../../../import-screenshots/pulsarBatchingchunking/PulsarFlows.png)
 
 To publish messages to a topic, it accepts the messages that you want to send from the HTTP trigger along with your message. Then the PulsarPublisher activity sends a given message to a topic defined in its 'Settings'.
 The Settings tab has the specified connection and the topic name with an optional compression type and also send mode. And also, you can see the chunking option is there.When you select send mode as an 'async', then you can see the batching option is there.  
-![The HTTP Trigger](../../../import-screenshots/pulsarBatchingchunking/RestTrigger.png)
-![The Publisher Settings](../../../import-screenshots/pulsarBatchingchunking/PulsarProducer1.png)
+![The HTTP Trigger](../../../../import-screenshots/pulsarBatchingchunking/RestTrigger.png)
+![The Publisher Settings](../../../../import-screenshots/pulsarBatchingchunking/PulsarProducer1.png)
 Here we are sending the messages in JSON format which is set in the Input Settings along with a message property 'message_type'
-![The Publisher Input Settings](../../../import-screenshots/pulsarBatchingchunking/PulsarProducer2.png)
+![The Publisher Input Settings](../../../../import-screenshots/pulsarBatchingchunking/PulsarProducer2.png)
 You can map the actual message and the message properties in the Input tab. It retruns the number of messages published with message payload.
-![The Publisher Input](../../../import-screenshots/pulsarBatchingchunking/PulsarProducer3.png)
+![The Publisher Input](../../../../import-screenshots/pulsarBatchingchunking/PulsarProducer3.png)
 Also you can override the client cert and client key using app property support.
-![The App Property support](../../../import-screenshots/pulsarBatchingchunking/AppPropertySupportForClientKeyCert.png)
-![The App Property support](../../../import-screenshots/pulsarBatchingchunking/AppProperty.png)
+![The App Property support](../../../../import-screenshots/pulsarBatchingchunking/AppPropertySupportForClientKeyCert.png)
+![The App Property support](../../../../import-screenshots/pulsarBatchingchunking/AppProperty.png)
 
 
 To receive the message using the chunking and batching feature, it has a consumer trigger flow that subscribes to the same topic using a subscription name to process the incoming messages. You can set the subscription type and processing mode according to your choice in the trigger setting.  
 For information on trigger settings please refer to https://integration.cloud.tibco.com/docs/index.html#Subsystems/flogo-pulsar/connector-users-guide/pulsar-consumer-trigger.html
 When there is a new message, the consumer triggers get extecuted and it prints the message payload, properties, topic name and the message id of received message using a log activity.
 
-![The Pulsar Trigger](../../../import-screenshots/pulsarBatchingchunking/PulsarConsumerFlow.png)
-![The Pulsar Trigger](../../../import-screenshots/pulsarBatchingchunking/PulsarConsumerTrigger.png)
-![The Pulsar Trigger](../../../import-screenshots/pulsarBatchingchunking/PulsarConsumerTrigger1.png)
+![The Pulsar Trigger](../../../../import-screenshots/pulsarBatchingchunking/PulsarConsumerFlow.png)
+![The Pulsar Trigger](../../../../import-screenshots/pulsarBatchingchunking/PulsarConsumerTrigger.png)
+![The Pulsar Trigger](../../../../import-screenshots/pulsarBatchingchunking/PulsarConsumerTrigger1.png)
 
 ### Run the application
 Once you are ready to run the application, you can use the Push option and later run this app.
 Once it reaches to Running state, go to Endpoints, click on Test under Actions and select 'Try it out' for /publisher/{pid}
 Now enter the number of messages you want to send.
 Now click Execute button.
-![Runtime Execution](../../../import-screenshots/pulsarBatchingchunking/EndpointInput.png)
+![Runtime Execution](../../../../import-screenshots/pulsarBatchingchunking/EndpointInput.png)
 You can hit the endponit using jmeter also.
-![Runtime Execution](../../../import-screenshots/pulsarBatchingchunking/EndpointUsingJMETER.png)
+![Runtime Execution](../../../../import-screenshots/pulsarBatchingchunking/EndpointUsingJMETER.png)
 
 
 ## Outputs
 
 1. Response when hit the endpoints
-![Sample Response](../../../import-screenshots/pulsarBatchingchunking/EndpointOutput.png)
+![Sample Response](../../../../import-screenshots/pulsarBatchingchunking/EndpointOutput.png)
 
 2. Receieve Message Logs for Chunking
-![Sample Logs](../../../import-screenshots/pulsarBatchingchunking/consumerReceivesPayload.png)
+![Sample Logs](../../../../import-screenshots/pulsarBatchingchunking/consumerReceivesPayload.png)
 
 3. Receieve Message Logs for Batching
-![Sample Logs](../../../import-screenshots/pulsarBatchingchunking/PulsarBatchOfMessages.png)
-![Sample Logs](../../../import-screenshots/pulsarBatchingchunking/ConsumerReceivedBatchOfMessages.png)
+![Sample Logs](../../../../import-screenshots/pulsarBatchingchunking/PulsarBatchOfMessages.png)
+![Sample Logs](../../../../import-screenshots/pulsarBatchingchunking/ConsumerReceivedBatchOfMessages.png)
 
 
 
