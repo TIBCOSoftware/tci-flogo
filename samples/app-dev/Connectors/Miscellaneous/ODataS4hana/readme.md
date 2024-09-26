@@ -62,10 +62,6 @@ In the connection, note that,
 		 	Basic: Basic authentication using Username and Password.
 		 	OAuth2: Access the token based client authentication by using OAuth 2.0 athentication service.
 
-Authorization type Basic
-
-![The connection](../../../import-screenshots/ODataS4Hana/5.png)
-
 
 Note: OData using SAP S4 Hana uses Basic Authentication type.
 
