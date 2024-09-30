@@ -151,7 +151,7 @@ If you have feedback, don't hesitate to talk to us!
 * Send us a note at `tci@tibco.com`
 
 ## Help
-Please visit our TIBCO Cloud™ Integration documentation and TIBCO Flogo® Enterprise documentation on docs.tibco.com for additional information.
+Please visit our https://integration.cloud.tibco.com/docs/ and TIBCO Flogo® Enterprise documentation on https://docs.tibco.com/ for additional information.
 
 ## License
 This TCI Flogo SDK and Samples project is licensed under a BSD-type license. See [license.txt](license.txt).
