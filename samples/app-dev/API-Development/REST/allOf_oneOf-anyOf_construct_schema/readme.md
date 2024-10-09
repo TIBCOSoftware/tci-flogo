@@ -1,0 +1,125 @@
+# allOf-oneOf-anyOf schema construct
+
+# Description
+
+In JSON Schema, the keywords allOf,anyOf,oneOf are used to specify that a data structure must validate against one or more specified schemas.
+The oneOf keyword specifies that the data must validate against exactly one of the schemas listed. If it matches more than one, or none at all, the validation fails.
+The anyOf keyword allows for validation against multiple schemas. If the data validates against at least one of the schemas listed in anyOf, it is considered valid.
+The allOf keyword JSON Schema is used to specify that a JSON document must satisfy all of the specified subschemas. It’s particularly useful for combining multiple schemas into one.
+This sample demonstrates some of the combinator keywords features present in the FLOGO ReceiveHTTPMessage trigger and InvokeRestService activity. Features which are covered in these sample apps are:
+
+## ReceiveHTTPMessage trigger
+1. Path, query and header parameters in the REST trigger.
+2. Configure multiple response code in REST trigger.
+3. Response Headers in REST trigger.
+4. App level schema in Request Schema and mapper activities.
+5. Multiple branching for each Response code.
+6. ConfigureHTTPResponse activity to map corresponding response schema and header with Return activity.
+
+## InvokeRestService activity
+1. Configuring InvokeRest activity with the API Spec of the producer REST service.
+2. Path, query, header parameters and Request and Response schema will be auto-populated.
+3. App property for the URL field which can be overridden at runtime as per the request URL.
+
+## Import the sample
+1. Download the sample json files i.e., *AllOf_OneOf_AnyOf_Keywords_APISpec_Service.json* and *Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service.json* 
+Rest triggers in the service app have been configured with Open API Specs 3.0 files. These API Specs are available in the *OpenAPISpecs* folder.
+
+2. Create a new empty app.
+![Create an app](../../import-screenshots/2.png)
+
+3. On the app details page, select Import app.
+![Select import](../../import-screenshots/3.png)
+
+4. Browse on your machine or drag and drop the .json file for the app that you want to import.
+![Import your sample](../../import-screenshots/4.png)
+
+5. Click Upload. The Import app dialog displays some generic errors and warnings as well as any specific errors or warnings pertaining to the app you are importing. It validates whether all the activities and triggers used in the app are available in the Extensions tab.
+![The Import app dialog](../../import-screenshots/5.png)
+
+6. You have the option to import all flows from the source app or selectively import flows.
+
+7. Click Next. If you had not selected a trigger in the previous dialog, the flows associated with that trigger are displayed. You have the option to select one or more of these flows such that the flows get imported as blank flows that are not attached to any trigger. By default, all flows are selected. Clear the check box for the flows that you do not want to import. If your flow(s) have subflows, and you select only the main flow but do not select the subflow, the main flow gets imported without the subflow. Click Next.
+
+
+## Understanding the configuration
+After importing the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service', we can see that multiple response codes have been configured in the Rest trigger. Few Response codes have Response headers as well. While adding schema in Response header and Response body we need to make sure that both are in JSON data or JSON Schema format.
+![MultipleResponseCode_configuration](./import-screenshots/MultipleResponse_serviceApp.png)
+
+ConfigureHTTPResponse activity should be used when we have configured multiple response codes in the Rest trigger. This activity is useful in mapping Response body and Response headers of a particular Response code in getting input from other activities and output to 'Return' activity.
+![ConfigureHTTPResponse_Input](./import-screenshots/ConfigureHTTPResponse_Input_Mappings.png)
+
+For the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app, we have configured the activity with the API Spec of the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service'. We can upload swagger 2.0 or Open API spec 3.0 in the InvokeRestService activity to configure it. Request parameters, Request schema, Response schema and header would be auto-populated when a valid API spec file is uploaded. After uploading the spec we just need to map the input.
+App property is attached with the Invoke Rest activity URL field which can be overridden at runtime as per the URL of the service to be invoked without changing the app.
+![InvokeRest_API_spec_config](./import-screenshots/Import_InvokeRest_API_spec.png)
+
+Click on *Invoke_AllofKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations and verify allOf properies present in schema is available in activity inputs.
+![allOf configuration](../../import-screenshots/allOfProperties.png)
+
+Click on *Invoke_OneOfKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations.Click on oneOf schema and select the radio button corrosponding to required schema.Save the configuration and verify that in mapper input tab,properties of selected schema are appeared in activity inputs.
+![oneOf configuration](../../import-screenshots/selectOneOfSchema.png)
+![select oneOf configuration](../../import-screenshots/select_oneOf_configuration.png)
+
+Click on *Invoke_AnyOfKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations.Click on anyOf schema and select the checkboxes(multiple schemas can be selected) corrosponding to required schema.Save the configuration and verify that in mapper input tab,properties of selected schema are appeared in activity inputs.
+![anyOf configuration](../../import-screenshots/selectAnyOfSchema.png)
+![select anyOf configuration](../../import-screenshots/select_anyOf_configuration.png)
+
+## Run the application
+
+Once you have imported both the apps, push the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app first and scale the app to 1. Now we need to get the endpoint of the producer service, go to the 'Endpoint' tab of the app and click on 'Copy URL' to get the endpoint URL.
+![Copy URL from Endpoint tab](./import-screenshots/copy_service_URL.png)
+
+Now push the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'InvokeRestURL' application property to point to the endpoint URL of the producer Rest service app.
+![Application property on Endpoint tab](./import-screenshots/updateServiceUrl_EnvControlstab.png)
+
+To run the app in Flogo Enterprise, create appropriate binaries for both the apps and run the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service'. Export the URL of the Service app in the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app before running the invoking app like this:
+
+ $ export InvokeRestURL="http://localhost:9998"
+
+ $ FLOGO_APP_PROPS_ENV=auto ./Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service-linux_amd64 
+
+And then hit the endpoint of the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app.
+
+## Output
+
+1. Sample response for allOf 201 Success 
+![Enter the allOf POST request schema](../../import-screenshots/allOf_request_payload.png)
+![verify the allOf POST response schema](../../import-screenshots/allOf_response_payload.png)
+
+2. Sample response for oneOf 201 Success 
+![Enter the oneOf POST request schema](../../import-screenshots/oneOf_request_payload.png)
+![Verify the oneOf POST response schema](../../import-screenshots/oneOf_response_payload.png)
+
+3. Sample response for anyOf 201 Success 
+![Enter the anyOf POST request schema](../../import-screenshots/anyOf_request_payload.png)
+![Verify the anyOf POST response schema](../../import-screenshots/anyOf_response_payload.png)
+
+4. Sample response for allOf 400 Bad request
+![Enter the allOf invalid POST request schema](../../import-screenshots/allOf_invalid_request_payload.png)
+![verify the allOf POST response schema:invalid data type](../../import-screenshots/allOf_response_invalidDataType_entered.png)
+
+5. Sample response for oneOf 400 Bad request
+![Enter the oneOf invalid POST request schema](../../import-screenshots/oneOf_invalid_request_payload.png)
+![verify the oneOf POST response schema:Must validate one and only one schema](../../import-screenshots/oneOf_mustValidate_only_one_schema.png)
+
+
+**Note:- Return and Reply to Trigger activity does not possess selecting oneOf-anyOf schema since it is driven by trigger reply of Receive HTTP Message .**
+## Contributing
+If you want to build your own activities for Flogo please read the docs here.
+
+If you want to showcase your project, check out [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome)
+
+You can also send an email to `tci@tibco.com`
+
+## Feedback
+If you have feedback, don't hesitate to talk to us!
+
+* Submit feature requests on our [TCI Ideas](https://ideas.tibco.com/?project=TCI) or [FE Ideas](https://ideas.tibco.com/?project=FE) portal
+* Ask questions on the [TIBCO Community](https://community.tibco.com/answers/product/344006)
+* Send us a note at `tci@tibco.com`
+
+## Help
+Please visit our [TIBCO Cloud<sup>&trade;</sup> Integration documentation](https://integration.cloud.tibco.com/docs/) and TIBCO Flogo® Enterprise documentation on [docs.tibco.com](https://docs.tibco.com/) for additional information.
+
+## License
+This TCI Flogo SDK and Samples project is licensed under a BSD-type license. See [license.txt](license.txt).
