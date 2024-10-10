@@ -10,15 +10,12 @@ This sample demonstrates some of the combinator keywords features present in the
 
 ## ReceiveHTTPMessage trigger
 1. Path, query and header parameters in the REST trigger.
-2. Configure multiple response code in REST trigger.
-3. Response Headers in REST trigger.
-4. App level schema in Request Schema and mapper activities.
-5. Multiple branching for each Response code.
-6. ConfigureHTTPResponse activity to map corresponding response schema and header with Return activity.
+2. allOf,oneOf and anyOf keyword are used in Open API Specs 3.0 files which are in turn imported in REST trigger
+3. ConfigureHTTPResponse activity to map corresponding code and response with Return activity.
 
 ## InvokeRestService activity
 1. Configuring InvokeRest activity with the API Spec of the producer REST service.
-2. Path, query, header parameters and Request and Response schema will be auto-populated.
+2. allOf, anyOf and oneOf schema keywords are used to validate aginst the schema as stated in description
 3. App property for the URL field which can be overridden at runtime as per the request URL.
 
 ## Import the sample
@@ -43,24 +40,23 @@ Rest triggers in the service app have been configured with Open API Specs 3.0 fi
 
 
 ## Understanding the configuration
-After importing the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service', we can see that multiple response codes have been configured in the Rest trigger. Few Response codes have Response headers as well. While adding schema in Response header and Response body we need to make sure that both are in JSON data or JSON Schema format.
-![MultipleResponseCode_configuration](./import-screenshots/MultipleResponse_serviceApp.png)
+In *Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service* app we have three flows *Invoke_AnyOfKeywordAPISpecConfiguredFlow*, *Invoke_AllofKeywordAPISpecConfiguredFlow* and *Invoke_OneOfKeywordAPISpecConfiguredFlow* for anyOf, allOf and oneOf keyword.
+![anyOf_keyword_response_body](./import-screenshots/anyOf_response_body.png)
+![allOf_keyword_response_body](./import-screenshots/allOf_response_body.png)
+![oneOf_keyword_response_body](./import-screenshots/oneOf_response_body.png)
 
-ConfigureHTTPResponse activity should be used when we have configured multiple response codes in the Rest trigger. This activity is useful in mapping Response body and Response headers of a particular Response code in getting input from other activities and output to 'Return' activity.
-![ConfigureHTTPResponse_Input](./import-screenshots/ConfigureHTTPResponse_Input_Mappings.png)
-
-For the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app, we have configured the activity with the API Spec of the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service'. We can upload swagger 2.0 or Open API spec 3.0 in the InvokeRestService activity to configure it. Request parameters, Request schema, Response schema and header would be auto-populated when a valid API spec file is uploaded. After uploading the spec we just need to map the input.
+For the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app, we have configured the activity with the API Spec of the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service'. We have to upload Open API spec 3.0 in the InvokeRestService activity to configure it. After uploading the spec we just need to map the input.
 App property is attached with the Invoke Rest activity URL field which can be overridden at runtime as per the URL of the service to be invoked without changing the app.
 ![InvokeRest_API_spec_config](./import-screenshots/Import_InvokeRest_API_spec.png)
 
-Click on *Invoke_AllofKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations and verify allOf properies present in schema is available in activity inputs.
+Click on *Invoke_AllofKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations and verify allOf properies present in schema is available in activity inputs. 
 ![allOf configuration](../../import-screenshots/allOfProperties.png)
 
-Click on *Invoke_OneOfKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations.Click on oneOf schema and select the radio button corrosponding to required schema.Save the configuration and verify that in mapper input tab,properties of selected schema are appeared in activity inputs.
+Click on *Invoke_OneOfKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations.Click on oneOf schema and select the radio button corresponding to required schema.Save the configuration and verify that in mapper input tab properties of selected schema are present in activity inputs. Input tree closes automatically when a schema is selected, we need to open the tree again to see the newly added schema properties and mapping the values.
 ![oneOf configuration](../../import-screenshots/selectOneOfSchema.png)
 ![select oneOf configuration](../../import-screenshots/select_oneOf_configuration.png)
 
-Click on *Invoke_AnyOfKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations.Click on anyOf schema and select the checkboxes(multiple schemas can be selected) corrosponding to required schema.Save the configuration and verify that in mapper input tab,properties of selected schema are appeared in activity inputs.
+Click on *Invoke_AnyOfKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations.Click on anyOf schema and select the checkboxes(multiple schemas can be selected) corrosponding to required schema.Save the configuration and verify that in mapper input tab properties of selected schema are present in activity inputs. Input tree closes automatically when a schema is selected, we need to open the tree again to see the newly added schema properties and mapping the values.
 ![anyOf configuration](../../import-screenshots/selectAnyOfSchema.png)
 ![select anyOf configuration](../../import-screenshots/select_anyOf_configuration.png)
 
@@ -72,9 +68,11 @@ Once you have imported both the apps, push the 'AllOf_OneOf_AnyOf_Keywords_APISp
 Now push the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app and scale the app to 1. Go to 'Environment Controls' tab -> 'Application Variables' and edit the default value of the 'InvokeRestURL' application property to point to the endpoint URL of the producer Rest service app.
 ![Application property on Endpoint tab](./import-screenshots/updateServiceUrl_EnvControlstab.png)
 
-To run the app in Flogo Enterprise, create appropriate binaries for both the apps and run the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service'. Export the URL of the Service app in the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app before running the invoking app like this:
+To run the app binary, create appropriate binaries for both the apps and run the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service'. Export app property and its URL for all the three services in  'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app before running the invoking app like this:
 
- $ export InvokeRestURL="http://localhost:9998"
+ $ export allOf_Service="https://1a91e01153ca0b9e0ff24561c8-integration.local.cic2apps.pro/nvetqpftntbygh233hxmhvvwcn2sdesb/allOfAPISpecRestTrigger"
+ $ export anyOf_Service="https://1a91e01153ca0b9e0ff24561c8-integration.local.cic2apps.pro/nvetqpftntbygh233hxmhvvwcn2sdesb/anyOfAPISpecRestTrigger"
+ $ export oneOf_Service="https://1a91e01153ca0b9e0ff24561c8-integration.local.cic2apps.pro/nvetqpftntbygh233hxmhvvwcn2sdesb/oneOfAPISpecRestTrigger"
 
  $ FLOGO_APP_PROPS_ENV=auto ./Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service-linux_amd64 
 
