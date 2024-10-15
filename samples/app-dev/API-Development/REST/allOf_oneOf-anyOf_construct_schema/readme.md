@@ -45,9 +45,13 @@ In *Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service* app we have three flows *
 ![allOf_keyword_response_body](./import-screenshots/allOf_response_body.png)
 ![oneOf_keyword_response_body](./import-screenshots/oneOf_response_body.png)
 
-For the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app, we have configured the activity with the API Spec of the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service'. We have to upload Open API spec 3.0 in the InvokeRestService activity to configure it. After uploading the spec we just need to map the input.
+In *Invoke_AllofKeywordAPISpecConfiguredFlow* flow we have uploaded Invoke rest activity with OAS *AllOfKeywordOAS30GetPost.json* from *OpenAPISpecs* folder
+Similarly for *Invoke_OneOfKeywordAPISpecConfiguredFlow* flow we have uploaded Invoke rest activity with OAS *Petstore-Post-Nested-OneOf-30-APIspec.json*
+and for *Invoke_AnyOfKeywordAPISpecConfiguredFlow* flow we have uploaded Invoke rest activity with OAS *Pets-Nested-Anyof-withAllof-30-APISpec.json*
 App property is attached with the Invoke Rest activity URL field which can be overridden at runtime as per the URL of the service to be invoked without changing the app.
-![InvokeRest_API_spec_config](./import-screenshots/Import_InvokeRest_API_spec.png)
+![InvokeRest_API_spec_config_allOf](./import-screenshots/Import_InvokeRest_API_spec.png)
+![InvokeRest_API_spec_config_oneOf](./import-screenshots/Import_InvokeRest_API_spec_oneOf.png)
+![InvokeRest_API_spec_config_anyOf](./import-screenshots/Import_InvokeRest_API_spec_anyOf.png)
 
 Click on *Invoke_AllofKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations and verify allOf properies present in schema is available in activity inputs. 
 ![allOf configuration](../../import-screenshots/allOfProperties.png)
@@ -56,7 +60,7 @@ Click on *Invoke_OneOfKeywordAPISpecConfiguredFlow* click on mapper activity,nav
 ![oneOf configuration](../../import-screenshots/selectOneOfSchema.png)
 ![select oneOf configuration](../../import-screenshots/select_oneOf_configuration.png)
 
-Click on *Invoke_AnyOfKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations.Click on anyOf schema and select the checkboxes(multiple schemas can be selected) corrosponding to required schema.Save the configuration and verify that in mapper input tab properties of selected schema are present in activity inputs. Input tree closes automatically when a schema is selected, we need to open the tree again to see the newly added schema properties and mapping the values.
+Click on *Invoke_AnyOfKeywordAPISpecConfiguredFlow* click on mapper activity,navigate to input tab and expand all configurations.Click on anyOf schema and select the checkboxes(multiple schemas can be selected) corresponding to required schema.Save the configuration and verify that in mapper input tab properties of selected schema are present in activity inputs. Input tree closes automatically when a schema is selected, we need to open the tree again to see the newly added schema properties and mapping the values.
 ![anyOf configuration](../../import-screenshots/selectAnyOfSchema.png)
 ![select anyOf configuration](../../import-screenshots/select_anyOf_configuration.png)
 
@@ -70,9 +74,9 @@ Now push the 'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app and scale t
 
 To run the app binary, create appropriate binaries for both the apps and run the 'AllOf_OneOf_AnyOf_Keywords_APISpec_Service'. Export app property and its URL for all the three services in  'Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service' app before running the invoking app like this:
 
- $ export allOf_Service="https://1a91e01153ca0b9e0ff24561c8-integration.local.cic2apps.pro/nvetqpftntbygh233hxmhvvwcn2sdesb/allOfAPISpecRestTrigger"
- $ export anyOf_Service="https://1a91e01153ca0b9e0ff24561c8-integration.local.cic2apps.pro/nvetqpftntbygh233hxmhvvwcn2sdesb/anyOfAPISpecRestTrigger"
- $ export oneOf_Service="https://1a91e01153ca0b9e0ff24561c8-integration.local.cic2apps.pro/nvetqpftntbygh233hxmhvvwcn2sdesb/oneOfAPISpecRestTrigger"
+ $ export allOf_Service="http://localhost:9999/invokepostallof"
+ $ export anyOf_Service="http://localhost:9999/invokeoneOfpets"
+ $ export oneOf_Service="http://localhost:9999/invokeanyOfpets"
 
  $ FLOGO_APP_PROPS_ENV=auto ./Invoke_AllOf_OneOf_AnyOf_Keywords_APISpec_Service-linux_amd64 
 
