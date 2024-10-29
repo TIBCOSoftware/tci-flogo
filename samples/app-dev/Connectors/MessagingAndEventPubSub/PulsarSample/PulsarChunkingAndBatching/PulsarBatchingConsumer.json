@@ -1,0 +1,236 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "github.com/tibco/flogo-general/src/app/General/activity/log",
+        "github.com/project-flogo/messaging-contrib/pulsar/trigger/subscriber",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/function/utility",
+        "github.com/project-flogo/contrib/function/string",
+        "github.com/project-flogo/messaging-contrib/pulsar/connection"
+    ],
+    "name": "New_Flogo_App_36",
+    "description": "  ",
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#subscriber",
+            "name": "pulsar-subscriber",
+            "description": "A pulsar trigger which reads messages from apache pulsar queue",
+            "settings": {
+                "connection": "conn://567e5c20-70e8-11ef-8ce1-d3711afff934"
+            },
+            "id": "ApachePulsarConsumer",
+            "handlers": [
+                {
+                    "description": "To consume a messages from a topic",
+                    "settings": {
+                        "topic": "pulsar",
+                        "topicsPattern": "",
+                        "subscriptionName": "automationSubscription",
+                        "subscriptionType": "Shared",
+                        "processingMode": "Sync",
+                        "initialPosition": "Latest",
+                        "dlqTopic": "",
+                        "dlqMaxDeliveries": 3,
+                        "nackRedeliveryDelay": 60,
+                        "enableBatchIndexAcknowledgment": false,
+                        "maxPendingChunkedMessage": 2,
+                        "expireTimeOfIncompleteChunk": 5,
+                        "autoAckIncompleteChunk": false,
+                        "format": "JSON"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:Consumer"
+                        },
+                        "input": {
+                            "payload": {
+                                "mapping": {
+                                    "MsgText": "=$.payload.MsgText",
+                                    "number": "=$.payload.number"
+                                }
+                            },
+                            "properties": {
+                                "mapping": {
+                                    "msgType": "=$.properties.msgType"
+                                }
+                            },
+                            "topic": "=$.topic"
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "payload": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"MsgText\":{\"type\":\"string\"},\"number\":{\"type\":\"number\"}}}",
+                                "fe_metadata": "{\"MsgText\":\"\",\"number\":1}",
+                                "feSchemaMap": {}
+                            },
+                            "properties": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"msgType\":{\"type\":\"string\"}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"msgType\",\"type\":\"string\"}]"
+                            },
+                            "jsonSchema": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"MsgText\":{\"type\":\"string\"},\"number\":{\"type\":\"number\"}}}",
+                                "fe_metadata": "{\"MsgText\":\"\",\"number\":1}",
+                                "feSchemaMap": {}
+                            }
+                        }
+                    },
+                    "name": "Consumer"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:Consumer",
+            "data": {
+                "name": "Consumer",
+                "description": "To consume a messages from a topic",
+                "links": [],
+                "tasks": [
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.concat(\"Payload : \", utility.renderJSON($flow.payload, false), \" Property : \",$flow.properties.msgType,\" Topic : \",$flow.topic)"
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJMb2dNZXNzYWdlIjp7IngiOjUwLCJ5Ijo1MH19",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "payload",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"MsgText\":{\"type\":\"string\"},\"number\":{\"type\":\"number\"}}"
+                            }
+                        },
+                        {
+                            "name": "properties",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"msgType\":{\"type\":\"string\"}}"
+                            }
+                        },
+                        {
+                            "name": "topic",
+                            "type": "string"
+                        },
+                        {
+                            "name": "msgid",
+                            "type": "string"
+                        },
+                        {
+                            "name": "redeliveryCount",
+                            "type": "integer"
+                        }
+                    ],
+                    "output": [],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ApachePulsarConsumer\",\"properties\":{\"payload\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"MsgText\":{\"type\":\"string\"},\"number\":{\"type\":\"number\"}}},\"properties\":{\"type\":\"object\",\"properties\":{\"msgType\":{\"type\":\"string\"}},\"required\":[]},\"topic\":{\"type\":\"string\",\"required\":false},\"msgid\":{\"type\":\"string\",\"required\":false},\"redeliveryCount\":{\"type\":\"integer\",\"required\":false}}}"
+                    }
+                }
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "pulsar.pulsarConnection.Broker_URL",
+            "type": "string",
+            "value": "pulsar+ssl://ec2-18-144-30-182.us-west-1.compute.amazonaws.com:6659"
+        },
+        {
+            "name": "pulsar.pulsarConnection.Allow_Insecure_Connection",
+            "type": "boolean",
+            "value": false
+        },
+        {
+            "name": "pulsar.pulsarConnection.Broker_CA",
+            "type": "string",
+            "value": {
+                "filename": "rootCA.crt.pem",
+                "content": ""
+            }
+        },
+        {
+            "name": "pulsar.pulsarConnection.Private_Key",
+            "type": "string",
+            "value": {
+                "filename": "credentials.json",
+                "content": ""
+            }
+        },
+        {
+            "name": "pulsar.pulsarConnection.Issuer_URL",
+            "type": "string",
+            "value": " https://dev-wv1kfgp1.us.auth0.com"
+        },
+        {
+            "name": "pulsar.pulsarConnection.Audience",
+            "type": "string",
+            "value": "https://dev-wv1kfgp1.us.auth0.com/api/v2/"
+        },
+        {
+            "name": "pulsar.pulsarConnection.Scope",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "pulsar.pulsarConnection.Connection_Timeout",
+            "type": "float64",
+            "value": 30
+        },
+        {
+            "name": "pulsar.pulsarConnection.Operation_Timeout",
+            "type": "float64",
+            "value": 30
+        }
+    ],
+    "connections": {
+        "567e5c20-70e8-11ef-8ce1-d3711afff934": {
+            "id": "567e5c20-70e8-11ef-8ce1-d3711afff934",
+            "name": "pulsarConnection",
+            "ref": "#connection",
+            "isGlobal": false,
+            "settings": {
+                "name": "pulsarConnection",
+                "description": "",
+                "url": "=$property[\"pulsar.pulsarConnection.Broker_URL\"]",
+                "auth": "OAuth2",
+                "allowInsecure": "=$property[\"pulsar.pulsarConnection.Allow_Insecure_Connection\"]",
+                "caCert": "=$property[\"pulsar.pulsarConnection.Broker_CA\"]",
+                "certFile": "",
+                "keyFile": "",
+                "athenzAuth": "",
+                "jwt": "SECRET:TukBPuLrbFQfKBksO2lYgQ==",
+                "privateKey": "=$property[\"pulsar.pulsarConnection.Private_Key\"]",
+                "issuerUrl": "=$property[\"pulsar.pulsarConnection.Issuer_URL\"]",
+                "audience": "=$property[\"pulsar.pulsarConnection.Audience\"]",
+                "scope": "=$property[\"pulsar.pulsarConnection.Scope\"]",
+                "connTimeout": "=$property[\"pulsar.pulsarConnection.Connection_Timeout\"]",
+                "opTimeout": "=$property[\"pulsar.pulsarConnection.Operation_Timeout\"]"
+            }
+        }
+    },
+    "metadata": {
+        "endpoints": [],
+        "flogoVersion": "2.25.1"
+    },
+    "contrib": "W3sicmVmIjoiZ2l0aHViLmNvbS9wcm9qZWN0LWZsb2dvL21lc3NhZ2luZy1jb250cmliL3B1bHNhciIsInZlcnNpb24iOiIxLjMuMyIsInRhZyI6IjEuMy4zLWIwOSIsIm5hbWUiOiJBcGFjaGUgUHVsc2FyIiwiaWQiOiJwdWxzYXIiLCJzM2xvY2F0aW9uIjoiVGliY28vcHVsc2FyIiwiaXNVc2VyRXh0ZW5zaW9uIjpmYWxzZX0seyJyZWYiOiJnaXRodWIuY29tL3RpYmNvL2Zsb2dvLWdlbmVyYWwvc3JjL2FwcC9HZW5lcmFsIiwidmVyc2lvbiI6IjEuNi4yIiwidGFnIjoiMS42LjItYjAyIiwibmFtZSI6IkdlbmVyYWwiLCJpZCI6IkdlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCIsImlzVXNlckV4dGVuc2lvbiI6ZmFsc2V9XQ=="
+}
