@@ -1,0 +1,2458 @@
+{
+    "imports": [
+        "github.com/project-flogo/flow",
+        "github.com/project-flogo/contrib/activity/noop",
+        "github.com/tibco/flogo-general/src/app/General/activity/log",
+        "github.com/tibco/flogo-files/src/app/File/activity/create",
+        "github.com/project-flogo/contrib/activity/actreturn",
+        "github.com/tibco/wi-amazons3/src/app/AmazonS3/activity/get",
+        "github.com/tibco/flogo-files/src/app/File/activity/read",
+        "github.com/tibco/flogo-general/src/app/General/activity/xmltojson",
+        "github.com/tibco/flogo-files/src/app/File/activity/write",
+        "github.com/tibco/flogo-files/src/app/File/activity/rename",
+        "github.com/tibco/flogo-files/src/app/File/activity/copy",
+        "github.com/tibco/flogo-general/src/app/General/activity/jsontoxml",
+        "github.com/tibco/flogo-files/src/app/File/activity/list",
+        "github.com/tibco/flogo-files/src/app/File/activity/archive",
+        "github.com/tibco/flogo-files/src/app/File/activity/unarchive",
+        "github.com/tibco/flogo-files/src/app/File/activity/remove",
+        "github.com/tibco/flogo-files/src/app/File/trigger/poller",
+        "github.com/tibco/flogo-general/src/app/General/trigger/rest",
+        "github.com/project-flogo/contrib/function/string",
+        "git.tibco.com/git/product/ipaas/wi-contrib.git/function/boolean",
+        "github.com/tibco/flogo-aws/src/app/AWS/connector"
+    ],
+    "name": "Files-App",
+    "description": "",
+    "version": "1.0.0",
+    "type": "flogo:app",
+    "appModel": "1.1.1",
+    "tags": [],
+    "triggers": [
+        {
+            "ref": "#poller",
+            "name": "flogo-file-poller",
+            "description": "The File Poller trigger polls for files or directories with the specified name when a change (Create, Write, Rename, Remove, Move file event) is detected.",
+            "settings": {},
+            "id": "FilePoller",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "pollingDir": "/tmp",
+                        "recursive": true,
+                        "fileFilter": "",
+                        "pollingInterval": 5000,
+                        "mode": "Files and Directories",
+                        "fileEvents": "[\"Create\",\"Write\",\"Rename\",\"Remove\",\"Move\"]"
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:Poll_directory_for_events"
+                        },
+                        "input": {
+                            "output": "=$.output"
+                        }
+                    },
+                    "schemas": {
+                        "output": {
+                            "output": {
+                                "type": "json",
+                                "value": "{\"properties\":{\"action\":{\"type\":\"string\"},\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"oldPath\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                "fe_metadata": "{\"properties\":{\"action\":{\"type\":\"string\"},\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"oldPath\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                "feSchemaMap": {}
+                            }
+                        }
+                    },
+                    "name": "Poll_directory_for_events"
+                }
+            ]
+        },
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9999,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "apiVersion": "1.0.0",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/create",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:CREATE_Directory_File"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "data": "=$.data"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}",
+                                "feSchemaMap": {}
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "feSchemaMap": {}
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "CREATE_Directory_File"
+                }
+            ]
+        },
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9998,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "apiVersion": "1.0.0",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage1",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/write",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:GET_File_from_Amazon_S3"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "data": "=$.data"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}",
+                                "feSchemaMap": {}
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "feSchemaMap": {}
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "GET_File_from_Amazon_S3"
+                }
+            ]
+        },
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9997,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "apiVersion": "1.0.0",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage2",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/read",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:READ_File_and_convert_XML_To_JSON_and_Compress_while_WRITE_to_new_file"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "data": "=$.data"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}",
+                                "feSchemaMap": {}
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "feSchemaMap": {}
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "READ_File_and_convert_XML_To_JSON_and_Compress_while_WRITE_to_new_file"
+                }
+            ]
+        },
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9996,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "apiVersion": "1.0.0",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage3",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/rename",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:Rename_File"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "data": "=$.data"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}",
+                                "feSchemaMap": {}
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "feSchemaMap": {}
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "Rename_File"
+                }
+            ]
+        },
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9995,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "apiVersion": "1.0.0",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage4",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/copy-list",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:COPY_File_READ_and_Uncompress_File_Convert_JSON_To_XML_WRITE_to_new_file_and_LIST_Dir"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "data": "=$.data"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}",
+                                "feSchemaMap": {}
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "feSchemaMap": {}
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "COPY_File_READ_and_Uncompress_File_Convert_JSON_To_XML_WRITE_to_new_file_and_LIST_Dir"
+                }
+            ]
+        },
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9994,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "apiVersion": "1.0.0",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage5",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/archive-unarchive",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:Archive_and_Unarchive"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "data": "=$.data"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}",
+                                "feSchemaMap": {}
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "feSchemaMap": {}
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "Archive_and_Unarchive"
+                }
+            ]
+        },
+        {
+            "ref": "#rest",
+            "name": "tibco-wi-rest",
+            "description": "Simple REST Trigger",
+            "settings": {
+                "port": 9993,
+                "APISpecUpdate": false,
+                "swagger": "",
+                "swaggerVersion": "v2",
+                "apiVersion": "1.0.0",
+                "secureConnection": false,
+                "serverKey": "",
+                "caCertificate": ""
+            },
+            "id": "ReceiveHTTPMessage6",
+            "handlers": [
+                {
+                    "description": "",
+                    "settings": {
+                        "Method": "GET",
+                        "reqType": "application/json",
+                        "Path": "/remove",
+                        "OutputValidation": false
+                    },
+                    "action": {
+                        "ref": "github.com/project-flogo/flow",
+                        "settings": {
+                            "flowURI": "res://flow:REMOVE_Directories"
+                        },
+                        "input": {
+                            "headers": "=$.headers"
+                        },
+                        "output": {
+                            "code": "=$.code",
+                            "data": "=$.data"
+                        }
+                    },
+                    "reply": {
+                        "code": 200,
+                        "configureResponseCodes": false,
+                        "message": {}
+                    },
+                    "schemas": {
+                        "reply": {
+                            "data": {
+                                "type": "json",
+                                "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}",
+                                "fe_metadata": "{\n    \"output\":\"\"\n}",
+                                "feSchemaMap": {}
+                            },
+                            "responseBody": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "fe_metadata": "{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"any\"},\"headers\":{\"type\":\"object\"}}}",
+                                "feSchemaMap": {}
+                            }
+                        },
+                        "output": {
+                            "headers": {
+                                "type": "json",
+                                "value": "{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]}",
+                                "fe_metadata": "[{\"parameterName\":\"Accept\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Charset\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Accept-Encoding\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Type\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Content-Length\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Connection\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Cookie\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false},{\"parameterName\":\"Pragma\",\"type\":\"string\",\"repeating\":\"false\",\"required\":\"false\",\"visible\":false}]"
+                            }
+                        }
+                    },
+                    "name": "REMOVE_Directories"
+                }
+            ]
+        }
+    ],
+    "resources": [
+        {
+            "id": "flow:Poll_directory_for_events",
+            "data": {
+                "name": "Poll directory for events",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "LogMessage",
+                        "type": "label",
+                        "label": "StartActivitytoLogMessage"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($flow.output)",
+                                "logLevel": ""
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjEwMCwieSI6MTAwfSwiTG9nTWVzc2FnZSI6eyJ4IjoxOTksInkiOjEzNX19",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "output",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"action\":{\"type\":\"string\"},\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"oldPath\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}}"
+                            }
+                        }
+                    ],
+                    "output": [],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"FilePoller\",\"properties\":{\"output\":{\"properties\":{\"action\":{\"type\":\"string\"},\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"oldPath\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}}}"
+                    }
+                }
+            }
+        },
+        {
+            "id": "flow:CREATE_Directory_File",
+            "data": {
+                "name": "CREATE Directory File",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "CreateDirectory",
+                        "type": "label",
+                        "label": "StartActivitytoCreateFile"
+                    },
+                    {
+                        "id": 2,
+                        "from": "CreateDirectory",
+                        "to": "CreateFile",
+                        "type": "label",
+                        "label": "CreateDirectorytoCreateFile"
+                    },
+                    {
+                        "id": 3,
+                        "from": "CreateFile",
+                        "to": "LogMessage1",
+                        "type": "label",
+                        "label": "CreateFiletoLogMessage1"
+                    },
+                    {
+                        "id": 4,
+                        "from": "LogMessage1",
+                        "to": "Return",
+                        "type": "label",
+                        "label": "LogMessage1toReturn"
+                    },
+                    {
+                        "id": 5,
+                        "from": "CreateDirectory",
+                        "to": "LogMessage",
+                        "type": "label",
+                        "label": "CreateDirectorytoLogMessage"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "CreateDirectory",
+                        "name": "CreateDirectory",
+                        "description": "This activity creates a new file or directory",
+                        "activity": {
+                            "ref": "#create",
+                            "input": {
+                                "isDir": true,
+                                "createNonExistingDir": false,
+                                "input": {
+                                    "mapping": {
+                                        "fileName": "/tmp/QA-TestDir",
+                                        "overwrite": "=boolean.false()"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"fileName\",\"overwrite\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"fileName\",\"overwrite\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "CreateFile",
+                        "name": "CreateFile",
+                        "description": "This activity creates a new file or directory",
+                        "activity": {
+                            "ref": "#create",
+                            "input": {
+                                "isDir": false,
+                                "createNonExistingDir": false,
+                                "input": {
+                                    "mapping": {
+                                        "fileName": "=$activity[CreateDirectory].output.fileMetadata.fullPath + \"/TestFile.xml\"",
+                                        "overwrite": "=boolean.false()"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"fileName\",\"overwrite\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"fileName\",\"overwrite\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage1",
+                        "name": "LogMessage1",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[CreateFile].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200,
+                                    "data": {
+                                        "mapping": {
+                                            "output": "=string.concat(string.tostring($activity[CreateDirectory].output), \"                  \",string.tostring($activity[CreateFile].output))"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[CreateDirectory].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjEwMCwieSI6MTAwfSwiQ3JlYXRlRGlyZWN0b3J5Ijp7IngiOjE3NiwieSI6MTc2fSwiQ3JlYXRlRmlsZSI6eyJ4IjozNzYsInkiOjE3Nn0sIkxvZ01lc3NhZ2UxIjp7IngiOjQ4OSwieSI6Mjk5fSwiUmV0dXJuIjp7IngiOjY1MiwieSI6MTg0fSwiTG9nTWVzc2FnZSI6eyJ4IjoyNzMsInkiOjMxMH19",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        },
+                        {
+                            "name": "requestURI",
+                            "type": "string"
+                        },
+                        {
+                            "name": "method",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"output\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:GET_File_from_Amazon_S3",
+            "data": {
+                "name": "GET File from Amazon S3",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "Get",
+                        "type": "label",
+                        "label": "StartActivitytoGet"
+                    },
+                    {
+                        "id": 2,
+                        "from": "Get",
+                        "to": "LogMessage",
+                        "type": "label",
+                        "label": "GettoLogMessage"
+                    },
+                    {
+                        "id": 3,
+                        "from": "LogMessage",
+                        "to": "Return",
+                        "type": "label",
+                        "label": "LogMessagetoReturn"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "Get",
+                        "name": "Get",
+                        "description": "Amazon S3 Get Activity",
+                        "activity": {
+                            "ref": "#get",
+                            "input": {
+                                "connection": "conn://b95d9500-7f72-11ec-bf99-9f87d4f1f481",
+                                "operationType": "single",
+                                "outputType": "file",
+                                "input": {
+                                    "mapping": {
+                                        "Bucket": "vinsharm-s3-test",
+                                        "Key": "PersonData.xml",
+                                        "DestinationFilePath": "/tmp/QA-TestDir/"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"required\":[\"Bucket\",\"Key\",\"DestinationFilePath\"],\"properties\":{\"Bucket\":{\"type\":\"string\"},\"DestinationFilePath\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"VersionId\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"required\":[\"Bucket\",\"Key\",\"DestinationFilePath\"],\"properties\":{\"Bucket\":{\"type\":\"string\"},\"DestinationFilePath\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"VersionId\":{\"type\":\"string\"}}}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"Bucket\":{\"type\":\"string\"},\"DestinationFilePath\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"Metadata\":{\"type\":\"object\",\"properties\":{\"AcceptRanges\":{\"type\":\"string\"},\"CacheControl\":{\"type\":\"string\"},\"ContentDisposition\":{\"type\":\"string\"},\"ContentEncoding\":{\"type\":\"string\"},\"ContentLanguage\":{\"type\":\"string\"},\"ContentLength\":{\"type\":\"integer\"},\"ContentRange\":{\"type\":\"string\"},\"ContentType\":{\"type\":\"string\"},\"DeleteMarker\":{\"type\":\"boolean\"},\"ETag\":{\"type\":\"string\"},\"Expiration\":{\"type\":\"string\"},\"Expires\":{\"type\":\"string\"},\"LastModified\":{\"type\":\"string\",\"format\":\"date-time\"},\"MissingMeta\":{\"type\":\"integer\"},\"PartsCount\":{\"type\":\"integer\"},\"ReplicationStatus\":{\"type\":\"string\"},\"RequestCharged\":{\"type\":\"string\"},\"Restore\":{\"type\":\"string\"},\"SSECustomerAlgorithm\":{\"type\":\"string\"},\"SSECustomerKeyMD5\":{\"type\":\"string\"},\"SSEKMSKeyId\":{\"type\":\"string\"},\"ServerSideEncryption\":{\"type\":\"string\"},\"StorageClass\":{\"type\":\"string\"},\"TagCount\":{\"type\":\"integer\"},\"UserMetadata\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"Key\":{\"type\":\"string\"},\"Value\":{\"type\":\"string\"}}}},\"VersionId\":{\"type\":\"string\"},\"WebsiteRedirectLocation\":{\"type\":\"string\"}}}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"Bucket\":{\"type\":\"string\"},\"DestinationFilePath\":{\"type\":\"string\"},\"Key\":{\"type\":\"string\"},\"Metadata\":{\"type\":\"object\",\"properties\":{\"AcceptRanges\":{\"type\":\"string\"},\"CacheControl\":{\"type\":\"string\"},\"ContentDisposition\":{\"type\":\"string\"},\"ContentEncoding\":{\"type\":\"string\"},\"ContentLanguage\":{\"type\":\"string\"},\"ContentLength\":{\"type\":\"integer\"},\"ContentRange\":{\"type\":\"string\"},\"ContentType\":{\"type\":\"string\"},\"DeleteMarker\":{\"type\":\"boolean\"},\"ETag\":{\"type\":\"string\"},\"Expiration\":{\"type\":\"string\"},\"Expires\":{\"type\":\"string\"},\"LastModified\":{\"type\":\"string\",\"format\":\"date-time\"},\"MissingMeta\":{\"type\":\"integer\"},\"PartsCount\":{\"type\":\"integer\"},\"ReplicationStatus\":{\"type\":\"string\"},\"RequestCharged\":{\"type\":\"string\"},\"Restore\":{\"type\":\"string\"},\"SSECustomerAlgorithm\":{\"type\":\"string\"},\"SSECustomerKeyMD5\":{\"type\":\"string\"},\"SSEKMSKeyId\":{\"type\":\"string\"},\"ServerSideEncryption\":{\"type\":\"string\"},\"StorageClass\":{\"type\":\"string\"},\"TagCount\":{\"type\":\"integer\"},\"UserMetadata\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"Key\":{\"type\":\"string\"},\"Value\":{\"type\":\"string\"}}}},\"VersionId\":{\"type\":\"string\"},\"WebsiteRedirectLocation\":{\"type\":\"string\"}}}}}",
+                                        "feSchemaMap": {}
+                                    },
+                                    "error": {
+                                        "type": "json",
+                                        "value": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"statusCode\":{\"type\":\"integer\"},\"requestId\":{\"type\":\"string\"}}}",
+                                        "fe_metadata": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"statusCode\":{\"type\":\"integer\"},\"requestId\":{\"type\":\"string\"}}}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[Get].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200,
+                                    "data": {
+                                        "mapping": {
+                                            "output": "=string.tostring($activity[Get].output)"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjEwMCwieSI6MTAwfSwiR2V0Ijp7IngiOjIwNSwieSI6MTIyfSwiTG9nTWVzc2FnZSI6eyJ4Ijo0MTMsInkiOjEyNH0sIlJldHVybiI6eyJ4Ijo2MDksInkiOjEyM319",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        },
+                        {
+                            "name": "requestURI",
+                            "type": "string"
+                        },
+                        {
+                            "name": "method",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"output\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage1\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:READ_File_and_convert_XML_To_JSON_and_Compress_while_WRITE_to_new_file",
+            "data": {
+                "name": "READ File and convert XML To JSON and Compress while WRITE to new file",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "ReadFile",
+                        "type": "label",
+                        "label": "StartActivitytoReadFile"
+                    },
+                    {
+                        "id": 2,
+                        "from": "ReadFile",
+                        "to": "LogMessage",
+                        "type": "label",
+                        "label": "ReadFiletoLogMessage"
+                    },
+                    {
+                        "id": 3,
+                        "from": "LogMessage",
+                        "to": "XMLToJSON",
+                        "type": "label",
+                        "label": "LogMessagetoXMLToJSON"
+                    },
+                    {
+                        "id": 4,
+                        "from": "XMLToJSON",
+                        "to": "LogMessage1",
+                        "type": "label",
+                        "label": "XMLToJSONtoLogMessage1"
+                    },
+                    {
+                        "id": 5,
+                        "from": "LogMessage1",
+                        "to": "WriteFile",
+                        "type": "label",
+                        "label": "LogMessage1toWriteFile"
+                    },
+                    {
+                        "id": 6,
+                        "from": "WriteFile",
+                        "to": "LogMessage2",
+                        "type": "label",
+                        "label": "WriteFiletoLogMessage2"
+                    },
+                    {
+                        "id": 7,
+                        "from": "LogMessage2",
+                        "to": "Return",
+                        "type": "label",
+                        "label": "LogMessage2toReturn"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "ReadFile",
+                        "name": "ReadFile",
+                        "description": "This activity reads the content of a file",
+                        "activity": {
+                            "ref": "#read",
+                            "input": {
+                                "readAs": "Text",
+                                "compress": "None",
+                                "input": {
+                                    "mapping": {
+                                        "fileName": "/tmp/QA-TestDir/PersonData.xml"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"},\"fileContent\":{\"properties\":{\"textContent\":{\"type\":\"string\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"},\"fileContent\":{\"properties\":{\"textContent\":{\"type\":\"string\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[ReadFile].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "XMLToJSON",
+                        "name": "XMLToJSON",
+                        "description": "Converts XML string into JSON object",
+                        "activity": {
+                            "ref": "#xmltojson",
+                            "input": {
+                                "xmlString": "=$activity[ReadFile].output.fileContent.textContent",
+                                "ordered": "=boolean.false()",
+                                "typeCast": "=boolean.true()"
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage1",
+                        "name": "LogMessage1",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=$activity[XMLToJSON].jsonObject",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "WriteFile",
+                        "name": "WriteFile",
+                        "description": "This activity writes the content to a file",
+                        "activity": {
+                            "ref": "#write",
+                            "input": {
+                                "writeAs": "Text",
+                                "createNonExistingDir": false,
+                                "compress": "GZip",
+                                "input": {
+                                    "mapping": {
+                                        "overwrite": "=boolean.false()",
+                                        "fileName": "/tmp/QA-TestDir/PersonRecord.json",
+                                        "textContent": "=string.tostring($activity[XMLToJSON].jsonObject)"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"},\"textContent\":{\"type\":\"string\"}},\"required\":[\"fileName\",\"overwrite\",\"textContent\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"},\"textContent\":{\"type\":\"string\"}},\"required\":[\"fileName\",\"overwrite\",\"textContent\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage2",
+                        "name": "LogMessage2",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[WriteFile].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200,
+                                    "data": {
+                                        "mapping": {
+                                            "output": "=string.tostring($activity[XMLToJSON].jsonObject)"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjEwMCwieSI6MTAwfSwiUmVhZEZpbGUiOnsieCI6MTk2LCJ5IjoxNDZ9LCJMb2dNZXNzYWdlIjp7IngiOjM3OSwieSI6MTQzfSwiWE1MVG9KU09OIjp7IngiOjU2MCwieSI6MTQzfSwiTG9nTWVzc2FnZTEiOnsieCI6NzM3LCJ5IjoxMzd9LCJXcml0ZUZpbGUiOnsieCI6MzU0LCJ5IjoyNzd9LCJMb2dNZXNzYWdlMiI6eyJ4Ijo1NTIsInkiOjI3N30sIlJldHVybiI6eyJ4Ijo3NDYsInkiOjI3NH19",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        },
+                        {
+                            "name": "requestURI",
+                            "type": "string"
+                        },
+                        {
+                            "name": "method",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"output\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage2\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:Rename_File",
+            "data": {
+                "name": "Rename File",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "RenameFile",
+                        "type": "label",
+                        "label": "StartActivitytoRenameFile"
+                    },
+                    {
+                        "id": 2,
+                        "from": "RenameFile",
+                        "to": "LogMessage",
+                        "type": "label",
+                        "label": "RenameFiletoLogMessage"
+                    },
+                    {
+                        "id": 3,
+                        "from": "LogMessage",
+                        "to": "Return",
+                        "type": "label",
+                        "label": "LogMessagetoReturn"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "RenameFile",
+                        "name": "RenameFile",
+                        "description": "This activity renames the file or directory",
+                        "activity": {
+                            "ref": "#rename",
+                            "input": {
+                                "createNonExistingDir": false,
+                                "input": {
+                                    "mapping": {
+                                        "fromFileName": "/tmp/QA-TestDir/PersonRecord.json",
+                                        "toFileName": "/tmp/QA-TestDir/NewPersonRecordFile.json",
+                                        "overwrite": "=boolean.false()"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fromFileName\":{\"type\":\"string\"},\"toFileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"fromFileName\",\"toFileName\",\"overwrite\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fromFileName\":{\"type\":\"string\"},\"toFileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"fromFileName\",\"toFileName\",\"overwrite\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[RenameFile].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200,
+                                    "data": {
+                                        "mapping": {
+                                            "output": "=string.tostring($activity[RenameFile].output)"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjEwMCwieSI6MTAwfSwiUmVuYW1lRmlsZSI6eyJ4IjoxOTIsInkiOjE2NX0sIkxvZ01lc3NhZ2UiOnsieCI6Mzg3LCJ5IjoxNjV9LCJSZXR1cm4iOnsieCI6NTgyLCJ5IjoxNjN9fQ==",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        },
+                        {
+                            "name": "requestURI",
+                            "type": "string"
+                        },
+                        {
+                            "name": "method",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"output\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage3\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:COPY_File_READ_and_Uncompress_File_Convert_JSON_To_XML_WRITE_to_new_file_and_LIST_Dir",
+            "data": {
+                "name": "COPY File READ and Uncompress File Convert JSON To XML WRITE to new file and LIST Dir",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "CopyFile",
+                        "type": "label",
+                        "label": "StartActivitytoCopyFile"
+                    },
+                    {
+                        "id": 2,
+                        "from": "CopyFile",
+                        "to": "ReadFile",
+                        "type": "label",
+                        "label": "CopyFiletoReadFile"
+                    },
+                    {
+                        "id": 3,
+                        "from": "ReadFile",
+                        "to": "JSONToXML",
+                        "type": "label",
+                        "label": "ReadFiletoJSONToXML"
+                    },
+                    {
+                        "id": 4,
+                        "from": "JSONToXML",
+                        "to": "WriteFile",
+                        "type": "label",
+                        "label": "JSONToXMLtoWriteFile"
+                    },
+                    {
+                        "id": 5,
+                        "from": "WriteFile",
+                        "to": "LogMessage1",
+                        "type": "label",
+                        "label": "WriteFiletoLogMessage1"
+                    },
+                    {
+                        "id": 6,
+                        "from": "LogMessage1",
+                        "to": "ListFiles",
+                        "type": "label",
+                        "label": "LogMessage1toListFiles"
+                    },
+                    {
+                        "id": 7,
+                        "from": "ListFiles",
+                        "to": "LogMessage",
+                        "type": "label",
+                        "label": "ListFilestoLogMessage"
+                    },
+                    {
+                        "id": 8,
+                        "from": "LogMessage",
+                        "to": "Return",
+                        "type": "label",
+                        "label": "LogMessagetoReturn"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "CopyFile",
+                        "name": "CopyFile",
+                        "description": "This activity copies the file or directory to a new location",
+                        "activity": {
+                            "ref": "#copy",
+                            "input": {
+                                "createNonExistingDir": true,
+                                "includeSubDirectories": true,
+                                "input": {
+                                    "mapping": {
+                                        "fromFileName": "/tmp/QA-TestDir/NewPersonRecordFile.json",
+                                        "toFileName": "/tmp/TempFolder/NewPersonRecordFile.json",
+                                        "overwrite": "=boolean.false()"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fromFileName\":{\"type\":\"string\"},\"toFileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"fromFileName\",\"toFileName\",\"overwrite\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fromFileName\":{\"type\":\"string\"},\"toFileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"fromFileName\",\"toFileName\",\"overwrite\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "ReadFile",
+                        "name": "ReadFile",
+                        "description": "This activity reads the content of a file",
+                        "activity": {
+                            "ref": "#read",
+                            "input": {
+                                "readAs": "Text",
+                                "compress": "GUnZip",
+                                "input": {
+                                    "mapping": {
+                                        "fileName": "/tmp/TempFolder/NewPersonRecordFile.json"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"},\"fileContent\":{\"properties\":{\"textContent\":{\"type\":\"string\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"},\"fileContent\":{\"properties\":{\"textContent\":{\"type\":\"string\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "JSONToXML",
+                        "name": "JSONToXML",
+                        "description": "Converts JSON into XML string",
+                        "activity": {
+                            "ref": "#jsontoxml",
+                            "input": {
+                                "jsonString": "=$activity[ReadFile].output.fileContent.textContent"
+                            }
+                        }
+                    },
+                    {
+                        "id": "WriteFile",
+                        "name": "WriteFile",
+                        "description": "This activity writes the content to a file",
+                        "activity": {
+                            "ref": "#write",
+                            "input": {
+                                "writeAs": "Text",
+                                "createNonExistingDir": false,
+                                "compress": "None",
+                                "input": {
+                                    "mapping": {
+                                        "fileName": "/tmp/TempFolder/TemporaryPersonRecFile.json",
+                                        "overwrite": "=boolean.false()",
+                                        "textContent": "=$activity[JSONToXML].xmlString"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"},\"textContent\":{\"type\":\"string\"}},\"required\":[\"fileName\",\"overwrite\",\"textContent\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"},\"overwrite\":{\"type\":\"boolean\"},\"textContent\":{\"type\":\"string\"}},\"required\":[\"fileName\",\"overwrite\",\"textContent\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage1",
+                        "name": "LogMessage1",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[WriteFile].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "ListFiles",
+                        "name": "ListFiles",
+                        "description": "This activity lists all the files or directories in the specified directory",
+                        "activity": {
+                            "ref": "#list",
+                            "input": {
+                                "mode": "Files and Directories",
+                                "input": {
+                                    "mapping": {
+                                        "fileName": "/tmp/*"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"items\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"},\"type\":\"array\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"items\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"},\"type\":\"array\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[ListFiles].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200,
+                                    "data": {
+                                        "mapping": {
+                                            "output": "=string.tostring($activity[ListFiles].output)"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjEwMCwieSI6MTAwfSwiQ29weUZpbGUiOnsieCI6MTk0LCJ5IjoxNDF9LCJSZWFkRmlsZSI6eyJ4IjozODAsInkiOjE0M30sIkpTT05Ub1hNTCI6eyJ4Ijo2MDYsInkiOjE0MX0sIldyaXRlRmlsZSI6eyJ4IjoyNzcsInkiOjI5M30sIkxvZ01lc3NhZ2UxIjp7IngiOjQ2NiwieSI6MjkyfSwiTGlzdEZpbGVzIjp7IngiOjY0OCwieSI6MjkxfSwiTG9nTWVzc2FnZSI6eyJ4Ijo4NjAsInkiOjE4OH0sIlJldHVybiI6eyJ4IjoxMDQ1LCJ5IjoxODB9fQ==",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        },
+                        {
+                            "name": "requestURI",
+                            "type": "string"
+                        },
+                        {
+                            "name": "method",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"output\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage4\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:Archive_and_Unarchive",
+            "data": {
+                "name": "Archive and Unarchive",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "ArchiveFiles",
+                        "type": "label",
+                        "label": "StartActivitytoArchiveFiles"
+                    },
+                    {
+                        "id": 2,
+                        "from": "ArchiveFiles",
+                        "to": "LogMessage",
+                        "type": "label",
+                        "label": "ArchiveFilestoLogMessage"
+                    },
+                    {
+                        "id": 3,
+                        "from": "ArchiveFiles",
+                        "to": "UnarchiveFiles",
+                        "type": "label",
+                        "label": "ArchiveFilestoUnarchiveFiles"
+                    },
+                    {
+                        "id": 4,
+                        "from": "UnarchiveFiles",
+                        "to": "LogMessage1",
+                        "type": "label",
+                        "label": "UnarchiveFilestoLogMessage1"
+                    },
+                    {
+                        "id": 5,
+                        "from": "LogMessage1",
+                        "to": "Return",
+                        "type": "label",
+                        "label": "LogMessage1toReturn"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "ArchiveFiles",
+                        "name": "ArchiveFiles",
+                        "description": "This activity creates archives of a file/directory",
+                        "activity": {
+                            "ref": "#archive",
+                            "input": {
+                                "archiveType": "zip",
+                                "sourcePath": "/tmp/TempFolder",
+                                "destinationFilePath": "/tmp/TempFolder"
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=$activity[ArchiveFiles].archivePath",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "UnarchiveFiles",
+                        "name": "UnarchiveFiles",
+                        "description": "This activity unarchives archived file to file/directory",
+                        "activity": {
+                            "ref": "#unarchive",
+                            "input": {
+                                "archiveType": "zip",
+                                "sourceFilePath": "=$activity[ArchiveFiles].archivePath",
+                                "destinationPath": "/tmp/QA-TestDir/"
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage1",
+                        "name": "LogMessage1",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=$activity[UnarchiveFiles].extractedPath",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200,
+                                    "data": {
+                                        "mapping": {
+                                            "output": "=string.concat($activity[ArchiveFiles].archivePath,\"                          \", $activity[UnarchiveFiles].extractedPath)"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjEwMCwieSI6MTAwfSwiQXJjaGl2ZUZpbGVzIjp7IngiOjIyNCwieSI6MTYyfSwiTG9nTWVzc2FnZSI6eyJ4IjoyNTIsInkiOjI4OH0sIlVuYXJjaGl2ZUZpbGVzIjp7IngiOjQ2NywieSI6MTczfSwiTG9nTWVzc2FnZTEiOnsieCI6NTM4LCJ5IjozMDd9LCJSZXR1cm4iOnsieCI6NzkyLCJ5IjoxOTF9fQ==",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        },
+                        {
+                            "name": "requestURI",
+                            "type": "string"
+                        },
+                        {
+                            "name": "method",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"output\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage5\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        },
+        {
+            "id": "flow:REMOVE_Directories",
+            "data": {
+                "name": "REMOVE Directories",
+                "description": "",
+                "links": [
+                    {
+                        "id": 1,
+                        "from": "StartActivity",
+                        "to": "RemoveFile",
+                        "type": "label",
+                        "label": "StartActivitytoRemoveFile"
+                    },
+                    {
+                        "id": 2,
+                        "from": "RemoveFile",
+                        "to": "LogMessage",
+                        "type": "label",
+                        "label": "RemoveFiletoLogMessage"
+                    },
+                    {
+                        "id": 3,
+                        "from": "LogMessage",
+                        "to": "RemoveFile1",
+                        "type": "label",
+                        "label": "LogMessagetoRemoveFile1"
+                    },
+                    {
+                        "id": 4,
+                        "from": "RemoveFile1",
+                        "to": "CopyOfCopyOfLogMessage",
+                        "type": "label",
+                        "label": "RemoveFile1toCopyOfCopyOfLogMessage"
+                    },
+                    {
+                        "id": 5,
+                        "from": "CopyOfCopyOfLogMessage",
+                        "to": "Return",
+                        "type": "label",
+                        "label": "CopyOfCopyOfLogMessagetoReturn"
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "StartActivity",
+                        "name": "StartActivity",
+                        "description": "NoOp Activity",
+                        "activity": {
+                            "ref": "#noop"
+                        }
+                    },
+                    {
+                        "id": "RemoveFile",
+                        "name": "RemoveFile",
+                        "description": "This activity removes the specified file or directory",
+                        "activity": {
+                            "ref": "#remove",
+                            "input": {
+                                "removeRecursive": true,
+                                "input": {
+                                    "mapping": {
+                                        "fileName": "/tmp/TempFolder/"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "LogMessage",
+                        "name": "LogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[RemoveFile].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "RemoveFile1",
+                        "name": "RemoveFile1",
+                        "description": "This activity removes the specified file or directory",
+                        "activity": {
+                            "ref": "#remove",
+                            "input": {
+                                "removeRecursive": true,
+                                "input": {
+                                    "mapping": {
+                                        "fileName": "/tmp/QA-TestDir"
+                                    }
+                                }
+                            },
+                            "schemas": {
+                                "input": {
+                                    "input": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileName\":{\"type\":\"string\"}},\"required\":[\"fileName\"],\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                },
+                                "output": {
+                                    "output": {
+                                        "type": "json",
+                                        "value": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "fe_metadata": "{\"properties\":{\"fileMetadata\":{\"properties\":{\"fullPath\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"size\":{\"type\":\"number\"},\"mode\":{\"type\":\"string\"},\"modTime\":{\"type\":\"string\",\"format\":\"date-time\"},\"isDir\":{\"type\":\"boolean\"}},\"type\":\"object\"}},\"type\":\"object\"}",
+                                        "feSchemaMap": {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "CopyOfCopyOfLogMessage",
+                        "name": "CopyOfCopyOfLogMessage",
+                        "description": "Simple Log Message Activity",
+                        "activity": {
+                            "ref": "#log",
+                            "input": {
+                                "Log Level": "INFO",
+                                "flowInfo": false,
+                                "message": "=string.tostring($activity[RemoveFile1].output)",
+                                "logLevel": ""
+                            }
+                        }
+                    },
+                    {
+                        "id": "Return",
+                        "name": "Return",
+                        "description": "Simple Return Activity",
+                        "activity": {
+                            "ref": "#actreturn",
+                            "settings": {
+                                "mappings": {
+                                    "code": 200,
+                                    "data": {
+                                        "mapping": {
+                                            "output": "=string.concat(string.tostring($activity[RemoveFile].output),\"                     \", string.tostring($activity[RemoveFile1].output))"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "fe_metadata": "eyJTdGFydEFjdGl2aXR5Ijp7IngiOjEwMCwieSI6MTAwfSwiUmVtb3ZlRmlsZSI6eyJ4IjoxOTIsInkiOjE3OX0sIkxvZ01lc3NhZ2UiOnsieCI6MzkyLCJ5IjoxNzl9LCJSZW1vdmVGaWxlMSI6eyJ4Ijo1NTksInkiOjE4MX0sIkNvcHlPZkNvcHlPZkxvZ01lc3NhZ2UiOnsieCI6NzMwLCJ5IjoxODJ9LCJSZXR1cm4iOnsieCI6OTE3LCJ5IjoxODR9fQ==",
+                "metadata": {
+                    "input": [
+                        {
+                            "name": "headers",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}}"
+                            }
+                        },
+                        {
+                            "name": "requestURI",
+                            "type": "string"
+                        },
+                        {
+                            "name": "method",
+                            "type": "string"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "type": "object",
+                            "schema": {
+                                "type": "json",
+                                "value": "{\"output\":{\"type\":\"string\"}}"
+                            }
+                        }
+                    ],
+                    "fe_metadata": {
+                        "input": "{\"type\":\"object\",\"title\":\"ReceiveHTTPMessage6\",\"properties\":{\"headers\":{\"type\":\"object\",\"properties\":{\"Accept\":{\"type\":\"string\",\"visible\":false},\"Accept-Charset\":{\"type\":\"string\",\"visible\":false},\"Accept-Encoding\":{\"type\":\"string\",\"visible\":false},\"Content-Type\":{\"type\":\"string\",\"visible\":false},\"Content-Length\":{\"type\":\"string\",\"visible\":false},\"Connection\":{\"type\":\"string\",\"visible\":false},\"Cookie\":{\"type\":\"string\",\"visible\":false},\"Pragma\":{\"type\":\"string\",\"visible\":false}},\"required\":[]},\"requestURI\":{\"type\":\"string\",\"required\":false},\"method\":{\"type\":\"string\",\"required\":false}}}",
+                        "output": "{\"type\":\"object\",\"title\":\"Inputs\",\"properties\":{\"code\":{\"type\":\"integer\",\"required\":false},\"data\":{\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}}}},\"required\":[]}"
+                    }
+                },
+                "explicitReply": true
+            }
+        }
+    ],
+    "properties": [
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Custom_Endpoint",
+            "type": "boolean",
+            "value": false
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Region",
+            "type": "string",
+            "value": "us-west-2"
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Authentication_Type",
+            "type": "string",
+            "value": "AWS Credentials"
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Access_key_ID",
+            "type": "string",
+            "value": "AKIA3J6MPFK226PU7Q4R"
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Secret_access_key",
+            "type": "string",
+            "value": "SECRET:7N31r8+hHOIC9tMKGGEPNVgzXhuXChkTgMD0U18U2ODgMaS3sZgc2OGYonUtQCIcFBtzMkHUnZc="
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Session_Token",
+            "type": "string",
+            "value": "SECRET:CWZCaKyaNlj+H6YuMtuEIg=="
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Role_ARN",
+            "type": "string",
+            "value": "arn:aws:iam::777281022645:role/AWS_Automation_Role"
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Role_Session_Name",
+            "type": "string",
+            "value": "amazons3-vinay"
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.External_ID",
+            "type": "string",
+            "value": ""
+        },
+        {
+            "name": "AWS.AmazonS3-conn-21stJan22.Expiration_Duration",
+            "type": "float64",
+            "value": 900
+        }
+    ],
+    "connections": {
+        "b95d9500-7f72-11ec-bf99-9f87d4f1f481": {
+            "id": "b95d9500-7f72-11ec-bf99-9f87d4f1f481",
+            "name": "AmazonS3-conn-21stJan22",
+            "ref": "#connector",
+            "isGlobal": false,
+            "settings": {
+                "name": "AmazonS3-conn-21stJan22",
+                "description": "",
+                "customEndpoint": "=$property[\"AWS.AmazonS3-conn-21stJan22.Custom_Endpoint\"]",
+                "endpoint": "",
+                "region": "=$property[\"AWS.AmazonS3-conn-21stJan22.Region\"]",
+                "authenticationType": "=$property[\"AWS.AmazonS3-conn-21stJan22.Authentication_Type\"]",
+                "accessKey": "=$property[\"AWS.AmazonS3-conn-21stJan22.Access_key_ID\"]",
+                "secretKey": "=$property[\"AWS.AmazonS3-conn-21stJan22.Secret_access_key\"]",
+                "sessionToken": "=$property[\"AWS.AmazonS3-conn-21stJan22.Session_Token\"]",
+                "assumeRole": true,
+                "roleArn": "=$property[\"AWS.AmazonS3-conn-21stJan22.Role_ARN\"]",
+                "roleSessionName": "=$property[\"AWS.AmazonS3-conn-21stJan22.Role_Session_Name\"]",
+                "externalId": "=$property[\"AWS.AmazonS3-conn-21stJan22.External_ID\"]",
+                "expirationDuration": "=$property[\"AWS.AmazonS3-conn-21stJan22.Expiration_Duration\"]",
+                "LAMBDA_CONNECTION_INFO": ""
+            }
+        }
+    },
+    "metadata": {
+        "endpoints": [
+            {
+                "protocol": "http",
+                "port": "9999",
+                "spec": {
+                    "name": "Files-App",
+                    "version": "1.0.0"
+                },
+                "swagger": {
+                    "swagger": "2.0",
+                    "info": {
+                        "title": "Files-App-ReceiveHTTPMessage",
+                        "version": "1.0.0",
+                        "description": "Simple REST Trigger"
+                    },
+                    "paths": {
+                        "/create": {
+                            "get": {
+                                "summary": "CREATE Directory File",
+                                "operationId": "get_create",
+                                "parameters": [],
+                                "responses": {
+                                    "200": {
+                                        "description": "Rest Response",
+                                        "schema": {
+                                            "$ref": "#/definitions/schema1"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "definitions": {
+                        "schema1": {
+                            "type": "object",
+                            "properties": {
+                                "output": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "name": "ReceiveHTTPMessage"
+            },
+            {
+                "protocol": "http",
+                "port": "9998",
+                "spec": {
+                    "name": "Files-App",
+                    "version": "1.0.0"
+                },
+                "swagger": {
+                    "swagger": "2.0",
+                    "info": {
+                        "title": "Files-App-ReceiveHTTPMessage1",
+                        "version": "1.0.0",
+                        "description": "Simple REST Trigger"
+                    },
+                    "paths": {
+                        "/write": {
+                            "get": {
+                                "summary": "GET File from Amazon S3",
+                                "operationId": "get_write",
+                                "parameters": [],
+                                "responses": {
+                                    "200": {
+                                        "description": "Rest Response",
+                                        "schema": {
+                                            "$ref": "#/definitions/schema2"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "definitions": {
+                        "schema2": {
+                            "type": "object",
+                            "properties": {
+                                "output": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "name": "ReceiveHTTPMessage1"
+            },
+            {
+                "protocol": "http",
+                "port": "9997",
+                "spec": {
+                    "name": "Files-App",
+                    "version": "1.0.0"
+                },
+                "swagger": {
+                    "swagger": "2.0",
+                    "info": {
+                        "title": "Files-App-ReceiveHTTPMessage2",
+                        "version": "1.0.0",
+                        "description": "Simple REST Trigger"
+                    },
+                    "paths": {
+                        "/read": {
+                            "get": {
+                                "summary": "READ File and convert XML To JSON and Compress while WRITE to new file",
+                                "operationId": "get_read",
+                                "parameters": [],
+                                "responses": {
+                                    "200": {
+                                        "description": "Rest Response",
+                                        "schema": {
+                                            "$ref": "#/definitions/schema3"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "definitions": {
+                        "schema3": {
+                            "type": "object",
+                            "properties": {
+                                "output": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "name": "ReceiveHTTPMessage2"
+            },
+            {
+                "protocol": "http",
+                "port": "9996",
+                "spec": {
+                    "name": "Files-App",
+                    "version": "1.0.0"
+                },
+                "swagger": {
+                    "swagger": "2.0",
+                    "info": {
+                        "title": "Files-App-ReceiveHTTPMessage3",
+                        "version": "1.0.0",
+                        "description": "Simple REST Trigger"
+                    },
+                    "paths": {
+                        "/rename": {
+                            "get": {
+                                "summary": "Rename File",
+                                "operationId": "get_rename",
+                                "parameters": [],
+                                "responses": {
+                                    "200": {
+                                        "description": "Rest Response",
+                                        "schema": {
+                                            "$ref": "#/definitions/schema4"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "definitions": {
+                        "schema4": {
+                            "type": "object",
+                            "properties": {
+                                "output": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "name": "ReceiveHTTPMessage3"
+            },
+            {
+                "protocol": "http",
+                "port": "9995",
+                "spec": {
+                    "name": "Files-App",
+                    "version": "1.0.0"
+                },
+                "swagger": {
+                    "swagger": "2.0",
+                    "info": {
+                        "title": "Files-App-ReceiveHTTPMessage4",
+                        "version": "1.0.0",
+                        "description": "Simple REST Trigger"
+                    },
+                    "paths": {
+                        "/copy-list": {
+                            "get": {
+                                "summary": "COPY File READ and Uncompress File Convert JSON To XML WRITE to new file and LIST Dir",
+                                "operationId": "get_copy-list",
+                                "parameters": [],
+                                "responses": {
+                                    "200": {
+                                        "description": "Rest Response",
+                                        "schema": {
+                                            "$ref": "#/definitions/schema5"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "definitions": {
+                        "schema5": {
+                            "type": "object",
+                            "properties": {
+                                "output": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "name": "ReceiveHTTPMessage4"
+            },
+            {
+                "protocol": "http",
+                "port": "9994",
+                "spec": {
+                    "name": "Files-App",
+                    "version": "1.0.0"
+                },
+                "swagger": {
+                    "swagger": "2.0",
+                    "info": {
+                        "title": "Files-App-ReceiveHTTPMessage5",
+                        "version": "1.0.0",
+                        "description": "Simple REST Trigger"
+                    },
+                    "paths": {
+                        "/archive-unarchive": {
+                            "get": {
+                                "summary": "Archive and Unarchive",
+                                "operationId": "get_archive-unarchive",
+                                "parameters": [],
+                                "responses": {
+                                    "200": {
+                                        "description": "Rest Response",
+                                        "schema": {
+                                            "$ref": "#/definitions/schema6"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "definitions": {
+                        "schema6": {
+                            "type": "object",
+                            "properties": {
+                                "output": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "name": "ReceiveHTTPMessage5"
+            },
+            {
+                "protocol": "http",
+                "port": "9993",
+                "spec": {
+                    "name": "Files-App",
+                    "version": "1.0.0"
+                },
+                "swagger": {
+                    "swagger": "2.0",
+                    "info": {
+                        "title": "Files-App-ReceiveHTTPMessage6",
+                        "version": "1.0.0",
+                        "description": "Simple REST Trigger"
+                    },
+                    "paths": {
+                        "/remove": {
+                            "get": {
+                                "summary": "REMOVE Directories",
+                                "operationId": "get_remove",
+                                "parameters": [],
+                                "responses": {
+                                    "200": {
+                                        "description": "Rest Response",
+                                        "schema": {
+                                            "$ref": "#/definitions/schema7"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "definitions": {
+                        "schema7": {
+                            "type": "object",
+                            "properties": {
+                                "output": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "name": "ReceiveHTTPMessage6"
+            }
+        ],
+        "flogoVersion": "2.25.1"
+    },
+    "contrib": "W3sicmVmIjoiZ2l0aHViLmNvbS90aWJjby9mbG9nby1maWxlcy9zcmMvYXBwL0ZpbGUiLCJ2ZXJzaW9uIjoiMS4wLjAiLCJ0YWciOiIxLjAuMC1iMTIiLCJuYW1lIjoiRmlsZSIsImlkIjoiRmlsZSIsInMzbG9jYXRpb24iOiJUaWJjby9GaWxlIiwiaXNVc2VyRXh0ZW5zaW9uIjpmYWxzZX0seyJyZWYiOiJnaXRodWIuY29tL3RpYmNvL2Zsb2dvLWdlbmVyYWwvc3JjL2FwcC9HZW5lcmFsIiwidmVyc2lvbiI6IjEuNi4yIiwidGFnIjoiMS42LjItYjAyIiwibmFtZSI6IkdlbmVyYWwiLCJpZCI6IkdlbmVyYWwiLCJzM2xvY2F0aW9uIjoiVGliY28vR2VuZXJhbCIsImlzVXNlckV4dGVuc2lvbiI6ZmFsc2V9LHsicmVmIjoiZ2l0aHViLmNvbS90aWJjby93aS1hbWF6b25zMy9zcmMvYXBwL0FtYXpvblMzIiwidmVyc2lvbiI6IjEuMy4xIiwidGFnIjoiMS4zLjEtYjAyIiwibmFtZSI6IkFtYXpvbiBTMyIsImlkIjoiQW1hem9uUzMiLCJzM2xvY2F0aW9uIjoiVGliY28vQW1hem9uUzMiLCJpc1VzZXJFeHRlbnNpb24iOmZhbHNlfSx7InJlZiI6ImdpdGh1Yi5jb20vdGliY28vZmxvZ28tYXdzL3NyYy9hcHAvQVdTIiwidmVyc2lvbiI6IjEuMi4yIiwidGFnIjoiMS4yLjItYjAyIiwibmFtZSI6IkFXUyIsImlkIjoiQVdTIiwiczNsb2NhdGlvbiI6IlRpYmNvL0FXUyIsImlzVXNlckV4dGVuc2lvbiI6ZmFsc2V9XQ=="
+}
