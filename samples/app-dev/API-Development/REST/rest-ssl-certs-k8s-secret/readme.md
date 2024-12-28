@@ -27,13 +27,13 @@ Following commands can be used to create the server secret and client secret.
 
 This will create two secrets named server-secret and client-secret containing your respective certificates and private keys.
 
-![Create secrets](../../import-screenshots/rest-ssl-certs-k8s-secret/1.png)
+![Create secrets](../../../import-screenshots/rest-ssl-certs-k8s-secret/1.png)
 
 2. Prepare the Flogo App
 
 Ensure your Flogo app is configured to use SSL and is configured with the app properties for the SSL certificates and keys. The app should be built and ready to deploy as a Docker image.
 
-![Create an app with app properties](../../import-screenshots/rest-ssl-certs-k8s-secret/2.png)
+![Create an app with app properties](../../../import-screenshots/rest-ssl-certs-k8s-secret/2.png)
 
 3. Build and Tag the Docker Image
 
@@ -41,7 +41,7 @@ Run the following command to tag your Docker image:
 
 	`docker tag <source-image>:<source-tag> <target-image>:<target-tag>`
 		
-![Tag the image](../../import-screenshots/rest-ssl-certs-k8s-secret/3.png)
+![Tag the image](../../../import-screenshots/rest-ssl-certs-k8s-secret/3.png)
 
 4. Load the Image to Minikube
 
@@ -180,7 +180,7 @@ View logs:
 Execute commands inside the pod:
 	`kubectl exec -it <pod-name> -- /bin/sh`
 
-![Check pod status and logs](../../import-screenshots/rest-ssl-certs-k8s-secret/6.png)
+![Check pod status and logs](../../../import-screenshots/rest-ssl-certs-k8s-secret/6.png)
 
 ##Notes
 
