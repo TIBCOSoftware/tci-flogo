@@ -190,23 +190,3 @@ Update certificate paths and secret names in the configuration files as required
 
 By following these steps, you can successfully configure and deploy a REST service and client with SSL certificate support in Kubernetes.
 
-## Contributing
-If you want to build your own activities for Flogo please read the docs here.
-
-If you want to showcase your project, check out [tci-awesome](https://github.com/TIBCOSoftware/tci-awesome)
-
-You can also send an email to `tci@tibco.com`
-
-## Feedback
-If you have feedback, don't hesitate to talk to us!
-
-* Submit feature requests on our [TCI Ideas](https://ideas.tibco.com/?project=TCI) or [FE Ideas](https://ideas.tibco.com/?project=FE) portal
-* Ask questions on the [TIBCO Community](https://community.tibco.com/answers/product/344006)
-* Send us a note at `tci@tibco.com`
-
-## Help
-
-Please visit our [TIBCO Cloud<sup>&trade;</sup> Integration documentation](https://integration.cloud.tibco.com/docs/) and TIBCO Flogo® Enterprise documentation on [docs.tibco.com](https://docs.tibco.com/) for additional information.
-
-## License
-This TCI Flogo SDK and Samples project is licensed under a BSD-type license. See [license.txt](license.txt).
