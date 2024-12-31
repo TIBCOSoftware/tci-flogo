@@ -1,5 +1,6 @@
 # REST Sample: Supporting SSL Certificates from K8s Secret for REST Service and Client
 
+The app must be designed with Flogo Extension for VS Code v1.1.1 and above.
 
 This sample demonstrates how to support SSL certificates for a REST service and client using Kubernetes secrets.
 Two approaches are provided: 
