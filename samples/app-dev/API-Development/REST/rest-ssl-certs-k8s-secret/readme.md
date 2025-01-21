@@ -58,7 +58,7 @@ The deployment-env.yaml file demonstrates how to use environment variables to ac
 
 ### Environment Variables in Deployment YAML
 
-Below is a generic YAML configuration for deploying an application with SSL certificate support using environment variables.
+Below is a generic YAML configuration for deploying an application with SSL certificates stored in secret and secret used as environment variables.
 
 	```yaml
 
@@ -130,7 +130,7 @@ The volume-pod.yaml file demonstrates how to use volume mounts to access the sec
 
 ###Volume Mounts Configuration for YAML
 
-Below is a generic YAML configuration for deploying an application with SSL certificate support using volume mounts.
+Below is a generic YAML configuration for deploying an application with SSL certificate stored in secret and secret used as volume mount.
 
 	```yaml
 
