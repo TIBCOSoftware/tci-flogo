@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mtls-env-deployment
+spec:
+  selector:
+    matchLabels:
+      app: mtls-env-deployment
+  template:
+    metadata:
+      labels:
+        app: mtls-env-deployment
+    spec:
+      containers:
+        - name: mtls-enn-container
+          image: restserviceclientapp:1.1.2
+          imagePullPolicy: Never
+          env:
+            # Root certificate environment variable
+            - name: root_cert
+              valueFrom:
+                secretKeyRef:
+                  name: server-secret  # Assuming root_cert is part of server-secret
+                  key: tls.crt
+            # Server certificate and key environment variables
+            - name: server
+              valueFrom:
+                secretKeyRef:
+                  name: server-secret
+                  key: tls.crt
+            - name: server_key
+              valueFrom:
+                secretKeyRef:
+                  name: server-secret
+                  key: tls.key
+            # Client certificate and key environment variables
+            - name: client
+              valueFrom:
+                secretKeyRef:
+                  name: client-secret
+                  key: tls.crt
+            - name: client_key
+              valueFrom:
+                secretKeyRef:
+                  name: client-secret
+                  key: tls.key
+            - name: FLOGO_APP_PROPS_ENV
+              value: auto
+          ports:
+            - containerPort: 9999
+          volumeMounts:
+            - name: tls-persistent-storage
+              mountPath: /var/lib/misc
+      volumes:
+        - name: tls-persistent-storage
+          emptyDir: {}
